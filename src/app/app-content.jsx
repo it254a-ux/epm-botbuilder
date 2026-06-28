@@ -32,7 +32,7 @@ const PreviewBranding =
 const EPM_MAIN_SITE = 'https://executiveprimemarkets.site';
 
 const navLinks = [
-    { label: 'Dashboard',         icon: '🏠', href: EPM_MAIN_SITE + '/#dashboard' },
+    { label: 'Dashboard',         icon: '🏠', href: EPM_MAIN_SITE },
     { label: 'Charts',            icon: '📊', href: EPM_MAIN_SITE + '/#charts' },
     { label: 'DTrader',           icon: '💹', href: EPM_MAIN_SITE + '/#dtrader' },
     { label: 'Analysis Tool',     icon: '🔍', href: EPM_MAIN_SITE + '/#analysis' },
@@ -47,15 +47,14 @@ function EPMNav() {
 
     return (
         <>
-            {/* TOP BAR */}
+            {/* TOP BAR - relative so it pushes content down, not fixed */}
             <div style={{
-                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+                position: 'relative', zIndex: 99999,
                 height: '52px',
                 background: 'rgba(10,10,10,0.97)',
                 borderBottom: '1px solid rgba(201,168,76,0.2)',
                 display: 'flex', alignItems: 'center',
                 padding: '0 14px', gap: '12px',
-                backdropFilter: 'blur(12px)',
             }}>
                 {/* HAMBURGER */}
                 <button
@@ -120,7 +119,7 @@ function EPMNav() {
                 transition: 'transform 0.25s ease',
             }}>
                 {navLinks.map(link => (
-                    <a
+                    
                         key={link.label}
                         href={link.href || '#'}
                         onClick={e => {
@@ -165,9 +164,6 @@ function EPMNav() {
                     POWERED BY <span style={{ color: 'rgba(201,168,76,0.4)' }}>DERIV</span>
                 </div>
             </aside>
-
-            {/* PUSH CONTENT DOWN so nav doesn't cover the botbuilder */}
-            <div style={{ height: '52px', flexShrink: 0 }} />
         </>
     );
 }
