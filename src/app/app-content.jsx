@@ -102,7 +102,7 @@ function EPMNav() {
                 },
                     React.createElement('a', { href: EPM_MAIN_SITE, style: { textDecoration: 'none' } },
                         React.createElement('img', {
-                            src: '/logo.png',
+                            src: '/ExecutivePrimeMarkets_logo_transparent.png',
                             alt: 'Executive Prime Markets',
                             style: { height: '48px', width: 'auto', display: 'block' },
                         })
