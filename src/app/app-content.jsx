@@ -119,7 +119,7 @@ function EPMNav() {
                 transition: 'transform 0.25s ease',
             }}>
                 {navLinks.map(link => (
-                    
+                    <a
                         key={link.label}
                         href={link.href || '#'}
                         onClick={e => {
