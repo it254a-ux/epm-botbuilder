@@ -26,12 +26,151 @@ import './app.scss';
 import 'react-toastify/dist/ReactToastify.css';
 import '../components/bot-notification/bot-notification.scss';
 
-// App Builder live-preview branding listener. Mounted only in the preview deployment
-// (NEXT_PUBLIC_APP_BUILD === 'true'); the inline check is constant-folded by rsbuild so
-// the import — and all of src/preview/ — is dead-code-eliminated from standalone partner
-// builds (where the BFF strips src/preview/ entirely).
 const PreviewBranding =
     process.env.NEXT_PUBLIC_APP_BUILD === 'true' ? lazy(() => import('../preview/preview-branding')) : null;
+
+const EPM_MAIN_SITE = 'https://executiveprimemarkets.site';
+
+const navLinks = [
+    { label: 'Dashboard',         icon: '🏠', href: EPM_MAIN_SITE + '/#dashboard' },
+    { label: 'Charts',            icon: '📊', href: EPM_MAIN_SITE + '/#charts' },
+    { label: 'DTrader',           icon: '💹', href: EPM_MAIN_SITE + '/#dtrader' },
+    { label: 'Analysis Tool',     icon: '🔍', href: EPM_MAIN_SITE + '/#analysis' },
+    { label: 'Bot Builder',       icon: '🤖', href: null },
+    { label: 'Free Bots by EPM',  icon: '🎁', href: EPM_MAIN_SITE + '/#freebots' },
+    { label: 'Copy Trading',      icon: '🔗', href: EPM_MAIN_SITE + '/#copytrading' },
+    { label: 'Trading Tutorials', icon: '🎓', href: EPM_MAIN_SITE + '/#tutorials' },
+];
+
+function EPMNav() {
+    const [open, setOpen] = React.useState(false);
+
+    return (
+        <>
+            {/* TOP BAR */}
+            <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+                height: '52px',
+                background: 'rgba(10,10,10,0.97)',
+                borderBottom: '1px solid rgba(201,168,76,0.2)',
+                display: 'flex', alignItems: 'center',
+                padding: '0 14px', gap: '12px',
+                backdropFilter: 'blur(12px)',
+            }}>
+                {/* HAMBURGER */}
+                <button
+                    onClick={() => setOpen(o => !o)}
+                    style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '6px', display: 'flex', flexDirection: 'column',
+                        gap: '5px', flexShrink: 0,
+                    }}
+                    aria-label="Toggle menu"
+                >
+                    {[0, 1, 2].map(i => (
+                        <span key={i} style={{
+                            display: 'block', width: '22px', height: '2px',
+                            background: '#c9a84c', borderRadius: '2px',
+                            transform: open
+                                ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
+                                : 'none',
+                            transition: 'all 0.2s',
+                        }} />
+                    ))}
+                </button>
+
+                {/* LOGO */}
+                <a href={EPM_MAIN_SITE} style={{ textDecoration: 'none', flexShrink: 0 }}>
+                    <img src="/logo.png" alt="EPM"
+                        style={{ height: '44px', width: 'auto', display: 'block' }}
+                        onError={e => { e.target.style.display = 'none'; }}
+                    />
+                </a>
+
+                <div style={{ flex: 1 }} />
+
+                <span style={{
+                    color: '#c9a84c', fontSize: '12px', fontWeight: 600,
+                    letterSpacing: '1px', opacity: 0.8,
+                }}>
+                    BOT BUILDER
+                </span>
+            </div>
+
+            {/* OVERLAY */}
+            {open && (
+                <div
+                    onClick={() => setOpen(false)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 99997,
+                        background: 'rgba(0,0,0,0.55)',
+                    }}
+                />
+            )}
+
+            {/* SIDEBAR */}
+            <aside style={{
+                position: 'fixed', top: '52px', left: 0, bottom: 0,
+                width: '210px', zIndex: 99998,
+                background: '#0f0f0f',
+                borderRight: '1px solid rgba(201,168,76,0.12)',
+                display: 'flex', flexDirection: 'column',
+                padding: '12px 8px', gap: '2px',
+                transform: open ? 'translateX(0)' : 'translateX(-100%)',
+                transition: 'transform 0.25s ease',
+            }}>
+                {navLinks.map(link => (
+                    
+                        key={link.label}
+                        href={link.href || '#'}
+                        onClick={e => {
+                            if (!link.href) { e.preventDefault(); return; }
+                            setOpen(false);
+                        }}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            padding: '10px 12px', borderRadius: '8px',
+                            color: link.href === null ? '#c9a84c' : 'rgba(255,255,255,0.6)',
+                            fontSize: '13px', textDecoration: 'none',
+                            borderLeft: link.href === null ? '2px solid #c9a84c' : '2px solid transparent',
+                            background: link.href === null ? 'rgba(201,168,76,0.08)' : 'transparent',
+                            cursor: link.href === null ? 'default' : 'pointer',
+                            transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                            if (link.href !== null) {
+                                e.currentTarget.style.color = '#c9a84c';
+                                e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
+                                e.currentTarget.style.borderLeftColor = '#c9a84c';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (link.href !== null) {
+                                e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.borderLeftColor = 'transparent';
+                            }
+                        }}
+                    >
+                        <span style={{ fontSize: '16px' }}>{link.icon}</span>
+                        {link.label}
+                    </a>
+                ))}
+                <div style={{ flex: 1 }} />
+                <div style={{
+                    padding: '12px', fontSize: '10px',
+                    color: 'rgba(255,255,255,0.18)', letterSpacing: '1.5px',
+                    borderTop: '1px solid rgba(201,168,76,0.1)', marginTop: '8px',
+                }}>
+                    POWERED BY <span style={{ color: 'rgba(201,168,76,0.4)' }}>DERIV</span>
+                </div>
+            </aside>
+
+            {/* PUSH CONTENT DOWN so nav doesn't cover the botbuilder */}
+            <div style={{ height: '52px', flexShrink: 0 }} />
+        </>
+    );
+}
 
 const AppContent = observer(() => {
     const [is_api_initialized, setIsApiInitialized] = React.useState(false);
@@ -46,12 +185,8 @@ const AppContent = observer(() => {
     const msg_listener = React.useRef(null);
     const { connectionStatus } = useApiBase();
 
-    // Initialize dev mode keyboard shortcuts
     useDevMode();
 
-    // Warn (once) when the OAuth app id isn't configured, so a developer running
-    // locally understands why Log in / Sign up are disabled. Skipped inside the
-    // App Builder static preview, which intentionally runs without env vars.
     useEffect(() => {
         if (isPreviewMode()) return;
         if (!process.env.NEXT_PUBLIC_DERIV_APP_ID) {
@@ -71,10 +206,6 @@ const AppContent = observer(() => {
     };
 
     useLiveChat(livechat_client_information);
-
-    // NOTE: Disabled Intercom until further notice
-    // const token = V2GetActiveToken() ?? null;
-    // useIntercom(token);
 
     useEffect(() => {
         if (connectionStatus === CONNECTION_STATUS.OPENED) {
@@ -112,9 +243,6 @@ const AppContent = observer(() => {
     }, []);
 
     React.useEffect(() => {
-        // Check if api is initialized and then subscribe to the api messages
-        // Also we should only subscribe to the messages once user is logged in
-        // And is not already subscribed to the messages
         if (!is_subscribed_to_msg_listener.current && client.is_logged_in && is_api_initialized && api_base?.api) {
             is_subscribed_to_msg_listener.current = true;
             msg_listener.current = api_base.api.onMessage()?.subscribe(handleMessage);
@@ -138,20 +266,15 @@ const AppContent = observer(() => {
 
     const changeActiveSymbolLoadingState = () => {
         init();
-
         const retrieveActiveSymbols = () => {
             const { active_symbols } = ApiHelpers.instance;
-
             active_symbols.retrieveActiveSymbols(true).then(() => {
                 setIsLoading(false);
             });
         };
-
         if (ApiHelpers?.instance?.active_symbols) {
             retrieveActiveSymbols();
         } else {
-            // This is a workaround to fix the issue where the active symbols are not loaded immediately
-            // when the API is initialized. Should be replaced with RxJS pubsub
             const intervalId = setInterval(() => {
                 if (ApiHelpers?.instance?.active_symbols) {
                     clearInterval(intervalId);
@@ -183,6 +306,7 @@ const AppContent = observer(() => {
 
     return (
         <React.Fragment>
+            <EPMNav />
             {PreviewBranding && (
                 <Suspense fallback={null}>
                     <PreviewBranding />
