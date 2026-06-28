@@ -46,74 +46,78 @@ function EPMNav() {
     const [open, setOpen] = React.useState(false);
 
     return (
-        <>
-            {/* HAMBURGER BUTTON — fixed top-left, small, covers nothing */}
-            <button
-                onClick={() => setOpen(o => !o)}
-                style={{
+        React.createElement(React.Fragment, null,
+            React.createElement('button', {
+                onClick: () => setOpen(o => !o),
+                style: {
                     position: 'fixed', top: '12px', left: '12px', zIndex: 99999,
                     background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.4)',
                     borderRadius: '8px', cursor: 'pointer',
                     padding: '8px', display: 'flex', flexDirection: 'column',
                     gap: '5px', flexShrink: 0,
-                }}
-                aria-label="Toggle EPM menu"
-            >
-                {[0, 1, 2].map(i => (
-                    <span key={i} style={{
-                        display: 'block', width: '20px', height: '2px',
-                        background: '#c9a84c', borderRadius: '2px',
-                        transform: open
-                            ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
-                            : 'none',
-                        transition: 'all 0.2s',
-                    }} />
-                ))}
-            </button>
+                },
+                'aria-label': 'Toggle EPM menu',
+            },
+                [0, 1, 2].map(i =>
+                    React.createElement('span', {
+                        key: i,
+                        style: {
+                            display: 'block', width: '20px', height: '2px',
+                            background: '#c9a84c', borderRadius: '2px',
+                            transform: open
+                                ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
+                                : 'none',
+                            transition: 'all 0.2s',
+                        },
+                    })
+                )
+            ),
 
-            {/* OVERLAY — only when open */}
-            {open && (
-                <div
-                    onClick={() => setOpen(false)}
-                    style={{
-                        position: 'fixed', inset: 0, zIndex: 99997,
-                        background: 'rgba(0,0,0,0.5)',
-                    }}
-                />
-            )}
+            open && React.createElement('div', {
+                onClick: () => setOpen(false),
+                style: {
+                    position: 'fixed', inset: 0, zIndex: 99997,
+                    background: 'rgba(0,0,0,0.5)',
+                },
+            }),
 
-            {/* SIDEBAR — slides in from left, does not push content */}
-            <aside style={{
-                position: 'fixed', top: 0, left: 0, bottom: 0,
-                width: '220px', zIndex: 99998,
-                background: '#0f0f0f',
-                borderRight: '1px solid rgba(201,168,76,0.15)',
-                display: 'flex', flexDirection: 'column',
-                padding: '16px 8px', gap: '2px',
-                transform: open ? 'translateX(0)' : 'translateX(-100%)',
-                transition: 'transform 0.25s ease',
-            }}>
-                {/* LOGO */}
-                <div style={{ padding: '8px 12px 16px', borderBottom: '1px solid rgba(201,168,76,0.12)', marginBottom: '8px' }}>
-                    <a href={EPM_MAIN_SITE} style={{ textDecoration: 'none' }}>
-                        <img
-                            src="https://executiveprimemarkets.site/logo.png"
-                            alt="Executive Prime Markets"
-                            style={{ height: '48px', width: 'auto', display: 'block' }}
-                        />
-                    </a>
-                </div>
+            React.createElement('aside', {
+                style: {
+                    position: 'fixed', top: 0, left: 0, bottom: 0,
+                    width: '220px', zIndex: 99998,
+                    background: '#0f0f0f',
+                    borderRight: '1px solid rgba(201,168,76,0.15)',
+                    display: 'flex', flexDirection: 'column',
+                    padding: '16px 8px', gap: '2px',
+                    transform: open ? 'translateX(0)' : 'translateX(-100%)',
+                    transition: 'transform 0.25s ease',
+                },
+            },
+                React.createElement('div', {
+                    style: {
+                        padding: '8px 12px 16px',
+                        borderBottom: '1px solid rgba(201,168,76,0.12)',
+                        marginBottom: '8px',
+                    },
+                },
+                    React.createElement('a', { href: EPM_MAIN_SITE, style: { textDecoration: 'none' } },
+                        React.createElement('img', {
+                            src: 'https://executiveprimemarkets.site/logo.png',
+                            alt: 'Executive Prime Markets',
+                            style: { height: '48px', width: 'auto', display: 'block' },
+                        })
+                    )
+                ),
 
-                {/* NAV LINKS */}
-                {navLinks.map(link => (
-                    
-                        key={link.label}
-                        href={link.href || '#'}
-                        onClick={e => {
+                navLinks.map(link =>
+                    React.createElement('a', {
+                        key: link.label,
+                        href: link.href || '#',
+                        onClick: e => {
                             if (!link.href) { e.preventDefault(); return; }
                             setOpen(false);
-                        }}
-                        style={{
+                        },
+                        style: {
                             display: 'flex', alignItems: 'center', gap: '10px',
                             padding: '10px 12px', borderRadius: '8px',
                             color: link.href === null ? '#c9a84c' : 'rgba(255,255,255,0.6)',
@@ -122,37 +126,40 @@ function EPMNav() {
                             background: link.href === null ? 'rgba(201,168,76,0.08)' : 'transparent',
                             cursor: link.href === null ? 'default' : 'pointer',
                             transition: 'all 0.15s',
-                        }}
-                        onMouseEnter={e => {
+                        },
+                        onMouseEnter: e => {
                             if (link.href !== null) {
                                 e.currentTarget.style.color = '#c9a84c';
                                 e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
                                 e.currentTarget.style.borderLeftColor = '#c9a84c';
                             }
-                        }}
-                        onMouseLeave={e => {
+                        },
+                        onMouseLeave: e => {
                             if (link.href !== null) {
                                 e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
                                 e.currentTarget.style.background = 'transparent';
                                 e.currentTarget.style.borderLeftColor = 'transparent';
                             }
-                        }}
-                    >
-                        <span style={{ fontSize: '16px' }}>{link.icon}</span>
-                        {link.label}
-                    </a>
-                ))}
+                        },
+                    },
+                        React.createElement('span', { style: { fontSize: '16px' } }, link.icon),
+                        link.label
+                    )
+                ),
 
-                <div style={{ flex: 1 }} />
-                <div style={{
-                    padding: '12px', fontSize: '10px',
-                    color: 'rgba(255,255,255,0.18)', letterSpacing: '1.5px',
-                    borderTop: '1px solid rgba(201,168,76,0.1)', marginTop: '8px',
-                }}>
-                    POWERED BY <span style={{ color: 'rgba(201,168,76,0.4)' }}>DERIV</span>
-                </div>
-            </aside>
-        </>
+                React.createElement('div', { style: { flex: 1 } }),
+                React.createElement('div', {
+                    style: {
+                        padding: '12px', fontSize: '10px',
+                        color: 'rgba(255,255,255,0.18)', letterSpacing: '1.5px',
+                        borderTop: '1px solid rgba(201,168,76,0.1)', marginTop: '8px',
+                    },
+                },
+                    'POWERED BY ',
+                    React.createElement('span', { style: { color: 'rgba(201,168,76,0.4)' } }, 'DERIV')
+                )
+            )
+        )
     );
 }
 
