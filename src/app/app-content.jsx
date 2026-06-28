@@ -47,79 +47,66 @@ function EPMNav() {
 
     return (
         <>
-            {/* TOP BAR - relative so it pushes content down, not fixed */}
-            <div style={{
-                position: 'relative', zIndex: 99999,
-                height: '52px',
-                background: 'rgba(10,10,10,0.97)',
-                borderBottom: '1px solid rgba(201,168,76,0.2)',
-                display: 'flex', alignItems: 'center',
-                padding: '0 14px', gap: '12px',
-            }}>
-                {/* HAMBURGER */}
-                <button
-                    onClick={() => setOpen(o => !o)}
-                    style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        padding: '6px', display: 'flex', flexDirection: 'column',
-                        gap: '5px', flexShrink: 0,
-                    }}
-                    aria-label="Toggle menu"
-                >
-                    {[0, 1, 2].map(i => (
-                        <span key={i} style={{
-                            display: 'block', width: '22px', height: '2px',
-                            background: '#c9a84c', borderRadius: '2px',
-                            transform: open
-                                ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
-                                : 'none',
-                            transition: 'all 0.2s',
-                        }} />
-                    ))}
-                </button>
+            {/* HAMBURGER BUTTON — fixed top-left, small, covers nothing */}
+            <button
+                onClick={() => setOpen(o => !o)}
+                style={{
+                    position: 'fixed', top: '12px', left: '12px', zIndex: 99999,
+                    background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.4)',
+                    borderRadius: '8px', cursor: 'pointer',
+                    padding: '8px', display: 'flex', flexDirection: 'column',
+                    gap: '5px', flexShrink: 0,
+                }}
+                aria-label="Toggle EPM menu"
+            >
+                {[0, 1, 2].map(i => (
+                    <span key={i} style={{
+                        display: 'block', width: '20px', height: '2px',
+                        background: '#c9a84c', borderRadius: '2px',
+                        transform: open
+                            ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
+                            : 'none',
+                        transition: 'all 0.2s',
+                    }} />
+                ))}
+            </button>
 
-                {/* LOGO */}
-                <a href={EPM_MAIN_SITE} style={{ textDecoration: 'none', flexShrink: 0 }}>
-                    <img src="https://executiveprimemarkets.site/logo.png" alt="EPM"
-                        style={{ height: '44px', width: 'auto', display: 'block' }}
-                        onError={e => { e.target.style.display = 'none'; }}
-                    />
-                </a>
-
-                <div style={{ flex: 1 }} />
-
-                <span style={{
-                    color: '#c9a84c', fontSize: '12px', fontWeight: 600,
-                    letterSpacing: '1px', opacity: 0.8,
-                }}>
-                    BOT BUILDER
-                </span>
-            </div>
-
-            {/* OVERLAY */}
+            {/* OVERLAY — only when open */}
             {open && (
                 <div
                     onClick={() => setOpen(false)}
                     style={{
                         position: 'fixed', inset: 0, zIndex: 99997,
-                        background: 'rgba(0,0,0,0.55)',
+                        background: 'rgba(0,0,0,0.5)',
                     }}
                 />
             )}
 
-            {/* SIDEBAR */}
+            {/* SIDEBAR — slides in from left, does not push content */}
             <aside style={{
-                position: 'fixed', top: '52px', left: 0, bottom: 0,
-                width: '210px', zIndex: 99998,
+                position: 'fixed', top: 0, left: 0, bottom: 0,
+                width: '220px', zIndex: 99998,
                 background: '#0f0f0f',
-                borderRight: '1px solid rgba(201,168,76,0.12)',
+                borderRight: '1px solid rgba(201,168,76,0.15)',
                 display: 'flex', flexDirection: 'column',
-                padding: '12px 8px', gap: '2px',
+                padding: '16px 8px', gap: '2px',
                 transform: open ? 'translateX(0)' : 'translateX(-100%)',
                 transition: 'transform 0.25s ease',
             }}>
+                {/* LOGO */}
+                <div style={{ padding: '8px 12px 16px', borderBottom: '1px solid rgba(201,168,76,0.12)', marginBottom: '8px' }}>
+                    <a href={EPM_MAIN_SITE} style={{ textDecoration: 'none' }}>
+                        <img
+                            src="https://executiveprimemarkets.site/logo.png"
+                            alt="Executive Prime Markets"
+                            style={{ height: '48px', width: 'auto', display: 'block' }}
+                        />
+                    </a>
+                </div>
+
+                {/* NAV LINKS */}
                 {navLinks.map(link => (
-                    <a
+                    
                         key={link.label}
                         href={link.href || '#'}
                         onClick={e => {
@@ -155,6 +142,7 @@ function EPMNav() {
                         {link.label}
                     </a>
                 ))}
+
                 <div style={{ flex: 1 }} />
                 <div style={{
                     padding: '12px', fontSize: '10px',
