@@ -80,7 +80,7 @@ function EPMNav() {
 
                 {/* LOGO */}
                 <a href={EPM_MAIN_SITE} style={{ textDecoration: 'none', flexShrink: 0 }}>
-                    <img src="/logo.png" alt="EPM"
+                    <img src="https://executiveprimemarkets.site/logo.png" alt="EPM"
                         style={{ height: '44px', width: 'auto', display: 'block' }}
                         onError={e => { e.target.style.display = 'none'; }}
                     />
