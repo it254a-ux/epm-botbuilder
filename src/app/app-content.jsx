@@ -47,16 +47,18 @@ function EPMNav() {
 
     return (
         React.createElement(React.Fragment, null,
-            // TOP BAR: hamburger + logo only (no auth buttons — this sub-app
-            // already has its own Real/Demo display and Log Out elsewhere).
-            // This is a real bar pushing content down via the spacer below,
-            // not a floating button overlapping existing UI.
+            // TOP-LEFT OVERLAY: hamburger + logo only. Sized to content
+            // (not full-width) and positioned over the existing page's empty
+            // top-left corner, so it does NOT cover the existing header's
+            // own content (e.g. Log In) on the right side. No spacer is
+            // added since this page already has its own top spacing.
             React.createElement('div', {
                 style: {
-                    position: 'fixed', top: 0, left: 0, right: 0, height: '62px',
+                    position: 'fixed', top: 0, left: 0, height: '62px',
                     zIndex: 99999,
                     background: 'rgba(24,28,37,0.97)',
                     borderBottom: '1px solid rgba(201,168,76,0.18)',
+                    borderRight: '1px solid rgba(201,168,76,0.18)',
                     display: 'flex', alignItems: 'center',
                     padding: '0 16px', gap: '12px',
                     backdropFilter: 'blur(12px)',
@@ -93,10 +95,6 @@ function EPMNav() {
                     })
                 )
             ),
-
-            // Spacer so the bot app's own existing content/header starts
-            // below this new bar instead of being covered by it.
-            React.createElement('div', { style: { height: '62px', flexShrink: 0 } }),
 
             open && React.createElement('div', {
                 onClick: () => setOpen(false),
