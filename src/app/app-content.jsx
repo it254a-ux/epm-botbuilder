@@ -47,31 +47,56 @@ function EPMNav() {
 
     return (
         React.createElement(React.Fragment, null,
-            React.createElement('button', {
-                onClick: () => setOpen(o => !o),
+            // TOP BAR: hamburger + logo only (no auth buttons — this sub-app
+            // already has its own Real/Demo display and Log Out elsewhere).
+            // This is a real bar pushing content down via the spacer below,
+            // not a floating button overlapping existing UI.
+            React.createElement('div', {
                 style: {
-                    position: 'fixed', top: '12px', left: '12px', zIndex: 99999,
-                    background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.4)',
-                    borderRadius: '8px', cursor: 'pointer',
-                    padding: '8px', display: 'flex', flexDirection: 'column',
-                    gap: '5px', flexShrink: 0,
+                    position: 'fixed', top: 0, left: 0, right: 0, height: '62px',
+                    zIndex: 99999,
+                    background: 'rgba(24,28,37,0.97)',
+                    borderBottom: '1px solid rgba(201,168,76,0.18)',
+                    display: 'flex', alignItems: 'center',
+                    padding: '0 16px', gap: '12px',
+                    backdropFilter: 'blur(12px)',
                 },
-                'aria-label': 'Toggle EPM menu',
             },
-                [0, 1, 2].map(i =>
-                    React.createElement('span', {
-                        key: i,
-                        style: {
-                            display: 'block', width: '20px', height: '2px',
-                            background: '#c9a84c', borderRadius: '2px',
-                            transform: open
-                                ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
-                                : 'none',
-                            transition: 'all 0.2s',
-                        },
+                React.createElement('button', {
+                    onClick: () => setOpen(o => !o),
+                    style: {
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '6px', display: 'flex', flexDirection: 'column',
+                        gap: '5px', flexShrink: 0,
+                    },
+                    'aria-label': 'Toggle EPM menu',
+                },
+                    [0, 1, 2].map(i =>
+                        React.createElement('span', {
+                            key: i,
+                            style: {
+                                display: 'block', width: '20px', height: '2px',
+                                background: '#c9a84c', borderRadius: '2px',
+                                transform: open
+                                    ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
+                                    : 'none',
+                                transition: 'all 0.2s',
+                            },
+                        })
+                    )
+                ),
+                React.createElement('a', { href: EPM_MAIN_SITE, style: { textDecoration: 'none', display: 'flex', flexShrink: 0 } },
+                    React.createElement('img', {
+                        src: '/logo.png',
+                        alt: 'Executive Prime Markets',
+                        style: { height: '40px', width: 'auto', display: 'block' },
                     })
                 )
             ),
+
+            // Spacer so the bot app's own existing content/header starts
+            // below this new bar instead of being covered by it.
+            React.createElement('div', { style: { height: '62px', flexShrink: 0 } }),
 
             open && React.createElement('div', {
                 onClick: () => setOpen(false),
@@ -85,7 +110,7 @@ function EPMNav() {
                 style: {
                     position: 'fixed', top: 0, left: 0, bottom: 0,
                     width: '220px', zIndex: 99998,
-                    background: '#0f0f0f',
+                    background: '#181c25',
                     borderRight: '1px solid rgba(201,168,76,0.15)',
                     display: 'flex', flexDirection: 'column',
                     padding: '16px 8px', gap: '2px',
@@ -102,7 +127,7 @@ function EPMNav() {
                 },
                     React.createElement('a', { href: EPM_MAIN_SITE, style: { textDecoration: 'none' } },
                         React.createElement('img', {
-                            src: '/ExecutivePrimeMarkets_logo_transparent.png',
+                            src: '/logo.png',
                             alt: 'Executive Prime Markets',
                             style: { height: '48px', width: 'auto', display: 'block' },
                         })
