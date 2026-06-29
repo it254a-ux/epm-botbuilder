@@ -47,51 +47,34 @@ function EPMNav() {
 
     return (
         React.createElement(React.Fragment, null,
-            // TOP-LEFT OVERLAY: hamburger + logo only. Sized to content
-            // (not full-width) and positioned over the existing page's empty
-            // top-left corner, so it does NOT cover the existing header's
-            // own content (e.g. Log In) on the right side. No spacer is
-            // added since this page already has its own top spacing.
-            React.createElement('div', {
+            // Standalone hamburger button only, positioned at the horizontal
+            // center of the top header row — empty space on this page, away
+            // from the existing logo (left) and account/Transfer controls
+            // (right).
+            React.createElement('button', {
+                onClick: () => setOpen(o => !o),
                 style: {
-                    position: 'fixed', top: 0, left: 0, height: '62px',
-                    zIndex: 99999,
-                    background: 'rgba(24,28,37,0.97)',
-                    borderBottom: '1px solid rgba(201,168,76,0.18)',
-                    borderRight: '1px solid rgba(201,168,76,0.18)',
-                    display: 'flex', alignItems: 'center',
-                    padding: '0 16px', gap: '12px',
-                    backdropFilter: 'blur(12px)',
+                    position: 'fixed', top: '14px', left: '50%', zIndex: 99999,
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(24,28,37,0.9)',
+                    border: '1px solid rgba(201,168,76,0.35)',
+                    borderRadius: '8px', cursor: 'pointer',
+                    padding: '8px', display: 'flex', flexDirection: 'column',
+                    gap: '5px', flexShrink: 0,
                 },
+                'aria-label': 'Toggle EPM menu',
             },
-                React.createElement('button', {
-                    onClick: () => setOpen(o => !o),
-                    style: {
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        padding: '6px', display: 'flex', flexDirection: 'column',
-                        gap: '5px', flexShrink: 0,
-                    },
-                    'aria-label': 'Toggle EPM menu',
-                },
-                    [0, 1, 2].map(i =>
-                        React.createElement('span', {
-                            key: i,
-                            style: {
-                                display: 'block', width: '20px', height: '2px',
-                                background: '#c9a84c', borderRadius: '2px',
-                                transform: open
-                                    ? (i === 0 ? 'rotate(45deg) translate(5px, 5px)' : i === 2 ? 'rotate(-45deg) translate(5px, -5px)' : 'scaleX(0)')
-                                    : 'none',
-                                transition: 'all 0.2s',
-                            },
-                        })
-                    )
-                ),
-                React.createElement('a', { href: EPM_MAIN_SITE, style: { textDecoration: 'none', display: 'flex', flexShrink: 0 } },
-                    React.createElement('img', {
-                        src: '/logo.png',
-                        alt: 'Executive Prime Markets',
-                        style: { height: '40px', width: 'auto', display: 'block' },
+                [0, 1, 2].map(i =>
+                    React.createElement('span', {
+                        key: i,
+                        style: {
+                            display: 'block', width: '18px', height: '2px',
+                            background: '#c9a84c', borderRadius: '2px',
+                            transform: open
+                                ? (i === 0 ? 'rotate(45deg) translate(4px, 4px)' : i === 2 ? 'rotate(-45deg) translate(4px, -4px)' : 'scaleX(0)')
+                                : 'none',
+                            transition: 'all 0.2s',
+                        },
                     })
                 )
             ),
