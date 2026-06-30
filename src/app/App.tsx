@@ -68,8 +68,9 @@ const router = createBrowserRouter(
  *
  * Responsibilities:
  * 1. OAuth callback handling (via vendored deriv-core handleOAuthCallback)
- * 2. Account switching from URL (via useAccountSwitching hook)
- * 3. Router provider setup
+ * 2. Token handed off directly from the parent dashboard (executiveprimemarkets.site)
+ * 3. Account switching from URL (via useAccountSwitching hook)
+ * 4. Router provider setup
  */
 function App() {
     // Handle account switching via URL parameter
@@ -111,6 +112,51 @@ function App() {
         };
 
         handleCallback();
+    }, []);
+
+    // ── Token passed directly from the parent dashboard (executiveprimemarkets.site) via ?token= ──
+    // This mirrors the OAuth callback flow above, but skips the code-exchange step since the
+    // dashboard already holds a valid Deriv access token and hands it straight to the iframe.
+    React.useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const parentToken = urlParams.get('token');
+        if (!parentToken) return;
+
+        const handleParentToken = async () => {
+            try {
+                const { DerivWSAccountsService } = await import('@/services/derivws-accounts.service');
+                const accounts = await DerivWSAccountsService.fetchAccountsList(parentToken);
+
+                if (accounts && accounts.length > 0) {
+                    DerivWSAccountsService.storeAccounts(accounts);
+
+                    const requestedAcct = urlParams.get('acct');
+                    const targetAccount =
+                        (requestedAcct && accounts.find(a => a.account_id === requestedAcct)) || accounts[0];
+
+                    localStorage.setItem('active_loginid', targetAccount.account_id);
+                    localStorage.setItem('authToken', parentToken);
+                    const isDemo =
+                        targetAccount.account_id.startsWith('VRT') || targetAccount.account_id.startsWith('VRTC');
+                    localStorage.setItem('account_type', isDemo ? 'demo' : 'real');
+
+                    const { api_base } = await import('@/external/bot-skeleton');
+                    await api_base.init(true);
+                } else {
+                    console.error('No accounts returned for parent token');
+                }
+            } catch (error) {
+                console.error('Parent token login error:', error);
+            } finally {
+                // Clean token from URL without a reload
+                urlParams.delete('token');
+                urlParams.delete('acct');
+                const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+                window.history.replaceState({}, '', newUrl);
+            }
+        };
+
+        handleParentToken();
     }, []);
 
     return <RouterProvider router={router} />;
