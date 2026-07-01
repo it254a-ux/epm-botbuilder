@@ -140,6 +140,13 @@ function App() {
                         targetAccount.account_id.startsWith('VRT') || targetAccount.account_id.startsWith('VRTC');
                     localStorage.setItem('account_type', isDemo ? 'demo' : 'real');
 
+                    // ── Store token under the key getAuthInfo() reads so getSocketURL()
+                    // can fetch an authenticated WebSocket URL with a valid app_id ──
+                    localStorage.setItem('auth_info', JSON.stringify({
+                        access_token: parentToken,
+                        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+                    }));
+
                     const { api_base } = await import('@/external/bot-skeleton');
                     await api_base.init(true);
                 } else {
