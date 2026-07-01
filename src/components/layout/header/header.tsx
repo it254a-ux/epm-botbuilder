@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
-import useActiveAccount from '@/hooks/api/account/useActiveAccount';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useLogout } from '@/hooks/useLogout';
 import { useStore } from '@/hooks/useStore';
@@ -18,7 +17,11 @@ import './header.scss';
  * When Bot Builder runs inside the Executive Prime Markets dashboard iframe,
  * the parent dashboard owns all auth (login / logout / account switching).
  * This header therefore:
- *  - Shows a display-only balance badge when the user is authenticated
+ *  - Shows a display-only balance badge when the user is authenticated,
+ *    read directly from the `authorize` response (authData) rather than
+ *    the MobX `client` store — the client store's balance/all_accounts_balance
+ *    fields are never populated when auth happens via the parent-supplied
+ *    token flow instead of Bot Builder's native OAuth/subscribe flow.
  *  - Hides Login, Sign up, Logout, and Transfer buttons entirely
  *  - Keeps the logo, desktop menu items, and mobile hamburger menu
  */
@@ -27,11 +30,6 @@ const AppHeader = observer(() => {
     const { isAuthorizing, activeLoginid, authData } = useApiBase();
     const { client } = useStore() ?? {};
     const is_account_regenerating = client?.is_account_regenerating || false;
-
-    const { data: activeAccount } = useActiveAccount({
-        allBalanceData: client?.all_accounts_balance,
-        directBalance: client?.balance,
-    });
 
     const handleLogout = useLogout();
 
@@ -56,20 +54,20 @@ const AppHeader = observer(() => {
 
     const renderAccountSection = useCallback(() => {
         // Authenticated — show display-only balance badge (no logout/transfer)
-        if (activeLoginid && !is_account_regenerating && activeAccount) {
-            const isDemo =
-                activeAccount.loginid?.startsWith('VRT') ||
-                activeAccount.loginid?.startsWith('VRTC') ||
-                authData?.is_virtual === 1;
+        // Read balance/currency/is_virtual straight from the authorize
+        // response (authData) — this is populated as soon as the WebSocket
+        // authorizes, independent of the MobX client store.
+        if (activeLoginid && !is_account_regenerating && authData) {
+            const isDemo = authData.is_virtual === 1;
 
-            const balance = typeof activeAccount.balance === 'number'
-                ? activeAccount.balance.toLocaleString('en-US', {
+            const balance = typeof authData.balance === 'number'
+                ? authData.balance.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                   })
                 : '0.00';
 
-            const currency = activeAccount.currency || authData?.currency || 'USD';
+            const currency = authData.currency || 'USD';
 
             return (
                 <div className='auth-actions'>
@@ -139,7 +137,6 @@ const AppHeader = observer(() => {
         isTokenPending,
         isDesktop,
         activeLoginid,
-        activeAccount,
         authData,
         is_account_regenerating,
     ]);
