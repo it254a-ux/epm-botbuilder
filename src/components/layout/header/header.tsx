@@ -15,16 +15,16 @@ import './header.scss';
  * AppHeader — embedded partner variant
  *
  * When Bot Builder runs inside the Executive Prime Markets dashboard iframe,
- * the parent dashboard owns all auth (login / logout / account switching).
- * This header therefore:
- *  - Shows a display-only balance badge when the user is authenticated,
- *    read directly from the `authorize` response (authData) rather than
- *    the MobX `client` store — the client store's balance/all_accounts_balance
- *    fields are never populated when auth happens via the parent-supplied
- *    token flow instead of Bot Builder's native OAuth/subscribe flow.
- *  - Hides Login, Sign up, Logout, and Transfer buttons entirely
- *  - Keeps the logo, desktop menu items, and mobile hamburger menu
+ * the parent dashboard already renders its own top bar (logo, hamburger,
+ * balance badge, Log Out) directly above this iframe. Rendering Bot
+ * Builder's own header on top of that would just duplicate it, so this
+ * component is hidden entirely in the embedded context.
+ *
+ * Set to `true` if Bot Builder is ever run standalone (outside the
+ * dashboard iframe) and needs its own header back.
  */
+const SHOW_EMBEDDED_HEADER = false;
+
 const AppHeader = observer(() => {
     const { isDesktop } = useDevice();
     const { isAuthorizing, activeLoginid, authData } = useApiBase();
@@ -140,6 +140,8 @@ const AppHeader = observer(() => {
         authData,
         is_account_regenerating,
     ]);
+
+    if (!SHOW_EMBEDDED_HEADER) return null;
 
     if (client?.should_hide_header) return null;
 
