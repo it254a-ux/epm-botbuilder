@@ -1,9 +1,15 @@
+@use 'components/shared/styles/mixins' as *;
+
 .ai-bot-builder {
     max-width: 640px;
     margin: 0 auto;
     padding: 24px 16px;
-    height: 100%;
+    height: var(--tab-content-height);
     overflow-y: auto;
+
+    @include mobile-or-tablet-screen {
+        height: var(--tab-content-height-mobile);
+    }
 
     &__header {
         margin-bottom: 20px;
@@ -114,6 +120,7 @@
 
     &__result {
         margin-top: 16px;
+        margin-bottom: 32px;
     }
 
     &__result-title {
