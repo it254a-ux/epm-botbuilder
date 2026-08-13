@@ -8,6 +8,7 @@ import { api_base } from '@/external/bot-skeleton';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useLogout } from '@/hooks/useLogout';
 import { useStore } from '@/hooks/useStore';
+import useThemeSwitcher from '@/hooks/useThemeSwitcher';
 import { TSocketResponseData } from '@/types/api-types';
 import { clearInvalidTokenParams } from '@/utils/url-utils';
 import { useTranslations } from '@deriv-com/translations';
@@ -22,6 +23,12 @@ type TClientInformation = {
     preferred_language?: string | null;
     user_id?: number | string;
 };
+
+// Message protocol shared with the main shell (executive-prime-market-app).
+// Keep these strings in sync with THEME_REQUEST_MSG / THEME_UPDATE_MSG there.
+const THEME_REQUEST_MSG = 'epm-theme-request';
+const THEME_UPDATE_MSG = 'epm-theme-update';
+
 const CoreStoreProvider: React.FC<{ children: React.ReactNode }> = observer(({ children }) => {
     const currentDomain = useMemo(() => '.' + window.location.hostname.split('.').slice(-2).join('.'), []);
     const { isAuthorizing, isAuthorized, connectionStatus, accountList, activeLoginid } = useApiBase();
@@ -31,6 +38,7 @@ const CoreStoreProvider: React.FC<{ children: React.ReactNode }> = observer(({ c
     const timeInterval = useRef<NodeJS.Timeout | null>(null);
     const msg_listener = useRef<{ unsubscribe: () => void } | null>(null);
     const { client, common } = useStore() ?? {};
+    const { setTheme } = useThemeSwitcher();
 
     const { currentLang } = useTranslations();
 
@@ -67,6 +75,28 @@ const CoreStoreProvider: React.FC<{ children: React.ReactNode }> = observer(({ c
             common.setCurrentLanguage(currentLang);
         }
     }, [currentLang, common]);
+
+    // Syncs this app's theme with the main shell when embedded as an iframe.
+    // This app's own toggle is being disabled via brand.config.json — the
+    // main shell is now the single source of truth for theme. On mount this
+    // asks the parent shell for the current theme, then listens forever
+    // after for theme-change broadcasts and applies them via setTheme(),
+    // which already updates localStorage, the body class, and the ui store.
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.parent === window) return;
+
+        function handleThemeMessage(event: MessageEvent) {
+            if (event.source !== window.parent) return;
+            if (event.data?.type !== THEME_UPDATE_MSG) return;
+            const theme = event.data.theme === 'dark' ? 'dark' : 'light';
+            setTheme(theme);
+        }
+
+        window.addEventListener('message', handleThemeMessage);
+        window.parent.postMessage({ type: THEME_REQUEST_MSG }, '*');
+
+        return () => window.removeEventListener('message', handleThemeMessage);
+    }, [setTheme]);
 
     // Type-safe interface for API with time() method
     interface ApiWithTime {
