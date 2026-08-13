@@ -174,6 +174,19 @@
                 }
             }
         }
+
+        // Hides only the Tutorials tab's clickable header button from this
+        // app's own top tab bar. Deliberately scoped to #id-tutorials inside
+        // .main__container only, so no other tab bar in the app is affected.
+        // Nothing else changes: the tab's index position, routing, and the
+        // #tutorial hash-based tab detection in main.tsx all still work
+        // exactly as before — the outer ExecutivePrimeMarkets app's
+        // dedicated "Trading Courses" page still embeds this same app
+        // directly at the #tutorial hash and lands on this content, it just
+        // can no longer be reached by clicking a tab from inside this app.
+        #id-tutorials {
+            display: none !important;
+        }
     }
 
     &__run-strategy-wrapper {
@@ -757,4 +770,4 @@
     display: flex;
     align-items: center;
     justify-content: center;
-}
+}    
