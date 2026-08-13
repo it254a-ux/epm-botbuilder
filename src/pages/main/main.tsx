@@ -86,6 +86,14 @@ const AppWrapper = observer(() => {
     const [left_tab_shadow, setLeftTabShadow] = useState<boolean>(false);
     const [right_tab_shadow, setRightTabShadow] = useState<boolean>(false);
 
+    // Embed mode used by the ExecutivePrimeMarkets "Trading Courses" page: when
+    // this app is loaded there, the URL carries ?embed=tutorial-only alongside
+    // the #tutorial hash. When present, we hide this app's own top tab bar and
+    // the Run/Bot-status panel, showing only the Tutorials content itself.
+    // The plain /botbuilder route (no query flag) is completely unaffected.
+    const search_params = new URLSearchParams(location.search);
+    const is_tutorial_only_embed = search_params.get('embed') === 'tutorial-only';
+
     // Trade type modal state
     const [tradeTypeModalState, setTradeTypeModalState] = useState(getModalState());
 
@@ -373,6 +381,7 @@ const AppWrapper = observer(() => {
                 <div
                     className={classNames('main__container', {
                         'main__container--active': active_tour && active_tab === DASHBOARD && !isDesktop,
+                        'main__container--hide-tabs': is_tutorial_only_embed,
                     })}
                 >
                     <div>
@@ -476,14 +485,16 @@ const AppWrapper = observer(() => {
                 </div>
             </div>
             <DesktopWrapper>
-                <div className='main__run-strategy-wrapper'>
-                    <RunStrategy />
-                    <RunPanel />
-                </div>
+                {!is_tutorial_only_embed && (
+                    <div className='main__run-strategy-wrapper'>
+                        <RunStrategy />
+                        <RunPanel />
+                    </div>
+                )}
                 <ChartModal />
                 <TradingViewModal />
             </DesktopWrapper>
-            <MobileWrapper>{!is_open && <RunPanel />}</MobileWrapper>
+            <MobileWrapper>{!is_tutorial_only_embed && !is_open && <RunPanel />}</MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
                 className='dc-dialog__wrapper--fixed'
