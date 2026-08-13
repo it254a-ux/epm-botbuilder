@@ -103,8 +103,9 @@
                         }
                     }
 
-                    &__list--border-bottom:first-child {
-                        margin-top: 0 !important;
+                    &__list--border-bottom {
+                        height: auto !important;
+                        min-height: 100% !important;
                     }
                 }
             }
