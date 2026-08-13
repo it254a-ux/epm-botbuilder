@@ -39,6 +39,15 @@
         padding: 0;
     }
 
+    // When the tab bar is hidden (embed=tutorial-only), this wrapper no
+    // longer needs to reserve space for it, so let it use the full
+    // available height instead of the calc() above (which was sized to
+    // leave room for the now-hidden header row).
+    &:has(.main__container--hide-tabs) {
+        height: 100vh;
+        padding: 0;
+    }
+
     &__container {
         position: relative;
         border: none;
@@ -74,6 +83,30 @@
         &--hide-tabs {
             .dc-tabs__list--header--main__tabs {
                 display: none !important;
+            }
+
+            // The Tutorials page's own internal layout (tutorials.scss) uses
+            // calc(100vh - Xrem) heights and negative top margins that were
+            // tuned assuming this outer tab bar's space was still reserved
+            // above it. With that space reclaimed, those numbers need to
+            // shrink by roughly the same amount, or the content sits too
+            // high with a leftover empty gap below it.
+            .tutorials-wrapper {
+                .dc-tabs {
+                    &__wrapper__content {
+                        max-height: calc(100vh - 8rem) !important;
+                    }
+
+                    &--top {
+                        @include mobile-or-tablet-screen {
+                            height: calc(100vh - 10rem) !important;
+                        }
+                    }
+
+                    &__list--border-bottom:first-child {
+                        margin-top: 0 !important;
+                    }
+                }
             }
         }
 
