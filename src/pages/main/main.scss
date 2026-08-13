@@ -64,6 +64,19 @@
             }
         }
 
+        // Used only when this app is embedded on the ExecutivePrimeMarkets
+        // "Trading Courses" page via ?embed=tutorial-only in the iframe URL
+        // (set in main.tsx). Hides this app's own top tab bar (Dashboard /
+        // Bot Builder / Charts / Tutorials / AI Bot Builder) so only the
+        // Tutorials content shows. Scoped to .main__container--hide-tabs
+        // only, so the plain /botbuilder route (no query flag) is completely
+        // unaffected — its tab bar renders exactly as before.
+        &--hide-tabs {
+            .dc-tabs__list--header--main__tabs {
+                display: none !important;
+            }
+        }
+
         .dc-tabs {
             &__active-line {
                 background-color: var(--general-main-1);
@@ -770,4 +783,4 @@
     display: flex;
     align-items: center;
     justify-content: center;
-}    
+}
