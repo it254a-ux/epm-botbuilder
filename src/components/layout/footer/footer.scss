@@ -7,107 +7,90 @@
     flex-direction: row-reverse;
     padding: 0 1rem;
     align-items: center;
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    left: 0;
+    /* Previously: position: fixed; bottom: 0; right: 0; left: 0;
+       That pulled the footer out of the .layout flex column and glued it to
+       the iframe's own viewport bottom, causing it to overlay on top of the
+       scrollable bot-list table instead of sitting below it in normal flow.
+       flex-shrink: 0 keeps it pinned at the bottom of the flex column
+       (since .layout is display:flex; flex-direction:column) without
+       removing it from the document's layout flow. */
+    flex-shrink: 0;
+    position: relative;
     border-top: 1px solid var(--general-section-1);
     box-shadow: 0 1px 0 0 var(--general-section-1) inset;
     background: var(--general-main-1);
     z-index: 2;
-
     &__icon {
         padding: 0.8rem;
-
         svg > g > path,
         svg > path {
             fill: var(--text-prominent);
         }
-
         @include mobile-or-tablet-screen {
             padding: 0;
         }
     }
-
     &__vertical-line {
         width: 0.1rem;
         height: 1.6rem;
         background-color: var(--general-section-1);
         margin: 0 0.8rem;
     }
-
     &__language {
         display: flex;
         align-items: center;
         padding: 0.8rem;
-
         & span {
             margin-inline-start: 0.4rem;
         }
     }
-
     &__network-status {
         width: 1rem;
         height: 1rem;
         border-radius: 100%;
-
         &-online {
             background-color: $color-green-1;
         }
-
         &-offline {
             background-color: $color-red;
         }
-
         &-blinking {
             animation: blink 1s infinite alternate;
         }
-
         @include mobile-or-tablet-screen {
             margin-inline-start: 1.2rem;
         }
     }
-
     &__endpoint {
         margin-inline-end: 2rem;
-
         &-text {
             color: $color-blue;
             text-decoration: underline;
         }
     }
 }
-
 .languages-modal__body {
     padding-inline: 1.6rem;
-
     &-button {
-        // No flag icons are shown, so the button hugs the language title.
         height: auto;
         width: 13.3rem;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0.8rem 1.2rem;
-
         &-selected {
             border-radius: 4px;
             border: 1px solid var(--brand-blue, $color-green);
         }
     }
-
-    // Hide flag SVG icons in language modal buttons - icons are intentionally not shown,
-    // only language names are displayed
     &-button svg {
         display: none;
     }
 }
-
 @keyframes blink {
     0% {
         opacity: 1;
     }
-
     100% {
         opacity: 0.2;
     }
