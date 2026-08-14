@@ -61,6 +61,21 @@ type TStatisticsInfoModal = {
     toggleStatisticsInfoModal: () => void;
 };
 
+/**
+ * When Bot Builder runs inside the Executive Prime Markets dashboard iframe,
+ * the embedded viewport's rendered width can dip under @deriv-com/ui's
+ * useDevice() desktop breakpoint even on large screens (depending on
+ * sidebar width / container sizing in the outer shell). That falsely
+ * triggers RunPanel's mobile branch, which renders MobileDrawerFooter — a
+ * solid, fixed, full-width bar pinned to the bottom of the iframe viewport
+ * (see .controls__section in run-panel.scss: position: fixed; bottom: 0).
+ * This bar is redundant in the embedded context anyway, since the outer
+ * shell already renders its own Run button / status bar above the iframe.
+ * Set to `true` if Bot Builder is ever run standalone (outside the
+ * dashboard iframe) and needs this mobile control bar back.
+ */
+const SHOW_EMBEDDED_MOBILE_DRAWER_FOOTER = false;
+
 const StatisticsTile = ({ content, contentClassName, title }: TStatisticsTile) => (
     <div className='run-panel__tile'>
         <div className='run-panel__tile-title'>{title}</div>
@@ -181,6 +196,8 @@ const DrawerFooter = ({ is_clear_stat_disabled, onClearStatClick }: TDrawerFoote
 );
 
 const MobileDrawerFooter = () => {
+    if (!SHOW_EMBEDDED_MOBILE_DRAWER_FOOTER) return null;
+
     return (
         <div className='controls__section'>
             <div className='controls__buttons'>
