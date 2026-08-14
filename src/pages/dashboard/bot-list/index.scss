@@ -382,6 +382,7 @@
 
     &__table {
         height: calc(100vh - 57rem);
+        min-height: 12rem;
         overflow: auto;
 
         @include mobile-screen {
