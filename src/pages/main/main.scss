@@ -29,6 +29,7 @@
 
 .main {
     display: flex;
+    align-items: flex-start;
     overflow: hidden;
     width: 100%;
     height: calc(100vh - 9rem);
