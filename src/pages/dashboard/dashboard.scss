@@ -184,7 +184,7 @@
             }
 
             @include mobile-or-tablet-screen {
-                height: calc(100vh - 19rem);
+                height: 100%;
                 align-items: flex-start;
                 padding: 1.6rem;
             }
