@@ -27,6 +27,9 @@ type TGuideContent = {
     is_dialog_open: boolean;
 };
 
+// Toggle to true to re-enable the "Step-by-step guides" section
+const SHOW_STEP_BY_STEP_GUIDES = false;
+
 const GuideContent = ({ guide_tab_content, video_tab_content, is_dialog_open }: TGuideContent) => {
     const { isDesktop } = useDevice();
     const { dashboard } = useStore();
@@ -72,7 +75,7 @@ const GuideContent = ({ guide_tab_content, video_tab_content, is_dialog_open }: 
         () =>
             has_guide_content && (
                 <div className='tutorials-wrap'>
-                    {guide_tab_content && guide_tab_content.length > 0 && (
+                    {SHOW_STEP_BY_STEP_GUIDES && guide_tab_content && guide_tab_content.length > 0 && (
                         <div className='tutorials-wrap__group'>
                             <div className='tutorials-wrap__group__title'>
                                 <Text
