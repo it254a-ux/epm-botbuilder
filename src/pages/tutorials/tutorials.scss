@@ -62,13 +62,14 @@
         margin-bottom: 5.2rem;
 
         &__guides {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(21.5rem, 1fr));
+            gap: 2.4rem;
             margin-top: 2.4rem;
-            max-width: 80vw;
-            overflow: auto;
+            max-width: 100%;
 
             @include mobile-or-tablet-screen {
-                display: unset;
+                grid-template-columns: 1fr;
             }
         }
 
@@ -86,7 +87,7 @@
             display: flex;
             text-align: center;
             flex-direction: column;
-            margin-inline-end: 2.4rem;
+            margin-inline-end: 0;
 
             @include mobile-or-tablet-screen {
                 flex-direction: row;
@@ -111,11 +112,11 @@
         background: var(--checkbox-disabled-grey);
         margin-bottom: 0.8rem;
         height: 16rem;
-        width: 28rem;
+        width: 100%;
         background-size: 100% 100%;
 
         &__description {
-            width: 28rem;
+            width: 100%;
 
             @include mobile-or-tablet-screen {
                 text-align: start;
@@ -133,8 +134,8 @@
             height: 13.5rem;
             background-size: contain;
             margin-bottom: 0.8rem;
-            margin-inline-end: 0.8rem;
-            width: 21.5rem;
+            margin-inline-end: 0;
+            width: 100%;
             cursor: pointer;
 
             @include mobile-or-tablet-screen {
@@ -229,6 +230,7 @@
 .tutorials-wrapper {
     width: 100%;
     height: 100%;
+    overflow: hidden;
     background: var(--general-main-1);
 
     @include tablet-screen {
@@ -239,6 +241,7 @@
     .dc-tabs {
         &__wrapper {
             height: 100%;
+            overflow: hidden;
             padding: 1.6rem 0.8rem;
 
             &__group {
@@ -294,6 +297,7 @@
 
             .dc-tabs {
                 height: 100%;
+                overflow: hidden;
 
                 .tutorials-search {
                     .faq__wrapper {
@@ -304,8 +308,10 @@
                 &__content {
                     margin: 0 2.4rem;
                     width: 100%;
+                    height: 100%;
                     max-height: 100%;
-                    overflow: auto;
+                    overflow-y: auto;
+                    overflow-x: hidden;
 
                     .tutorials-wrap {
                         margin-bottom: 3rem;
@@ -334,6 +340,7 @@
                 &--top {
                     display: flex;
                     height: 100%;
+                    overflow: hidden;
 
                     @include mobile-or-tablet-screen {
                         height: 100%;
@@ -345,6 +352,7 @@
                     display: flex;
                     flex-direction: column;
                     padding: 0 0.8rem;
+                    overflow-y: auto;
 
                     &--border-bottom {
                         padding: 0 0.8rem;
