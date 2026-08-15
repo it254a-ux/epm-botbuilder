@@ -243,10 +243,13 @@
             height: 100%;
             overflow: hidden;
             padding: 1.6rem 0.8rem;
+            display: flex;
+            flex-direction: column;
 
             &__group {
                 @include flex-center;
 
+                flex-shrink: 0;
                 width: 22.5rem;
                 position: relative;
                 padding: 1.6rem 0.8rem;
@@ -296,7 +299,7 @@
             }
 
             .dc-tabs {
-                height: 100%;
+                flex: 1;
                 min-height: 0;
                 overflow: hidden;
 
