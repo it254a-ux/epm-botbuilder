@@ -391,8 +391,8 @@ const AppWrapper = observer(() => {
                                 label={
                                     <>
                                         <LabelPairedObjectsColumnCaptionRegularIcon
-                                            height='24px'
-                                            width='24px'
+                                            height='18px'
+                                            width='18px'
                                             fill='var(--text-general)'
                                         />
                                         <Localize i18n_default_text='Dashboard' />
@@ -406,8 +406,8 @@ const AppWrapper = observer(() => {
                                 label={
                                     <>
                                         <LabelPairedPuzzlePieceTwoCaptionBoldIcon
-                                            height='24px'
-                                            width='24px'
+                                            height='18px'
+                                            width='18px'
                                             fill='var(--text-general)'
                                         />
                                         <Localize i18n_default_text='Bot Builder' />
@@ -419,8 +419,8 @@ const AppWrapper = observer(() => {
                                 label={
                                     <>
                                         <LabelPairedChartLineCaptionRegularIcon
-                                            height='24px'
-                                            width='24px'
+                                            height='18px'
+                                            width='18px'
                                             fill='var(--text-general)'
                                         />
                                         <Localize i18n_default_text='Charts' />
@@ -442,8 +442,8 @@ const AppWrapper = observer(() => {
                                 label={
                                     <>
                                         <LegacyGuide1pxIcon
-                                            height='16px'
-                                            width='16px'
+                                            height='12px'
+                                            width='12px'
                                             fill='var(--text-general)'
                                             className='icon-general-fill-g-path'
                                         />
@@ -465,7 +465,7 @@ const AppWrapper = observer(() => {
                             <div
                                 label={
                                     <>
-                                        <span style={{ fontSize: '20px', lineHeight: 1 }}>✨</span>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>✨</span>
                                         <Localize i18n_default_text='AI Bot Builder' />
                                     </>
                                 }
