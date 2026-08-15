@@ -1,0 +1,26 @@
+.toolbar__balance-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--general-section-1);
+    border-radius: 2rem;
+    padding: 0.4rem 1.2rem;
+    margin-inline-end: 1.2rem;
+    white-space: nowrap;
+    height: fit-content;
+
+    &__type {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--text-less-prominent);
+    }
+
+    &__amount {
+        font-size: 1.4rem;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--status-success);
+    }
+}
