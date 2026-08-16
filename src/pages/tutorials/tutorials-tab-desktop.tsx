@@ -90,6 +90,7 @@ const TutorialsTabDesktop = observer(({ tutorial_tabs, prev_active_tutorials }: 
                 })}
                 active_index={active_tab_tutorials}
                 history={history}
+                icon_size={16}
                 onTabItemClick={(index: number) => {
                     setActiveTabTutorial(index);
                     /* [AI] - Analytics event tracking removed - see migrate-docs/MONITORING_PACKAGES.md for re-implementation guide */
@@ -97,9 +98,9 @@ const TutorialsTabDesktop = observer(({ tutorial_tabs, prev_active_tutorials }: 
                 }}
                 top
             >
-                {tutorial_tabs?.map(({ label, content }) =>
+                {tutorial_tabs?.map(({ label, icon, content }) =>
                     content ? (
-                        <div label={label} key={`${content}_${label}`}>
+                        <div label={label} icon={icon} key={`${content}_${label}`}>
                             {content}
                         </div>
                     ) : null
