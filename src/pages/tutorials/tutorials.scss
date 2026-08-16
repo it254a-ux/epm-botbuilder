@@ -63,13 +63,13 @@
 
         &__guides {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(21.5rem, 1fr));
-            gap: 2.4rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.6rem;
             margin-top: 2.4rem;
             max-width: 100%;
 
             @include mobile-or-tablet-screen {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -131,7 +131,7 @@
         }
 
         &__tours {
-            height: 13.5rem;
+            height: 9rem;
             background-size: contain;
             margin-bottom: 0.8rem;
             margin-inline-end: 0;
