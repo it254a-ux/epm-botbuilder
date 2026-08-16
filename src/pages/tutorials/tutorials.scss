@@ -238,17 +238,35 @@
         justify-content: center;
     }
 
-    // Tab labels in this panel get a dedicated icon (added alongside the
-    // existing shared Tabs/Tab icon support) plus a slightly smaller font
-    // size than the app-wide 10px default in tabs.scss, so the label still
-    // reads comfortably next to the new icon at this panel's width. Scoped
-    // to .tutorials-wrapper only — no other tab bar in the app is affected.
+    // Tab labels in this panel get a dedicated icon prefix. The shared
+    // Icon component (src/utils/tmp/dummy.tsx) does NOT apply its
+    // size/height/width props to the rendered <img> - they're spread onto
+    // the outer <div> where they have no effect - so every icon renders at
+    // its own native SVG size. That's why one icon (drawn larger upstream)
+    // was overlapping the row above it. Fixing it here, scoped to this
+    // panel only, by forcing every tab icon into the same fixed box
+    // regardless of its native size, rather than touching the shared
+    // component used app-wide.
     .dc-tabs__item {
-        font-size: 9px;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        min-height: 3.6rem;
+        font-size: 10px;
 
         &__icon {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 1.6rem;
+            height: 1.6rem;
+
+            img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
         }
     }
 
