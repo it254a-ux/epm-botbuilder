@@ -81,34 +81,80 @@
         // Tutorials content shows. Scoped to .main__container--hide-tabs
         // only, so the plain /botbuilder route (no query flag) is completely
         // unaffected — its tab bar renders exactly as before.
+        //
+        // Real DOM chain confirmed via browser inspection (2026-08-16):
+        // .main__container--hide-tabs
+        //   > div (unstyled wrapper holding tab-shadow spans + dc-tabs)
+        //     > .dc-tabs.dc-tabs--top   (grid: auto 1fr, needs explicit height)
+        //       > .dc-tabs__content.dc-tabs__content--main_tabs
+        //         > .tutorials-wrapper
+        //           > .tutorials-mobile  (real content, ALWAYS this class,
+        //             regardless of viewport width, in this embed context)
+        //             > .tutorials-mobile__guide / __faq / __qs-guide / __search
+        //
+        // The block below REPLACES a previous version that used the selector
+        // ".tutorials-wrapper .dc-tabs { ... }" — that assumed .dc-tabs was a
+        // descendant of .tutorials-wrapper. It is actually the ANCESTOR, so
+        // that selector matched nothing in the live DOM and every rule inside
+        // it was dead code (confirmed: the fix never took effect after
+        // pushing). Also, .tutorials-mobile's own height/overflow rules in
+        // tutorials.scss are gated behind a mobile-only breakpoint, which
+        // doesn't apply at this iframe's actual rendered width — leaving the
+        // box with no height cap and no scroll capability. Both are fixed
+        // below using the real, verified class names, unconditionally (not
+        // breakpoint gated), scoped only to this hide-tabs embed context.
         &--hide-tabs {
             .dc-tabs__list--header--main__tabs {
                 display: none !important;
             }
 
-            // This embed mode has its own height chain, separate from the
-            // default (non-embedded) tutorials.scss rules. The FAQ/guide
-            // content must fill the reclaimed tab-bar space and scroll
-            // *inside* itself, without the outer iframe page scrolling.
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+
+            > div {
+                display: flex !important;
+                flex-direction: column !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+            }
+
+            .dc-tabs.dc-tabs--top {
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+            }
+
+            .dc-tabs__content {
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+
             .tutorials-wrapper {
                 height: 100% !important;
                 overflow: hidden !important;
+            }
 
-                .dc-tabs {
-                    &__wrapper__content {
-                        max-height: 100% !important;
-                        overflow-y: auto !important;
-                    }
+            .tutorials-mobile {
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow-y: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
 
-                    &--top {
-                        height: 100% !important;
-                    }
-
-                    &__list--border-bottom {
-                        height: 100% !important;
-                        min-height: 0 !important;
-                        overflow-y: auto !important;
-                    }
+                &__guide,
+                &__faq,
+                &__qs-guide,
+                &__search {
+                    height: 100% !important;
+                    min-height: 0 !important;
+                    overflow-y: auto !important;
+                    flex: 1 !important;
                 }
             }
         }
