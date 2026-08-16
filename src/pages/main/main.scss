@@ -86,27 +86,28 @@
                 display: none !important;
             }
 
-            // The Tutorials page's own internal layout (tutorials.scss) uses
-            // calc(100vh - Xrem) heights and negative top margins that were
-            // tuned assuming this outer tab bar's space was still reserved
-            // above it. With that space reclaimed, those numbers need to
-            // shrink by roughly the same amount, or the content sits too
-            // high with a leftover empty gap below it.
+            // This embed mode has its own height chain, separate from the
+            // default (non-embedded) tutorials.scss rules. The FAQ/guide
+            // content must fill the reclaimed tab-bar space and scroll
+            // *inside* itself, without the outer iframe page scrolling.
             .tutorials-wrapper {
+                height: 100% !important;
+                overflow: hidden !important;
+
                 .dc-tabs {
                     &__wrapper__content {
-                        max-height: calc(100vh - 8rem) !important;
+                        max-height: 100% !important;
+                        overflow-y: auto !important;
                     }
 
                     &--top {
-                        @include mobile-or-tablet-screen {
-                            height: calc(100vh - 10rem) !important;
-                        }
+                        height: 100% !important;
                     }
 
                     &__list--border-bottom {
-                        height: auto !important;
-                        min-height: 100% !important;
+                        height: 100% !important;
+                        min-height: 0 !important;
+                        overflow-y: auto !important;
                     }
                 }
             }
