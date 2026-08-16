@@ -238,6 +238,20 @@
         justify-content: center;
     }
 
+    // Tab labels in this panel get a dedicated icon (added alongside the
+    // existing shared Tabs/Tab icon support) plus a slightly smaller font
+    // size than the app-wide 10px default in tabs.scss, so the label still
+    // reads comfortably next to the new icon at this panel's width. Scoped
+    // to .tutorials-wrapper only — no other tab bar in the app is affected.
+    .dc-tabs__item {
+        font-size: 9px;
+
+        &__icon {
+            display: inline-flex;
+            align-items: center;
+        }
+    }
+
     .dc-tabs {
         &__wrapper {
             height: 100%;
