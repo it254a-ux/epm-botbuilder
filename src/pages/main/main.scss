@@ -391,7 +391,17 @@
 .dashboard {
     &__chart-wrapper {
         position: relative;
-        height: var(--tab-content-height);
+        /* --tab-content-height (calc(100vh - 6rem)) only accounts for the
+           space taken by the tab bar above this wrapper — it was never
+           subtracting the footer's height (3.6rem) below it, since this
+           variable is shared with other elements that don't sit above the
+           footer. That left this wrapper 3.6rem taller than the space
+           actually available, so the chart extended past the footer line.
+           This override (scoped to just this class, not the shared
+           variable) subtracts the footer height too, so the chart's bottom
+           edge now reaches exactly to the footer line — touching it, not
+           overlapping it, and no extra boundary/gap above it either. */
+        height: calc(var(--tab-content-height) - 3.6rem);
         width: 100%;
         transition: all 0.4s;
 
