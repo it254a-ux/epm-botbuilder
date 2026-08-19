@@ -18,7 +18,17 @@
     }
 
     .run-panel__container {
-        height: var(--tab-content-height) !important;
+        /* Previously: height: var(--tab-content-height) !important;
+           --tab-content-height (calc(100vh - 6rem)) was designed for content
+           starting at top: 0 (e.g. .tab__dashboard__content). This panel is
+           position: sticky; top: 10.4rem, so adding a height meant for a
+           top:0 element on top of that 10.4rem offset pushed the panel's
+           bottom edge to 100vh + 4.4rem — 4.4rem (44px) past the real
+           viewport bottom, straight under the footer (3.6rem tall).
+           This calc instead subtracts the panel's own top offset (10.4rem)
+           and the footer's height (3.6rem) so the panel's bottom edge lands
+           exactly at the footer's top edge instead of underneath it. */
+        height: calc(100vh - 10.4rem - 3.6rem) !important;
         position: sticky;
         transform: translateX(var(--translate-panel-ltr));
         transition: all 0.4s;
