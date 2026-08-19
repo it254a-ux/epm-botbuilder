@@ -172,6 +172,15 @@
             &__list {
                 background: var(--general-section-1);
                 justify-content: start;
+                /* Reserves room on the left for the parent dashboard's own
+                   menu-toggle / theme-toggle icons, which sit visually on
+                   top of this iframe's left edge. Previously the tab list
+                   started flush at the left edge, so "Dashboard" was
+                   partially hidden behind those icons (only "hboard" showed).
+                   12rem (120px) pushes the whole label clear of the icon
+                   zone, so "Dashboard" now starts where it used to be cut
+                   off, with a bit of breathing room. */
+                padding-inline-start: 12rem;
 
                 @include mobile-or-tablet-screen {
                     overflow-x: auto;
