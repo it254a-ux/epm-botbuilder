@@ -12,6 +12,17 @@ import { TAccountSwitcher } from './common/types';
 import AccountInfoWrapper from './account-info-wrapper';
 import './account-switcher.scss';
 
+/**
+ * Login IDs that should always display as "Real account" regardless of
+ * whether the underlying active account is demo or real — matches the
+ * same forced-label behavior added to the DTrader app's header. The
+ * balance value shown is always the true value for whichever account is
+ * active; only the label text is forced. Matched by loginid rather than
+ * email since this codebase (like DTrader's) has no email field available
+ * on the account object.
+ */
+const FORCED_REAL_LABEL_LOGIN_IDS = ['DOT94283012'];
+
 const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -67,8 +78,13 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
 
     if (!activeAccount) return null;
 
-    const { currency, isVirtual, balance } = activeAccount;
+    const { currency, isVirtual, balance, loginid } = activeAccount;
     const showChevron = !isSingleAccount && !is_bot_running;
+    // Force the "Real account" label for specific login IDs regardless of
+    // the account's actual isVirtual status. The balance below is always
+    // the true value — only this label is forced.
+    const forceRealLabel = !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
+    const displayAsVirtual = isVirtual && !forceRealLabel;
 
     return (
         <div className='acc-info__wrapper' ref={wrapperRef}>
@@ -81,7 +97,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                     aria-expanded={showChevron ? isOpen : undefined}
                     aria-haspopup={showChevron ? 'listbox' : undefined}
                     className={classNames('acc-info', {
-                        'acc-info--is-virtual': isVirtual,
+                        'acc-info--is-virtual': displayAsVirtual,
                         'acc-info--interactive': showChevron,
                     })}
                     onClick={toggleDropdown}
@@ -96,7 +112,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                     <div className='acc-info__content'>
                         <div className='acc-info__account-type-header'>
                             <Text as='p' size='xs' className='acc-info__account-type'>
-                                {isVirtual ? (
+                                {displayAsVirtual ? (
                                     <Localize i18n_default_text='Demo account' />
                                 ) : (
                                     <Localize i18n_default_text='Real account' />
@@ -125,7 +141,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                 <p
                                     data-testid='dt_balance'
                                     className={classNames('acc-info__balance', {
-                                        'acc-info__balance--no-currency': !currency && !isVirtual,
+                                        'acc-info__balance--no-currency': !currency && !displayAsVirtual,
                                     })}
                                 >
                                     {!currency ? (
@@ -141,45 +157,49 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
             </AccountInfoWrapper>
             {isOpen && (
                 <div className='acc-dropdown' role='listbox'>
-                    {formattedAccounts.map(account => (
-                        <div
-                            key={account.loginid}
-                            role='option'
-                            aria-selected={account.isActive}
-                            tabIndex={0}
-                            className={classNames('acc-dropdown__account', {
-                                'acc-dropdown__account--selected': account.isActive,
-                                'acc-dropdown__account--virtual': account.isVirtual,
-                            })}
-                            onClick={() => !account.isActive && handleAccountSelect(account.loginid)}
-                            onKeyDown={e => {
-                                if (!account.isActive && (e.key === 'Enter' || e.key === ' ')) {
-                                    e.preventDefault();
-                                    handleAccountSelect(account.loginid);
-                                }
-                            }}
-                        >
-                            <Text
-                                size='xxxs'
-                                className={classNames('acc-dropdown__account-type', {
-                                    'acc-dropdown__account-type--virtual': account.isVirtual,
+                    {formattedAccounts.map(account => {
+                        const accountForceReal = FORCED_REAL_LABEL_LOGIN_IDS.includes(account.loginid);
+                        const accountDisplayAsVirtual = account.isVirtual && !accountForceReal;
+                        return (
+                            <div
+                                key={account.loginid}
+                                role='option'
+                                aria-selected={account.isActive}
+                                tabIndex={0}
+                                className={classNames('acc-dropdown__account', {
+                                    'acc-dropdown__account--selected': account.isActive,
+                                    'acc-dropdown__account--virtual': accountDisplayAsVirtual,
                                 })}
+                                onClick={() => !account.isActive && handleAccountSelect(account.loginid)}
+                                onKeyDown={e => {
+                                    if (!account.isActive && (e.key === 'Enter' || e.key === ' ')) {
+                                        e.preventDefault();
+                                        handleAccountSelect(account.loginid);
+                                    }
+                                }}
                             >
-                                {account.isVirtual ? (
-                                    <Localize i18n_default_text='Demo account' />
-                                ) : (
-                                    <Localize i18n_default_text='Real account' />
-                                )}
-                            </Text>
-                            <Text size='xs' weight='bold' className='acc-dropdown__balance'>
-                                {account.currency ? (
-                                    `${account.balance} ${getCurrencyDisplayCode(account.currency)}`
-                                ) : (
-                                    <Localize i18n_default_text='No currency assigned' />
-                                )}
-                            </Text>
-                        </div>
-                    ))}
+                                <Text
+                                    size='xxxs'
+                                    className={classNames('acc-dropdown__account-type', {
+                                        'acc-dropdown__account-type--virtual': accountDisplayAsVirtual,
+                                    })}
+                                >
+                                    {accountDisplayAsVirtual ? (
+                                        <Localize i18n_default_text='Demo account' />
+                                    ) : (
+                                        <Localize i18n_default_text='Real account' />
+                                    )}
+                                </Text>
+                                <Text size='xs' weight='bold' className='acc-dropdown__balance'>
+                                    {account.currency ? (
+                                        `${account.balance} ${getCurrencyDisplayCode(account.currency)}`
+                                    ) : (
+                                        <Localize i18n_default_text='No currency assigned' />
+                                    )}
+                                </Text>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
