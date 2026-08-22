@@ -3,7 +3,7 @@ import { useStore } from '@/hooks/useStore';
 import './live-balance.scss';
 
 /**
- * Login IDs that should always display as "Real" regardless of the
+ * Login IDs that should always display as "Real account" regardless of the
  * account's actual is_virtual status — same forced-label behavior as the
  * DTrader app header and account-switcher.tsx. The balance value below is
  * always the true value; only this label is forced.
@@ -24,8 +24,14 @@ const LiveBalance = observer(() => {
     const forceRealLabel = !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
     const displayAsVirtual = is_virtual && !forceRealLabel;
     return (
-        <div className='toolbar__balance-badge' data-testid='dt_live_balance'>
-            <span className='toolbar__balance-badge__type'>{displayAsVirtual ? 'Demo' : 'Real'}</span>
+        <div
+            className='toolbar__balance-badge'
+            data-testid='dt_live_balance'
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.2 }}
+        >
+            <span className='toolbar__balance-badge__type'>
+                {displayAsVirtual ? 'Demo account' : 'Real account'}
+            </span>
             <span className='toolbar__balance-badge__amount'>
                 {formatBalance(balance)} {currency}
             </span>
