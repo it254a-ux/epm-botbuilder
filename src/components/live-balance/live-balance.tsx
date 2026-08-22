@@ -27,12 +27,24 @@ const LiveBalance = observer(() => {
         <div
             className='toolbar__balance-badge'
             data-testid='dt_live_balance'
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.2 }}
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                lineHeight: 1.1,
+                fontSize: '10px',
+                letterSpacing: 'normal',
+                textTransform: 'none',
+                padding: 0,
+            }}
         >
-            <span className='toolbar__balance-badge__type'>
+            <span
+                className='toolbar__balance-badge__type'
+                style={{ fontSize: '9px', letterSpacing: 'normal', textTransform: 'none' }}
+            >
                 {displayAsVirtual ? 'Demo account' : 'Real account'}
             </span>
-            <span className='toolbar__balance-badge__amount'>
+            <span className='toolbar__balance-badge__amount' style={{ fontSize: '12px' }}>
                 {formatBalance(balance)} {currency}
             </span>
         </div>
