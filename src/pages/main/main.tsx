@@ -47,6 +47,7 @@ import './main.scss';
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 const AiBotBuilder = lazy(() => import('../ai-bot-builder'));
+const EpmTradingBots = lazy(() => import('../epm-trading-bots'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -79,7 +80,7 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'ai_bot_builder'];
+    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'ai_bot_builder', 'epm_trading_bots'];
     const { isDesktop } = useDevice();
     const location = useLocation();
     const navigate = useNavigate();
@@ -477,6 +478,25 @@ const AppWrapper = observer(() => {
                                     }
                                 >
                                     <AiBotBuilder />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>🤖</span>
+                                        <Localize i18n_default_text='EPM Trading bots' />
+                                    </>
+                                }
+                                id='id-epm-trading-bots'
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader
+                                            message={localize('Please wait, loading EPM Trading bots...')}
+                                        />
+                                    }
+                                >
+                                    <EpmTradingBots />
                                 </Suspense>
                             </div>
                         </Tabs>
