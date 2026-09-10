@@ -2,8 +2,39 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 
     &__tabs {
         height: 100%;
+        min-height: 0;
+    }
+}
+
+/*
+ * The shared Tabs component (src/components/shared_ui/tabs/tabs.tsx) applies
+ * the `className` prop as `dc-tabs--${className}` on its root element and
+ * `dc-tabs__content--${className}` on its content wrapper — NOT as a plain
+ * `.epm-trading-bots__tabs` class. The rules below target the classes Tabs
+ * actually renders, so height is correctly passed down to the active panel
+ * (Freebots / AI Bot Builder / Admin), letting each panel's own
+ * `overflow-y: auto` actually have something to scroll within.
+ */
+.dc-tabs--epm-trading-bots__tabs {
+    height: 100%;
+    min-height: 0;
+}
+
+.dc-tabs__content--epm-trading-bots__tabs {
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    > * {
+        height: 100%;
+        min-height: 0;
+        width: 100%;
     }
 }
