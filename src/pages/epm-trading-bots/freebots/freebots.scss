@@ -43,7 +43,7 @@
         padding: 1.6rem;
         display: flex;
         flex-direction: column;
-        background: var(--background-secondary, transparent);
+        background: #1a2332;
     }
 
     &__card-title {
@@ -98,7 +98,7 @@
 
     &__load-btn {
         margin-top: auto;
-        background: var(--button-primary-default, #2e9e9e);
+        background: var(--button-primary-default, #3B82F6);
         color: #fff;
         border: none;
         border-radius: 4px;
