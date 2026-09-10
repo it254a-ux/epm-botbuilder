@@ -1,0 +1,155 @@
+import React, { useEffect, useState } from 'react';
+import { observer } from 'mobx-react-lite';
+import { toast } from 'react-toastify';
+import { load, save_types } from '@/external/bot-skeleton';
+import { DBOT_TABS } from '@/constants/bot-contents';
+import { useStore } from '@/hooks/useStore';
+import { Localize, localize } from '@deriv-com/translations';
+import './freebots.scss';
+
+type TBotSummary = {
+    id: number;
+    name: string;
+    description: string;
+    market: string;
+    risk_level: string;
+    created_at: string;
+};
+
+const DESCRIPTION_PREVIEW_LENGTH = 160;
+
+const Freebots = observer(() => {
+    const { dashboard } = useStore();
+    const { setActiveTab } = dashboard;
+
+    const [bots, setBots] = useState<TBotSummary[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadingBotId, setLoadingBotId] = useState<number | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchBots = async () => {
+            setIsLoading(true);
+            setLoadError(null);
+            try {
+                const res = await fetch('/api/bots');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.error || localize('Failed to load bots'));
+                if (!cancelled) setBots(data.bots || []);
+            } catch (err: any) {
+                if (!cancelled) setLoadError(err?.message || localize('Failed to load bots'));
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        };
+
+        fetchBots();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const handleLoadBot = async (bot: TBotSummary) => {
+        setLoadingBotId(bot.id);
+        try {
+            const res = await fetch(`/api/bots/${bot.id}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || localize('Failed to load bot'));
+
+            await load({
+                block_string: data.bot.xml_content,
+                file_name: data.bot.name,
+                workspace: window.Blockly?.derivWorkspace,
+                from: save_types.LOCAL,
+                drop_event: {},
+                strategy_id: null,
+                showIncompatibleStrategyDialog: false,
+            });
+
+            setActiveTab(DBOT_TABS.BOT_BUILDER);
+            toast.success(localize('Bot loaded into Bot Builder'));
+        } catch (err: any) {
+            toast.error(err?.message || localize('Failed to load bot'));
+        } finally {
+            setLoadingBotId(null);
+        }
+    };
+
+    return (
+        <div className='freebots'>
+            <div className='freebots__header'>
+                <h1 className='freebots__title'>
+                    <Localize i18n_default_text='Free Bots' />
+                </h1>
+                <p className='freebots__subtitle'>
+                    <Localize i18n_default_text='Browse and load pre-built trading bots to get started quickly.' />
+                </p>
+            </div>
+
+            {isLoading && (
+                <div className='freebots__status'>
+                    <Localize i18n_default_text='Loading bots...' />
+                </div>
+            )}
+
+            {!isLoading && loadError && <div className='freebots__status freebots__status--error'>{loadError}</div>}
+
+            {!isLoading && !loadError && bots.length === 0 && (
+                <div className='freebots__status'>
+                    <Localize i18n_default_text='No bots have been added yet. Check back soon.' />
+                </div>
+            )}
+
+            <div className='freebots__grid'>
+                {bots.map(bot => {
+                    const isExpanded = expandedId === bot.id;
+                    const isLong = bot.description.length > DESCRIPTION_PREVIEW_LENGTH;
+                    return (
+                        <div key={bot.id} className='freebots__card'>
+                            <h2 className='freebots__card-title'>{bot.name}</h2>
+                            <div className='freebots__card-tags'>
+                                <span className='freebots__tag'>{bot.market}</span>
+                                <span className='freebots__tag'>{bot.risk_level}</span>
+                            </div>
+                            <p
+                                className={
+                                    isExpanded
+                                        ? 'freebots__card-description freebots__card-description--expanded'
+                                        : 'freebots__card-description'
+                                }
+                            >
+                                {bot.description}
+                            </p>
+                            {isLong && (
+                                <button
+                                    type='button'
+                                    className='freebots__learn-more'
+                                    onClick={() => setExpandedId(isExpanded ? null : bot.id)}
+                                >
+                                    {isExpanded ? localize('Show less') : localize('Learn more')}
+                                </button>
+                            )}
+                            <button
+                                type='button'
+                                className='freebots__load-btn'
+                                disabled={loadingBotId === bot.id}
+                                onClick={() => handleLoadBot(bot)}
+                            >
+                                {loadingBotId === bot.id ? (
+                                    <Localize i18n_default_text='Loading...' />
+                                ) : (
+                                    <Localize i18n_default_text='Load Bot' />
+                                )}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+});
+
+export default Freebots;
