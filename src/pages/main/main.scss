@@ -55,6 +55,32 @@
         max-width: 100%;
         width: 100%;
 
+        /*
+         * `.main` above uses `align-items: flex-start` (a row-direction flex
+         * container), so this child never stretched to fill the available
+         * height on its own — it only ever sized to its content. That left
+         * every tab's content area (including EPM Trading bots) without a
+         * bounded height to scroll within. The rules below give this
+         * container, its immediate child wrapper, and the outer app tab bar
+         * (`.dc-tabs--main__tabs`) an explicit height, the same pattern
+         * already proven below in `.main__container--hide-tabs`, just
+         * generalized to the base (non-embed) case so the normal
+         * /botbuilder route benefits too.
+         */
+        height: 100%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+
+        > div {
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
         &.no-scroll {
             overflow: hidden;
         }
@@ -160,6 +186,15 @@
         }
 
         .dc-tabs {
+            // Bounds the outer app tab bar itself (Dashboard / Bot Builder /
+            // Charts / Tutorials / EPM Trading bots). `.dc-tabs--top` (base
+            // tabs.scss) sets `grid-template-rows: auto 1fr`, but without an
+            // explicit height here that 1fr row has nothing to divide, so
+            // the content row below never got a real height — this is what
+            // made scrolling impossible.
+            height: 100%;
+            min-height: 0;
+
             &__active-line {
                 background-color: var(--general-main-1);
                 transition: none;
@@ -212,6 +247,11 @@
             }
 
             &__content {
+                // Bounds the outer tab content row so its height (the grid's
+                // 1fr row) actually flows down into whichever tab is active.
+                height: 100%;
+                min-height: 0;
+
                 @include mobile-or-tablet-screen {
                     width: 100%;
                     overflow-x: auto;
@@ -243,10 +283,32 @@
                     &__tabs {
                         display: flex;
                         justify-content: space-between;
+                        height: 100%;
+                        min-height: 0;
 
                         @include mobile-or-tablet-screen {
                             flex-direction: column;
                             background-color: var(--general-section-1);
+                        }
+
+                        /*
+                         * This row is `display: flex` with a single active
+                         * child at a time. Without a flex-basis, that child
+                         * (whichever tab is active) only ever took its
+                         * content width and sat at the start — this is what
+                         * squeezed the EPM Trading bots panel (Freebots / AI
+                         * Bot Builder / Admin, all rendered inside
+                         * `.epm-trading-bots`) to the left side of the
+                         * screen instead of filling it. Scoped to this one
+                         * class only, so Dashboard / Bot Builder / Charts /
+                         * Tutorials — which render as other children of this
+                         * same row when active — are unaffected.
+                         */
+                        > .epm-trading-bots {
+                            flex: 1 1 auto;
+                            width: 100%;
+                            height: 100%;
+                            min-height: 0;
                         }
                     }
                 }
