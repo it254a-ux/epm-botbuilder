@@ -3,7 +3,9 @@ import LiveBalance from '@/components/live-balance/live-balance';
 
 const RunStrategy = () => (
     <div className='toolbar__section' data-testid='dt_run_strategy'>
-        <LiveBalance />
+        <div className='toolbar__balance-wrapper'>
+            <LiveBalance />
+        </div>
         <TradeAnimation className='toolbar__animation' />
     </div>
 );
