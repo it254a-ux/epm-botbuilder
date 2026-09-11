@@ -13,6 +13,11 @@
     "generate:brand-css": "node scripts/generate-brand-css.js",
     "prebuild": "node scripts/generate-brand-css.js"
   },
+  "overrides": {
+    "@deriv-com/smartcharts-champion": {
+      "@deriv-com/quill-ui": "1.18.1"
+    }
+  },
   "dependencies": {
     "@deriv-com/quill-ui": "1.18.1",
     "@deriv-com/quill-ui-next": "^2.4.5",
