@@ -4,6 +4,16 @@ const MAX_NAME_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 5000;
 const MAX_XML_LENGTH = 200000; // ~200KB, generous for a bot strategy file
 
+const CONTRACT_TYPE_OPTIONS = [
+    'Accumulators',
+    'Rise/Fall',
+    'Matches/Differs',
+    'Over/Under',
+    'Even/Odd',
+    'Multiplier',
+    'Other',
+];
+
 // Plain Vercel serverless function handler (CommonJS, matching generate-bot.js).
 //
 // GET  /api/bots  -> public, returns the bot list WITHOUT xml_content (keeps
@@ -24,7 +34,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
         try {
             const bots = await sql`
-                SELECT id, name, description, market, risk_level, created_at
+                SELECT id, name, description, market, risk_level, contract_type, created_at
                 FROM free_bots
                 ORDER BY created_at DESC
             `;
@@ -56,6 +66,10 @@ module.exports = async function handler(req, res) {
             const market = String(body.market || '').trim();
             const risk_level = String(body.risk_level || '').trim();
             const xml_content = String(body.xml_content || '');
+            const contract_type_raw = String(body.contract_type || '').trim();
+            const contract_type = CONTRACT_TYPE_OPTIONS.includes(contract_type_raw)
+                ? contract_type_raw
+                : 'Other';
 
             if (!name || !description || !market || !risk_level || !xml_content) {
                 res.status(400).json({
@@ -81,9 +95,9 @@ module.exports = async function handler(req, res) {
             }
 
             const [bot] = await sql`
-                INSERT INTO free_bots (name, description, market, risk_level, xml_content)
-                VALUES (${name}, ${description}, ${market}, ${risk_level}, ${xml_content})
-                RETURNING id, name, description, market, risk_level, created_at
+                INSERT INTO free_bots (name, description, market, risk_level, xml_content, contract_type)
+                VALUES (${name}, ${description}, ${market}, ${risk_level}, ${xml_content}, ${contract_type})
+                RETURNING id, name, description, market, risk_level, contract_type, created_at
             `;
 
             res.status(201).json({ bot });
