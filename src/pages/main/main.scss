@@ -285,17 +285,6 @@
                         justify-content: space-between;
                         height: 100%;
                         min-height: 0;
-                        // Reserves vertical space for .main__run-strategy-wrapper
-                        // below, which is `position: absolute` and therefore
-                        // floats over whatever content sits underneath it. The
-                        // Bot Builder tab was unaffected because its actual
-                        // content (`.bot-builder`) is a separate,
-                        // independently absolutely-positioned block rendered
-                        // outside this flow entirely — every other tab
-                        // (Dashboard, Charts, EPM Trading bots) renders its
-                        // content directly inside this row, so without this
-                        // padding the Run bar overlapped their top edge.
-                        padding-top: 8rem;
 
                         @include mobile-or-tablet-screen {
                             flex-direction: column;
@@ -363,19 +352,30 @@
         #id-tutorials {
             display: none !important;
         }
+
+        // Only applied when this app is loaded inside another site's
+        // iframe (window.self !== window.top), where that parent page
+        // renders its own header row directly above this content. The
+        // plain standalone /botbuilder route never gets this class, so its
+        // layout is completely unaffected by the two rules below.
+        &--embedded-header {
+            .dc-tabs__content--main__tabs {
+                padding-top: 8rem;
+            }
+        }
     }
 
     &__run-strategy-wrapper {
         inset-inline-end: 1.6rem;
-        // Was 1.6rem, which sat inside the parent ExecutivePrimeMarkets
-        // dashboard's own header row (the bar holding its save/star/share/
-        // avatar/menu icons, visible above this iframe). That overlapped
-        // the Run button under those icons instead of leaving them a clear
-        // row. Pushed down to clear that outer header entirely, landing the
-        // Run bar just inside this app's own content area, immediately
-        // below it.
-        top: 4.8rem;
+        top: 1.6rem;
         z-index: 2;
+
+        // Pushed down only inside .main__container--embedded-header (see
+        // above) to clear the parent site's own header row. Standalone
+        // /botbuilder keeps the original 1.6rem.
+        .main__container--embedded-header & {
+            top: 4.8rem;
+        }
 
         // Balance badge now sits in its own row above the tab bar, not
         // beside the Run button.
