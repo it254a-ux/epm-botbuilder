@@ -377,6 +377,15 @@
         top: 4.8rem;
         z-index: 2;
 
+        // Balance badge now sits in its own row above the tab bar, not
+        // beside the Run button.
+        .toolbar__balance-wrapper {
+            position: fixed;
+            top: 1.6rem;
+            inset-inline-end: 1.6rem;
+            z-index: 3;
+        }
+
         @include desktop-screen {
             position: absolute;
         }
