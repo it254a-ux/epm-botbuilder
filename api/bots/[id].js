@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
         try {
             const [bot] = await sql`
-                SELECT id, name, description, market, risk_level, xml_content, created_at
+                SELECT id, name, description, market, risk_level, contract_type, xml_content, created_at
                 FROM free_bots
                 WHERE id = ${Number(id)}
             `;
