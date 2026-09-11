@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'react-toastify';
 import { load, save_types } from '@/external/bot-skeleton';
@@ -13,10 +13,24 @@ type TBotSummary = {
     description: string;
     market: string;
     risk_level: string;
+    contract_type: string;
     created_at: string;
 };
 
 const DESCRIPTION_PREVIEW_LENGTH = 160;
+
+// Fixed display order for contract-type sections. Anything that doesn't
+// match one of these (including bots added before this field existed,
+// which default to 'Other' server-side) falls into 'Other' at the end.
+const CONTRACT_TYPE_ORDER = [
+    'Accumulators',
+    'Rise/Fall',
+    'Matches/Differs',
+    'Over/Under',
+    'Even/Odd',
+    'Multiplier',
+    'Other',
+];
 
 const Freebots = observer(() => {
     const { dashboard } = useStore();
@@ -52,6 +66,18 @@ const Freebots = observer(() => {
         };
     }, []);
 
+    const sections = useMemo(() => {
+        const groups: Record<string, TBotSummary[]> = {};
+        bots.forEach(bot => {
+            const key = CONTRACT_TYPE_ORDER.includes(bot.contract_type) ? bot.contract_type : 'Other';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(bot);
+        });
+        return CONTRACT_TYPE_ORDER.map(type => ({ type, bots: groups[type] || [] })).filter(
+            section => section.bots.length > 0
+        );
+    }, [bots]);
+
     const handleLoadBot = async (bot: TBotSummary) => {
         setLoadingBotId(bot.id);
         try {
@@ -76,6 +102,50 @@ const Freebots = observer(() => {
         } finally {
             setLoadingBotId(null);
         }
+    };
+
+    const renderCard = (bot: TBotSummary) => {
+        const isExpanded = expandedId === bot.id;
+        const isLong = bot.description.length > DESCRIPTION_PREVIEW_LENGTH;
+        return (
+            <div key={bot.id} className='freebots__card'>
+                <h2 className='freebots__card-title'>{bot.name}</h2>
+                <div className='freebots__card-tags'>
+                    <span className='freebots__tag'>{bot.market}</span>
+                    <span className='freebots__tag'>{bot.risk_level}</span>
+                </div>
+                <p
+                    className={
+                        isExpanded
+                            ? 'freebots__card-description freebots__card-description--expanded'
+                            : 'freebots__card-description'
+                    }
+                >
+                    {bot.description}
+                </p>
+                {isLong && (
+                    <button
+                        type='button'
+                        className='freebots__learn-more'
+                        onClick={() => setExpandedId(isExpanded ? null : bot.id)}
+                    >
+                        {isExpanded ? localize('Show less') : localize('Learn more')}
+                    </button>
+                )}
+                <button
+                    type='button'
+                    className='freebots__load-btn'
+                    disabled={loadingBotId === bot.id}
+                    onClick={() => handleLoadBot(bot)}
+                >
+                    {loadingBotId === bot.id ? (
+                        <Localize i18n_default_text='Loading...' />
+                    ) : (
+                        <Localize i18n_default_text='Load Bot' />
+                    )}
+                </button>
+            </div>
+        );
     };
 
     return (
@@ -103,51 +173,14 @@ const Freebots = observer(() => {
                 </div>
             )}
 
-            <div className='freebots__grid'>
-                {bots.map(bot => {
-                    const isExpanded = expandedId === bot.id;
-                    const isLong = bot.description.length > DESCRIPTION_PREVIEW_LENGTH;
-                    return (
-                        <div key={bot.id} className='freebots__card'>
-                            <h2 className='freebots__card-title'>{bot.name}</h2>
-                            <div className='freebots__card-tags'>
-                                <span className='freebots__tag'>{bot.market}</span>
-                                <span className='freebots__tag'>{bot.risk_level}</span>
-                            </div>
-                            <p
-                                className={
-                                    isExpanded
-                                        ? 'freebots__card-description freebots__card-description--expanded'
-                                        : 'freebots__card-description'
-                                }
-                            >
-                                {bot.description}
-                            </p>
-                            {isLong && (
-                                <button
-                                    type='button'
-                                    className='freebots__learn-more'
-                                    onClick={() => setExpandedId(isExpanded ? null : bot.id)}
-                                >
-                                    {isExpanded ? localize('Show less') : localize('Learn more')}
-                                </button>
-                            )}
-                            <button
-                                type='button'
-                                className='freebots__load-btn'
-                                disabled={loadingBotId === bot.id}
-                                onClick={() => handleLoadBot(bot)}
-                            >
-                                {loadingBotId === bot.id ? (
-                                    <Localize i18n_default_text='Loading...' />
-                                ) : (
-                                    <Localize i18n_default_text='Load Bot' />
-                                )}
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
+            {!isLoading &&
+                !loadError &&
+                sections.map(section => (
+                    <div key={section.type} className='freebots__section'>
+                        <h2 className='freebots__section-title'>{section.type}</h2>
+                        <div className='freebots__grid'>{section.bots.map(renderCard)}</div>
+                    </div>
+                ))}
         </div>
     );
 });
