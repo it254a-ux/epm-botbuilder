@@ -356,7 +356,14 @@
 
     &__run-strategy-wrapper {
         inset-inline-end: 1.6rem;
-        top: 1.6rem;
+        // Was 1.6rem, which sat inside the parent ExecutivePrimeMarkets
+        // dashboard's own header row (the bar holding its save/star/share/
+        // avatar/menu icons, visible above this iframe). That overlapped
+        // the Run button under those icons instead of leaving them a clear
+        // row. Pushed down to clear that outer header entirely, landing the
+        // Run bar just inside this app's own content area, immediately
+        // below it.
+        top: 4.8rem;
         z-index: 2;
 
         @include desktop-screen {
