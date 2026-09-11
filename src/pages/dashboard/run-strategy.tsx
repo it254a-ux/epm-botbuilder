@@ -1,12 +1,12 @@
 import { observer } from 'mobx-react-lite';
 import TradeAnimation from '@/components/trade-animation';
-import AccountSwitcher from '@/components/layout/header/account-switcher';
+import AccountSwitcherModal from '@/components/layout/header/account-switcher-modal';
 import { generateOAuthURL } from '@/components/shared';
 import { useStore } from '@/hooks/useStore';
 
 const RunStrategy = observer(() => {
     const { client } = useStore();
-    const { balance, currency, is_logged_in, is_virtual, loginid } = client;
+    const { is_logged_in } = client;
 
     const handleLogin = async () => {
         const oauthUrl = await generateOAuthURL();
@@ -17,9 +17,7 @@ const RunStrategy = observer(() => {
         <div className='toolbar__section' data-testid='dt_run_strategy'>
             <div className='toolbar__balance-wrapper'>
                 {is_logged_in ? (
-                    <AccountSwitcher
-                        activeAccount={{ balance, currency, isVirtual: is_virtual, loginid }}
-                    />
+                    <AccountSwitcherModal />
                 ) : (
                     <button type='button' className='toolbar__signin-btn' onClick={handleLogin}>
                         Sign in / Sign up
