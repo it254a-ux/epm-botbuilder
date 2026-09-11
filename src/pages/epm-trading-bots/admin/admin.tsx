@@ -9,6 +9,7 @@ type TBotSummary = {
     description: string;
     market: string;
     risk_level: string;
+    contract_type: string;
     created_at: string;
 };
 
@@ -21,6 +22,15 @@ const MARKET_OPTIONS = [
     'Other',
 ];
 const RISK_OPTIONS = ['Low risk', 'Medium risk', 'High risk'];
+const CONTRACT_TYPE_OPTIONS = [
+    'Accumulators',
+    'Rise/Fall',
+    'Matches/Differs',
+    'Over/Under',
+    'Even/Odd',
+    'Multiplier',
+    'Other',
+];
 
 const AdminBots = () => {
     const [password, setPassword] = useState('');
@@ -31,6 +41,7 @@ const AdminBots = () => {
     const [description, setDescription] = useState('');
     const [market, setMarket] = useState(MARKET_OPTIONS[0]);
     const [riskLevel, setRiskLevel] = useState(RISK_OPTIONS[0]);
+    const [contractType, setContractType] = useState(CONTRACT_TYPE_OPTIONS[0]);
     const [xmlContent, setXmlContent] = useState('');
     const [xmlFileName, setXmlFileName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +80,7 @@ const AdminBots = () => {
         setDescription('');
         setMarket(MARKET_OPTIONS[0]);
         setRiskLevel(RISK_OPTIONS[0]);
+        setContractType(CONTRACT_TYPE_OPTIONS[0]);
         setXmlContent('');
         setXmlFileName('');
     };
@@ -97,6 +109,7 @@ const AdminBots = () => {
                     description: description.trim(),
                     market,
                     risk_level: riskLevel,
+                    contract_type: contractType,
                     xml_content: xmlContent,
                 }),
             });
@@ -211,6 +224,17 @@ const AdminBots = () => {
                 </div>
 
                 <label>
+                    <Localize i18n_default_text='Contract type' />
+                    <select value={contractType} onChange={e => setContractType(e.target.value)}>
+                        {CONTRACT_TYPE_OPTIONS.map(option => (
+                            <option key={option} value={option}>
+                                {option}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
+                <label>
                     <Localize i18n_default_text='Bot XML file' />
                     <input type='file' accept='application/xml, text/xml' onChange={handleXmlFile} />
                     {xmlFileName && <span className='admin-bots__file-name'>{xmlFileName}</span>}
@@ -244,6 +268,7 @@ const AdminBots = () => {
                         <div>
                             <strong>{bot.name}</strong>
                             <span className='admin-bots__list-tags'>
+                                {bot.contract_type ? `${bot.contract_type} · ` : ''}
                                 {bot.market} · {bot.risk_level}
                             </span>
                         </div>
