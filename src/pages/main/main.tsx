@@ -46,6 +46,7 @@ import './main.scss';
 
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
+const AiBotBuilder = lazy(() => import('../ai-bot-builder'));
 const EpmTradingBots = lazy(() => import('../epm-trading-bots'));
 
 const AppWrapper = observer(() => {
@@ -79,7 +80,7 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'epm_trading_bots'];
+    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'ai_bot_builder', 'epm_trading_bots'];
     const { isDesktop } = useDevice();
     const location = useLocation();
     const navigate = useNavigate();
@@ -93,6 +94,14 @@ const AppWrapper = observer(() => {
     // The plain /botbuilder route (no query flag) is completely unaffected.
     const search_params = new URLSearchParams(location.search);
     const is_tutorial_only_embed = search_params.get('embed') === 'tutorial-only';
+    // True only when this app is loaded inside another site's iframe (e.g.
+    // the ExecutivePrimeMarkets dashboard, which renders its own header row
+    // with save/star/share/avatar icons directly above this iframe). The
+    // plain standalone /botbuilder route (opened directly, not in an
+    // iframe) has no such overlapping header, so it must NOT get the extra
+    // top clearance below — applying it there just wastes space and breaks
+    // each tab's own height calculations.
+    const is_embedded_in_parent = typeof window !== 'undefined' && window.self !== window.top;
 
     // Trade type modal state
     const [tradeTypeModalState, setTradeTypeModalState] = useState(getModalState());
@@ -382,6 +391,7 @@ const AppWrapper = observer(() => {
                     className={classNames('main__container', {
                         'main__container--active': active_tour && active_tab === DASHBOARD && !isDesktop,
                         'main__container--hide-tabs': is_tutorial_only_embed,
+                        'main__container--embedded-header': is_embedded_in_parent,
                     })}
                 >
                     <div>
@@ -461,6 +471,23 @@ const AppWrapper = observer(() => {
                                         <Tutorial handleTabChange={handleTabChange} />
                                     </Suspense>
                                 </div>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>✨</span>
+                                        <Localize i18n_default_text='AI Bot Builder' />
+                                    </>
+                                }
+                                id='id-ai-bot-builder'
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader message={localize('Please wait, loading AI Bot Builder...')} />
+                                    }
+                                >
+                                    <AiBotBuilder />
+                                </Suspense>
                             </div>
                             <div
                                 label={
