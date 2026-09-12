@@ -285,6 +285,13 @@
                         justify-content: space-between;
                         height: 100%;
                         min-height: 0;
+                        // Clears the balance badge + Run bar stack in the
+                        // top-right corner (both position: absolute/fixed,
+                        // so they don't reserve space on their own). Bot
+                        // Builder's own content ignores this — it's a
+                        // separate, independently-positioned block outside
+                        // this flow entirely.
+                        padding-top: 8rem;
 
                         @include mobile-or-tablet-screen {
                             flex-direction: column;
@@ -360,21 +367,24 @@
         // layout is completely unaffected by the two rules below.
         &--embedded-header {
             .dc-tabs__content--main__tabs {
-                padding-top: 8rem;
+                padding-top: 10.4rem;
             }
         }
     }
 
     &__run-strategy-wrapper {
         inset-inline-end: 1.6rem;
-        top: 1.6rem;
+        // Balance badge (.toolbar__balance-wrapper below) now occupies the
+        // very top-right corner at top:1.6rem — this must always sit below
+        // it, regardless of embed context, or the two overlap.
+        top: 4.8rem;
         z-index: 2;
 
-        // Pushed down only inside .main__container--embedded-header (see
-        // above) to clear the parent site's own header row. Standalone
-        // /botbuilder keeps the original 1.6rem.
+        // Extra clearance only inside .main__container--embedded-header,
+        // stacking on top of the base offset above, to also clear the
+        // parent site's own header row.
         .main__container--embedded-header & {
-            top: 4.8rem;
+            top: 7.2rem;
         }
 
         // Balance badge now sits in its own row above the tab bar, not
