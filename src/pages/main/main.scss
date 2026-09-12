@@ -382,6 +382,17 @@
             top: 0.5rem;
             inset-inline-end: 1.6rem;
             z-index: 3;
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .toolbar__utility-icons {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding-inline-end: 0.8rem;
+            border-inline-end: 1px solid var(--border-normal, #333);
         }
 
         @include desktop-screen {
