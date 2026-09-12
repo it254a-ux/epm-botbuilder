@@ -1,12 +1,18 @@
 import { observer } from 'mobx-react-lite';
 import TradeAnimation from '@/components/trade-animation';
 import AccountSwitcherModal from '@/components/layout/header/account-switcher-modal';
+import FullScreen from '@/components/layout/footer/FullScreen';
+import LogoutFooter from '@/components/layout/footer/LogoutFooter';
+import NetworkStatus from '@/components/layout/footer/NetworkStatus';
+import ServerTime from '@/components/layout/footer/ServerTime';
 import { generateOAuthURL } from '@/components/shared';
+import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 
 const RunStrategy = observer(() => {
     const { client } = useStore();
     const { is_logged_in } = client;
+    const { isAuthorized } = useApiBase();
 
     const handleLogin = async () => {
         const oauthUrl = await generateOAuthURL();
@@ -16,6 +22,12 @@ const RunStrategy = observer(() => {
     return (
         <div className='toolbar__section' data-testid='dt_run_strategy'>
             <div className='toolbar__balance-wrapper'>
+                <div className='toolbar__utility-icons'>
+                    <NetworkStatus />
+                    <ServerTime />
+                    <FullScreen />
+                    {isAuthorized && <LogoutFooter />}
+                </div>
                 {is_logged_in ? (
                     <AccountSwitcherModal />
                 ) : (
