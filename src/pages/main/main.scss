@@ -365,14 +365,14 @@
         // Balance badge (.toolbar__balance-wrapper below) now occupies the
         // very top-right corner at top:1.6rem — this must always sit below
         // it, regardless of embed context, or the two overlap.
-        top: 4.8rem;
+        top: 5.6rem;
         z-index: 2;
 
         // Extra clearance only inside .main__container--embedded-header,
         // stacking on top of the base offset above, to also clear the
         // parent site's own header row.
         .main__container--embedded-header & {
-            top: 7.2rem;
+            top: 8rem;
         }
 
         // Balance badge now sits in its own row above the tab bar, not
