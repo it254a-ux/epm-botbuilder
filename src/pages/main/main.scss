@@ -285,13 +285,6 @@
                         justify-content: space-between;
                         height: 100%;
                         min-height: 0;
-                        // Clears the balance badge + Run bar stack in the
-                        // top-right corner (both position: absolute/fixed,
-                        // so they don't reserve space on their own). Bot
-                        // Builder's own content ignores this — it's a
-                        // separate, independently-positioned block outside
-                        // this flow entirely.
-                        padding-top: 8rem;
 
                         @include mobile-or-tablet-screen {
                             flex-direction: column;
@@ -360,16 +353,11 @@
             display: none !important;
         }
 
-        // Only applied when this app is loaded inside another site's
-        // iframe (window.self !== window.top), where that parent page
-        // renders its own header row directly above this content. The
-        // plain standalone /botbuilder route never gets this class, so its
-        // layout is completely unaffected by the two rules below.
-        &--embedded-header {
-            .dc-tabs__content--main__tabs {
-                padding-top: 10.4rem;
-            }
-        }
+        // Balance badge + Run bar (both fixed/absolute) float over the
+        // top-right corner of whichever tab is active. Left unpadded so
+        // every tab's content starts flush below the nav bar, matching Bot
+        // Builder's own layout — minor visual overlap in that top-right
+        // corner on some tabs is an accepted trade-off for that flush look.
     }
 
     &__run-strategy-wrapper {
