@@ -5,7 +5,12 @@
     --drawer-content-height-no-stat: calc(100vh - 233px);
     --drawer-scroll-height: calc(100vh - 365px);
     --drawer-content-height-mobile: calc(100% - 233px);
-    --tab-content-height: calc(100vh - 6rem);
+    // Was calc(100vh - 6rem): that 6rem accounted for both the top tab bar
+    // AND the app footer (3.6rem) below it. The footer has been removed
+    // entirely (see layout/index.tsx), so every page using this variable
+    // was leaving an empty gap at the bottom equal to the old footer's
+    // height. Reduced to just the tab bar's own space.
+    --tab-content-height: calc(100vh - 2.4rem);
     --tab-content-height-mobile: calc(100vh - 5rem);
     --zindex-drawer: 5;
     --zindex-modal: 6;
