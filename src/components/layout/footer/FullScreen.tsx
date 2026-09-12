@@ -14,7 +14,7 @@ const FullScreen = () => {
             onClick={toggleFullScreenMode}
             tooltipContent={localize('Full screen')}
         >
-            <LegacyFullscreen1pxIcon iconSize='xs' />
+            <LegacyFullscreen1pxIcon iconSize='xs' fill='var(--text-general)' />
         </Tooltip>
     );
 };
