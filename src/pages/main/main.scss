@@ -498,7 +498,11 @@
            variable) subtracts the footer height too, so the chart's bottom
            edge now reaches exactly to the footer line — touching it, not
            overlapping it, and no extra boundary/gap above it either. */
-        height: calc(var(--tab-content-height) - 3.6rem);
+        /* Was calc(var(--tab-content-height) - 3.6rem) to leave room for
+           the app footer below. The footer bar has been removed entirely
+           (see layout/index.tsx), so that subtraction now just left an
+           empty gap at the bottom of the chart for no reason. */
+        height: var(--tab-content-height);
         width: 100%;
         transition: all 0.4s;
 
