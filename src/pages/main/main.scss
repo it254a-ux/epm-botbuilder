@@ -428,6 +428,22 @@
     }
 }
 
+// Bounds the Dtrader tab's content to the tab pane's own height (same
+// pattern used for the tutorial-only embed above, generalized here for the
+// normal /botbuilder route). Without this, the tab pane has no explicit
+// height, so Dtrader's own internal `overflow-y-auto` (built for mobile)
+// has nothing to scroll within and the whole page scrolls instead -
+// showing the browser's own scrollbar and letting Bot Builder's floating
+// Run button/RunPanel (hidden separately in main.tsx for this tab) bleed
+// into view at the top/bottom edges.
+.main__dtrader-tab-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .animation__wrapper {
     .animation {
         &__button#db-animation {
