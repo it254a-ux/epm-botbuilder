@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Scoped to .dtrader-app (the wrapper around every ported dtrader page)
+ * instead of :root. Bot-builder has its own SCSS theme variables
+ * (--general-main-1, --border-normal, etc.) — defining generic names like
+ * --background/--border globally risked colliding with those or leaking
+ * Tailwind's reset into the rest of the app. This way the ported pages get
+ * their exact original palette, nothing else is touched.
+ *
+ * Only the dark-mode palette is included below: every reference screenshot
+ * for these pages was dark-themed, and bot-builder itself is dark-themed
+ * throughout, so the light-mode variant from dtrader's globals.css was
+ * dropped rather than carrying an unused toggle.
+ */
+.dtrader-app {
+    --radius: 0.5rem;
+    --primary: 3 221 58;
+    --accent-foreground: 246 247 248;
+    --background: 24 28 37;
+    --border: 255 255 255 / 0.10000000149011612;
+    --card: 23 23 23;
+    --accent: 17 20 27;
+    --card-foreground: 255 255 255;
+    --destructive: 230 25 14 / 0.7200000286102295;
+    --destructive-foreground: 254 252 252;
+    --foreground: 255 255 255;
+    --input: 255 255 255 / 0.07999999821186066;
+    --muted: 38 38 38;
+    --popover: 38 38 38;
+    --popover-foreground: 255 255 255;
+    --primary-foreground: 255 255 255;
+    --ring: 115 115 115;
+    --secondary: 0 0 0;
+    --secondary-foreground: 255 255 255;
+    --muted-foreground: 163 163 163;
+    --chart-1: 29 78 216;
+    --chart-2: 0 195 144;
+    --chart-3: 245 158 11;
+    --chart-4: 168 85 247;
+    --chart-5: 222 0 64;
+    --buy-background: 0 195 144;
+    --buy-foreground: 255 255 255;
+    --sell-background: 222 0 64;
+    --sell-foreground: 255 255 255;
+    --button-black: 0 0 0;
+    --button-black-foreground: 255 255 255;
+    --button-white: 255 255 255;
+    --button-white-foreground: 0 0 0;
+    --alpha-10: 0 0 0 / 0.8999999761581421;
+    --alpha-20: 0 0 0 / 0.800000011920929;
+    --alpha-30: 0 0 0 / 0.699999988079071;
+    --alpha-40: 0 0 0 / 0.6000000238418579;
+    --alpha-50: 0 0 0 / 0.5;
+    --alpha-60: 0 0 0 / 0.4000000059604645;
+    --alpha-70: 0 0 0 / 0.30000001192092896;
+    --alpha-80: 0 0 0 / 0.20000000298023224;
+    --alpha-90: 0 0 0 / 0.10000000149011612;
+    --ring-offset: 24 28 37;
+    --alpha-5: 0 0 0 / 0.949999988079071;
+    --outline: 115 115 115 / 0.5;
+    --dark\:input: 0 0 0 / 0.07999999821186066;
+    --destructive-20: 248 113 113 / 0.4000000059604645;
+    --destructive-40: 248 113 113 / 0.6000000059604645;
+    --outline-10: 115 115 115 / 0.20000000298023224;
+    --blue-500: 37 99 235;
+    --buy-20: 0 195 144 / 0.4000000059604645;
+    --sell-20: 222 0 64 / 0.4000000059604645;
+    --section-message: 30 64 175 / 0.8399999737739563;
+    --border-focus: 255 255 255;
+    --border-focus-destructive: 255 77 77;
+    --button-blackwhite: 255 255 255;
+    --button-blackwhite-foreground: 0 0 0;
+    --checkmark-foreground: 24 28 37;
+    --checkmark: 255 255 255;
+
+    background: rgb(var(--background));
+    color: rgb(var(--foreground));
+
+    * {
+        border-color: rgb(var(--border));
+    }
+}
+
+/* Thin scrollbar utility, used inside the ported pages */
+.dtrader-app .thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--muted-foreground) / 0.4) transparent;
+}
+
+.dtrader-app .thin-scrollbar::-webkit-scrollbar {
+    width: 1px;
+    height: 1px;
+}
+
+.dtrader-app .thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dtrader-app .thin-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--muted-foreground) / 0.4);
+    border-radius: 9999px;
+}
+
+.dtrader-app .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--muted-foreground) / 0.6);
+}
