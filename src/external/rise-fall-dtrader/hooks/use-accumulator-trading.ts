@@ -1,12 +1,12 @@
 
 import { useState, useMemo, useCallback } from 'react';
-import { useBuy } from '@deriv/core';
+import { useBuy } from '@/external/rise-fall-dtrader/hooks/use-buy';
 import type {
-  DerivWS,
   ActiveSymbol,
   Tick,
   BuyResult,
-} from '@deriv/core';
+} from '@/external/deriv-core';
+import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
 import { useBaseTrading } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import type { UseBaseTradingParams } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import { useAccumulatorProposal } from './use-accumulator-proposal';

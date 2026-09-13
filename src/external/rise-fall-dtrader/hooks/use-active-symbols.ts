@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import type { DerivWS } from '../ws';
-import type { ActiveSymbol, ContractsForResponse, ContractInfo, DurationLimits } from '../types';
-import { pickDefaultSymbol } from '../utils/pick-default-symbol';
+import type { ApiWsHandle as DerivWS } from '../lib/api-ws-adapter';
+import type { ActiveSymbol, ContractsForResponse, ContractInfo, DurationLimits } from '@/external/deriv-core';
+import { pickDefaultSymbol } from '../lib/pick-default-symbol';
 
 const SYMBOL_PARAM = 'symbol';
 

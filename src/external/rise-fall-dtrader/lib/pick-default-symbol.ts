@@ -1,4 +1,4 @@
-import type { ActiveSymbol } from '../types';
+import type { ActiveSymbol } from '@/external/deriv-core';
 
 const DEFAULT_SYMBOL = '1HZ100V';
 

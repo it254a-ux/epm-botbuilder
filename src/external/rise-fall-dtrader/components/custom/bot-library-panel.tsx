@@ -1,6 +1,6 @@
 
 import { BOT_LIBRARY } from '@/external/rise-fall-dtrader/lib/bots-library';
-import type { StrategyProgram } from '@deriv/core';
+import type { StrategyProgram } from '../../lib/types';
 
 interface BotLibraryPanelProps {
   open: boolean;

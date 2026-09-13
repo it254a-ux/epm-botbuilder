@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { BuyResult, ProposalInfo } from '@deriv/core';
+import type { BuyResult, ProposalInfo } from '@/external/deriv-core';
 import type { OpenPosition } from '../lib/types';
 import type { ContractMode } from '@/external/rise-fall-dtrader/lib/digit-types';
 

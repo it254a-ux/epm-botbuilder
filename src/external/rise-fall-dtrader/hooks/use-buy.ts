@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
-import type { DerivWS } from '../ws';
-import type { ProposalInfo, BuyResponse, BuyResult } from '../types';
+import type { ApiWsHandle as DerivWS } from '../lib/api-ws-adapter';
+import type { ProposalInfo, BuyResponse, BuyResult } from '@/external/deriv-core';
 
 interface UseBuyReturn {
   buyContract: (proposal: ProposalInfo) => Promise<void>;
