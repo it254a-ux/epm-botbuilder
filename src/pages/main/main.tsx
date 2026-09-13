@@ -47,6 +47,7 @@ import './main.scss';
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 const EpmTradingBots = lazy(() => import('../epm-trading-bots'));
+const DtraderPage = lazy(() => import('../dtrader'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -79,7 +80,7 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'tutorial', 'epm_trading_bots'];
+    const hash = ['dashboard', 'bot_builder', 'chart', 'dtrader', 'tutorial', 'epm_trading_bots'];
     const { isDesktop } = useDevice();
     const location = useLocation();
     const navigate = useNavigate();
@@ -445,6 +446,21 @@ const AppWrapper = observer(() => {
                                     fallback={<ChunkLoader message={localize('Please wait, loading chart...')} />}
                                 >
                                     <ChartWrapper show_digits_stats={false} />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>📈</span>
+                                        <Localize i18n_default_text='Dtrader' />
+                                    </>
+                                }
+                                id='id-dtrader'
+                            >
+                                <Suspense
+                                    fallback={<ChunkLoader message={localize('Please wait, loading Dtrader...')} />}
+                                >
+                                    <DtraderPage />
                                 </Suspense>
                             </div>
                             <div
