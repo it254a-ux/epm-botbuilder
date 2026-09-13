@@ -79,8 +79,52 @@
     background: rgb(var(--background));
     color: rgb(var(--foreground));
 
-    * {
+    /* Preflight is disabled globally (corePlugins.preflight: false in
+     * tailwind.config.js) so it can't leak onto bot-builder's SCSS pages.
+     * Reproduced here, scoped to .dtrader-app, so ported components still
+     * get the reset they were built against. */
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+        border-width: 0;
+        border-style: solid;
         border-color: rgb(var(--border));
+    }
+
+    h1, h2, h3, h4, h5, h6, p, blockquote, figure, dl, dd {
+        margin: 0;
+    }
+
+    ul, ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    button, input, optgroup, select, textarea {
+        font-family: inherit;
+        font-size: 100%;
+        font-weight: inherit;
+        line-height: inherit;
+        color: inherit;
+        margin: 0;
+        padding: 0;
+    }
+
+    button {
+        background-color: transparent;
+        background-image: none;
+        cursor: pointer;
+    }
+
+    img, svg, video, canvas {
+        display: block;
+        max-width: 100%;
+    }
+
+    table {
+        border-collapse: collapse;
     }
 }
 

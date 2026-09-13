@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     darkMode: ['class'],
+    // Global preflight would leak a CSS reset (margins, box-sizing, etc.)
+    // onto bot-builder's own SCSS pages, since Tailwind's base layer isn't
+    // limited by `content` globs. Preflight is reproduced instead, scoped
+    // under .dtrader-app, in src/styles/dtrader-globals.css.
+    corePlugins: { preflight: false },
     // Scoped to the ported dtrader pages/components only — the rest of
     // bot-builder uses its own SCSS/BEM classes, so scanning the whole
     // src/ tree isn't necessary and keeps Tailwind's generated CSS small.

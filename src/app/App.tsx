@@ -16,6 +16,7 @@ import './app-root.scss';
 
 const Layout = lazy(() => import('../components/layout'));
 const AppRoot = lazy(() => import('./app-root'));
+const DtraderPage = lazy(() => import('../pages/dtrader'));
 
 /**
  * Component wrapper to handle language URL parameter
@@ -58,6 +59,8 @@ const router = createBrowserRouter(
             <Route index element={<AppRoot />} />
             {/* App Builder embeds the template at /preview — render the same app shell */}
             <Route path='preview' element={<AppRoot />} />
+            {/* Ported Rise/Fall trading page (formerly its own repo) */}
+            <Route path='dtrader' element={<DtraderPage />} />
         </Route>
     ),
     { basename: routerBasename }

@@ -62,6 +62,7 @@ export default defineConfig({
       '@/utils': path.resolve(__dirname, './src/utils'),
       '@/constants': path.resolve(__dirname, './src/constants'),
       '@/stores': path.resolve(__dirname, './src/stores'),
+      '@deriv/core': path.resolve(__dirname, './src/external/rise-fall-dtrader/packages/core/src/index.ts'),
     },
   },
   output: {
