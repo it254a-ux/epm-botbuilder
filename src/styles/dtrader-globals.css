@@ -151,3 +151,32 @@
 .dtrader-app .thin-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: rgb(var(--muted-foreground) / 0.6);
 }
+
+/*
+ * Desktop only: cancel out the 1.6rem top/bottom padding that `.main`
+ * (src/pages/main/main.scss) puts around every tab's content on screens
+ * ≥1280px (that padding is zeroed below 1280px already, via that file's
+ * mobile-or-tablet-screen mixin, so nothing below needs to happen on
+ * mobile/tablet).
+ *
+ * `.main` is shared by every tab (Dashboard, Bot Builder, Charts, EPM
+ * Trading) and other tabs deliberately rely on that padding for their own
+ * framing, so it can't be changed there without moving those tabs too.
+ * Scoping this to `.dtrader-app` instead only affects Dtrader.
+ *
+ * Scoped further to `.main .dtrader-app` (not `.dtrader-app` alone)
+ * because `.dtrader-app` is also the root of the separate standalone
+ * `/dtrader` route (see src/app/App.tsx), which renders outside `.main`
+ * entirely and has no such padding to cancel — applying this there would
+ * cut real content instead of reclaiming empty space.
+ *
+ * Horizontal padding/position is untouched — this only pulls the panel up
+ * and stretches it down, per the requested "top and bottom only" change.
+ */
+@media (min-width: 1280px) {
+    .main .dtrader-app.h-full {
+        margin-top: -1.6rem;
+        margin-bottom: -1.6rem;
+        height: calc(100% + 3.2rem);
+    }
+}
