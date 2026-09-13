@@ -428,26 +428,6 @@
     }
 }
 
-// Bounds the Dtrader tab's content on mobile/tablet ONLY (max-width: 1279px,
-// same breakpoint as mobile-or-tablet-screen elsewhere in this file) so its
-// own internal overflow-y-auto (built for mobile) scrolls instead of the
-// whole page - which otherwise shows the browser's own scrollbar and a
-// reserved-scrollbar gap on the right edge.
-//
-// Deliberately NOT applied on desktop: an earlier attempt gave this
-// height:100%/overflow:hidden unconditionally, which broke the desktop
-// chart+panel grid entirely (chart disappeared). Scoping it to mobile-only
-// avoids touching that lg: grid layout at all.
-@include mobile-or-tablet-screen {
-    .main__dtrader-tab-content {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 0;
-        overflow: hidden;
-    }
-}
-
 .animation__wrapper {
     .animation {
         &__button#db-animation {
