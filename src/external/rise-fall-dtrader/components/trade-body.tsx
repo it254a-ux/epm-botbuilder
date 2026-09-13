@@ -45,15 +45,16 @@ export interface TradeBodyProps {
 }
 
 const DEFAULT_OUTER =
-  'flex w-full flex-col px-3 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-3 max-lg:pb-16 lg:pb-2 lg:px-3 lg:flex-1 lg:min-h-0 lg:overflow-hidden';
+  'flex w-full flex-col px-0 py-2 sm:px-0 sm:py-4 gap-2 sm:gap-3 max-lg:pb-16 lg:pb-2 lg:px-3 lg:flex-1 lg:min-h-0 lg:overflow-hidden';
 const DEFAULT_GRID =
   'flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-3 lg:h-full lg:min-h-0';
 const DEFAULT_CHART_COL = 'flex flex-col gap-2 px-0 pt-2 lg:py-0 lg:h-full lg:min-h-0';
 const DEFAULT_CHART_WRAPPER = 'h-[70vh] min-h-[420px] max-h-[640px] lg:h-full lg:min-h-0 lg:max-h-none';
 const DEFAULT_SETTINGS_COL =
   'flex flex-col gap-3 pt-3 lg:pt-0 border-t border-border lg:border-0 lg:h-full lg:min-h-0';
-const DEFAULT_CARD = 'lg:h-full lg:overflow-y-auto thin-scrollbar';
-const DEFAULT_CARD_CONTENT = 'pt-4';
+const DEFAULT_CARD =
+  'max-lg:w-full max-lg:rounded-none max-lg:border-0 max-lg:shadow-none max-lg:bg-transparent lg:h-full lg:overflow-y-auto thin-scrollbar';
+const DEFAULT_CARD_CONTENT = 'pt-4 max-lg:px-3';
 const DEFAULT_SKELETON = 'lg:h-full h-48 w-full rounded-xl';
 
 export function TradeBody({
