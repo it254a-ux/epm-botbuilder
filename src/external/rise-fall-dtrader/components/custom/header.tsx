@@ -90,7 +90,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header({
   return (
     <header
       ref={ref}
-      className="fixed top-0 left-0 lg:left-[72px] right-0 z-50 flex items-center justify-between px-4 pt-3 pb-1 border-b bg-background/80 backdrop-blur-sm"
+      className="sticky top-0 z-30 flex items-center justify-between px-4 pt-3 pb-1 border-b bg-background/80 backdrop-blur-sm"
     >
       {/* FIX (mobile only): the top TradeTypesFlyout tab row was overlapping
           the chart on mobile, and now duplicates the "Market contracts"

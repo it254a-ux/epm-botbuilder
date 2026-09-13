@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSmartChartsApi } from '@/external/rise-fall-dtrader/hooks/use-smartcharts-api';
 import { useSmartChartChartData } from '@/external/rise-fall-dtrader/hooks/use-smartchart-chart-data';
 import { useRiseFallTrading } from '@/external/rise-fall-dtrader/hooks/use-rise-fall-trading';
@@ -17,7 +17,7 @@ import '../../styles/dtrader-globals.css';
 export default function DtraderPage() {
   return (
     <TemplateLayout>
-      <div className="dtrader-app">
+      <div className="dtrader-app h-full">
         <RiseFallPage />
       </div>
     </TemplateLayout>
@@ -32,25 +32,8 @@ function RiseFallPage() {
 
   const [activeTradeType, setActiveTradeType] = useState<string>('rise-fall');
 
-  // FIX: instead of a hardcoded pixel spacer that goes stale every time the
-  // header's padding changes, measure the header's real rendered height via
-  // ResizeObserver and use that exact number for the content spacer below
-  // it. Updates automatically if the header ever resizes (auth state
-  // change, responsive breakpoint, font change, future padding tweaks).
-  const headerRef = useRef<HTMLElement>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
-
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setHeaderHeight(entry.contentRect.height);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  // Header is `sticky top-0` within this page's own scroll container, so it
+  // occupies its own space in the flex flow — no manual spacer needed.
 
   // Which trade-type "family" is currently selected. Computed before the
   // trading hooks below so each hook can be told whether it's the active
@@ -140,11 +123,10 @@ function RiseFallPage() {
   if (activeTradeType === 'accumulators') {
     return (
       <main
-        className="flex flex-col bg-background max-lg:h-dvh max-lg:overflow-y-auto lg:h-dvh lg:overflow-hidden"
+        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         <Header
-          ref={headerRef}
           authState={authState}
           accounts={accounts}
           activeAccount={activeAccount}
@@ -158,7 +140,6 @@ function RiseFallPage() {
           ws={ws}
           isConnected={isConnected}
         />
-        <div style={{ height: headerHeight }} className="shrink-0" />
         <AccumulatorsBody
           ws={accumulators.ws}
           isConnected={accumulators.isConnected}
@@ -199,11 +180,10 @@ function RiseFallPage() {
   if (isDigitsTab) {
     return (
       <main
-        className="flex flex-col bg-background max-lg:h-dvh max-lg:overflow-y-auto lg:h-dvh lg:overflow-hidden"
+        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         <Header
-          ref={headerRef}
           authState={authState}
           accounts={accounts}
           activeAccount={activeAccount}
@@ -217,7 +197,6 @@ function RiseFallPage() {
           ws={ws}
           isConnected={isConnected}
         />
-        <div style={{ height: headerHeight }} className="shrink-0" />
         <DigitsBody
           authState={authState}
           isConnected={digits.isConnected}
@@ -261,11 +240,10 @@ function RiseFallPage() {
 
   return (
     <main
-      className="flex flex-col bg-background max-lg:h-dvh max-lg:overflow-y-auto lg:h-dvh lg:overflow-hidden"
+      className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
       style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       <Header
-        ref={headerRef}
         authState={authState}
         accounts={accounts}
         activeAccount={activeAccount}
@@ -279,7 +257,6 @@ function RiseFallPage() {
         ws={ws}
         isConnected={isConnected}
       />
-      <div style={{ height: headerHeight }} className="shrink-0" />
       <RiseFallBody
         ws={trading.ws}
         isConnected={trading.isConnected}
