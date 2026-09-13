@@ -6,11 +6,9 @@ import { useRiseFallTrading } from '@/external/rise-fall-dtrader/hooks/use-rise-
 import { useDigitsTrading } from '@/external/rise-fall-dtrader/hooks/use-digits-trading';
 import { useAccumulatorTrading } from '@/external/rise-fall-dtrader/hooks/use-accumulator-trading';
 import { useDerivWSContext } from '@/external/rise-fall-dtrader/components/custom/deriv-ws-provider';
-import { useLogoSrc } from '@/external/rise-fall-dtrader/components/custom/logo-src-provider';
 import { RiseFallBody } from '@/external/rise-fall-dtrader/components/rise-fall-body';
 import { DigitsBody } from '@/external/rise-fall-dtrader/components/digits-body';
 import { AccumulatorsBody } from '@/external/rise-fall-dtrader/components/accumulators-body';
-import { Header } from '@/external/rise-fall-dtrader/components/custom/header';
 import { TemplateLayout } from '@/external/rise-fall-dtrader/components/custom/template-layout';
 import '../../styles/dtrader-globals.css';
 
@@ -25,15 +23,15 @@ export default function DtraderPage() {
 }
 
 function RiseFallPage() {
-  const logoSrc = useLogoSrc();
   const { ws, isConnected, isExhausted, auth } = useDerivWSContext();
-  const { authState, accounts, activeAccount, login, signUp, logout, switchAccount } = auth;
+  const { authState, logout } = auth;
   const isAuthenticated = !!auth.wsUrl;
 
   const [activeTradeType, setActiveTradeType] = useState<string>('rise-fall');
 
-  // Header is `sticky top-0` within this page's own scroll container, so it
-  // occupies its own space in the flex flow — no manual spacer needed.
+  // Trade-type switching lives inside each Body's own "Market contracts"
+  // menu (ModeRail, via TradeModeToggle/TradeBody) — no separate header
+  // needed for it.
 
   // Which trade-type "family" is currently selected. Computed before the
   // trading hooks below so each hook can be told whether it's the active
@@ -126,20 +124,6 @@ function RiseFallPage() {
         className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
-        <Header
-          authState={authState}
-          accounts={accounts}
-          activeAccount={activeAccount}
-          onLogin={login}
-          onSignUp={signUp}
-          onLogout={logout}
-          onSwitchAccount={switchAccount}
-          logoSrc={logoSrc}
-          activeTradeType={activeTradeType}
-          onSelectTradeType={setActiveTradeType}
-          ws={ws}
-          isConnected={isConnected}
-        />
         <AccumulatorsBody
           ws={accumulators.ws}
           isConnected={accumulators.isConnected}
@@ -183,20 +167,6 @@ function RiseFallPage() {
         className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
-        <Header
-          authState={authState}
-          accounts={accounts}
-          activeAccount={activeAccount}
-          onLogin={login}
-          onSignUp={signUp}
-          onLogout={logout}
-          onSwitchAccount={switchAccount}
-          logoSrc={logoSrc}
-          activeTradeType={activeTradeType}
-          onSelectTradeType={setActiveTradeType}
-          ws={ws}
-          isConnected={isConnected}
-        />
         <DigitsBody
           authState={authState}
           isConnected={digits.isConnected}
@@ -243,20 +213,6 @@ function RiseFallPage() {
       className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
       style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
-      <Header
-        authState={authState}
-        accounts={accounts}
-        activeAccount={activeAccount}
-        onLogin={login}
-        onSignUp={signUp}
-        onLogout={logout}
-        onSwitchAccount={switchAccount}
-        logoSrc={logoSrc}
-        activeTradeType={activeTradeType}
-        onSelectTradeType={setActiveTradeType}
-        ws={ws}
-        isConnected={isConnected}
-      />
       <RiseFallBody
         ws={trading.ws}
         isConnected={trading.isConnected}
