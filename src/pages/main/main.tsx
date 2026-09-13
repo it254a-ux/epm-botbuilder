@@ -78,7 +78,7 @@ const AppWrapper = observer(() => {
         [key: string]: string;
     };
     const { clear } = summary_card;
-    const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
+    const { DASHBOARD, BOT_BUILDER, DTRADER } = DBOT_TABS;
     const init_render = React.useRef(true);
     const hash = ['dashboard', 'bot_builder', 'chart', 'dtrader', 'tutorial', 'epm_trading_bots'];
     const { isDesktop } = useDevice();
@@ -94,6 +94,12 @@ const AppWrapper = observer(() => {
     // The plain /botbuilder route (no query flag) is completely unaffected.
     const search_params = new URLSearchParams(location.search);
     const is_tutorial_only_embed = search_params.get('embed') === 'tutorial-only';
+    // Dtrader has its own Automated/Run controls built into its trade panel,
+    // so Bot Builder's floating Run button + bottom RunPanel status bar
+    // (meant for the Blockly bot workflow) just float uselessly on top of
+    // it. Hidden only while this tab is active - every other tab keeps
+    // both exactly as before.
+    const is_dtrader_tab = active_tab === DTRADER;
     // True only when this app is loaded inside another site's iframe (e.g.
     // the ExecutivePrimeMarkets dashboard, which renders its own header row
     // with save/star/share/avatar icons directly above this iframe). The
@@ -457,11 +463,13 @@ const AppWrapper = observer(() => {
                                 }
                                 id='id-dtrader'
                             >
-                                <Suspense
-                                    fallback={<ChunkLoader message={localize('Please wait, loading Dtrader...')} />}
-                                >
-                                    <DtraderPage />
-                                </Suspense>
+                                <div className='main__dtrader-tab-content'>
+                                    <Suspense
+                                        fallback={<ChunkLoader message={localize('Please wait, loading Dtrader...')} />}
+                                    >
+                                        <DtraderPage />
+                                    </Suspense>
+                                </div>
                             </div>
                             <div
                                 label={
@@ -512,7 +520,7 @@ const AppWrapper = observer(() => {
                 </div>
             </div>
             <DesktopWrapper>
-                {!is_tutorial_only_embed && (
+                {!is_tutorial_only_embed && !is_dtrader_tab && (
                     <div className='main__run-strategy-wrapper'>
                         <RunStrategy />
                         <RunPanel />
@@ -521,7 +529,7 @@ const AppWrapper = observer(() => {
                 <ChartModal />
                 <TradingViewModal />
             </DesktopWrapper>
-            <MobileWrapper>{!is_tutorial_only_embed && !is_open && <RunPanel />}</MobileWrapper>
+            <MobileWrapper>{!is_tutorial_only_embed && !is_dtrader_tab && !is_open && <RunPanel />}</MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
                 className='dc-dialog__wrapper--fixed'
