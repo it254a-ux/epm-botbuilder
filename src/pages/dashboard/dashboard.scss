@@ -193,13 +193,6 @@
                 padding: 1.6rem;
             }
 
-            // Phone only: pull the dashboard content almost flush against
-            // the left edge instead of matching the same 1.6rem gap used
-            // for the other sides/tablet.
-            @include mobile-screen {
-                padding-inline-start: 0.4rem;
-            }
-
             .quick-panel {
                 flex: 1 1 44%;
             }

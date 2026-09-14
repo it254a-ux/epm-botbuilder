@@ -2,39 +2,6 @@
 @use 'components/shared/styles/mixins' as *;
 
 .app-header {
-    // @deriv-com/ui's Header is a flex row (`justify-content: space-between`)
-    // holding two Wrapper columns (left / right), but each Wrapper ships
-    // with `width: 100%` and no shrink allowance. Two 100%-wide children in
-    // one row want 200% of the header's width between them — with nothing
-    // to give, the browser pushes the header (and the page) wider than the
-    // viewport instead. That's what was clipping the Transfer button on the
-    // right and causing the horizontal sway: the right column never lost
-    // any width, so the overflow always landed on-screen as a shifting,
-    // too-wide header.
-    //
-    // Fix: let the left column (logo + nav) be the one that flexes and
-    // shrinks — its own nav already scrolls internally via overflow-x — and
-    // pin the right column (account switcher + Transfer) to only the width
-    // its content actually needs, so it's never the side that gets
-    // squeezed or cut off.
-    .deriv-wrapper {
-        width: auto;
-        min-width: 0;
-    }
-
-    .deriv-wrapper__left {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-
-    .deriv-wrapper__right {
-        flex: 0 0 auto;
-    }
-
-    // Safety net: nothing inside the header should ever be able to force
-    // horizontal scroll on the page.
-    overflow-x: hidden;
-
     &__account-settings {
         padding-inline-end: 1.2rem;
         border-inline-end: 0.1rem solid var(--general-section-1);
