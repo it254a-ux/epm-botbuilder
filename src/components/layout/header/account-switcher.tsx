@@ -179,7 +179,13 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                     {!currency ? (
                                         <Localize i18n_default_text='No currency assigned' />
                                     ) : (
-                                        formatBalance(balance, currency)
+                                        // `balance` here comes from useActiveAccount, which already
+                                        // returns a fully formatted string (comma'd, fixed to the
+                                        // right decimal places for the currency) — NOT a raw number.
+                                        // Re-parsing it with Number()/toFixed() (as formatBalance
+                                        // does for the raw numeric values below) breaks on the comma
+                                        // and produces "NaN". Use it as-is, same as before the merge.
+                                        `${balance} ${getCurrencyDisplayCode(currency)}`
                                     )}
                                 </p>
                             </div>
