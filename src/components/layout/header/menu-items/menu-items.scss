@@ -66,11 +66,14 @@
         align-self: stretch;
         flex-shrink: 0;
 
-        // The clock itself floats above the row, straddling the seam,
-        // rather than sitting inline in the tab row.
+        // The clock itself floats below the row, straddling the seam,
+        // rather than sitting inline in the tab row. Anchored from the
+        // bottom (not the top) so it sits closer to the header's bottom
+        // border instead of poking up past the row and overlapping the
+        // header's top edge.
         .app-footer__icon {
             position: absolute;
-            top: -6px;
+            bottom: -6px;
             left: 0;
             transform: translateX(-50%);
             white-space: nowrap;
