@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { observer } from 'mobx-react-lite';
-import { addComma, getCurrencyDisplayCode, getDecimalPlaces } from '@/components/shared';
+import { addComma, getCurrencyDisplayCode, getDecimalPlaces, standalone_routes } from '@/components/shared';
 import Text from '@/components/shared_ui/text';
+import { CurrencyIcon } from '@/components/currency/currency-icon';
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
@@ -19,18 +20,34 @@ import './account-switcher.scss';
  * balance value shown is always the true value for whichever account is
  * active; only the label text is forced. Matched by loginid rather than
  * email since this codebase (like DTrader's) has no email field available
- * on the account object.
+ * on the account object. Applied consistently to every account in the
+ * dropdown list too, not just the active one, so a forced-real account
+ * sorts into the Real tab and shows the Real label wherever it appears.
  */
 const FORCED_REAL_LABEL_LOGIN_IDS = ['DOT94283012'];
 
+const isForcedReal = (loginid: string | undefined) => !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
+
 const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [activeCategory, setActiveCategory] = useState<'real' | 'demo'>('real');
+    const [isResetting, setIsResetting] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const { accountList, activeLoginid } = useApiBase();
     const { client, run_panel } = useStore() ?? {};
 
     const is_bot_running = run_panel?.is_running || api_base.is_running;
     const isSingleAccount = !accountList || accountList.length <= 1;
+
+    // Computed before any hook below reads them, but activeAccount can be
+    // undefined on some renders (loading state) — every hook must still run
+    // unconditionally on every render, so the `if (!activeAccount)` bail-out
+    // stays below, after all hooks, not before.
+    const displayAsVirtual = activeAccount ? activeAccount.isVirtual && !isForcedReal(activeAccount.loginid) : false;
+
+    useEffect(() => {
+        setActiveCategory(displayAsVirtual ? 'demo' : 'real');
+    }, [displayAsVirtual, isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -55,36 +72,49 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     }, [is_bot_running, isSingleAccount]);
 
     const handleAccountSelect = useCallback(
-        (loginid: string) => {
-            localStorage.setItem('active_loginid', loginid);
+        (selected_loginid: string) => {
+            if (selected_loginid === activeLoginid) return;
+            localStorage.setItem('active_loginid', selected_loginid);
             client?.checkAndRegenerateWebSocket();
             setIsOpen(false);
         },
-        [client]
+        [activeLoginid, client]
     );
 
-    const formattedAccounts = useMemo(() => {
+    const handleResetBalance = useCallback(async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsResetting(true);
+        try {
+            await api_base.api?.send({ topup_virtual: 1 });
+            // The existing 'balance' subscription (set up in api-base.ts) pushes
+            // the updated amount automatically — no manual refetch needed.
+        } catch (err) {
+            console.error('Failed to reset demo balance:', err);
+        } finally {
+            setIsResetting(false);
+        }
+    }, []);
+
+    const formatBalance = (bal: number | string | undefined, curr: string | undefined) =>
+        curr ? `${addComma(Number(bal ?? 0).toFixed(getDecimalPlaces(curr)))} ${getCurrencyDisplayCode(curr)}` : null;
+
+    const categoryAccounts = useMemo(() => {
         if (!accountList) return [];
         return accountList
-            .map(account => ({
-                loginid: account.loginid,
-                currency: account.currency,
-                balance: addComma(Number(account.balance ?? 0).toFixed(getDecimalPlaces(account.currency))),
-                isVirtual: isDemoAccount(account.loginid),
-                isActive: account.loginid === activeLoginid,
-            }))
-            .sort((a, b) => (a.isActive ? -1 : b.isActive ? 1 : 0));
-    }, [accountList, activeLoginid]);
+            .filter(account => {
+                const accountDisplayAsVirtual = isDemoAccount(account.loginid) && !isForcedReal(account.loginid);
+                return accountDisplayAsVirtual === (activeCategory === 'demo');
+            })
+            .sort((a, b) => (a.loginid === activeLoginid ? -1 : b.loginid === activeLoginid ? 1 : 0));
+    }, [accountList, activeCategory, activeLoginid]);
 
+    // All hooks above run on every render regardless of activeAccount, per
+    // the Rules of Hooks — only now, after every hook has been called, is it
+    // safe to bail out for the "no active account yet" (loading) state.
     if (!activeAccount) return null;
 
-    const { currency, isVirtual, balance, loginid } = activeAccount;
+    const { currency, balance } = activeAccount;
     const showChevron = !isSingleAccount && !is_bot_running;
-    // Force the "Real account" label for specific login IDs regardless of
-    // the account's actual isVirtual status. The balance below is always
-    // the true value — only this label is forced.
-    const forceRealLabel = !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
-    const displayAsVirtual = isVirtual && !forceRealLabel;
 
     return (
         <div className='acc-info__wrapper' ref={wrapperRef}>
@@ -108,7 +138,9 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                         }
                     }}
                 >
-                    <span className='acc-info__id' aria-hidden='true'></span>
+                    <span className='acc-info__id' aria-hidden='true'>
+                        <CurrencyIcon currency={currency} isVirtual={displayAsVirtual} />
+                    </span>
                     <div className='acc-info__content'>
                         <div className='acc-info__account-type-header'>
                             <Text as='p' size='xs' className='acc-info__account-type'>
@@ -147,7 +179,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                     {!currency ? (
                                         <Localize i18n_default_text='No currency assigned' />
                                     ) : (
-                                        `${balance} ${getCurrencyDisplayCode(currency)}`
+                                        formatBalance(balance, currency)
                                     )}
                                 </p>
                             </div>
@@ -156,50 +188,122 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                 </div>
             </AccountInfoWrapper>
             {isOpen && (
-                <div className='acc-dropdown' role='listbox'>
-                    {formattedAccounts.map(account => {
-                        const accountForceReal = FORCED_REAL_LABEL_LOGIN_IDS.includes(account.loginid);
-                        const accountDisplayAsVirtual = account.isVirtual && !accountForceReal;
-                        return (
-                            <div
-                                key={account.loginid}
-                                role='option'
-                                aria-selected={account.isActive}
-                                tabIndex={0}
-                                className={classNames('acc-dropdown__account', {
-                                    'acc-dropdown__account--selected': account.isActive,
-                                    'acc-dropdown__account--virtual': accountDisplayAsVirtual,
-                                })}
-                                onClick={() => !account.isActive && handleAccountSelect(account.loginid)}
-                                onKeyDown={e => {
-                                    if (!account.isActive && (e.key === 'Enter' || e.key === ' ')) {
-                                        e.preventDefault();
-                                        handleAccountSelect(account.loginid);
-                                    }
-                                }}
-                            >
-                                <Text
-                                    size='xxxs'
-                                    className={classNames('acc-dropdown__account-type', {
-                                        'acc-dropdown__account-type--virtual': accountDisplayAsVirtual,
-                                    })}
-                                >
-                                    {accountDisplayAsVirtual ? (
-                                        <Localize i18n_default_text='Demo account' />
-                                    ) : (
-                                        <Localize i18n_default_text='Real account' />
-                                    )}
-                                </Text>
-                                <Text size='xs' weight='bold' className='acc-dropdown__balance'>
-                                    {account.currency ? (
-                                        `${account.balance} ${getCurrencyDisplayCode(account.currency)}`
-                                    ) : (
-                                        <Localize i18n_default_text='No currency assigned' />
-                                    )}
-                                </Text>
+                <div className='acc-dropdown acc-dropdown--panel' role='listbox'>
+                    <div className='acc-dropdown__tabs'>
+                        <button
+                            type='button'
+                            className={classNames('acc-dropdown__tab', {
+                                'acc-dropdown__tab--active': activeCategory === 'real',
+                            })}
+                            onClick={() => setActiveCategory('real')}
+                        >
+                            <Localize i18n_default_text='Real' />
+                        </button>
+                        <button
+                            type='button'
+                            className={classNames('acc-dropdown__tab', {
+                                'acc-dropdown__tab--active': activeCategory === 'demo',
+                            })}
+                            onClick={() => setActiveCategory('demo')}
+                        >
+                            <Localize i18n_default_text='Demo' />
+                        </button>
+                    </div>
+
+                    <div className='acc-dropdown__section-header'>
+                        <Localize i18n_default_text='Deriv account' />
+                    </div>
+
+                    <div className='acc-dropdown__list'>
+                        {categoryAccounts.length === 0 && (
+                            <div className='acc-dropdown__empty'>
+                                {activeCategory === 'demo' ? (
+                                    <Localize i18n_default_text='No demo account found.' />
+                                ) : (
+                                    <Localize i18n_default_text='No real account found.' />
+                                )}
                             </div>
-                        );
-                    })}
+                        )}
+                        {categoryAccounts.map(account => {
+                            const accountForceReal = isForcedReal(account.loginid);
+                            const accountDisplayAsVirtual = isDemoAccount(account.loginid) && !accountForceReal;
+                            const accountIsActive = account.loginid === activeLoginid;
+                            return (
+                                <div
+                                    key={account.loginid}
+                                    role='option'
+                                    aria-selected={accountIsActive}
+                                    tabIndex={0}
+                                    className={classNames('acc-dropdown__account', {
+                                        'acc-dropdown__account--selected': accountIsActive,
+                                        'acc-dropdown__account--virtual': accountDisplayAsVirtual,
+                                    })}
+                                    onClick={() => handleAccountSelect(account.loginid)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleAccountSelect(account.loginid);
+                                        }
+                                    }}
+                                >
+                                    <div className='acc-dropdown__account-left'>
+                                        <CurrencyIcon currency={account.currency} isVirtual={accountDisplayAsVirtual} />
+                                        <div>
+                                            <Text
+                                                size='xxxs'
+                                                className={classNames('acc-dropdown__account-type', {
+                                                    'acc-dropdown__account-type--virtual': accountDisplayAsVirtual,
+                                                })}
+                                            >
+                                                {accountDisplayAsVirtual ? (
+                                                    <Localize i18n_default_text='Demo account' />
+                                                ) : (
+                                                    <Localize i18n_default_text='Real account' />
+                                                )}
+                                            </Text>
+                                            <div className='acc-dropdown__account-id'>{account.loginid}</div>
+                                        </div>
+                                    </div>
+                                    {activeCategory === 'demo' && accountIsActive ? (
+                                        <button
+                                            type='button'
+                                            className='acc-dropdown__reset-btn'
+                                            disabled={isResetting}
+                                            onClick={handleResetBalance}
+                                        >
+                                            {isResetting ? (
+                                                <Localize i18n_default_text='Resetting...' />
+                                            ) : (
+                                                <Localize i18n_default_text='Reset balance' />
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <Text size='xs' weight='bold' className='acc-dropdown__balance'>
+                                            {account.currency ? (
+                                                formatBalance(account.balance, account.currency)
+                                            ) : (
+                                                <Localize i18n_default_text='No currency assigned' />
+                                            )}
+                                        </Text>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <a
+                        href={standalone_routes.traders_hub}
+                        className='acc-dropdown__cfd-link'
+                        onClick={() => setIsOpen(false)}
+                    >
+                        <Localize i18n_default_text="Looking for CFD accounts? Go to Trader's Hub" />
+                    </a>
+
+                    <div className='acc-dropdown__footer'>
+                        <a href={standalone_routes.traders_hub} className='acc-dropdown__manage-btn'>
+                            <Localize i18n_default_text='Manage accounts' />
+                        </a>
+                    </div>
                 </div>
             )}
         </div>

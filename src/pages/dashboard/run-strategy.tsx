@@ -1,23 +1,19 @@
 import { observer } from 'mobx-react-lite';
 import TradeAnimation from '@/components/trade-animation';
-import AccountSwitcherModal from '@/components/layout/header/account-switcher-modal';
 import FullScreen from '@/components/layout/footer/FullScreen';
 import LogoutFooter from '@/components/layout/footer/LogoutFooter';
 import NetworkStatus from '@/components/layout/footer/NetworkStatus';
 import ServerTime from '@/components/layout/footer/ServerTime';
-import { generateOAuthURL } from '@/components/shared';
 import { useApiBase } from '@/hooks/useApiBase';
-import { useStore } from '@/hooks/useStore';
 
+// Account switching and sign-in/sign-up are handled by AppHeader (via
+// AccountSwitcher) — this component previously duplicated both with its own
+// floating AccountSwitcherModal / "Sign in / Sign up" button, which visually
+// collided with the header's own controls. Only the utility icons that have
+// no header equivalent (network status, server time, fullscreen, logout)
+// remain here.
 const RunStrategy = observer(() => {
-    const { client } = useStore();
-    const { is_logged_in } = client;
     const { isAuthorized } = useApiBase();
-
-    const handleLogin = async () => {
-        const oauthUrl = await generateOAuthURL();
-        if (oauthUrl) window.location.replace(oauthUrl);
-    };
 
     return (
         <div className='toolbar__section' data-testid='dt_run_strategy'>
@@ -28,13 +24,6 @@ const RunStrategy = observer(() => {
                     <FullScreen />
                     {isAuthorized && <LogoutFooter />}
                 </div>
-                {is_logged_in ? (
-                    <AccountSwitcherModal />
-                ) : (
-                    <button type='button' className='toolbar__signin-btn' onClick={handleLogin}>
-                        Sign in / Sign up
-                    </button>
-                )}
             </div>
             <TradeAnimation className='toolbar__animation' />
         </div>
