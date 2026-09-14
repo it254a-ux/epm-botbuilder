@@ -377,22 +377,51 @@
 
         // Balance badge now sits in its own row above the tab bar, not
         // beside the Run button.
+        //
+        // Shifted further from the edge (inset-inline-end raised from 1.6rem
+        // to 4.8rem) and tightened up (smaller gaps, smaller icon padding,
+        // smaller clock text below) so this small utility cluster reads as
+        // one neat, compact group with room to breathe from the browser's
+        // edge/scrollbar, instead of looking cramped right against it.
         .toolbar__balance-wrapper {
             position: fixed;
             top: 0.5rem;
-            inset-inline-end: 1.6rem;
+            inset-inline-end: 4.8rem;
             z-index: 3;
             display: flex;
             align-items: center;
-            gap: 1.2rem;
+            gap: 0.6rem;
         }
 
         .toolbar__utility-icons {
             display: flex;
             align-items: center;
-            gap: 0.8rem;
-            padding-inline-end: 0.8rem;
+            gap: 0.2rem;
+            padding-inline-end: 0.6rem;
             border-inline-end: 1px solid var(--border-normal, #333);
+
+            // Tighten each icon's own box (was 0.8rem all round, which on
+            // top of the gap above made the cluster look loosely/unevenly
+            // spaced rather than one cohesive group).
+            .app-footer__icon {
+                padding: 0.4rem;
+            }
+
+            // The clock (ServerTime) is the widest element in this cluster
+            // by far — sized down a notch so the whole group reads as
+            // secondary/utility, not competing with the header's own text.
+            // ServerTime's Text comes from the separate @deriv-com/ui
+            // package (unlike most of this app's own shared_ui/text, which
+            // renders .dc-text) — its internal markup/class names aren't
+            // something to guess at, so force the size by inheritance from
+            // the wrapper instead of targeting an assumed class name.
+            [data-testid='dt_server_time'] {
+                font-size: 1.1rem !important;
+
+                * {
+                    font-size: inherit !important;
+                }
+            }
         }
 
         @include desktop-screen {
