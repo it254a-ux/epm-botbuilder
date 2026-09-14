@@ -4,9 +4,15 @@
 // renders as its own row on mobile (see main.tsx's `hide_list` prop, which is
 // only passed on desktop), since there's no header space for it there.
 import clsx from 'clsx';
+import { Fragment } from 'react';
 import { observer } from 'mobx-react-lite';
+import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
+import ChangeTheme from '@/components/layout/footer/ChangeTheme';
+import FullScreen from '@/components/layout/footer/FullScreen';
+import LogoutFooter from '@/components/layout/footer/LogoutFooter';
+import ServerTime from '@/components/layout/footer/ServerTime';
 import {
     LabelPairedChartLineCaptionRegularIcon,
     LabelPairedObjectsColumnCaptionRegularIcon,
@@ -45,12 +51,13 @@ const NAV_ITEMS = [
     {
         tab: DBOT_TABS.EPM_TRADING_BOTS,
         icon: <span className='app-header__menu-item-emoji'>🤖</span>,
-        label: <Localize i18n_default_text='EPM Trading bots' />,
+        label: <Localize i18n_default_text='Trading Bots' />,
     },
 ];
 
 export const MenuItems = observer(() => {
     const { dashboard } = useStore() ?? {};
+    const { isAuthorized } = useApiBase();
 
     // No dashboard store yet (very first render tick) — render nothing rather
     // than a nav that can't actually switch tabs.
@@ -61,19 +68,34 @@ export const MenuItems = observer(() => {
     return (
         <nav className='app-header__menu-items' aria-label='Primary'>
             {NAV_ITEMS.map(item => (
-                <button
-                    key={item.tab}
-                    type='button'
-                    className={clsx('app-header__menu-item', {
-                        'app-header__menu-item--active': active_tab === item.tab,
-                    })}
-                    onClick={() => setActiveTab(item.tab)}
-                    aria-current={active_tab === item.tab ? 'page' : undefined}
-                >
-                    <span className='app-header__menu-item-icon'>{item.icon}</span>
-                    <span className='app-header__menu-item-label'>{item.label}</span>
-                </button>
+                <Fragment key={item.tab}>
+                    <button
+                        type='button'
+                        className={clsx('app-header__menu-item', {
+                            'app-header__menu-item--active': active_tab === item.tab,
+                        })}
+                        onClick={() => setActiveTab(item.tab)}
+                        aria-current={active_tab === item.tab ? 'page' : undefined}
+                    >
+                        <span className='app-header__menu-item-icon'>{item.icon}</span>
+                        <span className='app-header__menu-item-label'>{item.label}</span>
+                    </button>
+                    {/* Floating date/time label — straddles the seam between
+                        Tutorials and Trading Bots, positioned via a zero-width
+                        anchor so it never shifts either button or interferes
+                        with their click targets. */}
+                    {item.tab === DBOT_TABS.TUTORIAL && (
+                        <span className='app-header__menu-boundary'>
+                            <ServerTime />
+                        </span>
+                    )}
+                </Fragment>
             ))}
+            <div className='app-header__menu-utility-icons'>
+                <FullScreen />
+                {isAuthorized && <LogoutFooter />}
+                <ChangeTheme />
+            </div>
         </nav>
     );
 });

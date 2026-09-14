@@ -276,6 +276,17 @@
         margin-inline-end: 1.6rem;
     }
 
+    &__transfer-btn {
+        height: 2.8rem;
+        min-height: 2.8rem;
+        padding: 0 1.2rem;
+        font-size: 1.2rem;
+
+        span {
+            font-size: 1.2rem;
+        }
+    }
+
     &__spinner {
         width: 2rem;
         height: 2rem;

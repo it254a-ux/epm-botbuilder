@@ -154,6 +154,7 @@ const AppHeader = observer(() => {
                             )}
                             <Button
                                 primary
+                                className='auth-actions__transfer-btn'
                                 disabled={client?.is_logging_out || !authData?.currency}
                                 onClick={handleTransfer}
                             >

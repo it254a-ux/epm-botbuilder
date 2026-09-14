@@ -397,30 +397,12 @@
             display: flex;
             align-items: center;
             gap: 0.2rem;
-            padding-inline-end: 0.6rem;
-            border-inline-end: 1px solid var(--border-normal, #333);
 
             // Tighten each icon's own box (was 0.8rem all round, which on
             // top of the gap above made the cluster look loosely/unevenly
             // spaced rather than one cohesive group).
             .app-footer__icon {
                 padding: 0.4rem;
-            }
-
-            // The clock (ServerTime) is the widest element in this cluster
-            // by far — sized down a notch so the whole group reads as
-            // secondary/utility, not competing with the header's own text.
-            // ServerTime's Text comes from the separate @deriv-com/ui
-            // package (unlike most of this app's own shared_ui/text, which
-            // renders .dc-text) — its internal markup/class names aren't
-            // something to guess at, so force the size by inheritance from
-            // the wrapper instead of targeting an assumed class name.
-            [data-testid='dt_server_time'] {
-                font-size: 1.1rem !important;
-
-                * {
-                    font-size: inherit !important;
-                }
             }
         }
 
