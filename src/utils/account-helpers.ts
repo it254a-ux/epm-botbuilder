@@ -1,6 +1,8 @@
 // Account and device utility functions
 // Moved from src/analytics/utils.ts during analytics cleanup
 
+import { storeAuthInfo } from '@/external/deriv-core';
+
 export const MAX_MOBILE_WIDTH = 926;
 export const ACCOUNT_TYPE_KEY = 'account_type';
 
@@ -50,23 +52,40 @@ export const getAccountType = (loginid?: string): string | undefined => {
 
 /**
  * Gets account_id with priority: URL parameter > localStorage > null
+ *
+ * The EPM dashboard embeds this app in an iframe with `?token=<access_token>&acct=<account_id>`
+ * (see executive-prime-market-app's app/page.tsx). `account_id` is kept as a fallback
+ * for direct/manual links that use the older param name.
+ *
  * @returns account_id string or null
  */
 export const getAccountId = (): string | null => {
-    // 1. Check URL parameter
+    // 1. Check URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const accountIdFromUrl = urlParams.get('account_id');
+    const accountIdFromUrl = urlParams.get('acct') || urlParams.get('account_id');
 
     const tokenFromUrl = urlParams.get('token');
-    // Remove token from URL if present
     if (tokenFromUrl) {
+        // Wrap the incoming Deriv access_token in the shape deriv-core's storage
+        // layer expects and persist it as auth_info. Without this, getSocketURL()
+        // never finds a token and silently falls back to the public (unauthenticated)
+        // WebSocket endpoint — previously this value was read only to be discarded.
+        storeAuthInfo({
+            access_token: tokenFromUrl,
+            token_type: 'Bearer',
+            expires_in: 0,
+            expires_at: 0, // falsy => getAuthInfo() never treats this as expired
+            scope: 'trade',
+            refresh_token: '',
+        });
         removeUrlParameter('token');
     }
 
     if (accountIdFromUrl) {
         // Store account ID in localStorage for future use
         localStorage.setItem('active_loginid', accountIdFromUrl);
-        // Remove from URL after storing
+        // Remove from URL after storing (whichever param name was actually present)
+        removeUrlParameter('acct');
         removeUrlParameter('account_id');
         // Return the account ID immediately as it takes precedence over localStorage
         return accountIdFromUrl;
