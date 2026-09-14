@@ -71,9 +71,8 @@ const router = createBrowserRouter(
  *
  * Responsibilities:
  * 1. OAuth callback handling (via vendored deriv-core handleOAuthCallback)
- * 2. Token handed off directly from the parent dashboard (executiveprimemarkets.site)
- * 3. Account switching from URL (via useAccountSwitching hook)
- * 4. Router provider setup
+ * 2. Account switching from URL (via useAccountSwitching hook)
+ * 3. Router provider setup
  */
 function App() {
     // Handle account switching via URL parameter
@@ -115,75 +114,6 @@ function App() {
         };
 
         handleCallback();
-    }, []);
-
-    // ── Token passed directly from the parent dashboard (executiveprimemarkets.site) via ?token= ──
-    // Handles both initial login and account switching (DEMO/REAL) triggered by the dashboard
-    // remounting this iframe with a new ?token=&acct= URL.
-    React.useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const parentToken = urlParams.get('token');
-        if (!parentToken) return;
-
-        const handleParentToken = async () => {
-            try {
-                // ── Clear all stale auth data first so the old account
-                // does not interfere when switching DEMO/REAL ──
-                localStorage.removeItem('active_loginid');
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('account_type');
-                localStorage.removeItem('auth_info');
-                localStorage.removeItem('accountsList');
-                localStorage.removeItem('clientAccounts');
-                localStorage.removeItem('active_account_loginid');
-                sessionStorage.removeItem('deriv_accounts');
-
-                const { DerivWSAccountsService } = await import('@/services/derivws-accounts.service');
-                const accounts = await DerivWSAccountsService.fetchAccountsList(parentToken);
-
-                if (accounts && accounts.length > 0) {
-                    DerivWSAccountsService.storeAccounts(accounts);
-
-                    const requestedAcct = urlParams.get('acct');
-                    const targetAccount =
-                        (requestedAcct && accounts.find((a: { account_id: string }) => a.account_id === requestedAcct)) || accounts[0];
-
-                    const isDemo =
-                        targetAccount.account_id.startsWith('VRT') || targetAccount.account_id.startsWith('VRTC');
-
-                    // ── Write all keys in one place, in the right order ──
-                    localStorage.setItem('active_loginid', targetAccount.account_id);
-                    localStorage.setItem('authToken', parentToken);
-                    localStorage.setItem('account_type', isDemo ? 'demo' : 'real');
-
-                    // Store token under the key getAuthInfo() reads so getSocketURL()
-                    // can fetch an authenticated WebSocket URL with a valid app_id
-                    localStorage.setItem('auth_info', JSON.stringify({
-                        access_token: parentToken,
-                        expires_at: Math.floor(Date.now() / 1000) + 3600,
-                    }));
-
-                    // Store accounts in sessionStorage so authorizeAndSubscribe()
-                    // can build the full account list after WebSocket connects
-                    sessionStorage.setItem('deriv_accounts', JSON.stringify(accounts));
-
-                    const { api_base } = await import('@/external/bot-skeleton');
-                    await api_base.init(true);
-                } else {
-                    console.error('No accounts returned for parent token');
-                }
-            } catch (error) {
-                console.error('Parent token login error:', error);
-            } finally {
-                // Clean token from URL without a reload
-                urlParams.delete('token');
-                urlParams.delete('acct');
-                const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
-                window.history.replaceState({}, '', newUrl);
-            }
-        };
-
-        handleParentToken();
     }, []);
 
     return <RouterProvider router={router} />;

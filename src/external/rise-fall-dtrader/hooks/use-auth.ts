@@ -154,27 +154,6 @@ export function useAuth(): UseAuthReturn {
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
 
-      // ── Token passed from parent site (executiveprimemarkets.site) via ?token= ──
-      const parentToken = url.searchParams.get('token');
-      if (parentToken) {
-        setAuthState('authenticating');
-        try {
-          const authInfo: AuthInfo = {
-            access_token: parentToken,
-            token_type: 'Bearer',
-          } as AuthInfo;
-          await completeAuth(authInfo);
-          // Clean token from URL without reload
-          url.searchParams.delete('token');
-          url.searchParams.delete('acct');
-          window.history.replaceState({}, '', url.toString());
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Token login failed');
-          setAuthState('unauthenticated');
-        }
-        return;
-      }
-
       // Standard OAuth callback
       if (code) {
         setAuthState('authenticating');
