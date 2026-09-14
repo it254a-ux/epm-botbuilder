@@ -9,6 +9,7 @@ import {
     applyFaviconFromLogo,
     applyPrimaryColorFromConfig,
 } from './utils/document-branding';
+import { getAccountId } from './utils/account-helpers';
 import { performVersionCheck } from './utils/version-check';
 import './styles/index.scss';
 
@@ -17,6 +18,15 @@ configure({ isolateGlobalState: true });
 
 // Perform version check FIRST - before any other operations
 performVersionCheck();
+
+// Consume any incoming ?token=&acct= from the dashboard's iframe embed BEFORE
+// anything else runs. getAccountId() is what actually stores the token as
+// auth_info and the account id as active_loginid (see account-helpers.ts).
+// This must happen before the app mounts: api_base picks an authenticated vs.
+// public WebSocket URL once, the first time it connects, so auth_info has to
+// already be in localStorage by then — not moments later once a component
+// happens to call getAccountId() on its own.
+getAccountId();
 
 // Apply deploy-time document branding (tab title, favicon, web font, and primary color).
 applyDocumentTitle();
