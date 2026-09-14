@@ -1,31 +1,30 @@
 .get-help {
     position: fixed;
-    left: 20px;
-    bottom: 20px;
+    right: 10px;
+    bottom: 10px;
     z-index: 1200;
     display: flex;
-    flex-direction: column-reverse;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    align-items: flex-end;
 
     // ── Trigger button ──────────────────────────────────────────────
     &__trigger {
         position: relative;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        height: 52px;
-        padding: 0 20px 0 14px;
+        gap: 4px;
+        height: 26px;
+        padding: 0 10px 0 7px;
         border: none;
         border-radius: 999px;
         background: #34d399; // bright, friendly green — not dark
         color: #04241a;
         font-family: inherit;
-        font-size: 14px;
+        font-size: 7px;
         font-weight: 700;
         cursor: pointer;
         box-shadow:
-            0 4px 14px rgba(52, 211, 153, 0.45),
+            0 2px 7px rgba(52, 211, 153, 0.45),
             0 0 0 0 rgba(52, 211, 153, 0.5);
         transition:
             transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -34,10 +33,10 @@
 
         &:hover {
             background: #4ade80;
-            transform: translateY(-2px);
+            transform: translateY(-1px);
             box-shadow:
-                0 6px 18px rgba(52, 211, 153, 0.55),
-                0 0 0 6px rgba(52, 211, 153, 0.12);
+                0 3px 9px rgba(52, 211, 153, 0.55),
+                0 0 0 3px rgba(52, 211, 153, 0.12);
         }
 
         &:active {
@@ -45,8 +44,8 @@
         }
 
         &:focus-visible {
-            outline: 2px solid #04241a;
-            outline-offset: 3px;
+            outline: 1px solid #04241a;
+            outline-offset: 2px;
         }
     }
 
@@ -55,8 +54,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 24px;
-        height: 24px;
+        width: 12px;
+        height: 12px;
         transition:
             opacity 0.2s ease,
             transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -86,32 +85,39 @@
     }
 
     // ── Expandable options stack ────────────────────────────────────
+    // Absolutely positioned relative to the trigger's corner so it
+    // never shifts the trigger's own position, and always opens
+    // upward regardless of DOM order or open/closed state.
     &__options {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 6px);
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        align-items: flex-start;
+        gap: 5px;
+        align-items: flex-end;
     }
 
     &__option {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        height: 46px;
-        padding: 0 16px 0 0;
+        gap: 5px;
+        height: 23px;
+        padding: 0 8px 0 0;
         border-radius: 999px;
         background: #ffffff;
         text-decoration: none;
         color: #1a2b23;
-        font-size: 13px;
+        font-size: 7px;
         font-weight: 600;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+        white-space: nowrap;
 
         // Hidden / collapsed by default — animated in via .get-help--open
         opacity: 0;
-        transform: translateY(16px) scale(0.75);
+        transform: translateY(8px) scale(0.75);
         pointer-events: none;
-        transform-origin: left bottom;
+        transform-origin: right bottom;
         transition:
             opacity 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
             transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -131,15 +137,15 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 46px;
-        height: 46px;
+        width: 23px;
+        height: 23px;
         border-radius: 999px;
         color: #ffffff;
         flex-shrink: 0;
     }
 
     &__option-label {
-        padding-right: 2px;
+        padding-right: 1px;
     }
 
     &__option--whatsapp &__option-icon {
@@ -157,21 +163,21 @@
 
 @media (max-width: 480px) {
     .get-help {
-        left: 14px;
-        bottom: 14px;
+        right: 7px;
+        bottom: 7px;
 
         &__trigger {
-            height: 48px;
-            padding: 0 16px 0 12px;
+            height: 24px;
+            padding: 0 8px 0 6px;
         }
 
         &__option {
-            height: 42px;
+            height: 21px;
         }
 
         &__option-icon {
-            width: 42px;
-            height: 42px;
+            width: 21px;
+            height: 21px;
         }
     }
 }
