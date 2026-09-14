@@ -8,6 +8,7 @@ import { useStore } from '@/hooks/useStore';
 import { useDevice } from '@deriv-com/ui';
 import { crypto_currencies_display_order, fiat_currencies_display_order } from '../shared';
 import AppHeader from './header';
+import GetHelpWidget from '../get-help';
 import Body from './main-body';
 import './layout.scss';
 
@@ -152,6 +153,7 @@ const Layout = observer(() => {
             <Body>
                 <Outlet />
             </Body>
+            {!isCallbackPage && <GetHelpWidget />}
             {/* Footer removed — its icons (fullscreen, logout, server time,
                 network status) now render inline in the header row via
                 RunStrategy, freeing this vertical space for tab content. */}

@@ -1,0 +1,177 @@
+.get-help {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+
+    // ── Trigger button ──────────────────────────────────────────────
+    &__trigger {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 52px;
+        padding: 0 20px 0 14px;
+        border: none;
+        border-radius: 999px;
+        background: #34d399; // bright, friendly green — not dark
+        color: #04241a;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow:
+            0 4px 14px rgba(52, 211, 153, 0.45),
+            0 0 0 0 rgba(52, 211, 153, 0.5);
+        transition:
+            transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+            box-shadow 0.25s ease,
+            background 0.2s ease;
+
+        &:hover {
+            background: #4ade80;
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 18px rgba(52, 211, 153, 0.55),
+                0 0 0 6px rgba(52, 211, 153, 0.12);
+        }
+
+        &:active {
+            transform: translateY(0) scale(0.96);
+        }
+
+        &:focus-visible {
+            outline: 2px solid #04241a;
+            outline-offset: 3px;
+        }
+    }
+
+    &__trigger-icon {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        transition:
+            opacity 0.2s ease,
+            transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+        &--close {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transform: rotate(-90deg) scale(0.6);
+        }
+    }
+
+    &__trigger-label {
+        white-space: nowrap;
+        transition: opacity 0.15s ease;
+    }
+
+    // ── Open state: swap icon, keep the pill (label stays put) ─────
+    &--open &__trigger-icon--help {
+        opacity: 0;
+        transform: rotate(90deg) scale(0.6);
+    }
+
+    &--open &__trigger-icon--close {
+        opacity: 1;
+        transform: rotate(0deg) scale(1);
+    }
+
+    // ── Expandable options stack ────────────────────────────────────
+    &__options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    &__option {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 46px;
+        padding: 0 16px 0 0;
+        border-radius: 999px;
+        background: #ffffff;
+        text-decoration: none;
+        color: #1a2b23;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+
+        // Hidden / collapsed by default — animated in via .get-help--open
+        opacity: 0;
+        transform: translateY(16px) scale(0.75);
+        pointer-events: none;
+        transform-origin: left bottom;
+        transition:
+            opacity 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+            transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+        &:hover {
+            transform: translateY(0) scale(1.04);
+        }
+    }
+
+    &--open &__option {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+    }
+
+    &__option-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 999px;
+        color: #ffffff;
+        flex-shrink: 0;
+    }
+
+    &__option-label {
+        padding-right: 2px;
+    }
+
+    &__option--whatsapp &__option-icon {
+        background: #25d366;
+    }
+
+    &__option--message &__option-icon {
+        background: #38bdf8;
+    }
+
+    &__option--phone &__option-icon {
+        background: #22c55e;
+    }
+}
+
+@media (max-width: 480px) {
+    .get-help {
+        left: 14px;
+        bottom: 14px;
+
+        &__trigger {
+            height: 48px;
+            padding: 0 16px 0 12px;
+        }
+
+        &__option {
+            height: 42px;
+        }
+
+        &__option-icon {
+            width: 42px;
+            height: 42px;
+        }
+    }
+}
