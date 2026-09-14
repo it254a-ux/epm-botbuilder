@@ -396,7 +396,16 @@ const AppWrapper = observer(() => {
                 >
                     <div>
                         {!isDesktop && left_tab_shadow && <span className='tabs-shadow tabs-shadow--left' />}{' '}
-                        <Tabs active_index={active_tab} className='main__tabs' onTabItemClick={handleTabChange} top>
+                        {/* The tab list itself now renders in the header (via MenuItems) on
+                            desktop, so there's one combined header instead of two stacked
+                            bars. Mobile has no room there, so it keeps its own row here. */}
+                        <Tabs
+                            active_index={active_tab}
+                            className='main__tabs'
+                            onTabItemClick={handleTabChange}
+                            hide_list={isDesktop}
+                            top
+                        >
                             <div
                                 label={
                                     <>

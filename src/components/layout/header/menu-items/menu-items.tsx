@@ -1,46 +1,81 @@
-// ========================================
-// MENU ITEMS PLACEHOLDER FOR WHITE-LABELING
-// ========================================
-//
-// This component has been simplified for white-labeling.
-// Third-party developers can add custom menu items here.
-//
-// EXAMPLE USAGE:
-// --------------
-// import { observer } from 'mobx-react-lite';
-// import { useStore } from '@/hooks/useStore';
-// import { useTranslations } from '@deriv-com/translations';
-// import { MenuItem, Text } from '@deriv-com/ui';
-//
-// export const MenuItems = observer(() => {
-//     const { localize } = useTranslations();
-//     const store = useStore();
-//     const is_logged_in = store?.client?.is_logged_in ?? false;
-//
-//     if (!is_logged_in) return null;
-//
-//     return (
-//         <>
-//             <MenuItem
-//                 as='a'
-//                 className='app-header__menu'
-//                 href='/your-page'
-//                 leftComponent={YourIcon}
-//             >
-//                 <Text>{localize('Your Menu Item')}</Text>
-//             </MenuItem>
-//         </>
-//     );
-// });
-//
-// For mobile menu items, see:
-// src/components/layout/header/mobile-menu/use-mobile-menu-config.tsx
-
+// Desktop header navigation — merges the app's tab bar (previously its own row
+// below the header) into this reserved slot next to the logo, so there's a
+// single combined header instead of two stacked bars. The tab list still
+// renders as its own row on mobile (see main.tsx's `hide_list` prop, which is
+// only passed on desktop), since there's no header space for it there.
+import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
+import { useStore } from '@/hooks/useStore';
+import { DBOT_TABS } from '@/constants/bot-contents';
+import {
+    LabelPairedChartLineCaptionRegularIcon,
+    LabelPairedObjectsColumnCaptionRegularIcon,
+    LabelPairedPuzzlePieceTwoCaptionBoldIcon,
+} from '@deriv/quill-icons/LabelPaired';
+import { LegacyGuide1pxIcon } from '@deriv/quill-icons/Legacy';
+import { Localize } from '@deriv-com/translations';
+import './menu-items.scss';
+
+const NAV_ITEMS = [
+    {
+        tab: DBOT_TABS.DASHBOARD,
+        icon: <LabelPairedObjectsColumnCaptionRegularIcon height='16px' width='16px' fill='currentColor' />,
+        label: <Localize i18n_default_text='Dashboard' />,
+    },
+    {
+        tab: DBOT_TABS.BOT_BUILDER,
+        icon: <LabelPairedPuzzlePieceTwoCaptionBoldIcon height='16px' width='16px' fill='currentColor' />,
+        label: <Localize i18n_default_text='Bot Builder' />,
+    },
+    {
+        tab: DBOT_TABS.CHART,
+        icon: <LabelPairedChartLineCaptionRegularIcon height='16px' width='16px' fill='currentColor' />,
+        label: <Localize i18n_default_text='Charts' />,
+    },
+    {
+        tab: DBOT_TABS.DTRADER,
+        icon: <span className='app-header__menu-item-emoji'>📈</span>,
+        label: <Localize i18n_default_text='Dtrader' />,
+    },
+    {
+        tab: DBOT_TABS.TUTORIAL,
+        icon: <LegacyGuide1pxIcon height='12px' width='12px' fill='currentColor' />,
+        label: <Localize i18n_default_text='Tutorials' />,
+    },
+    {
+        tab: DBOT_TABS.EPM_TRADING_BOTS,
+        icon: <span className='app-header__menu-item-emoji'>🤖</span>,
+        label: <Localize i18n_default_text='EPM Trading bots' />,
+    },
+];
 
 export const MenuItems = observer(() => {
-    // No menu items by default - add your custom menu items here
-    return null;
+    const { dashboard } = useStore() ?? {};
+
+    // No dashboard store yet (very first render tick) — render nothing rather
+    // than a nav that can't actually switch tabs.
+    if (!dashboard) return null;
+
+    const { active_tab, setActiveTab } = dashboard;
+
+    return (
+        <nav className='app-header__menu-items' aria-label='Primary'>
+            {NAV_ITEMS.map(item => (
+                <button
+                    key={item.tab}
+                    type='button'
+                    className={clsx('app-header__menu-item', {
+                        'app-header__menu-item--active': active_tab === item.tab,
+                    })}
+                    onClick={() => setActiveTab(item.tab)}
+                    aria-current={active_tab === item.tab ? 'page' : undefined}
+                >
+                    <span className='app-header__menu-item-icon'>{item.icon}</span>
+                    <span className='app-header__menu-item-label'>{item.label}</span>
+                </button>
+            ))}
+        </nav>
+    );
 });
 
 export const TradershubLink = observer(() => {
@@ -53,8 +88,6 @@ type MenuItemsType = typeof MenuItems & {
     TradershubLink: typeof TradershubLink;
 };
 
-// Assign TradershubLink to MenuItems
 (MenuItems as MenuItemsType).TradershubLink = TradershubLink;
 
 export default MenuItems as MenuItemsType;
-// [/AI]

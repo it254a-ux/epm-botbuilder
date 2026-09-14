@@ -25,6 +25,7 @@ type TTabsProps = {
     has_active_line?: boolean;
     has_bottom_line?: boolean;
     header_fit_content?: boolean;
+    hide_list?: boolean;
     history: History;
     icon_color?: string;
     icon_size?: number;
@@ -50,6 +51,7 @@ const Tabs = ({
     has_active_line = true,
     has_bottom_line = true,
     header_fit_content = false,
+    hide_list = false,
     history,
     icon_color = '',
     icon_size = 0,
@@ -152,7 +154,10 @@ const Tabs = ({
             })}
             style={{ '--tab-width': `${tab_width}`, background: background_color } as React.CSSProperties}
         >
-            <div className={classNames({ [`dc-tabs__list--header--${className}`]: className })}>
+            <div
+                className={classNames({ [`dc-tabs__list--header--${className}`]: className })}
+                style={hide_list ? { display: 'none' } : undefined}
+            >
                 <ul
                     className={classNames('dc-tabs__list', {
                         'dc-tabs__list--top': top,

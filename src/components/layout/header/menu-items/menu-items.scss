@@ -1,8 +1,65 @@
-.app-header__menu {
-    gap: 0.8rem;
-    padding: 1.25rem 1.25rem 1.25rem 1.5rem;
+.app-header {
+    &__menu-items {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-inline-start: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
 
-    &:hover {
-        background-color: transparent;
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    &__menu-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        height: 32px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text-general);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        transition:
+            background 0.15s ease,
+            color 0.15s ease;
+
+        &:hover {
+            background: var(--general-hover, rgba(0, 0, 0, 0.04));
+        }
+
+        &--active {
+            background: var(--general-section-1, rgba(0, 0, 0, 0.06));
+            color: var(--text-prominent);
+            font-weight: 700;
+        }
+    }
+
+    &__menu-item-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    &__menu-item-emoji {
+        font-size: 14px;
+        line-height: 1;
+    }
+}
+
+// The header only has room for this next to the logo on desktop — the
+// original stacked tab row below the header still renders on mobile
+// (main.tsx only hides it when isDesktop).
+@media (max-width: 1024px) {
+    .app-header__menu-items {
+        display: none;
     }
 }
