@@ -3,12 +3,12 @@ import clsx from 'clsx';
 import './get-help.scss';
 
 // ── Configure your real contact destinations here ──────────────────────────
-const WHATSAPP_NUMBER = '254700000000'; // digits only, country code, no + or spaces
+const WHATSAPP_NUMBER = '254115533208'; // digits only, country code, no + or spaces
 const WHATSAPP_MESSAGE = 'Hi, I need help with EPM Bot Builder';
-const PHONE_NUMBER = '+254700000000';
-// Where "Message" should go: a live-chat widget trigger, a mailto link, or an
-// in-app contact form route. Defaults to mailto — replace with whatever fits.
-const MESSAGE_HREF = 'mailto:support@executiveprimemarkets.site';
+const PHONE_NUMBER = '+254115533208';
+// "Message" opens the native SMS composer (sms:), matching the original
+// contact button's behavior in the parent app — not email or live chat.
+const MESSAGE_HREF = `sms:${PHONE_NUMBER}`;
 // ─────────────────────────────────────────────────────────────────────────
 
 const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
