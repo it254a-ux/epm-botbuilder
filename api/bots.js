@@ -32,6 +32,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
         try {
             const bots = await sql`
                 SELECT id, name, description, market, risk_level, contract_type, created_at
