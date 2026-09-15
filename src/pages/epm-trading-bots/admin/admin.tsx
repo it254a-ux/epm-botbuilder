@@ -50,7 +50,7 @@ const AdminBots = () => {
     const fetchBots = async () => {
         setIsLoadingList(true);
         try {
-            const res = await fetch('/api/bots');
+            const res = await fetch(`/api/bots?t=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
             if (res.ok) setBots(data.bots || []);
         } catch {
