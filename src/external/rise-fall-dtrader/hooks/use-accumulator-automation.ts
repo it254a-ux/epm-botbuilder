@@ -1,7 +1,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { BuyResult, OpenPosition } from '../lib/types';
-import type { Tick } from '@deriv/core';
+import type { Tick } from '@/external/deriv-core';
 import type { AccumulatorProposalInfo } from './use-accumulator-proposal';
 import type { AccumulatorAutomationSettings } from '@/external/rise-fall-dtrader/lib/accumulator-types';
 import { DEFAULT_ACCUMULATOR_AUTOMATION_SETTINGS } from '@/external/rise-fall-dtrader/lib/accumulator-types';

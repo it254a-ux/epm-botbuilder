@@ -1,4 +1,4 @@
-import type { ContractInfo } from '@deriv/core';
+import type { ContractInfo } from '@/external/deriv-core';
 
 export type DurationApiUnit = 't' | 's' | 'm' | 'd';
 export type DurationSelectUnit = 't' | 's' | 'm' | 'h' | 'd' | 'end-time';

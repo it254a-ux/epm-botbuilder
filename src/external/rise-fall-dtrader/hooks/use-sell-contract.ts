@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import type { DerivWS } from '@deriv/core';
+import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
 
 interface SellResponse {
   sell: {

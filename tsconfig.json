@@ -20,8 +20,7 @@
         "baseUrl": "./src",
         "paths": {
             "@/*": ["./*"],
-            "Stores/*": ["./stores/*"],
-            "@deriv/core": ["./external/rise-fall-dtrader/packages/core/src/index.ts"]
+            "Stores/*": ["./stores/*"]
         },
         "esModuleInterop": true,
         "types": ["jest", "node", "@testing-library/jest-dom"]

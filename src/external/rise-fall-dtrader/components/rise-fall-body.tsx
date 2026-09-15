@@ -8,7 +8,8 @@ import { useContractMarkers } from '@/external/rise-fall-dtrader/hooks/use-contr
 import { AutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/automated-panel';
 import { TradeBody } from './trade-body';
 import { useMartingaleAutomation } from '../hooks/use-martingale-automation';
-import type { ActiveSymbol, ProposalInfo, BuyResult, DerivWS } from '@deriv/core';
+import type { ActiveSymbol, ProposalInfo, BuyResult } from '@/external/deriv-core';
+import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
 import type { Direction, DurationSelectUnit, DurationOption } from '../lib/types';
 import type { UseSmartChartsApiReturn } from '@/external/rise-fall-dtrader/hooks/use-smartcharts-api';
 import type { SmartChartChartData } from '@/external/rise-fall-dtrader/hooks/use-smartchart-chart-data';

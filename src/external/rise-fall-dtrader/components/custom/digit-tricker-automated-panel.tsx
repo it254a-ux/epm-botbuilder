@@ -10,7 +10,7 @@ import {
 } from '@/external/rise-fall-dtrader/hooks/use-digit-tricker-automation';
 import { getSymbolDisplayName } from '@/external/rise-fall-dtrader/lib/active-symbols-display-names';
 import type { ContractMode, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
-import type { DurationLimits } from '@deriv/core';
+import type { DurationLimits } from '@/external/deriv-core';
 
 interface DigitTrickerAutomatedPanelProps {
   contractMode: ContractMode;

@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
-import type { DerivWS, ProposalInfo } from '@deriv/core';
+import type { ProposalInfo } from '@/external/deriv-core';
+import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
 
 export interface AccumulatorProposalParams {
   symbol: string;

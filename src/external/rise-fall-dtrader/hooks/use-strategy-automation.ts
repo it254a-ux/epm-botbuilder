@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { ProposalInfo, BuyResult, StrategyProgram } from '@deriv/core';
+import type { ProposalInfo, BuyResult } from '@/external/deriv-core';
+import type { StrategyProgram } from '../lib/types';
 import type { OpenPosition } from '../lib/types';
 
 /** Computes the next stake after a settled trade, per the program's stake rule. */

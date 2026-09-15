@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { DerivWS } from '../ws';
-import type { ActiveSymbol, Tick, TicksHistoryResponse } from '../types';
+import type { ApiWsHandle as DerivWS } from '../lib/api-ws-adapter';
+import type { ActiveSymbol, Tick, TicksHistoryResponse } from '@/external/deriv-core';
 
 const DEFAULT_TICK_COUNT = 1000;
 
@@ -104,9 +104,7 @@ export function useTicks(
       }
       // Send forget_all for ticks so the server clears the stream before the
       // next mount re-subscribes — prevents AlreadySubscribed on navigation.
-      if (ws?.isConnected) {
-        ws.send({ forget_all: 'ticks' }).catch(() => {});
-      }
+      ws?.send({ forget_all: 'ticks' }).catch(() => {});
     };
   }, [ws, isConnected, activeSymbol, tickCount, pipSizeFromPip]);
 
