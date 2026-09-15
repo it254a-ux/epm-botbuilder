@@ -11,7 +11,7 @@ const ChangeTheme = observer(() => {
     return (
         <Tooltip
             as='button'
-            className='app-footer__icon'
+            className='app-footer__icon app-footer__icon--theme'
             tooltipContent={localize('Change theme')}
             onClick={toggleTheme}
         >
