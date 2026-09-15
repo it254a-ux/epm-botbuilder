@@ -333,14 +333,25 @@ export function SmartChartWrapper({
     [chartTheme]
   );
 
+  // Missing `portalNodeId` here (unlike bot-builder's own Charts page,
+  // src/pages/chart/toolbar-widgets.tsx, which passes 'modal_root' to every
+  // one of these) is why dtrader's chart toolbar was missing several
+  // elements — without a portal target, these widgets' dropdown/menu
+  // content (chart type picker, indicator legend, drawing tools panel,
+  // share dialog) had nowhere valid to render into. 'modal_root' is a
+  // single global DOM node (in index.html) already used the same way by
+  // bot-builder's own Charts page — safe to reuse since only one chart tab
+  // is visible/interactive at a time.
   const toolbarWidget = useCallback(
     () => (
       <ToolbarWidget>
-        <ChartMode onChartType={setChartType} onGranularity={setGranularity} />
-        {!isMobile && <StudyLegend />}
-        {!isMobile && <Views onChartType={setChartType} onGranularity={setGranularity} />}
-        <DrawTools />
-        {!isMobile && <Share />}
+        <ChartMode portalNodeId='modal_root' onChartType={setChartType} onGranularity={setGranularity} />
+        {!isMobile && <StudyLegend portalNodeId='modal_root' />}
+        {!isMobile && (
+            <Views portalNodeId='modal_root' onChartType={setChartType} onGranularity={setGranularity} />
+        )}
+        <DrawTools portalNodeId='modal_root' />
+        {!isMobile && <Share portalNodeId='modal_root' />}
       </ToolbarWidget>
     ),
     [isMobile]
