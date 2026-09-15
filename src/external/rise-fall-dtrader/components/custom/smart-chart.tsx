@@ -6,7 +6,6 @@ import {
   ChartTitle,
   DrawTools,
   Share,
-  setSmartChartsPublicPath,
   SmartChart,
   StudyLegend,
   ToolbarWidget,
@@ -17,11 +16,22 @@ import type { SmartChartChartData } from '@/external/rise-fall-dtrader/hooks/use
 import type { ContractMarker } from '@/external/rise-fall-dtrader/lib/chart-markers';
 import { SMART_CHART_DRAWING_TOOL_POSITION } from '@/external/rise-fall-dtrader/lib/smartchart-constants';
 
-// In preview deployments the app is served under a basePath, so
-// SmartCharts must load its lazy assets from that same prefix.
-const smartChartsPublicPath =
-  process.env.NEXT_PUBLIC_BASE_PATH ? `${process.env.NEXT_PUBLIC_BASE_PATH}/` : '/';
-setSmartChartsPublicPath(smartChartsPublicPath);
+// setSmartChartsPublicPath used to be called here with a value gated on
+// process.env.NEXT_PUBLIC_BASE_PATH — a Next.js env-var naming convention
+// left over from before dtrader was ported into this Rsbuild-based app
+// (see git history: "Port dtrader into botbuilder as a page"). That
+// variable is never set anywhere in this project, so the call always fell
+// through to its '/' fallback, forcing SmartCharts to fetch its lazily-
+// loaded chunks (flutter-chart-loader-*.js, lz-string-*.js, etc.) from the
+// literal site root — which 404s, since that isn't actually where Rsbuild
+// serves them. That 404 (an HTML fallback page, not JS) is what threw
+// "Uncaught SyntaxError: Unexpected token '<'" / ChunkLoadError in the
+// console, and is why the chart canvas never rendered.
+//
+// bot-builder's own chart.tsx (src/pages/chart/chart.tsx) never calls this
+// function at all, letting SmartCharts auto-detect its own correct base
+// path — which is exactly why Charts always worked. Removed here to match
+// that same, already-correct behavior.
 
 /** Configuration for a single barrier rendered on the chart. */
 export interface ChartBarrier {

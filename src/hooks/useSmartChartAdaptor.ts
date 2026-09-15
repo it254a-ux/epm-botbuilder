@@ -78,9 +78,42 @@ export const useSmartChartAdaptor = (): UseSmartChartAdaptorReturn => {
         };
     }, []);
 
-    // Initialize adapter - runs once when chart_api.api is available
+    // Initialize adapter — waits for chart_api.api to become ready.
+    //
+    // chart_api.api is a plain mutable property, not something React can
+    // watch via a dependency array. The previous version checked it once,
+    // gated only on [adapterInitialized] — if chart_api.api was still null
+    // at that exact instant (a real possibility on a cold page load, before
+    // the shared WebSocket connection has finished opening), this effect
+    // would never run again, since adapterInitialized itself never changes
+    // on its own. That left the chart permanently stuck showing its loader,
+    // recoverable only by whatever unrelated re-render happened to occur
+    // after chart_api.api became available. Poll for it instead, bounded to
+    // match the app root's own 5s connection-init timeout.
     useEffect(() => {
-        if (!adapterInitialized && chart_api.api) {
+        if (adapterInitialized) return;
+
+        let cancelled = false;
+        let attempts = 0;
+        const maxAttempts = 25; // 25 x 200ms = 5s, matching AppRoot's init timeout
+        let pollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const tryInit = () => {
+            if (cancelled) return;
+
+            if (!chart_api.api) {
+                attempts += 1;
+                if (attempts >= maxAttempts) {
+                    if (isMountedRef.current) {
+                        setError(new Error('Chart connection did not become ready in time'));
+                        setIsLoading(false);
+                    }
+                    return;
+                }
+                pollTimeout = setTimeout(tryInit, 200);
+                return;
+            }
+
             try {
                 const transport = createTransport();
                 const services = createServices();
@@ -100,7 +133,14 @@ export const useSmartChartAdaptor = (): UseSmartChartAdaptorReturn => {
                     setIsLoading(false);
                 }
             }
-        }
+        };
+
+        tryInit();
+
+        return () => {
+            cancelled = true;
+            if (pollTimeout) clearTimeout(pollTimeout);
+        };
     }, [adapterInitialized]);
 
     // Load chart data when adapter is initialized
