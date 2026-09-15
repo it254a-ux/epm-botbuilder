@@ -11,6 +11,7 @@ import {
 } from './utils/document-branding';
 import { getAccountId } from './utils/account-helpers';
 import { performVersionCheck } from './utils/version-check';
+import { clearStaleServiceWorkers } from './utils/clear-stale-service-workers';
 import './styles/index.scss';
 
 // Configure MobX to handle multiple instances in production builds
@@ -18,6 +19,11 @@ configure({ isolateGlobalState: true });
 
 // Perform version check FIRST - before any other operations
 performVersionCheck();
+
+// Unregister any service worker left behind by an earlier deployment before
+// anything else runs — see clear-stale-service-workers.ts for why this has
+// to be unconditional and global rather than scoped to one page/component.
+clearStaleServiceWorkers();
 
 // Consume any incoming ?token=&acct= from the dashboard's iframe embed BEFORE
 // anything else runs. getAccountId() is what actually stores the token as
