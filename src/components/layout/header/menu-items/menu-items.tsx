@@ -8,6 +8,7 @@ import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
+import { prefetchTab } from '@/utils/prefetch-tabs';
 import ChangeTheme from '@/components/layout/footer/ChangeTheme';
 import FullScreen from '@/components/layout/footer/FullScreen';
 import LogoutFooter from '@/components/layout/footer/LogoutFooter';
@@ -73,6 +74,8 @@ export const MenuItems = observer(() => {
                         'app-header__menu-item--active': active_tab === item.tab,
                     })}
                     onClick={() => setActiveTab(item.tab)}
+                    onMouseEnter={() => prefetchTab(item.tab)}
+                    onFocus={() => prefetchTab(item.tab)}
                     aria-current={active_tab === item.tab ? 'page' : undefined}
                 >
                     <span className='app-header__menu-item-icon'>{item.icon}</span>

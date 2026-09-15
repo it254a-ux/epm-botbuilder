@@ -17,6 +17,7 @@ import { CONNECTION_STATUS } from '@/external/bot-skeleton/services/api/observab
 import { isDbotRTL } from '@/external/bot-skeleton/utils/workspace';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
+import { prefetchAllTabsWhenIdle } from '@/utils/prefetch-tabs';
 import {
     disableUrlParameterApplication,
     enableUrlParameterApplication,
@@ -159,6 +160,14 @@ const AppWrapper = observer(() => {
     React.useEffect(() => {
         resetUrlParamProcessing();
     }, [location.search]);
+
+    // Warm Charts/Dtrader/Tutorials/EPM Trading Bots' JS chunks in the
+    // background once the browser is idle, so clicking one of those tabs
+    // later resolves against an already-cached module instead of kicking
+    // off a fresh network fetch at that moment.
+    React.useEffect(() => {
+        prefetchAllTabsWhenIdle();
+    }, []);
 
     React.useEffect(() => {
         const el_dashboard = document.getElementById('id-dbot-dashboard');
