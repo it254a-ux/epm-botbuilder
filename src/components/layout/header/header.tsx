@@ -10,6 +10,7 @@ import { useStore } from '@/hooks/useStore';
 import { navigateToTransfer } from '@/utils/transfer-utils';
 import { Localize } from '@deriv-com/translations';
 import { Header, useDevice, Wrapper } from '@deriv-com/ui';
+import ChangeTheme from '../footer/ChangeTheme';
 import { AppLogo } from '../app-logo';
 import AccountSwitcher from './account-switcher';
 import MenuItems from './menu-items';
@@ -244,6 +245,10 @@ const AppHeader = observer(() => {
                     {isDesktop ? <MenuItems /> : renderAccountSection('left')}
                 </Wrapper>
                 <Wrapper variant='right'>
+                    {/* Desktop already has this in MenuItems' utility-icons
+                        cluster — only add it here for mobile, where there's
+                        otherwise no theme toggle at all. */}
+                    {!isDesktop && <ChangeTheme />}
                     {renderAccountSection('right')}
                 </Wrapper>
             </Header>

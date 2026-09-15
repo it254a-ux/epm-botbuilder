@@ -56,36 +56,6 @@
         line-height: 1;
     }
 
-    // Zero-width anchor placed between Tutorials and Trading Bots in normal
-    // flow (so it always sits exactly at their seam regardless of either
-    // button's rendered width) but contributes no width itself, so neither
-    // button shifts and neither one's click target is affected.
-    &__menu-boundary {
-        position: relative;
-        width: 0;
-        align-self: stretch;
-        flex-shrink: 0;
-
-        // The clock itself floats above the row, straddling the seam,
-        // rather than sitting inline in the tab row.
-        .app-footer__icon {
-            position: absolute;
-            top: -6px;
-            left: 0;
-            transform: translateX(-50%);
-            white-space: nowrap;
-            font-size: 10px;
-
-            // ServerTime's Text comes from @deriv-com/ui (unlike this app's
-            // own shared_ui/text) — its internal markup/class names aren't
-            // something to guess at, so force size by inheritance instead
-            // of targeting an assumed class name.
-            * {
-                font-size: inherit !important;
-            }
-        }
-    }
-
     &__menu-utility-icons {
         display: flex;
         align-items: center;

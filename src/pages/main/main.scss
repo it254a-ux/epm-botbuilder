@@ -216,6 +216,19 @@
                    7.5rem clears them with a tighter, more uniform gap. */
                 padding-inline-start: 7.5rem;
 
+                // The 7.5rem inset above exists to clear an embedding
+                // parent page's own menu-toggle/theme-toggle icons when
+                // this app runs inside that page's iframe. On the
+                // standalone mobile view there's nothing to clear, so start
+                // the tab labels near the left margin instead. !important
+                // because a same-specificity BEM modifier class further
+                // down (`&--header--main__tabs`) may or may not land on
+                // this same element depending on context, and this must
+                // win either way on phone.
+                @include mobile-screen {
+                    padding-inline-start: 1.6rem !important;
+                }
+
                 @include mobile-or-tablet-screen {
                     overflow-x: auto;
                     overflow-y: hidden;
