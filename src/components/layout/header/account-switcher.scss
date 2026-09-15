@@ -734,7 +734,12 @@
     position: absolute;
     top: calc(100% + 4px);
     right: 0;
-    z-index: 3;
+    // Well above any page content — some pages (e.g. the ported dtrader
+    // app's mobile trade panels) use z-index up to 9999 for their own
+    // internal stacking, which buried this dropdown when it was only 3.
+    // A header-level overlay like this should never sit behind page
+    // content regardless of what z-index that content uses internally.
+    z-index: 10000;
     min-width: 16rem;
     background-color: var(--general-main-2);
     border-radius: $BORDER_RADIUS;
