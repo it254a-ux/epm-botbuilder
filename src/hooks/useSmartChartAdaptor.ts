@@ -81,21 +81,29 @@ export const useSmartChartAdaptor = (): UseSmartChartAdaptorReturn => {
     // Initialize adapter — waits for chart_api.api to become ready.
     //
     // chart_api.api is a plain mutable property, not something React can
-    // watch via a dependency array. The previous version checked it once,
-    // gated only on [adapterInitialized] — if chart_api.api was still null
-    // at that exact instant (a real possibility on a cold page load, before
-    // the shared WebSocket connection has finished opening), this effect
-    // would never run again, since adapterInitialized itself never changes
-    // on its own. That left the chart permanently stuck showing its loader,
-    // recoverable only by whatever unrelated re-render happened to occur
-    // after chart_api.api became available. Poll for it instead, bounded to
-    // match the app root's own 5s connection-init timeout.
+    // watch via a dependency array. Poll for it instead of checking once.
+    //
+    // This component (and its parent tab) stays mounted for the lifetime of
+    // the app — every tab mounts up front for instant switching, it doesn't
+    // remount when you navigate to/away from Charts. That makes a permanent,
+    // terminal failure here dangerous: if chart_api.api happens to still be
+    // null after the first few seconds (e.g. because another tab, such as
+    // Dtrader, is doing its own heavy initial work on the same shared
+    // connection at the same time), giving up for good would leave the
+    // chart broken for the rest of the session, recoverable only by a full
+    // page reload — even though the shared connection goes on to become
+    // ready moments later. So: poll quickly at first, then fall back to a
+    // slower indefinite poll rather than ever setting a terminal error for
+    // this specific condition. A genuinely broken connection (e.g. auth
+    // failing outright) surfaces elsewhere in the app already.
     useEffect(() => {
         if (adapterInitialized) return;
 
         let cancelled = false;
         let attempts = 0;
-        const maxAttempts = 25; // 25 x 200ms = 5s, matching AppRoot's init timeout
+        const fastAttempts = 25; // 25 x 200ms = 5s of quick polling
+        const fastIntervalMs = 200;
+        const slowIntervalMs = 2000; // then keep checking every 2s, indefinitely
         let pollTimeout: ReturnType<typeof setTimeout> | null = null;
 
         const tryInit = () => {
@@ -103,14 +111,8 @@ export const useSmartChartAdaptor = (): UseSmartChartAdaptorReturn => {
 
             if (!chart_api.api) {
                 attempts += 1;
-                if (attempts >= maxAttempts) {
-                    if (isMountedRef.current) {
-                        setError(new Error('Chart connection did not become ready in time'));
-                        setIsLoading(false);
-                    }
-                    return;
-                }
-                pollTimeout = setTimeout(tryInit, 200);
+                const nextDelay = attempts < fastAttempts ? fastIntervalMs : slowIntervalMs;
+                pollTimeout = setTimeout(tryInit, nextDelay);
                 return;
             }
 
