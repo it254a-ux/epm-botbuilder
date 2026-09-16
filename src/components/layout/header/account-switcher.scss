@@ -191,6 +191,39 @@
         }
     }
 
+    // Mobile: the header row also has to fit a hamburger, logo, theme
+    // toggle and Transfer button in the same space Wrapper variant='right'
+    // and variant='left' share — the desktop layout (icon + two stacked
+    // text lines: "Demo account" label above the balance) was overflowing
+    // that space and visually colliding with the theme toggle next to it.
+    // Collapse to icon + balance only, on one line, no label — the account
+    // switcher dropdown itself still says which account type it is.
+    .app-header--mobile & {
+        padding: 8px 0.8rem;
+
+        &__account-type-header {
+            display: none;
+        }
+
+        &__content {
+            margin-inline-start: 0.6rem;
+        }
+
+        &__balance {
+            font-size: 1.2rem;
+        }
+
+        &__id {
+            margin-inline-end: 0;
+
+            svg,
+            img {
+                width: 2rem;
+                height: 2rem;
+            }
+        }
+    }
+
     &__separator {
         border-right: 1px solid var(--general-section-1);
         height: 3.2rem;

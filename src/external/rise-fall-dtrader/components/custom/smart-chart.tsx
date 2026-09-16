@@ -345,24 +345,31 @@ export function SmartChartWrapper({
   );
 
   // Missing `portalNodeId` here (unlike bot-builder's own Charts page,
-  // src/pages/chart/toolbar-widgets.tsx, which passes 'modal_root' to every
-  // one of these) is why dtrader's chart toolbar was missing several
-  // elements — without a portal target, these widgets' dropdown/menu
-  // content (chart type picker, indicator legend, drawing tools panel,
-  // share dialog) had nowhere valid to render into. 'modal_root' is a
-  // single global DOM node (in index.html) already used the same way by
-  // bot-builder's own Charts page — safe to reuse since only one chart tab
-  // is visible/interactive at a time.
+  // src/pages/chart/toolbar-widgets.tsx) is why dtrader's chart toolbar was
+  // missing several elements — without a portal target, these widgets'
+  // dropdown/menu content (chart type picker, indicator legend, drawing
+  // tools panel, share dialog) had nowhere valid to render into.
+  //
+  // Points at 'smartcharts_portal_root' (index.html), not the app's own
+  // 'modal_root'. modal_root carries .modal-root's styling — a dark 72%
+  // backdrop, flex-centered — built for the app's own dialog modals (Load
+  // Strategy, etc). These are small anchored dropdowns, not centered
+  // dialogs; portaling into modal_root wrapped them in that dialog styling
+  // instead of letting them render as a normal anchored dropdown next to
+  // their toolbar icon, which is why clicking them didn't visibly do
+  // anything useful. smartcharts_portal_root has no such styling, so these
+  // popovers render using their own (already-imported) dist/smartcharts.css
+  // rules instead of fighting the app's.
   const toolbarWidget = useCallback(
     () => (
       <ToolbarWidget>
-        <ChartMode portalNodeId="modal_root" onChartType={setChartType} onGranularity={setGranularity} />
-        {!isMobile && <StudyLegend portalNodeId="modal_root" />}
+        <ChartMode portalNodeId="smartcharts_portal_root" onChartType={setChartType} onGranularity={setGranularity} />
+        {!isMobile && <StudyLegend portalNodeId="smartcharts_portal_root" />}
         {!isMobile && (
-          <Views portalNodeId="modal_root" onChartType={setChartType} onGranularity={setGranularity} />
+          <Views portalNodeId="smartcharts_portal_root" onChartType={setChartType} onGranularity={setGranularity} />
         )}
-        <DrawTools portalNodeId="modal_root" />
-        {!isMobile && <Share portalNodeId="modal_root" />}
+        <DrawTools portalNodeId="smartcharts_portal_root" />
+        {!isMobile && <Share portalNodeId="smartcharts_portal_root" />}
       </ToolbarWidget>
     ),
     [isMobile]
