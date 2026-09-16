@@ -16,11 +16,22 @@ const CONTRACT_TYPE_OPTIONS = [
 
 // Plain Vercel serverless function handler (CommonJS, matching generate-bot.js).
 //
-// GET  /api/bots  -> public, returns the bot list WITHOUT xml_content (keeps
-//                    the payload small; the full bot is fetched individually
-//                    via /api/bots/:id when the user clicks "Load Bot").
-// POST /api/bots  -> admin only, protected by the x-admin-password header,
-//                    checked against the ADMIN_PASSWORD environment variable.
+// GET    /api/bots           -> public, bot list WITHOUT xml_content (keeps
+//                                the payload small).
+// GET    /api/bots?id=X      -> public, single bot WITH xml_content — used
+//                                when the user clicks "Load Bot". Folded in
+//                                here (rather than the separate api/bots/[id].js
+//                                dynamic-route file) because Vercel was never
+//                                actually invoking that file as a function —
+//                                confirmed via server logs showing zero
+//                                invocations for it, ever, while this file's
+//                                own routes logged normally. Whatever the
+//                                exact cause, a single already-proven-working
+//                                file is a safer bet than debugging Vercel's
+//                                bracket-route detection further.
+// POST   /api/bots           -> admin only, protected by the x-admin-password
+//                                header, checked against ADMIN_PASSWORD.
+// DELETE /api/bots?id=X      -> admin only, same protection.
 module.exports = async function handler(req, res) {
     let sql;
     try {
@@ -31,7 +42,34 @@ module.exports = async function handler(req, res) {
         return;
     }
 
+    const { id } = req.query;
+
+    if (req.method === 'GET' && id !== undefined) {
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+        if (Number.isNaN(Number(id))) {
+            res.status(400).json({ error: 'Invalid bot id' });
+            return;
+        }
+        try {
+            const [bot] = await sql`
+                SELECT id, name, description, market, risk_level, contract_type, xml_content, created_at
+                FROM free_bots
+                WHERE id = ${Number(id)}
+            `;
+            if (!bot) {
+                res.status(404).json({ error: 'Bot not found' });
+                return;
+            }
+            res.status(200).json({ bot });
+        } catch (err) {
+            console.error('get bot error:', err);
+            res.status(500).json({ error: 'Failed to load bot' });
+        }
+        return;
+    }
+
     if (req.method === 'GET') {
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
         try {
             const bots = await sql`
                 SELECT id, name, description, market, risk_level, contract_type, created_at
@@ -104,6 +142,39 @@ module.exports = async function handler(req, res) {
         } catch (err) {
             console.error('create bot error:', err);
             res.status(500).json({ error: 'Failed to save bot' });
+        }
+        return;
+    }
+
+    if (req.method === 'DELETE') {
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        const providedPassword = req.headers['x-admin-password'];
+
+        if (!id || Number.isNaN(Number(id))) {
+            res.status(400).json({ error: 'Invalid bot id' });
+            return;
+        }
+        if (!adminPassword) {
+            res.status(500).json({ error: 'ADMIN_PASSWORD is not set in environment variables' });
+            return;
+        }
+        if (!providedPassword || providedPassword !== adminPassword) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        try {
+            const [deleted] = await sql`
+                DELETE FROM free_bots WHERE id = ${Number(id)} RETURNING id
+            `;
+            if (!deleted) {
+                res.status(404).json({ error: 'Bot not found' });
+                return;
+            }
+            res.status(200).json({ success: true });
+        } catch (err) {
+            console.error('delete bot error:', err);
+            res.status(500).json({ error: 'Failed to delete bot' });
         }
         return;
     }

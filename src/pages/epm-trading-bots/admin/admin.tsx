@@ -50,7 +50,7 @@ const AdminBots = () => {
     const fetchBots = async () => {
         setIsLoadingList(true);
         try {
-            const res = await fetch('/api/bots');
+            const res = await fetch(`/api/bots?t=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
             if (res.ok) setBots(data.bots || []);
         } catch {
@@ -136,7 +136,7 @@ const AdminBots = () => {
 
         setDeletingId(bot.id);
         try {
-            const res = await fetch(`/api/bots/${bot.id}`, {
+            const res = await fetch(`/api/bots?id=${bot.id}`, {
                 method: 'DELETE',
                 headers: { 'x-admin-password': password },
             });

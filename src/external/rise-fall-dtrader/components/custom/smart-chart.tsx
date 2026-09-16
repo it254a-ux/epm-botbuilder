@@ -338,6 +338,7 @@ export function SmartChartWrapper({
     () => ({
       language: 'en' as const,
       isHighestLowestMarkerEnabled: false,
+      countdown: true,
       theme: chartTheme,
     }),
     [chartTheme]
@@ -355,13 +356,13 @@ export function SmartChartWrapper({
   const toolbarWidget = useCallback(
     () => (
       <ToolbarWidget>
-        <ChartMode portalNodeId='modal_root' onChartType={setChartType} onGranularity={setGranularity} />
-        {!isMobile && <StudyLegend portalNodeId='modal_root' />}
+        <ChartMode portalNodeId="modal_root" onChartType={setChartType} onGranularity={setGranularity} />
+        {!isMobile && <StudyLegend portalNodeId="modal_root" />}
         {!isMobile && (
-            <Views portalNodeId='modal_root' onChartType={setChartType} onGranularity={setGranularity} />
+          <Views portalNodeId="modal_root" onChartType={setChartType} onGranularity={setGranularity} />
         )}
-        <DrawTools portalNodeId='modal_root' />
-        {!isMobile && <Share portalNodeId='modal_root' />}
+        <DrawTools portalNodeId="modal_root" />
+        {!isMobile && <Share portalNodeId="modal_root" />}
       </ToolbarWidget>
     ),
     [isMobile]
@@ -402,6 +403,7 @@ export function SmartChartWrapper({
         isLive={isLive}
         isMobile={isMobile}
         isVerticalScrollEnabled={false}
+        leftMargin={80}
         {...(endEpoch !== undefined && { endEpoch })}
         maxTick={isMobile ? (granularity === 0 ? 8 : 24) : undefined}
         onSettingsChange={() => {}}

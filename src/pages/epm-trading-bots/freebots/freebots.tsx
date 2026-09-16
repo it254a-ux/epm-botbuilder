@@ -49,7 +49,7 @@ const Freebots = observer(() => {
             setIsLoading(true);
             setLoadError(null);
             try {
-                const res = await fetch('/api/bots');
+                const res = await fetch(`/api/bots?t=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data?.error || localize('Failed to load bots'));
                 if (!cancelled) setBots(data.bots || []);
@@ -81,7 +81,7 @@ const Freebots = observer(() => {
     const handleLoadBot = async (bot: TBotSummary) => {
         setLoadingBotId(bot.id);
         try {
-            const res = await fetch(`/api/bots/${bot.id}`);
+            const res = await fetch(`/api/bots?id=${bot.id}&t=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || localize('Failed to load bot'));
 
