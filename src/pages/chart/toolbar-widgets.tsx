@@ -14,32 +14,24 @@ const ToolbarWidgets = ({ updateChartType, updateGranularity, position, isDeskto
     const { isMobile } = useDevice();
     const validPosition = position === 'top' || position === 'bottom' ? position : 'top';
 
-    // Points at 'smartcharts_portal_root' (index.html), not 'modal_root'.
-    // modal_root carries .modal-root's styling — a dark 72% backdrop,
-    // flex-centered — built for the app's own dialog modals (Load
-    // Strategy, etc). These are small anchored dropdowns (chart type,
-    // study legend, draw tools, share), not centered dialogs; portaling
-    // them into modal_root wrapped them in that dialog styling instead of
-    // letting them render as a normal anchored dropdown next to their
-    // toolbar icon — clicking them appeared to do nothing useful.
     return (
         <ToolbarWidget position={validPosition || (isMobile ? 'bottom' : null)}>
-            <ChartMode portalNodeId='smartcharts_portal_root' onChartType={updateChartType} onGranularity={updateGranularity} />
+            <ChartMode portalNodeId='modal_root' onChartType={updateChartType} onGranularity={updateGranularity} />
             {isDesktop && (
                 <>
-                    <StudyLegend portalNodeId='smartcharts_portal_root' searchInputClassName='data-hj-whitelist' />
+                    <StudyLegend portalNodeId='modal_root' searchInputClassName='data-hj-whitelist' />
                     <Views
-                        portalNodeId='smartcharts_portal_root'
+                        portalNodeId='modal_root'
                         onChartType={updateChartType}
                         onGranularity={updateGranularity}
                         searchInputClassName='data-hj-whitelist'
                     />
                 </>
             )}
-            <DrawTools portalNodeId='smartcharts_portal_root' />
+            <DrawTools portalNodeId='modal_root' />
             {isDesktop && (
                 <>
-                    <Share portalNodeId='smartcharts_portal_root' />
+                    <Share portalNodeId='modal_root' />
                 </>
             )}
         </ToolbarWidget>

@@ -27,38 +27,6 @@
     }
 }
 
-// main.tsx renders the two spans above as fade-out edge indicators for a
-// horizontally scrollable version of this tab list on mobile, toggled by a
-// scroll-position listener (see left_tab_shadow / right_tab_shadow state).
-// That scroll listener has nothing to actually listen to without this,
-// though: .dc-tabs__item has white-space: nowrap (tabs.scss) but no
-// flex-shrink: 0, and .dc-tabs__list has no overflow-x — so with six tabs
-// (Dashboard / Bot Builder / Charts / Dtrader / Tutorials / Trading Bots)
-// not fitting one row on a phone-width screen, flexbox's default
-// flex-shrink squeezes each tab's box down below its own nowrap text
-// width, and since there's no overflow:hidden either, that text spills out
-// and visually overlaps the neighboring tab instead of scrolling into
-// view. Scoped to main__tabs only — other .dc-tabs usages elsewhere in the
-// app (Run panel's Summary/Transactions/Journal, etc.) are short enough to
-// fit and keep their existing centered, non-scrolling behavior.
-.dc-tabs__list--header--main__tabs {
-    @include mobile-or-tablet-screen {
-        justify-content: flex-start;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-
-        &::-webkit-scrollbar {
-            display: none;
-        }
-
-        .dc-tabs__item {
-            flex-shrink: 0;
-        }
-    }
-}
-
 .main {
     display: flex;
     align-items: flex-start;
