@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { DerivWS } from '@deriv/core';
 
 export interface ClosedPosition {
   contract_id: number;

@@ -9,8 +9,7 @@ import { useAccumulatorAutomation } from '@/external/rise-fall-dtrader/hooks/use
 import { useIsMobile } from '@/external/rise-fall-dtrader/hooks/use-is-mobile';
 import { useContractMarkers } from '@/external/rise-fall-dtrader/hooks/use-contract-markers';
 import type { ChartBarrier } from '@/external/rise-fall-dtrader/components/custom/smart-chart';
-import type { ActiveSymbol, BuyResult, Tick } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { ActiveSymbol, BuyResult, DerivWS, Tick } from '@deriv/core';
 import type { GrowthRate } from '@/external/rise-fall-dtrader/lib/accumulator-types';
 import type { AccumulatorProposalInfo } from '@/external/rise-fall-dtrader/hooks/use-accumulator-proposal';
 import type { UseSmartChartsApiReturn } from '@/external/rise-fall-dtrader/hooks/use-smartcharts-api';

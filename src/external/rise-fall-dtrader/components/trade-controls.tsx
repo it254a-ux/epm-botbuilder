@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/external/rise-fall-dtrader/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/external/rise-fall-dtrader/components/ui/toggle-group';
 import { EndTimePicker } from '@/external/rise-fall-dtrader/components/custom/end-time-picker';
-import type { ActiveSymbol, ProposalInfo } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { DerivWS, ActiveSymbol, ProposalInfo } from '@deriv/core';
 import type { Direction, DurationSelectUnit, DurationOption } from '../lib/types';
 
 interface TradeControlsProps {

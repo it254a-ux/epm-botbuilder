@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
-import type { ApiWsHandle as DerivWS } from '../lib/api-ws-adapter';
-import type { ProposalResponse, ProposalInfo, ProposalParams } from '@/external/deriv-core';
+import type { DerivWS } from '../ws';
+import type { ProposalResponse, ProposalInfo, ProposalParams } from '../types';
 
 interface UseProposalReturn {
   proposal: ProposalInfo | null;

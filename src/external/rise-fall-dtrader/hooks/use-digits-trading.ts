@@ -1,7 +1,9 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useProposal } from '@/external/rise-fall-dtrader/hooks/use-proposal';
-import { useBuy } from '@/external/rise-fall-dtrader/hooks/use-buy';
+import {
+  useProposal,
+  useBuy,
+} from '@deriv/core';
 import type {
   ActiveSymbol,
   Tick,
@@ -9,7 +11,7 @@ import type {
   ProposalParams,
   DurationLimits,
   BuyResult,
-} from '@/external/deriv-core';
+} from '@deriv/core';
 import { useBaseTrading } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import type { UseBaseTradingParams } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import { computeDigitStats, getLastDigit } from '@/external/rise-fall-dtrader/lib/digit-stats';

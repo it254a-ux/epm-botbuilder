@@ -1,7 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import type { ActiveSymbol } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { ActiveSymbol, DerivWS } from '@deriv/core';
 import {
   getMarketDisplayName,
   getSubmarketDisplayName,

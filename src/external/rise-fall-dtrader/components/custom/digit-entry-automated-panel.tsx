@@ -5,7 +5,7 @@ import { Switch } from '@/external/rise-fall-dtrader/components/ui/switch';
 import { NumberField } from '@/external/rise-fall-dtrader/components/custom/automation-controls';
 import type { UseDigitsEntryAutomationReturn, EntryStrategy } from '@/external/rise-fall-dtrader/hooks/use-digits-entry-automation';
 import type { ContractMode, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
-import type { DurationLimits } from '@/external/deriv-core';
+import type { DurationLimits } from '@deriv/core';
 
 interface DigitEntryAutomatedPanelProps {
   contractMode: ContractMode;

@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { DerivWS } from '@deriv/core';
 
 export interface OpenPosition {
   contract_id: number;
@@ -108,7 +108,7 @@ export function useOpenPositions(
       setPositions([]);
       // Cancel all open-contract streams on the server so the next mount
       // can re-subscribe without hitting AlreadySubscribed.
-      if (isSubscribedRef.current && isConnected) {
+      if (isSubscribedRef.current && ws.isConnected) {
         ws.send({ forget_all: 'proposal_open_contract' }).catch(() => {});
       }
       isSubscribedRef.current = false;

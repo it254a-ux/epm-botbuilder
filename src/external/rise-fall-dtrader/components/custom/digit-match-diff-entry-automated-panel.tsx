@@ -7,7 +7,7 @@ import type {
   DigitShiftMode,
 } from '@/external/rise-fall-dtrader/hooks/use-digits-match-diff-entry-automation';
 import type { ContractMode, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
-import type { DurationLimits } from '@/external/deriv-core';
+import type { DurationLimits } from '@deriv/core';
 
 interface DigitMatchDiffEntryAutomatedPanelProps {
   contractMode: ContractMode;

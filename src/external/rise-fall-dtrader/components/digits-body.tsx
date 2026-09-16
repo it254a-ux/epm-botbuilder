@@ -23,8 +23,7 @@ import { useDigit3ConsecutiveAutomation } from '@/external/rise-fall-dtrader/hoo
 import { useDigitTwinAutomation } from '@/external/rise-fall-dtrader/hooks/use-digit-twin-automation';
 import { useDigitTrickerAutomation } from '@/external/rise-fall-dtrader/hooks/use-digit-tricker-automation';
 import { useTrickerBackgroundScanner } from '@/external/rise-fall-dtrader/hooks/use-tricker-background-scanner';
-import type { AuthState, ActiveSymbol, ProposalInfo, DurationLimits, BuyResult } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { AuthState, ActiveSymbol, ProposalInfo, DurationLimits, BuyResult, DerivWS } from '@deriv/core';
 import type { ContractMode, TradeType, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
 import type { UseSmartChartsApiReturn } from '@/external/rise-fall-dtrader/hooks/use-smartcharts-api';
 import type { SmartChartChartData } from '@/external/rise-fall-dtrader/hooks/use-smartchart-chart-data';

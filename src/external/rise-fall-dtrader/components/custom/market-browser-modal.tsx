@@ -1,6 +1,6 @@
 
 import { useMemo, useState } from 'react';
-import type { ActiveSymbol } from '@/external/deriv-core';
+import type { ActiveSymbol } from '@deriv/core';
 
 export interface MarketBrowserModalProps {
   open: boolean;

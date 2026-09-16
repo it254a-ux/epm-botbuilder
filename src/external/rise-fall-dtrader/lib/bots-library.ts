@@ -1,4 +1,4 @@
-import type { StrategyProgram } from '@/external/rise-fall-dtrader/lib/types';
+import type { StrategyProgram } from '@deriv/core';
 
 export interface BotListing {
   id: string;

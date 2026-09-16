@@ -1,5 +1,5 @@
 
-import type { Tick, ActiveSymbol } from '@/external/deriv-core';
+import type { Tick, ActiveSymbol } from '@deriv/core';
 
 interface CurrentTickDisplayProps {
   tick: Tick | null;

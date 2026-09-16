@@ -1,7 +1,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ActiveSymbol } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { DerivWS, ActiveSymbol } from '@deriv/core';
 import { getLastDigit, pipSizeFromPip } from '@/external/rise-fall-dtrader/lib/digit-stats';
 import { TRICKER_ROTATION_SYMBOLS } from './use-digit-tricker-automation';
 

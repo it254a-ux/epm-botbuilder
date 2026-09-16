@@ -1,10 +1,8 @@
 
 import { useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { useActiveSymbols } from '@/external/rise-fall-dtrader/hooks/use-active-symbols';
-import { useTicks } from '@/external/rise-fall-dtrader/hooks/use-ticks';
-import type { ActiveSymbol, Tick, DurationLimits, ContractInfo } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import { useActiveSymbols, useTicks } from '@deriv/core';
+import type { DerivWS, ActiveSymbol, Tick, DurationLimits, ContractInfo } from '@deriv/core';
 import { useOpenPositions, type OpenPosition } from './use-open-positions';
 import { useClosedPositions, type ClosedPosition } from './use-closed-positions';
 import { useSellContract } from './use-sell-contract';
@@ -101,7 +99,7 @@ export function useBaseTrading({
     if (!ws || !isConnected || !activeSymbol) return;
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && isConnected) {
+      if (document.visibilityState === 'hidden' && ws.isConnected) {
         ws.send({ forget_all: 'ticks' }).catch(() => {});
       }
     };
@@ -109,7 +107,7 @@ export function useBaseTrading({
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (isConnected) {
+      if (ws.isConnected) {
         ws.send({ forget_all: 'ticks' }).catch(() => {});
       }
     };

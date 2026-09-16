@@ -7,8 +7,7 @@ import { Calendar } from '@/external/rise-fall-dtrader/components/ui/calendar';
 import { Input } from '@/external/rise-fall-dtrader/components/ui/input';
 import { Label } from '@/external/rise-fall-dtrader/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/external/rise-fall-dtrader/components/ui/popover';
-import type { ActiveSymbol } from '@/external/deriv-core';
-import type { ApiWsHandle as DerivWS } from '@/external/rise-fall-dtrader/lib/api-ws-adapter';
+import type { DerivWS, ActiveSymbol } from '@deriv/core';
 import { parseTradingDays, getEarlyCloseDates, getCloseTimeForDate } from '@/external/rise-fall-dtrader/lib/duration-utils';
 import type { TradingSymbolData } from '@/external/rise-fall-dtrader/lib/duration-utils';
 

@@ -3,7 +3,7 @@ import { Input } from '@/external/rise-fall-dtrader/components/ui/input';
 import { Label } from '@/external/rise-fall-dtrader/components/ui/label';
 import { Skeleton } from '@/external/rise-fall-dtrader/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/external/rise-fall-dtrader/components/ui/toggle-group';
-import type { DurationLimits, ProposalInfo } from '@/external/deriv-core';
+import type { DurationLimits, ProposalInfo } from '@deriv/core';
 import type { ContractMode, TradeType, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
 
 interface DigitTradePanelProps {
