@@ -81,7 +81,7 @@ const Freebots = observer(() => {
     const handleLoadBot = async (bot: TBotSummary) => {
         setLoadingBotId(bot.id);
         try {
-            const res = await fetch(`/api/bots/${bot.id}?t=${Date.now()}`, { cache: 'no-store' });
+            const res = await fetch(`/api/bots?id=${bot.id}&t=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || localize('Failed to load bot'));
 

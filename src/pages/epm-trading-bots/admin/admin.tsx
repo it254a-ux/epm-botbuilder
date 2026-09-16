@@ -136,7 +136,7 @@ const AdminBots = () => {
 
         setDeletingId(bot.id);
         try {
-            const res = await fetch(`/api/bots/${bot.id}`, {
+            const res = await fetch(`/api/bots?id=${bot.id}`, {
                 method: 'DELETE',
                 headers: { 'x-admin-password': password },
             });
