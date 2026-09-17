@@ -249,7 +249,41 @@
                                 width: 100%;
                                 overflow-x: auto;
                                 padding: 0.8rem 1.6rem 0;
+                                justify-content: flex-start;
+                                // Fades each scrollable edge so the row visibly
+                                // reads as "more to scroll" rather than looking
+                                // like the last tab is simply cut off.
+                                mask-image: linear-gradient(
+                                    to right,
+                                    transparent 0,
+                                    black 1.6rem,
+                                    black calc(100% - 1.6rem),
+                                    transparent 100%
+                                );
                             }
+                        }
+                    }
+                }
+
+                .dc-tabs__item--main__tabs {
+                    @include mobile-or-tablet-screen {
+                        // Previously zero — this and the base font-size (10px,
+                        // from tabs.scss) is why every label ran together with
+                        // no visible gap ("Bot BuilderCharts").
+                        padding: 0 1rem;
+                        flex-shrink: 0;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.4rem;
+                        font-size: 1.2rem;
+
+                        .dc-tabs__item__icon {
+                            padding-top: 0;
+                            padding-right: 0;
+                        }
+
+                        &:first-child {
+                            padding-inline-start: 0;
                         }
                     }
                 }
