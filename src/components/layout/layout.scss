@@ -8,6 +8,13 @@
     .deriv-header {
         background: var(--general-main-1);
         height: 5.6rem;
+        // @deriv-com/ui's Header ships its own default border/shadow along
+        // the bottom edge (not something in our own CSS — nothing in this
+        // repo sets it). That's the thin boundary strip visible between the
+        // header and the page content; overriding it here since the
+        // package itself can't be edited directly.
+        border-bottom: none;
+        box-shadow: none;
     }
 
     &.quick-strategy-active {
