@@ -677,26 +677,25 @@
 
 .bot-builder {
     position: absolute;
-    // Was 6.6rem — 1rem taller than the actual header (.deriv-header,
-    // height: 5.6rem in layout.scss), which is what left an extra gap
-    // above Bot Builder's content specifically (on top of whatever the
-    // other tabs already had via .main's own padding). Matches the
-    // mobile version of this same rule below, which already correctly
-    // used 5.6rem.
-    top: 5.6rem;
+    // Was 6.6rem, then 5.6rem — both wrong for the same reason: this
+    // element's positioning parent is .bot-dashboard (position: relative,
+    // dashboard.scss), which itself already sits correctly below the
+    // header via normal flex flow (.main-body { flex-grow: 1 } in
+    // main-body.scss fills exactly the space left after the header). Any
+    // positive `top` here doesn't "clear the header" — the header is
+    // already cleared by the time this element's containing block starts
+    // — it just adds that much empty space a second time. 0 is correct.
+    top: 0;
     inset-inline-start: 1.6rem;
     z-index: -1;
     background: var(--general-main-1);
-    // Deliberately NOT var(--tab-content-height) (calc(100vh - 2.4rem),
-    // app.scss) — that variable is shared with other pages (Dashboard,
-    // etc.) that sit in normal document flow, where it works fine. This
-    // element is absolutely positioned with its own explicit `top` above,
-    // so using that same shared value here double-counted: top (5.6rem)
-    // plus a height that only reserves 2.4rem for the header left this
-    // overflowing the viewport by 3.2rem. Computed locally instead, to
-    // exactly match this element's own top value with zero overflow,
-    // without touching the shared variable other pages still rely on.
-    height: calc(100vh - 5.6rem);
+    // Same reasoning as top above: .bot-dashboard's own height already
+    // correctly equals the viewport minus the header (100% of .main-body,
+    // which is flex-grow: 1 in the space left after the header's fixed
+    // 5.6rem). 100% of that containing block is exactly right — no
+    // separate 100vh-based calculation needed, and none of the previous
+    // ones could have been correct while top was also wrong.
+    height: 100%;
 
     .injectionDiv {
         .blocklyTrash {
@@ -723,13 +722,10 @@
     }
 
     @include mobile-or-tablet-screen {
-        top: 5.6rem;
+        top: 0;
         inset-inline-start: 0;
         width: 100vw;
-        // Same reasoning as the desktop height above — local calc matching
-        // this element's own top, not the shared --tab-content-height-mobile
-        // (calc(100vh - 5rem), a 0.6rem mismatch against this 5.6rem top).
-        height: calc(100vh - 5.6rem);
+        height: 100%;
     }
 }
 
