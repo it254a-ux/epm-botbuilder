@@ -653,7 +653,16 @@
     inset-inline-start: 1.6rem;
     z-index: -1;
     background: var(--general-main-1);
-    height: var(--tab-content-height);
+    // Deliberately NOT var(--tab-content-height) (calc(100vh - 2.4rem),
+    // app.scss) — that variable is shared with other pages (Dashboard,
+    // etc.) that sit in normal document flow, where it works fine. This
+    // element is absolutely positioned with its own explicit `top` above,
+    // so using that same shared value here double-counted: top (5.6rem)
+    // plus a height that only reserves 2.4rem for the header left this
+    // overflowing the viewport by 3.2rem. Computed locally instead, to
+    // exactly match this element's own top value with zero overflow,
+    // without touching the shared variable other pages still rely on.
+    height: calc(100vh - 5.6rem);
 
     .injectionDiv {
         .blocklyTrash {
@@ -683,7 +692,10 @@
         top: 5.6rem;
         inset-inline-start: 0;
         width: 100vw;
-        height: var(--tab-content-height-mobile);
+        // Same reasoning as the desktop height above — local calc matching
+        // this element's own top, not the shared --tab-content-height-mobile
+        // (calc(100vh - 5rem), a 0.6rem mismatch against this 5.6rem top).
+        height: calc(100vh - 5.6rem);
     }
 }
 
