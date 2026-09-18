@@ -336,9 +336,12 @@ export function useStreakReversalAutomation({
     setCurrentStake(nextStake);
     setStake(String(nextStake));
 
-    // Reset the window and go back to watching for the next streak.
-    windowRef.current = [];
-    setWindowTicks([]);
+    // Do NOT clear the window here. Same as the DBot version: the tick
+    // window just keeps sliding — it's never wiped after a trade. If the
+    // streak is still extending (a loss on a continuing run), the window
+    // already sitting here still satisfies the condition and the very
+    // next tick fires immediately. Only a genuine direction change lets
+    // the AND-chain fail naturally on its own, no explicit reset needed.
     setPhaseBoth('collecting');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPositions, phase, netProfit, lossRunCount, direction, setStake]);
