@@ -204,12 +204,20 @@ export function useStreakReversalAutomation({
   useEffect(() => {
     if (!isRunningRef.current) return;
     if (lastQuote === null) return;
+    // Only the 'collecting' phase does streak detection. While 'ready' or
+    // 'entered' — including the whole loss-chase sequence, which sets
+    // 'ready' directly without going through detection — this effect
+    // still tracks the window for display, but must not touch direction
+    // or phase, since a loss-chase is deliberately not gated on the
+    // streak condition reappearing.
     if (phaseRef.current === 'entered') return; // don't evaluate new entries while a contract is open
 
     const cfg = settingsRef.current;
     const next = [...windowRef.current, lastQuote].slice(-(cfg.streakLength + 1));
     windowRef.current = next;
     setWindowTicks(next);
+
+    if (phaseRef.current !== 'collecting') return; // loss-chase in progress — direction/phase already decided
 
     if (next.length < cfg.streakLength + 1) return;
 
@@ -226,9 +234,7 @@ export function useStreakReversalAutomation({
         staleProposalId.current = latestProposalRef.current?.id ?? null;
         setDirection(nextDirection);
       }
-      if (phaseRef.current === 'collecting') {
-        setPhaseBoth('ready');
-      }
+      setPhaseBoth('ready');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastQuote, lastTickEpoch]);
@@ -336,13 +342,18 @@ export function useStreakReversalAutomation({
     setCurrentStake(nextStake);
     setStake(String(nextStake));
 
-    // Do NOT clear the window here. Same as the DBot version: the tick
-    // window just keeps sliding — it's never wiped after a trade. If the
-    // streak is still extending (a loss on a continuing run), the window
-    // already sitting here still satisfies the condition and the very
-    // next tick fires immediately. Only a genuine direction change lets
-    // the AND-chain fail naturally on its own, no explicit reset needed.
-    setPhaseBoth('collecting');
+    if (won) {
+      // Recovery complete — this is the only thing that ends a chase.
+      // Go back to watching for a fresh streak from scratch.
+      setPhaseBoth('collecting');
+    } else {
+      // Loss — do NOT wait for the streak condition to reappear. Fire
+      // again immediately in the SAME direction at the new (bigger)
+      // stake, so every tick from here on has an active contract with
+      // no gap, until a win breaks the chase. The BUY effect below
+      // picks this up the moment a live proposal matches the new stake.
+      setPhaseBoth('ready');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPositions, phase, netProfit, lossRunCount, direction, setStake]);
 
@@ -354,8 +365,10 @@ export function useStreakReversalAutomation({
   const statusMessage =
     phase === 'collecting'
       ? `Watching — ${windowTicks.length}/${settings.streakLength + 1} ticks, ${lossRunCount} consecutive loss${lossRunCount === 1 ? '' : 'es'}.`
-      : phase === 'ready'
+      : phase === 'ready' && lossRunCount === 0
       ? `Streak confirmed — entering ${direction === 'CALL' ? 'Rise' : 'Fall'}.`
+      : phase === 'ready'
+      ? `Loss ${lossRunCount} — chasing recovery, re-entering ${direction === 'CALL' ? 'Rise' : 'Fall'} immediately.`
       : phase === 'entered'
       ? 'Trade placed — waiting for it to settle.'
       : 'Idle';
