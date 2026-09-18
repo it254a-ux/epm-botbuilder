@@ -213,13 +213,13 @@ export function useStreakReversalAutomation({
     if (phaseRef.current === 'entered') return; // don't evaluate new entries while a contract is open
 
     const cfg = settingsRef.current;
-    const next = [...windowRef.current, lastQuote].slice(-(cfg.streakLength + 1));
+    const next = [...windowRef.current, lastQuote].slice(-cfg.streakLength);
     windowRef.current = next;
     setWindowTicks(next);
 
     if (phaseRef.current !== 'collecting') return; // loss-chase in progress — direction/phase already decided
 
-    if (next.length < cfg.streakLength + 1) return;
+    if (next.length < cfg.streakLength) return;
 
     let allRising = true;
     let allFalling = true;
@@ -364,7 +364,7 @@ export function useStreakReversalAutomation({
 
   const statusMessage =
     phase === 'collecting'
-      ? `Watching — ${windowTicks.length}/${settings.streakLength + 1} ticks, ${lossRunCount} consecutive loss${lossRunCount === 1 ? '' : 'es'}.`
+      ? `Watching — ${windowTicks.length}/${settings.streakLength} ticks, ${lossRunCount} consecutive loss${lossRunCount === 1 ? '' : 'es'}.`
       : phase === 'ready' && lossRunCount === 0
       ? `Streak confirmed — entering ${direction === 'CALL' ? 'Rise' : 'Fall'}.`
       : phase === 'ready'
