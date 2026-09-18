@@ -411,10 +411,14 @@
 
     &__run-strategy-wrapper {
         inset-inline-end: 1.6rem;
-        // Balance badge (.toolbar__balance-wrapper below) now occupies the
-        // very top-right corner at top:1.6rem — this must always sit below
-        // it, regardless of embed context, or the two overlap.
-        top: 5.6rem;
+        // Was 5.6rem — same mistake as .bot-builder's old top value (fixed
+        // separately): this wrapper's positioning parent, .main__container,
+        // already starts flush at the header's bottom edge via normal flex
+        // flow, so a positive top here doesn't clear the header — it's
+        // already cleared — it just adds that much empty space again. 0
+        // starts it flush, matching Bot Builder's own now-flush layout (see
+        // the comment above about that intentional consistency).
+        top: 0;
         z-index: 2;
 
         // Extra clearance only inside .main__container--embedded-header,
