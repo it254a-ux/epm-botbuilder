@@ -265,6 +265,21 @@
                     }
                 }
 
+                // ThemedScrollbars (only actually mounted now that Tabs
+                // gets is_scrollable) hardcodes a `dc-themed-scrollbars-wrapper`
+                // class with `margin-bottom: -3rem; padding-bottom: 3rem;` --
+                // a trick built for a different, vertically-clipped pill list
+                // elsewhere in the app. Here it pulled whatever page content
+                // rendered below this tab row (Dashboard/Bot Builder/Charts)
+                // upward by 3rem, so that page's own background painted over
+                // and hid the tab row entirely after switching tabs. This
+                // row is horizontal-only and doesn't need that vertical
+                // clearance hack at all.
+                .dc-themed-scrollbars-wrapper {
+                    margin-bottom: 0;
+                    padding-bottom: 0;
+                }
+
                 .dc-tabs__item--main__tabs {
                     @include mobile-or-tablet-screen {
                         // Previously zero — this and the base font-size (10px,

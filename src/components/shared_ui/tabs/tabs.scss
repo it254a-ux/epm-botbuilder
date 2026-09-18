@@ -113,6 +113,12 @@
                 content: '';
                 position: absolute;
                 left: 0;
+                // Was missing entirely, so this had no vertical position
+                // and rendered wherever its static position happened to
+                // land -- through the middle of the label instead of
+                // underneath it. Matches the non-scrollable active-line's
+                // own bottom offset (see &--top above).
+                bottom: -2px;
                 display: block;
                 width: 100%;
             }
