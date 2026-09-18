@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useSmartChartsApi } from '@/external/rise-fall-dtrader/hooks/use-smartcharts-api';
 import { useSmartChartChartData } from '@/external/rise-fall-dtrader/hooks/use-smartchart-chart-data';
@@ -251,6 +250,8 @@ function RiseFallPage() {
         isAuthenticated={authState === 'authenticated'}
         activeTradeType={activeTradeType}
         onSelectTradeType={setActiveTradeType}
+        lastQuote={trading.currentTick?.quote ?? null}
+        lastTickEpoch={trading.currentTick?.epoch ?? null}
       />
     </main>
   );
