@@ -151,6 +151,7 @@ export function useStreakReversalAutomation({
   const hasFired = useRef(false);
   const pendingContractId = useRef<number | null>(null);
   const intendedStake = useRef(0);
+  const roundStakeRef = useRef(0);
   const windowRef = useRef<number[]>([]);
   const latestProposalRef = useRef<ProposalInfo | null>(null);
   const staleProposalId = useRef<string | null>(null);
@@ -182,6 +183,7 @@ export function useStreakReversalAutomation({
     windowRef.current = [];
     setWindowTicks([]);
     intendedStake.current = cfg.baseStake;
+    roundStakeRef.current = cfg.baseStake;
     setCurrentStake(cfg.baseStake);
     setStake(String(cfg.baseStake));
     isRunningRef.current = true;
@@ -213,7 +215,35 @@ export function useStreakReversalAutomation({
     if (phaseRef.current === 'entered') return; // don't evaluate new entries while a contract is open
 
     const cfg = settingsRef.current;
-    const next = [...windowRef.current, lastQuote].slice(-cfg.streakLength);
+    const oldWindow = windowRef.current;
+
+    // SPECULATIVE PRE-FETCH (entry side): checked on the window as it
+    // stood BEFORE this new tick arrives. If its last (streakLength - 1)
+    // values already form a clean, unbroken run, then the tick about to
+    // land would complete a full streak IF it continues the same way.
+    // Speculate that direction now so the proposal starts arriving in
+    // the background one tick early — same principle as the loss-chase
+    // pre-fetch, just applied to the very first entry too. If the new
+    // tick actually breaks the run instead, this speculation is simply
+    // discarded below (no trade fires) — no harm done either way.
+    if (phaseRef.current === 'collecting' && oldWindow.length >= cfg.streakLength - 1) {
+      const tail = oldWindow.slice(-(cfg.streakLength - 1));
+      let partialRising = true;
+      let partialFalling = true;
+      for (let i = 1; i < tail.length; i++) {
+        if (!(tail[i] > tail[i - 1])) partialRising = false;
+        if (!(tail[i] < tail[i - 1])) partialFalling = false;
+      }
+      if (partialRising || partialFalling) {
+        const candidateDirection: Direction = partialRising ? 'PUT' : 'CALL';
+        if (candidateDirection !== direction) {
+          staleProposalId.current = latestProposalRef.current?.id ?? null;
+          setDirection(candidateDirection);
+        }
+      }
+    }
+
+    const next = [...oldWindow, lastQuote].slice(-cfg.streakLength);
     windowRef.current = next;
     setWindowTicks(next);
 
@@ -236,6 +266,10 @@ export function useStreakReversalAutomation({
       }
       setPhaseBoth('ready');
     }
+    // If the run was broken instead (not allRising/allFalling), nothing
+    // fires — a wrong speculative direction guessed one tick early is
+    // simply unused, exactly as intended: "if the last tick is opposite,
+    // no trade."
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastQuote, lastTickEpoch]);
 
@@ -250,8 +284,24 @@ export function useStreakReversalAutomation({
 
     staleProposalId.current = null;
     hasFired.current = true;
+    roundStakeRef.current = intendedStake.current; // stake actually used for THIS contract
+
+    // Speculative pre-fetch: request the proposal for what the next stake
+    // would be if this trade loses, right now, while this contract is
+    // still open — instead of waiting until settlement to even start
+    // that round-trip. If it wins, this gets discarded and reset to
+    // baseStake; the wasted request costs nothing. If it loses, the
+    // proposal has had the entire contract duration to arrive, so the
+    // BUY effect can fire on it immediately with little to no gap.
+    const cfg = settingsRef.current;
+    const speculativeNext = computeNextStake(cfg, intendedStake.current, false);
+    if (cfg.maxStake === null || speculativeNext <= cfg.maxStake) {
+      intendedStake.current = speculativeNext;
+      setStake(String(speculativeNext));
+    }
+
     buyContract();
-  }, [isRunning, phase, proposal, isBuying, buyContract]);
+  }, [isRunning, phase, proposal, isBuying, buyContract, setStake]);
 
   useEffect(() => {
     if (!hasFired.current || phase !== 'ready' || !buyResult) return;
@@ -287,7 +337,7 @@ export function useStreakReversalAutomation({
     const profit = parseFloat(position.profit);
     const won = profit >= 0;
     const nextNet = netProfit + profit;
-    const roundStake = intendedStake.current;
+    const roundStake = roundStakeRef.current;
 
     const result: StreakResult = { contractId, profit, won, stake: roundStake, direction };
     setResults((prev) => [...prev, result]);
@@ -338,6 +388,10 @@ export function useStreakReversalAutomation({
       return;
     }
 
+    // On a loss this reaffirms the same value already speculatively
+    // pre-fetched when the contract was bought (so the proposal is
+    // likely already caught up — little to no wait here). On a win it
+    // overwrites that discarded speculative value back down to baseStake.
     intendedStake.current = nextStake;
     setCurrentStake(nextStake);
     setStake(String(nextStake));
