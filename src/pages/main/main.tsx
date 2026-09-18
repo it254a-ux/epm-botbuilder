@@ -484,6 +484,20 @@ const AppWrapper = observer(() => {
                                     </>
                                 }
                                 id='id-dtrader'
+                                // .dtrader-app (dtrader/index.tsx) is 'h-full',
+                                // meant to fill this panel, but a plain block
+                                // child doesn't inherit height from its parent
+                                // without an explicit value here -- it just
+                                // shrinks to its own content. .dc-tabs__content
+                                // itself does have a real height (main.scss),
+                                // but that never reached .dtrader-app without
+                                // this. Trade types with a taller automated
+                                // panel (Rise/Fall) filled the space by
+                                // coincidence; shorter ones (Accumulators,
+                                // Matches/Differs, Over/Under, Even/Odd) left
+                                // .dc-tabs__content's own background exposed
+                                // below -- the black block underneath them.
+                                style={{ height: '100%' }}
                             >
                                 <Suspense
                                     fallback={<ChunkLoader message={localize('Please wait, loading Dtrader...')} />}
