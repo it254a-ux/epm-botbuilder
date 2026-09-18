@@ -530,7 +530,14 @@ const AppWrapper = observer(() => {
                 </div>
             </div>
             <DesktopWrapper>
-                {!is_tutorial_only_embed && (
+                {/* Never rendered at all while dtrader is active — not just
+                    hidden by CSS. It was never actually hidden there before;
+                    it just happened to be visually covered once dtrader's
+                    own chart UI finished loading, which is exactly why it
+                    flashed visible during dtrader's loading gap. A real
+                    condition here removes it from the DOM outright, so
+                    there's nothing to flash regardless of timing. */}
+                {!is_tutorial_only_embed && active_tab !== DBOT_TABS.DTRADER && (
                     <div className='main__run-strategy-wrapper'>
                         <RunStrategy />
                         <RunPanel />
@@ -539,7 +546,9 @@ const AppWrapper = observer(() => {
                 <ChartModal />
                 <TradingViewModal />
             </DesktopWrapper>
-            <MobileWrapper>{!is_tutorial_only_embed && !is_open && <RunPanel />}</MobileWrapper>
+            <MobileWrapper>
+                {!is_tutorial_only_embed && !is_open && active_tab !== DBOT_TABS.DTRADER && <RunPanel />}
+            </MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
                 className='dc-dialog__wrapper--fixed'
