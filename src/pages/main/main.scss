@@ -206,6 +206,18 @@
                 background: var(--general-main-1);
             }
 
+            // .bot-builder (app-content.jsx) is a true sibling of <Main/> --
+            // not nested inside it -- under their shared .bot-dashboard
+            // wrapper, absolutely positioned top:0 over the same area, and
+            // gets z-index:1 while active. Our tab bar had no stacking
+            // context of its own, so nothing stopped .bot-builder's opaque
+            // background from painting straight over it once Bot Builder
+            // became the active tab. This was invisible before because the
+            // tab row itself was invisible (the ThemedScrollbars bug, fixed
+            // separately) -- fixing that exposed this pre-existing conflict.
+            position: relative;
+            z-index: 2;
+
             &__list {
                 background: var(--general-section-1);
                 justify-content: start;
