@@ -84,11 +84,11 @@ export function StreakReversalAutomatedPanel({
         <div className="flex items-center justify-between">
           <p className="text-[9px] text-muted-foreground">Streak window</p>
           <p className="text-[9px] tabular-nums text-muted-foreground">
-            {windowTicks.length}/{settings.streakLength + 1} ticks
+            {windowTicks.length}/{settings.streakLength} ticks
           </p>
         </div>
         <div className="flex gap-0.5">
-          {Array.from({ length: settings.streakLength }).map((_, i) => {
+          {Array.from({ length: Math.max(settings.streakLength - 1, 1) }).map((_, i) => {
             let cls = 'bg-muted';
             if (i < windowTicks.length - 1) {
               cls = windowTicks[i + 1] > windowTicks[i] ? 'bg-green-600' : windowTicks[i + 1] < windowTicks[i] ? 'bg-destructive' : 'bg-muted';
