@@ -218,16 +218,19 @@ export function useStreakReversalAutomation({
     const oldWindow = windowRef.current;
 
     // SPECULATIVE PRE-FETCH (entry side): checked on the window as it
-    // stood BEFORE this new tick arrives. If its last (streakLength - 1)
-    // values already form a clean, unbroken run, then the tick about to
-    // land would complete a full streak IF it continues the same way.
-    // Speculate that direction now so the proposal starts arriving in
-    // the background one tick early — same principle as the loss-chase
-    // pre-fetch, just applied to the very first entry too. If the new
-    // tick actually breaks the run instead, this speculation is simply
+    // stood BEFORE this new tick arrives. Triggers as soon as the last
+    // (streakLength - 2) values already form a clean run — i.e. TWO
+    // ticks before confirmation, not one — giving the proposal
+    // round-trip extra lead time to actually land before the confirming
+    // tick arrives (the staleness re-check right before buying is what
+    // actually protects against a broken run either way; this just
+    // gives the network more head start). Re-speculates every tick as
+    // the run extends, so the direction stays current right up to
+    // confirmation. If the run breaks at any point, this is simply
     // discarded below (no trade fires) — no harm done either way.
-    if (phaseRef.current === 'collecting' && oldWindow.length >= cfg.streakLength - 1) {
-      const tail = oldWindow.slice(-(cfg.streakLength - 1));
+    const leadTicks = Math.max(cfg.streakLength - 2, 1);
+    if (phaseRef.current === 'collecting' && oldWindow.length >= leadTicks) {
+      const tail = oldWindow.slice(-leadTicks);
       let partialRising = true;
       let partialFalling = true;
       for (let i = 1; i < tail.length; i++) {
@@ -281,6 +284,32 @@ export function useStreakReversalAutomation({
     if (!proposal) return;
     if (staleProposalId.current !== null && proposal.id === staleProposalId.current) return;
     if (Math.abs(proposal.askPrice - intendedStake.current) > 0.01) return;
+
+    // Re-validate right before committing — only for a fresh entry
+    // (lossRunCount === 0). The 'ready' decision may have been made a
+    // moment ago; if getting a matching proposal took long enough for
+    // more ticks to land and reverse the run, don't fire on a now-stale
+    // decision. Loss-chase re-entries (lossRunCount > 0) deliberately
+    // skip this — they're not supposed to wait for the pattern to
+    // reappear, by design.
+    if (lossRunCount === 0) {
+      const w = windowRef.current;
+      if (w.length >= settingsRef.current.streakLength) {
+        let stillRising = true;
+        let stillFalling = true;
+        for (let i = 1; i < w.length; i++) {
+          if (!(w[i] > w[i - 1])) stillRising = false;
+          if (!(w[i] < w[i - 1])) stillFalling = false;
+        }
+        const stillValid = direction === 'PUT' ? stillRising : stillFalling;
+        if (!stillValid) {
+          // Streak broke while we were waiting on the proposal — abort,
+          // go back to genuinely watching instead of buying on stale info.
+          setPhaseBoth('collecting');
+          return;
+        }
+      }
+    }
 
     staleProposalId.current = null;
     hasFired.current = true;
