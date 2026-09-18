@@ -746,6 +746,19 @@
     box-shadow: 0 8px 16px 0 var(--shadow-menu);
     overflow: hidden;
 
+    // On mobile the trigger button sits left-of-center in the header
+    // (after the hamburger + logo), not flush against the right edge like
+    // on desktop. `right: 0` anchored to that narrow button was pushing
+    // this panel's left edge off-screen, clipping the tab/account labels.
+    // Pin to the viewport itself instead, so it's centered under the
+    // header regardless of where the trigger button happens to sit.
+    @include mobile-screen {
+        position: fixed;
+        top: 5.1rem;
+        left: 1.6rem;
+        right: 1.6rem;
+    }
+
     // The richer panel (tabs, section header, reset balance, CFD/manage
     // links) merged in from the former AccountSwitcherModal component.
     // Widened from the plain list's 16rem minimum to fit the tab row and
@@ -753,6 +766,11 @@
     &--panel {
         width: 32rem;
         max-width: calc(100vw - 3.2rem);
+
+        @include mobile-screen {
+            width: auto;
+            max-width: none;
+        }
     }
 
     &__tabs {

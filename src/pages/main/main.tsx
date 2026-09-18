@@ -413,6 +413,16 @@ const AppWrapper = observer(() => {
                             className='main__tabs'
                             onTabItemClick={handleTabChange}
                             hide_list={isDesktop}
+                            // Without this, Tabs forces every tab into a fixed
+                            // 100%/tab-count width (~16.67% for 6 tabs) rather
+                            // than sizing to its own label. Labels like "EPM
+                            // Trading bots" don't fit that box and, since text
+                            // stays nowrap, overflow into the neighbouring
+                            // tabs -- the jumbled/overlapping look on mobile.
+                            // Scrollable mode sizes each tab to its content and
+                            // scrolls the row instead, matching the shadow
+                            // affordances already built for this tab bar.
+                            is_scrollable={!isDesktop}
                             top
                         >
                             <div
