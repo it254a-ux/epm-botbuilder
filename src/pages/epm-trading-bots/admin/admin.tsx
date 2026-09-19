@@ -46,6 +46,9 @@ const AdminBots = () => {
     const [xmlFileName, setXmlFileName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    // Non-null while editing an existing bot instead of creating a new one —
+    // drives both the form's submit behavior (PUT vs POST) and its labels.
+    const [editingId, setEditingId] = useState<number | null>(null);
 
     const fetchBots = async () => {
         setIsLoadingList(true);
@@ -83,6 +86,27 @@ const AdminBots = () => {
         setContractType(CONTRACT_TYPE_OPTIONS[0]);
         setXmlContent('');
         setXmlFileName('');
+        setEditingId(null);
+    };
+
+    // Populates the form from the bot's already-loaded list data (name,
+    // market, risk_level, contract_type, description) — the list endpoint
+    // doesn't include xml_content (kept out to keep that payload small), so
+    // the strategy file field starts empty. Leaving it empty on submit is
+    // fine: the PUT endpoint only replaces xml_content when a new file is
+    // actually chosen, otherwise it keeps the bot's existing one untouched.
+    const handleEdit = (bot: TBotSummary) => {
+        setEditingId(bot.id);
+        setName(bot.name);
+        setDescription(bot.description);
+        setMarket(bot.market);
+        setRiskLevel(bot.risk_level);
+        setContractType(bot.contract_type || CONTRACT_TYPE_OPTIONS[0]);
+        setXmlContent('');
+        setXmlFileName('');
+        // So the admin immediately sees the form they're about to edit,
+        // rather than needing to scroll up themselves.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -91,15 +115,22 @@ const AdminBots = () => {
             toast.error(localize('Enter the admin password first'));
             return;
         }
-        if (!name.trim() || !description.trim() || !xmlContent) {
-            toast.error(localize('Name, description, and an XML file are all required'));
+        const isEditing = editingId !== null;
+        // Editing doesn't require re-selecting the XML file — only creating
+        // a brand new bot does, since there's no existing file to fall back to.
+        if (!name.trim() || !description.trim() || (!isEditing && !xmlContent)) {
+            toast.error(
+                isEditing
+                    ? localize('Name and description are required')
+                    : localize('Name, description, and an XML file are all required')
+            );
             return;
         }
 
         setIsSubmitting(true);
         try {
-            const res = await fetch('/api/bots', {
-                method: 'POST',
+            const res = await fetch(isEditing ? `/api/bots?id=${editingId}` : '/api/bots', {
+                method: isEditing ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'x-admin-password': password,
@@ -110,17 +141,21 @@ const AdminBots = () => {
                     market,
                     risk_level: riskLevel,
                     contract_type: contractType,
-                    xml_content: xmlContent,
+                    // Omitted entirely when empty on an edit, rather than sent
+                    // as '', so the backend's "was a file actually chosen"
+                    // check works the same way whether the key is absent or
+                    // just falsy.
+                    ...(xmlContent ? { xml_content: xmlContent } : {}),
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data?.error || localize('Failed to save bot'));
+            if (!res.ok) throw new Error(data?.error || localize(isEditing ? 'Failed to update bot' : 'Failed to save bot'));
 
-            toast.success(localize('Bot added'));
+            toast.success(isEditing ? localize('Bot updated') : localize('Bot added'));
             resetForm();
             fetchBots();
         } catch (err: any) {
-            toast.error(err?.message || localize('Failed to save bot'));
+            toast.error(err?.message || localize(isEditing ? 'Failed to update bot' : 'Failed to save bot'));
         } finally {
             setIsSubmitting(false);
         }
@@ -159,7 +194,7 @@ const AdminBots = () => {
                     <Localize i18n_default_text='Manage Free Bots' />
                 </h1>
                 <p className='admin-bots__subtitle'>
-                    <Localize i18n_default_text='Add a new bot below, or remove one from the list.' />
+                    <Localize i18n_default_text='Add a new bot below, edit an existing one, or remove one from the list.' />
                 </p>
             </div>
 
@@ -177,6 +212,15 @@ const AdminBots = () => {
             </div>
 
             <form className='admin-bots__form' onSubmit={handleSubmit}>
+                {editingId !== null && (
+                    <div className='admin-bots__editing-banner'>
+                        <Localize i18n_default_text='Editing an existing bot' />
+                        <button type='button' className='admin-bots__cancel-edit-btn' onClick={resetForm}>
+                            <Localize i18n_default_text='Cancel' />
+                        </button>
+                    </div>
+                )}
+
                 <label>
                     <Localize i18n_default_text='Bot name' />
                     <input
@@ -235,18 +279,36 @@ const AdminBots = () => {
                 </label>
 
                 <label>
-                    <Localize i18n_default_text='Bot XML file' />
+                    {editingId !== null ? (
+                        <Localize i18n_default_text='Bot XML file (leave empty to keep the current one)' />
+                    ) : (
+                        <Localize i18n_default_text='Bot XML file' />
+                    )}
                     <input type='file' accept='application/xml, text/xml' onChange={handleXmlFile} />
                     {xmlFileName && <span className='admin-bots__file-name'>{xmlFileName}</span>}
                 </label>
 
-                <button type='submit' className='admin-bots__submit-btn' disabled={isSubmitting}>
-                    {isSubmitting ? (
-                        <Localize i18n_default_text='Saving...' />
-                    ) : (
-                        <Localize i18n_default_text='Add bot' />
+                <div className='admin-bots__form-actions'>
+                    <button type='submit' className='admin-bots__submit-btn' disabled={isSubmitting}>
+                        {isSubmitting ? (
+                            <Localize i18n_default_text='Saving...' />
+                        ) : editingId !== null ? (
+                            <Localize i18n_default_text='Update bot' />
+                        ) : (
+                            <Localize i18n_default_text='Add bot' />
+                        )}
+                    </button>
+                    {editingId !== null && (
+                        <button
+                            type='button'
+                            className='admin-bots__cancel-btn'
+                            onClick={resetForm}
+                            disabled={isSubmitting}
+                        >
+                            <Localize i18n_default_text='Cancel' />
+                        </button>
                     )}
-                </button>
+                </div>
             </form>
 
             <div className='admin-bots__list'>
@@ -272,18 +334,28 @@ const AdminBots = () => {
                                 {bot.market} · {bot.risk_level}
                             </span>
                         </div>
-                        <button
-                            type='button'
-                            className='admin-bots__delete-btn'
-                            disabled={deletingId === bot.id}
-                            onClick={() => handleDelete(bot)}
-                        >
-                            {deletingId === bot.id ? (
-                                <Localize i18n_default_text='Deleting...' />
-                            ) : (
-                                <Localize i18n_default_text='Delete' />
-                            )}
-                        </button>
+                        <div className='admin-bots__list-item-actions'>
+                            <button
+                                type='button'
+                                className='admin-bots__edit-btn'
+                                disabled={deletingId === bot.id}
+                                onClick={() => handleEdit(bot)}
+                            >
+                                <Localize i18n_default_text='Edit' />
+                            </button>
+                            <button
+                                type='button'
+                                className='admin-bots__delete-btn'
+                                disabled={deletingId === bot.id}
+                                onClick={() => handleDelete(bot)}
+                            >
+                                {deletingId === bot.id ? (
+                                    <Localize i18n_default_text='Deleting...' />
+                                ) : (
+                                    <Localize i18n_default_text='Delete' />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>

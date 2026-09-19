@@ -89,6 +89,34 @@
         margin-top: 0.4rem;
     }
 
+    &__editing-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.8rem 1.2rem;
+        border-radius: 4px;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid var(--button-primary-default, #3b82f6);
+        color: var(--text-general, #fff);
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    &__cancel-edit-btn {
+        background: none;
+        border: none;
+        color: var(--button-primary-default, #3b82f6);
+        font-size: 1.2rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    &__form-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
     &__submit-btn {
         background: var(--button-primary-default, #3B82F6);
         color: #fff;
@@ -97,6 +125,22 @@
         padding: 1rem;
         font-size: 1.4rem;
         font-weight: bold;
+        cursor: pointer;
+        flex: 1;
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    }
+
+    &__cancel-btn {
+        background: none;
+        border: 1px solid var(--border-normal, #444);
+        color: var(--text-general, #fff);
+        border-radius: 4px;
+        padding: 1rem 1.6rem;
+        font-size: 1.4rem;
         cursor: pointer;
 
         &:disabled {
@@ -128,6 +172,26 @@
         font-size: 1.1rem;
         color: var(--text-less-prominent, #999);
         margin-top: 0.2rem;
+    }
+
+    &__list-item-actions {
+        display: flex;
+        gap: 0.8rem;
+    }
+
+    &__edit-btn {
+        background: none;
+        border: 1px solid var(--button-primary-default, #3b82f6);
+        color: var(--button-primary-default, #3b82f6);
+        border-radius: 4px;
+        padding: 0.6rem 1.2rem;
+        font-size: 1.2rem;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     }
 
     &__delete-btn {

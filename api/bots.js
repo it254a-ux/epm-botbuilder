@@ -31,6 +31,13 @@ const CONTRACT_TYPE_OPTIONS = [
 //                                bracket-route detection further.
 // POST   /api/bots           -> admin only, protected by the x-admin-password
 //                                header, checked against ADMIN_PASSWORD.
+// PUT    /api/bots?id=X      -> admin only, same protection. Updates an
+//                                existing bot's editable fields. xml_content
+//                                is optional here (unlike POST, where it's
+//                                required) — the admin panel only sends it
+//                                when actually replacing the strategy file,
+//                                so editing just the name/market/etc doesn't
+//                                require re-uploading the XML.
 // DELETE /api/bots?id=X      -> admin only, same protection.
 module.exports = async function handler(req, res) {
     let sql;
@@ -142,6 +149,101 @@ module.exports = async function handler(req, res) {
         } catch (err) {
             console.error('create bot error:', err);
             res.status(500).json({ error: 'Failed to save bot' });
+        }
+        return;
+    }
+
+    if (req.method === 'PUT') {
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        const providedPassword = req.headers['x-admin-password'];
+
+        if (!id || Number.isNaN(Number(id))) {
+            res.status(400).json({ error: 'Invalid bot id' });
+            return;
+        }
+        if (!adminPassword) {
+            res.status(500).json({ error: 'ADMIN_PASSWORD is not set in environment variables' });
+            return;
+        }
+        if (!providedPassword || providedPassword !== adminPassword) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        try {
+            const body = req.body || {};
+            const name = String(body.name || '').trim();
+            const description = String(body.description || '').trim();
+            const market = String(body.market || '').trim();
+            const risk_level = String(body.risk_level || '').trim();
+            const contract_type_raw = String(body.contract_type || '').trim();
+            const contract_type = CONTRACT_TYPE_OPTIONS.includes(contract_type_raw)
+                ? contract_type_raw
+                : 'Other';
+            // Unlike POST, xml_content is optional — undefined/empty means
+            // "leave the existing strategy file alone", not "clear it".
+            const xml_content_provided = typeof body.xml_content === 'string' && body.xml_content.length > 0;
+            const xml_content = xml_content_provided ? body.xml_content : undefined;
+
+            if (!name || !description || !market || !risk_level) {
+                res.status(400).json({
+                    error: 'name, description, market, and risk_level are all required',
+                });
+                return;
+            }
+            if (name.length > MAX_NAME_LENGTH) {
+                res.status(400).json({ error: `name is too long (max ${MAX_NAME_LENGTH} characters)` });
+                return;
+            }
+            if (description.length > MAX_DESCRIPTION_LENGTH) {
+                res.status(400).json({ error: `description is too long (max ${MAX_DESCRIPTION_LENGTH} characters)` });
+                return;
+            }
+            if (xml_content_provided) {
+                if (xml_content.length > MAX_XML_LENGTH) {
+                    res.status(400).json({ error: 'xml_content is too large (max ~200KB)' });
+                    return;
+                }
+                if (!xml_content.trim().startsWith('<')) {
+                    res.status(400).json({ error: 'xml_content does not look like a valid XML file' });
+                    return;
+                }
+            }
+
+            // sql`` template calls can't conditionally omit a column, so branch
+            // into two queries rather than building one dynamically (keeps the
+            // parameterization the library handles safe, no string-built SQL).
+            const [bot] = xml_content_provided
+                ? await sql`
+                    UPDATE free_bots
+                    SET name = ${name},
+                        description = ${description},
+                        market = ${market},
+                        risk_level = ${risk_level},
+                        contract_type = ${contract_type},
+                        xml_content = ${xml_content}
+                    WHERE id = ${Number(id)}
+                    RETURNING id, name, description, market, risk_level, contract_type, created_at
+                `
+                : await sql`
+                    UPDATE free_bots
+                    SET name = ${name},
+                        description = ${description},
+                        market = ${market},
+                        risk_level = ${risk_level},
+                        contract_type = ${contract_type}
+                    WHERE id = ${Number(id)}
+                    RETURNING id, name, description, market, risk_level, contract_type, created_at
+                `;
+
+            if (!bot) {
+                res.status(404).json({ error: 'Bot not found' });
+                return;
+            }
+            res.status(200).json({ bot });
+        } catch (err) {
+            console.error('update bot error:', err);
+            res.status(500).json({ error: 'Failed to update bot' });
         }
         return;
     }
