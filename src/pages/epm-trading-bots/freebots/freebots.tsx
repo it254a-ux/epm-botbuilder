@@ -25,7 +25,34 @@ const DESCRIPTION_PREVIEW_LENGTH = 160;
 // show whatever's cached instantly, then always fetch fresh data in the
 // background and update when it arrives, so this feels instant on repeat
 // visits while still staying current.
-let bots_cache: TBotSummary[] | null = null;
+//
+// Also mirrored into sessionStorage: an in-memory cache alone only helps
+// switching tabs within the same page load -- a full refresh clears it,
+// since that's a fresh JS execution. Reading sessionStorage here, at
+// module-evaluation time (before the component even renders), means a
+// refresh can still show the last known list instantly instead of a bare
+// loading state, while a background fetch keeps it current.
+const SESSION_STORAGE_KEY = 'epm_freebots_cache_v1';
+
+let bots_cache: TBotSummary[] | null = (() => {
+    try {
+        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+        return raw ? (JSON.parse(raw) as TBotSummary[]) : null;
+    } catch {
+        // Storage unavailable (privacy mode, quota, etc.) or corrupted --
+        // fall back to no cache, same as before this existed.
+        return null;
+    }
+})();
+
+const persistBotsCache = (bots_list: TBotSummary[]) => {
+    bots_cache = bots_list;
+    try {
+        window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(bots_list));
+    } catch {
+        // Ignore -- the in-memory cache above still works for this page load.
+    }
+};
 
 // Fixed display order for contract-type sections. Anything that doesn't
 // match one of these (including bots added before this field existed,
@@ -61,7 +88,7 @@ const Freebots = observer(() => {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data?.error || localize('Failed to load bots'));
                 const bots_list = data.bots || [];
-                bots_cache = bots_list;
+                persistBotsCache(bots_list);
                 if (!cancelled) setBots(bots_list);
             } catch (err: any) {
                 // Only surface the error if we have nothing cached to show --
