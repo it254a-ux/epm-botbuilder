@@ -52,7 +52,8 @@ const DtraderPage = lazy(() => import('../dtrader'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
-    const { dashboard, load_modal, run_panel, quick_strategy, summary_card, blockly_store } = useStore();
+    const { chart_store, dashboard, load_modal, run_panel, quick_strategy, summary_card, blockly_store } =
+        useStore();
     const { is_loading } = blockly_store;
     const {
         active_tab,
@@ -87,6 +88,11 @@ const AppWrapper = observer(() => {
     const navigate = useNavigate();
     const [left_tab_shadow, setLeftTabShadow] = useState<boolean>(false);
     const [right_tab_shadow, setRightTabShadow] = useState<boolean>(false);
+    // Safety net for the Charts-preload gate below: if is_chart_loading
+    // never becomes true (a slow connection, a network hiccup, some edge
+    // case in the chart library), this forces the page to show anyway
+    // after 8s instead of leaving the spinner up forever.
+    const [charts_preload_timed_out, setChartsPreloadTimedOut] = useState(false);
 
     // Embed mode used by the ExecutivePrimeMarkets "Trading Courses" page: when
     // this app is loaded there, the URL carries ?embed=tutorial-only alongside
@@ -161,12 +167,17 @@ const AppWrapper = observer(() => {
         resetUrlParamProcessing();
     }, [location.search]);
 
-    // Warm Charts/Dtrader/Tutorials/EPM Trading Bots' JS chunks in the
-    // background once the browser is idle, so clicking one of those tabs
-    // later resolves against an already-cached module instead of kicking
-    // off a fresh network fetch at that moment.
+    // Warm the lazy tab chunks in the background once the app is idle
     React.useEffect(() => {
         prefetchAllTabsWhenIdle();
+    }, []);
+
+    // Safety net for the Charts-preload gate: force the page to show after
+    // 8s even if is_chart_loading never fires, so a rare failure can't
+    // permanently block someone from seeing their page.
+    React.useEffect(() => {
+        const timer = setTimeout(() => setChartsPreloadTimedOut(true), 8000);
+        return () => clearTimeout(timer);
     }, []);
 
     React.useEffect(() => {
@@ -404,11 +415,23 @@ const AppWrapper = observer(() => {
                     })}
                 >
                     <div>
-                        {!isDesktop && left_tab_shadow && <span className='tabs-shadow tabs-shadow--left' />}{' '}
-                        {/* The tab list itself now renders in the header (via MenuItems) on
-                            desktop, so there's one combined header instead of two stacked
-                            bars. Mobile has no room there, so it keeps its own row here. */}
-                        <Tabs
+                        {/* Charts and Dtrader share the same underlying chart
+                            engine (SmartCharts' CanvasKit/WASM bundle, tens of
+                            MB on a cold cache). Loading Charts fully first and
+                            only then revealing whatever page the person
+                            actually asked for means that shared engine is
+                            already cached by the time a chart-using tab like
+                            Dtrader needs it -- so every subsequent page opens
+                            fast, deliberately at the cost of a single upfront
+                            wait on first load/refresh, on every tab, not just
+                            Charts. This is intentional, not a loading bug. */}
+                        {chart_store.is_chart_loading || charts_preload_timed_out ? (
+                            <>
+                                {!isDesktop && left_tab_shadow && <span className='tabs-shadow tabs-shadow--left' />}{' '}
+                                {/* The tab list itself now renders in the header (via MenuItems) on
+                                    desktop, so there's one combined header instead of two stacked
+                                    bars. Mobile has no room there, so it keeps its own row here. */}
+                                <Tabs
                             active_index={active_tab}
                             className='main__tabs'
                             onTabItemClick={handleTabChange}
@@ -549,7 +572,42 @@ const AppWrapper = observer(() => {
                                 </Suspense>
                             </div>
                         </Tabs>
-                        {!isDesktop && right_tab_shadow && <span className='tabs-shadow tabs-shadow--right' />}{' '}
+                                {!isDesktop && right_tab_shadow && (
+                                    <span className='tabs-shadow tabs-shadow--right' />
+                                )}{' '}
+                            </>
+                        ) : (
+                            <ChunkLoader message={localize('Please wait, loading...')} />
+                        )}
+                        {/* Hidden Charts preload: mounted immediately on every
+                            app load/refresh, regardless of active_tab, so its
+                            chunk + chart engine start downloading right away
+                            rather than waiting for someone to actually open
+                            Charts. Skipped when Charts is already the visible
+                            active tab above -- that already covers loading it,
+                            and a second simultaneous instance would fight the
+                            first over the same shared chart_store state (symbol,
+                            granularity, tick subscriptions). Off-screen, not
+                            display:none -- some chart libraries need real
+                            layout dimensions to initialize correctly. */}
+                        {active_tab !== DBOT_TABS.CHART && (
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: '-9999px',
+                                    left: '-9999px',
+                                    width: '1px',
+                                    height: '1px',
+                                    overflow: 'hidden',
+                                    pointerEvents: 'none',
+                                }}
+                                aria-hidden='true'
+                            >
+                                <Suspense fallback={null}>
+                                    <ChartWrapper show_digits_stats={false} />
+                                </Suspense>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
