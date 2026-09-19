@@ -228,11 +228,13 @@
 }
 
 /*
- * Desktop only: cancel out the 1.6rem top/bottom padding that `.main`
+ * Desktop only: cancel out the 1.6rem *bottom* padding that `.main`
  * (src/pages/main/main.scss) puts around every tab's content on screens
  * ≥1280px (that padding is zeroed below 1280px already, via that file's
  * mobile-or-tablet-screen mixin, so nothing below needs to happen on
- * mobile/tablet).
+ * mobile/tablet). `.main`'s top padding was removed separately (it's 0
+ * now, everything starts flush under the header) — this rule only ever
+ * needs to reclaim the bottom side now.
  *
  * `.main` is shared by every tab (Dashboard, Bot Builder, Charts, EPM
  * Trading) and other tabs deliberately rely on that padding for their own
@@ -245,13 +247,23 @@
  * entirely and has no such padding to cancel — applying this there would
  * cut real content instead of reclaiming empty space.
  *
- * Horizontal padding/position is untouched — this only pulls the panel up
- * and stretches it down, per the requested "top and bottom only" change.
+ * Horizontal padding/position is untouched — this only stretches the
+ * panel down to reclaim the bottom padding.
+ */
+/*
+ * Was compensating for .main's padding on BOTH top and bottom (1.6rem
+ * each, 3.2rem total) — margin-top: -1.6rem; margin-bottom: -1.6rem;
+ * height: calc(100% + 3.2rem). .main's top padding was removed separately
+ * (it's 0 now, only bottom padding remains at 1.6rem), which left this
+ * rule compensating for top padding that no longer exists: pushing
+ * .dtrader-app 1.6rem above where it should start (clipped by the
+ * ancestor's overflow: hidden) and making it 3.2rem taller overall when
+ * only 1.6rem (the real, remaining bottom padding) needs reclaiming.
+ * Updated to match .main's current padding exactly.
  */
 @media (min-width: 1280px) {
     .main .dtrader-app.h-full {
-        margin-top: -1.6rem;
         margin-bottom: -1.6rem;
-        height: calc(100% + 3.2rem);
+        height: calc(100% + 1.6rem);
     }
 }
