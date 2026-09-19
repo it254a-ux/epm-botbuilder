@@ -167,10 +167,15 @@ const AppWrapper = observer(() => {
         resetUrlParamProcessing();
     }, [location.search]);
 
-    // Warm the lazy tab chunks in the background once the app is idle
+    // Warm the other lazy tab chunks in the background, but only after
+    // Charts has fully loaded (or the safety timeout fires) -- otherwise
+    // this ran independently on browser idle-time and could overlap with
+    // Charts' own load instead of strictly following it.
     React.useEffect(() => {
-        prefetchAllTabsWhenIdle();
-    }, []);
+        if (chart_store.is_chart_loading || charts_preload_timed_out) {
+            prefetchAllTabsWhenIdle();
+        }
+    }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 
     // Safety net for the Charts-preload gate: force the page to show after
     // 8s even if is_chart_loading never fires, so a rare failure can't
