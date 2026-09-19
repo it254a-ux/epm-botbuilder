@@ -429,7 +429,9 @@ const AppWrapper = observer(() => {
                             fast, deliberately at the cost of a single upfront
                             wait on first load/refresh, on every tab, not just
                             Charts. This is intentional, not a loading bug. */}
-                        {chart_store.is_chart_loading || charts_preload_timed_out ? (
+                        {chart_store.is_chart_loading ||
+                        charts_preload_timed_out ||
+                        active_tab === DBOT_TABS.CHART ? (
                             <>
                                 {!isDesktop && left_tab_shadow && <span className='tabs-shadow tabs-shadow--left' />}{' '}
                                 {/* The tab list itself now renders in the header (via MenuItems) on
@@ -594,7 +596,7 @@ const AppWrapper = observer(() => {
                             granularity, tick subscriptions). Off-screen, not
                             display:none -- some chart libraries need real
                             layout dimensions to initialize correctly. */}
-                        {active_tab !== DBOT_TABS.CHART && (
+                        {active_tab !== DBOT_TABS.CHART && !chart_store.is_chart_loading && (
                             <div
                                 style={{
                                     position: 'fixed',
