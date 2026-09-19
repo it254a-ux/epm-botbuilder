@@ -123,6 +123,39 @@ function RiseFallPage() {
         className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
+        {isExhausted && (
+          <div
+            role="alert"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 50,
+              padding: '0.75rem 1rem',
+              background: '#7f1d1d',
+              color: '#fff',
+              textAlign: 'center',
+              fontSize: '0.875rem',
+              flexShrink: 0,
+            }}
+          >
+            Connection lost — your trading session was disconnected. Please refresh before placing any trades.
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                marginLeft: '0.5rem',
+                textDecoration: 'underline',
+                fontWeight: 600,
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Refresh now
+            </button>
+          </div>
+        )}
         <AccumulatorsBody
           ws={accumulators.ws}
           isConnected={accumulators.isConnected}
@@ -166,6 +199,39 @@ function RiseFallPage() {
         className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
+        {isExhausted && (
+          <div
+            role="alert"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 50,
+              padding: '0.75rem 1rem',
+              background: '#7f1d1d',
+              color: '#fff',
+              textAlign: 'center',
+              fontSize: '0.875rem',
+              flexShrink: 0,
+            }}
+          >
+            Connection lost — your trading session was disconnected. Please refresh before placing any trades.
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                marginLeft: '0.5rem',
+                textDecoration: 'underline',
+                fontWeight: 600,
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Refresh now
+            </button>
+          </div>
+        )}
         <DigitsBody
           authState={authState}
           isConnected={digits.isConnected}
@@ -212,6 +278,39 @@ function RiseFallPage() {
       className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
       style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
+      {isExhausted && (
+        <div
+          role="alert"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 50,
+            padding: '0.75rem 1rem',
+            background: '#7f1d1d',
+            color: '#fff',
+            textAlign: 'center',
+            fontSize: '0.875rem',
+            flexShrink: 0,
+          }}
+        >
+          Connection lost — your trading session was disconnected. Please refresh before placing any trades.
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              marginLeft: '0.5rem',
+              textDecoration: 'underline',
+              fontWeight: 600,
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Refresh now
+          </button>
+        </div>
+      )}
       <RiseFallBody
         ws={trading.ws}
         isConnected={trading.isConnected}
