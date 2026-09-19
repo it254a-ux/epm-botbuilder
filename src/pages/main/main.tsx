@@ -211,8 +211,12 @@ const AppWrapper = observer(() => {
                 threshold: 0.5, // set offset 0.1 means trigger if atleast 10% of element in viewport
             }
         );
-        observer_dashboard.observe(el_dashboard);
-        observer_tutorial.observe(el_tutorial);
+        // During the Charts-preload phase (see below), Tabs isn't rendered
+        // yet, so these elements don't exist -- getElementById returns
+        // null, and .observe(null) throws a TypeError that was crashing
+        // the whole app via the error boundary. Guard against that.
+        if (el_dashboard) observer_dashboard.observe(el_dashboard);
+        if (el_tutorial) observer_tutorial.observe(el_tutorial);
     });
 
     React.useEffect(() => {
