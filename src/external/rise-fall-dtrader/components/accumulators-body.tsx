@@ -162,8 +162,8 @@ export function AccumulatorsBody({
       : [];
 
   return (
-    <div className="flex w-full flex-col px-3 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-3 max-lg:pb-16 lg:pb-2 lg:px-3 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_240px] lg:gap-3 lg:h-full lg:min-h-0">
+    <div className="flex w-full flex-col px-3 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-3 max-lg:pb-16 lg:pb-2 lg:px-3 flex-1 min-h-0 lg:overflow-hidden">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_240px] lg:gap-3 flex-1 min-h-0 lg:h-full">
         <div className="flex flex-col gap-2 px-0 pt-2 lg:py-0 lg:h-full lg:min-h-0">
           <div
             className="lg:h-full lg:min-h-0"
@@ -196,7 +196,7 @@ export function AccumulatorsBody({
 
         {/* Trade panel — the Automated-trading badge and Market-contracts
             icon render inline at the top of the card via TradeModeToggle. */}
-        <div className="flex flex-col gap-3 pt-3 lg:pt-0 border-t border-border lg:border-0 lg:h-full lg:min-h-0">
+        <div className="flex flex-col gap-3 pt-3 lg:pt-0 border-t border-border lg:border-0 flex-1 min-h-0 lg:h-full">
           {isLoading ? (
             <Skeleton className="lg:h-full h-48 w-full rounded-xl" />
           ) : (
