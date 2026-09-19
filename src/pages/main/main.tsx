@@ -11,6 +11,7 @@ import MobileWrapper from '@/components/shared_ui/mobile-wrapper';
 import Tabs from '@/components/shared_ui/tabs/tabs';
 import TradeTypeConfirmationModal from '@/components/trade-type-confirmation-modal';
 import TradingViewModal from '@/components/trading-view-chart/trading-view-modal';
+import { DerivWSProvider } from '@/external/rise-fall-dtrader/components/custom/deriv-ws-provider';
 import { DBOT_TABS, TAB_IDS } from '@/constants/bot-contents';
 import { api_base, updateWorkspaceName } from '@/external/bot-skeleton';
 import { CONNECTION_STATUS } from '@/external/bot-skeleton/services/api/observables/connection-status-stream';
@@ -82,6 +83,23 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
+    // Sticky, session-lifetime flag: once true, stays true. Set during
+    // render (not an effect) so there's no gap where active_tab is already
+    // DTRADER but this hasn't caught up yet -- a gap here would mean
+    // Dtrader's own useDerivWSContext() call crashes trying to find a
+    // provider that isn't wrapped around it yet in that same render.
+    const has_visited_dtrader_ref = React.useRef(false);
+    if (active_tab === DBOT_TABS.DTRADER) {
+        has_visited_dtrader_ref.current = true;
+    }
+    // DerivWSProvider (Dtrader's WS/auth connection) is only ever mounted
+    // once Dtrader has actually been visited -- otherwise it would start
+    // connecting for every visitor immediately on page load, even people
+    // who never open Dtrader. Once visited, it stays mounted around this
+    // whole tab area (not just Dtrader's own tab content) for the rest of
+    // the session, so navigating away and back doesn't tear the
+    // connection down and reconnect from scratch.
+    const MaybeDerivWSProvider = has_visited_dtrader_ref.current ? DerivWSProvider : React.Fragment;
     const hash = ['dashboard', 'bot_builder', 'chart', 'dtrader', 'tutorial', 'epm_trading_bots'];
     const { isDesktop } = useDevice();
     const location = useLocation();
@@ -423,6 +441,7 @@ const AppWrapper = observer(() => {
                         'main__container--embedded-header': is_embedded_in_parent,
                     })}
                 >
+                    <MaybeDerivWSProvider>
                     <div>
                         {/* Charts and Dtrader share the same underlying chart
                             engine (SmartCharts' CanvasKit/WASM bundle, tens of
@@ -620,6 +639,7 @@ const AppWrapper = observer(() => {
                             </div>
                         )}
                     </div>
+                    </MaybeDerivWSProvider>
                 </div>
             </div>
             <DesktopWrapper>

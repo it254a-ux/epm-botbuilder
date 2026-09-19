@@ -19,6 +19,14 @@ type TBotSummary = {
 
 const DESCRIPTION_PREVIEW_LENGTH = 160;
 
+// Module-level (not component state) so it survives this component being
+// unmounted and remounted every time someone leaves and returns to this
+// tab -- Tabs unmounts inactive tabs entirely. Stale-while-revalidate:
+// show whatever's cached instantly, then always fetch fresh data in the
+// background and update when it arrives, so this feels instant on repeat
+// visits while still staying current.
+let bots_cache: TBotSummary[] | null = null;
+
 // Fixed display order for contract-type sections. Anything that doesn't
 // match one of these (including bots added before this field existed,
 // which default to 'Other' server-side) falls into 'Other' at the end.
@@ -36,8 +44,8 @@ const Freebots = observer(() => {
     const { dashboard } = useStore();
     const { setActiveTab } = dashboard;
 
-    const [bots, setBots] = useState<TBotSummary[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [bots, setBots] = useState<TBotSummary[]>(bots_cache ?? []);
+    const [isLoading, setIsLoading] = useState(!bots_cache);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadingBotId, setLoadingBotId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -46,15 +54,20 @@ const Freebots = observer(() => {
         let cancelled = false;
 
         const fetchBots = async () => {
-            setIsLoading(true);
+            if (!bots_cache) setIsLoading(true);
             setLoadError(null);
             try {
                 const res = await fetch(`/api/bots?t=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data?.error || localize('Failed to load bots'));
-                if (!cancelled) setBots(data.bots || []);
+                const bots_list = data.bots || [];
+                bots_cache = bots_list;
+                if (!cancelled) setBots(bots_list);
             } catch (err: any) {
-                if (!cancelled) setLoadError(err?.message || localize('Failed to load bots'));
+                // Only surface the error if we have nothing cached to show --
+                // if a background refresh fails, silently keep showing the
+                // last known-good list rather than replacing it with an error.
+                if (!cancelled && !bots_cache) setLoadError(err?.message || localize('Failed to load bots'));
             } finally {
                 if (!cancelled) setIsLoading(false);
             }
