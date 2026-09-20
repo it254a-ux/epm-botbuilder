@@ -2,6 +2,18 @@
 @use 'components/shared/styles/mixins' as *;
 
 .app-header {
+    // On desktop, navigation lives inside this header (MenuItems), not the
+    // .dc-tabs__list row (that's hidden on desktop). .bot-builder
+    // (app-content.jsx) is a true sibling of <Main/>, absolutely positioned
+    // over the same area, and gets z-index:1 while active. This header had
+    // no stacking context of its own (z-index:auto), so .bot-builder's
+    // opaque background was covering the entire header -- including the
+    // nav -- once Bot Builder became the active tab. Same root cause as
+    // the mobile tab-row fix (main.scss, .dc-tabs--main__tabs &__list),
+    // just the desktop-nav half of it, never covered by that earlier fix.
+    position: relative;
+    z-index: 2;
+
     // @deriv-com/ui's Header is a flex row (`justify-content: space-between`)
     // holding two Wrapper columns (left / right), but each Wrapper ships
     // with `width: 100%` and no shrink allowance. Two 100%-wide children in
