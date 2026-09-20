@@ -11,7 +11,10 @@
     &__title {
         font-size: 2rem;
         font-weight: bold;
-        color: var(--text-general, #fff);
+        // Was --text-general, which is the dimmer secondary-text color in
+        // this theme -- every other bold heading in this app (nav items,
+        // account panel headers, etc.) uses --text-prominent instead.
+        color: var(--text-prominent, #fff);
         margin-bottom: 0.4rem;
     }
 
@@ -42,7 +45,7 @@
     &__section-title {
         font-size: 1.6rem;
         font-weight: bold;
-        color: var(--text-general, #fff);
+        color: var(--text-prominent, #fff);
         margin-bottom: 1.2rem;
         padding-bottom: 0.6rem;
         border-bottom: 1px solid var(--border-normal, #333);
@@ -75,7 +78,7 @@
     &__card-title {
         font-size: 1.5rem;
         font-weight: bold;
-        color: var(--text-general, #fff);
+        color: var(--text-prominent, #fff);
         text-transform: uppercase;
         margin-bottom: 0.8rem;
     }
