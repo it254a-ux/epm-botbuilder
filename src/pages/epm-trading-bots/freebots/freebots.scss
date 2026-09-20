@@ -60,7 +60,16 @@
         padding: 1.6rem;
         display: flex;
         flex-direction: column;
-        background: #1a2332;
+        // Was a hardcoded #1a2332 (dark navy) that never changed with
+        // theme, while the card's own text (title, description, tags)
+        // used theme-aware var(--text-general) etc. — correct in dark
+        // mode (light text on a dark card), but in light mode
+        // --text-general switches to dark text while this background
+        // stayed dark too, so the text became barely legible against its
+        // own card. var(--general-main-2) is the same variable this
+        // app's dropdown panels already use for a card-like surface that
+        // needs to adapt with theme (see account-switcher.scss).
+        background: var(--general-main-2);
     }
 
     &__card-title {
@@ -82,7 +91,13 @@
         font-size: 1.1rem;
         padding: 0.2rem 0.8rem;
         border-radius: 12px;
-        background: var(--background-tertiary, rgba(255, 255, 255, 0.08));
+        // Was var(--background-tertiary, ...) — that variable isn't
+        // actually defined anywhere in this app's theme, so it always
+        // fell back to a fixed white-tinted rgba, invisible-ish in dark
+        // mode and barely distinguishable in light mode either.
+        // var(--general-section-1) is a real, theme-aware variable
+        // already used elsewhere for this kind of subtle fill.
+        background: var(--general-section-1, rgba(255, 255, 255, 0.08));
         color: var(--text-less-prominent, #999);
     }
 
@@ -94,11 +109,6 @@
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
-
-        &--expanded {
-            -webkit-line-clamp: unset;
-            overflow: visible;
-        }
     }
 
     &__learn-more {
@@ -132,5 +142,34 @@
         &:hover:not(:disabled) {
             opacity: 0.9;
         }
+    }
+}
+
+// The "Learn more" pop-out — full bot details in a proper modal (dc-modal,
+// shared_ui/modal) instead of the old inline expand, which grew the card
+// itself and pushed every card after it down the page. Uses the app's
+// existing modal system (same one used throughout the rest of the app),
+// so it inherits its centered placement, backdrop, close button, and
+// click-outside/Escape handling for free, rather than reinventing any of
+// that.
+.freebots-details-modal {
+    &__body {
+        display: flex;
+        flex-direction: column;
+        gap: 1.6rem;
+        padding: 0.4rem 0 1.6rem;
+    }
+
+    &__tags {
+        display: flex;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+    }
+
+    &__description {
+        font-size: 1.4rem;
+        line-height: 1.6;
+        color: var(--text-general, #fff);
+        white-space: pre-wrap;
     }
 }

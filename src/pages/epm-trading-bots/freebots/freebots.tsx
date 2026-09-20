@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { load, save_types } from '@/external/bot-skeleton';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { useStore } from '@/hooks/useStore';
+import Modal from '@/components/shared_ui/modal';
 import { Localize, localize } from '@deriv-com/translations';
 import './freebots.scss';
 
@@ -75,7 +76,11 @@ const Freebots = observer(() => {
     const [isLoading, setIsLoading] = useState(!bots_cache);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadingBotId, setLoadingBotId] = useState<number | null>(null);
-    const [expandedId, setExpandedId] = useState<number | null>(null);
+    // The bot whose full details are showing in the pop-out modal, or null
+    // when it's closed. Replaced the old expandedId (which expanded the
+    // description in place, pushing the whole card and everything below it
+    // taller) with this instead -- the card itself never changes size now.
+    const [detailsBot, setDetailsBot] = useState<TBotSummary | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -119,6 +124,7 @@ const Freebots = observer(() => {
     }, [bots]);
 
     const handleLoadBot = async (bot: TBotSummary) => {
+        setDetailsBot(null);
         setLoadingBotId(bot.id);
         try {
             const res = await fetch(`/api/bots?id=${bot.id}&t=${Date.now()}`, { cache: 'no-store' });
@@ -145,7 +151,6 @@ const Freebots = observer(() => {
     };
 
     const renderCard = (bot: TBotSummary) => {
-        const isExpanded = expandedId === bot.id;
         const isLong = bot.description.length > DESCRIPTION_PREVIEW_LENGTH;
         return (
             <div key={bot.id} className='freebots__card'>
@@ -154,22 +159,10 @@ const Freebots = observer(() => {
                     <span className='freebots__tag'>{bot.market}</span>
                     <span className='freebots__tag'>{bot.risk_level}</span>
                 </div>
-                <p
-                    className={
-                        isExpanded
-                            ? 'freebots__card-description freebots__card-description--expanded'
-                            : 'freebots__card-description'
-                    }
-                >
-                    {bot.description}
-                </p>
+                <p className='freebots__card-description'>{bot.description}</p>
                 {isLong && (
-                    <button
-                        type='button'
-                        className='freebots__learn-more'
-                        onClick={() => setExpandedId(isExpanded ? null : bot.id)}
-                    >
-                        {isExpanded ? localize('Show less') : localize('Learn more')}
+                    <button type='button' className='freebots__learn-more' onClick={() => setDetailsBot(bot)}>
+                        <Localize i18n_default_text='Learn more' />
                     </button>
                 )}
                 <button
@@ -221,6 +214,40 @@ const Freebots = observer(() => {
                         <div className='freebots__grid'>{section.bots.map(renderCard)}</div>
                     </div>
                 ))}
+
+            <Modal
+                is_open={!!detailsBot}
+                toggleModal={() => setDetailsBot(null)}
+                title={detailsBot?.name}
+                width='560px'
+                className='freebots-details-modal'
+                should_header_stick_body={false}
+            >
+                {detailsBot && (
+                    <Modal.Body className='freebots-details-modal__body'>
+                        <div className='freebots-details-modal__tags'>
+                            <span className='freebots__tag'>{detailsBot.market}</span>
+                            <span className='freebots__tag'>{detailsBot.risk_level}</span>
+                            {detailsBot.contract_type && (
+                                <span className='freebots__tag'>{detailsBot.contract_type}</span>
+                            )}
+                        </div>
+                        <p className='freebots-details-modal__description'>{detailsBot.description}</p>
+                        <button
+                            type='button'
+                            className='freebots__load-btn'
+                            disabled={loadingBotId === detailsBot.id}
+                            onClick={() => handleLoadBot(detailsBot)}
+                        >
+                            {loadingBotId === detailsBot.id ? (
+                                <Localize i18n_default_text='Loading...' />
+                            ) : (
+                                <Localize i18n_default_text='Load Bot' />
+                            )}
+                        </button>
+                    </Modal.Body>
+                )}
+            </Modal>
         </div>
     );
 });
