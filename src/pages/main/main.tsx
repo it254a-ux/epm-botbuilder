@@ -18,6 +18,7 @@ import { isDbotRTL } from '@/external/bot-skeleton/utils/workspace';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { prefetchAllTabsWhenIdle } from '@/utils/prefetch-tabs';
+import { fetchAndCacheBots } from '@/utils/freebots-cache';
 import {
     disableUrlParameterApplication,
     enableUrlParameterApplication,
@@ -175,6 +176,24 @@ const AppWrapper = observer(() => {
         if (chart_store.is_chart_loading || charts_preload_timed_out) {
             prefetchAllTabsWhenIdle();
         }
+    }, [chart_store.is_chart_loading, charts_preload_timed_out]);
+
+    // Same idea, extended to page *data*, not just page code: once Charts
+    // is stable, prefetch the Trading Bots list too, so opening that tab
+    // for the very first time is already instant instead of only repeat
+    // visits benefiting from the cache. Kept refreshed periodically for
+    // the rest of the session so the list stays current even if the
+    // person never actually visits that tab -- errors are swallowed since
+    // this is silent background work; Freebots' own fetch already handles
+    // showing an error if there's truly nothing cached when someone does
+    // visit.
+    React.useEffect(() => {
+        if (!(chart_store.is_chart_loading || charts_preload_timed_out)) return;
+        fetchAndCacheBots().catch(() => {});
+        const interval = setInterval(() => {
+            fetchAndCacheBots().catch(() => {});
+        }, 60000);
+        return () => clearInterval(interval);
     }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 
     // Safety net for the Charts-preload gate: force the page to show after

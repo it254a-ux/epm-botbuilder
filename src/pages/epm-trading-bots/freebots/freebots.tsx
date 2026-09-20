@@ -5,55 +5,11 @@ import { load, save_types } from '@/external/bot-skeleton';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { useStore } from '@/hooks/useStore';
 import Modal from '@/components/shared_ui/modal';
+import { bots_cache, fetchAndCacheBots, TBotSummary } from '@/utils/freebots-cache';
 import { Localize, localize } from '@deriv-com/translations';
 import './freebots.scss';
 
-type TBotSummary = {
-    id: number;
-    name: string;
-    description: string;
-    market: string;
-    risk_level: string;
-    contract_type: string;
-    created_at: string;
-};
-
 const DESCRIPTION_PREVIEW_LENGTH = 160;
-
-// Module-level (not component state) so it survives this component being
-// unmounted and remounted every time someone leaves and returns to this
-// tab -- Tabs unmounts inactive tabs entirely. Stale-while-revalidate:
-// show whatever's cached instantly, then always fetch fresh data in the
-// background and update when it arrives, so this feels instant on repeat
-// visits while still staying current.
-//
-// Also mirrored into sessionStorage: an in-memory cache alone only helps
-// switching tabs within the same page load -- a full refresh clears it,
-// since that's a fresh JS execution. Reading sessionStorage here, at
-// module-evaluation time (before the component even renders), means a
-// refresh can still show the last known list instantly instead of a bare
-// loading state, while a background fetch keeps it current.
-const SESSION_STORAGE_KEY = 'epm_freebots_cache_v1';
-
-let bots_cache: TBotSummary[] | null = (() => {
-    try {
-        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-        return raw ? (JSON.parse(raw) as TBotSummary[]) : null;
-    } catch {
-        // Storage unavailable (privacy mode, quota, etc.) or corrupted --
-        // fall back to no cache, same as before this existed.
-        return null;
-    }
-})();
-
-const persistBotsCache = (bots_list: TBotSummary[]) => {
-    bots_cache = bots_list;
-    try {
-        window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(bots_list));
-    } catch {
-        // Ignore -- the in-memory cache above still works for this page load.
-    }
-};
 
 // Fixed display order for contract-type sections. Anything that doesn't
 // match one of these (including bots added before this field existed,
@@ -85,15 +41,11 @@ const Freebots = observer(() => {
     useEffect(() => {
         let cancelled = false;
 
-        const fetchBots = async () => {
+        const loadBots = async () => {
             if (!bots_cache) setIsLoading(true);
             setLoadError(null);
             try {
-                const res = await fetch(`/api/bots?t=${Date.now()}`, { cache: 'no-store' });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data?.error || localize('Failed to load bots'));
-                const bots_list = data.bots || [];
-                persistBotsCache(bots_list);
+                const bots_list = await fetchAndCacheBots();
                 if (!cancelled) setBots(bots_list);
             } catch (err: any) {
                 // Only surface the error if we have nothing cached to show --
@@ -105,7 +57,7 @@ const Freebots = observer(() => {
             }
         };
 
-        fetchBots();
+        loadBots();
         return () => {
             cancelled = true;
         };
