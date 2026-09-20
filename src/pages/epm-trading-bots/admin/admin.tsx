@@ -13,14 +13,69 @@ type TBotSummary = {
     created_at: string;
 };
 
-const MARKET_OPTIONS = [
-    'Volatility 10',
-    'Volatility 25',
-    'Volatility 50',
-    'Volatility 75',
-    'Volatility 100',
-    'Other',
+const MARKET_GROUPS: { label: string; options: string[] }[] = [
+    {
+        label: 'Continuous Indices',
+        options: [
+            'Volatility 100 (1s) Index',
+            'Volatility 10 (1s) Index',
+            'Volatility 15 (1s) Index',
+            'Volatility 25 (1s) Index',
+            'Volatility 30 (1s) Index',
+            'Volatility 50 (1s) Index',
+            'Volatility 75 (1s) Index',
+            'Volatility 90 (1s) Index',
+            'Volatility 10 Index',
+            'Volatility 100 Index',
+            'Volatility 25 Index',
+            'Volatility 50 Index',
+            'Volatility 75 Index',
+        ],
+    },
+    {
+        label: 'Crash/Boom Indices',
+        options: [
+            'Boom 1000 Index',
+            'Boom 150 Index',
+            'Boom 300 Index',
+            'Boom 50 Index',
+            'Boom 500 Index',
+            'Boom 600 Index',
+            'Boom 900 Index',
+            'Crash 1000 Index',
+            'Crash 150 Index',
+            'Crash 300 Index',
+            'Crash 50 Index',
+            'Crash 500 Index',
+            'Crash 600 Index',
+            'Crash 900 Index',
+        ],
+    },
+    {
+        label: 'Daily Reset Indices',
+        options: ['Bear Market Index', 'Bull Market Index'],
+    },
+    {
+        label: 'Jump Indices',
+        options: ['Jump 10 Index', 'Jump 100 Index', 'Jump 25 Index', 'Jump 50 Index', 'Jump 75 Index'],
+    },
+    {
+        label: 'Range Indices',
+        options: ['Range Break 100 Index', 'Range Break 200 Index'],
+    },
+    {
+        label: 'Step Indices',
+        options: ['Step Index 100', 'Step Index 200', 'Step Index 300', 'Step Index 400', 'Step Index 500'],
+    },
+    {
+        label: 'Other',
+        options: ['Other'],
+    },
 ];
+// Flattened once for the default/fallback value — MARKET_GROUPS[0].options[0]
+// (first item of the first group) reads the same but this stays correct even
+// if the groups above get reordered later.
+const MARKET_OPTIONS = MARKET_GROUPS.flatMap(group => group.options);
 const RISK_OPTIONS = ['Low risk', 'Medium risk', 'High risk'];
 const CONTRACT_TYPE_OPTIONS = [
     'Accumulators',
@@ -247,10 +302,14 @@ const AdminBots = () => {
                     <label>
                         <Localize i18n_default_text='Market' />
                         <select value={market} onChange={e => setMarket(e.target.value)}>
-                            {MARKET_OPTIONS.map(option => (
-                                <option key={option} value={option}>
-                                    {option}
-                                </option>
+                            {MARKET_GROUPS.map(group => (
+                                <optgroup key={group.label} label={group.label}>
+                                    {group.options.map(option => (
+                                        <option key={option} value={option}>
+                                            {option}
+                                        </option>
+                                    ))}
+                                </optgroup>
                             ))}
                         </select>
                     </label>
