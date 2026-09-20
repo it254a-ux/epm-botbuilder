@@ -436,7 +436,8 @@ const AppWrapper = observer(() => {
                             Charts. This is intentional, not a loading bug. */}
                         {chart_store.is_chart_loading ||
                         charts_preload_timed_out ||
-                        active_tab === DBOT_TABS.CHART ? (
+                        active_tab === DBOT_TABS.CHART ||
+                        active_tab === BOT_BUILDER ? (
                             <>
                                 {!isDesktop && left_tab_shadow && <span className='tabs-shadow tabs-shadow--left' />}{' '}
                                 {/* The tab list itself now renders in the header (via MenuItems) on
