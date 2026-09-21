@@ -88,7 +88,21 @@
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
     }
 
+    &__menu-more-divider {
+        height: 1px;
+        margin: 4px 6px;
+        background: var(--border-normal, rgba(0, 0, 0, 0.1));
+    }
+
+    &__menu-more-heading {
+        padding: 4px 10px 2px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-less-prominent, rgba(0, 0, 0, 0.56));
+    }
+
     &__menu-more-item {
+        text-decoration: none;
         display: flex;
         align-items: center;
         gap: 8px;

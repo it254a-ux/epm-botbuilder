@@ -181,3 +181,12 @@
         }
     }
 }
+
+// Desktop: the same options live in the header's "More" menu instead (see
+// menu-items.tsx). The nav is hidden at <=1024px, so the floating button
+// stays for tablet/mobile only.
+@media (min-width: 1025px) {
+    .get-help {
+        display: none;
+    }
+}

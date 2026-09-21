@@ -65,6 +65,10 @@ const OPTIONS: TContactOption[] = [
     { key: 'phone', label: 'Call', href: PHONE_HREF, icon: <PhoneIcon />, className: 'get-help__option--phone' },
 ];
 
+// Reused by the desktop header's "More" menu (menu-items.tsx), which shows
+// the same contact options instead of the floating button on desktop.
+export const HELP_OPTIONS = OPTIONS;
+
 const GetHelpWidget = () => {
     const [is_open, setIsOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);

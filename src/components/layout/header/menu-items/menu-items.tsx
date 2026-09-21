@@ -20,6 +20,7 @@ import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { prefetchTab } from '@/utils/prefetch-tabs';
+import { HELP_OPTIONS } from '@/components/get-help';
 import ChangeTheme from '@/components/layout/footer/ChangeTheme';
 import FullScreen from '@/components/layout/footer/FullScreen';
 import LogoutFooter from '@/components/layout/footer/LogoutFooter';
@@ -275,6 +276,24 @@ export const MenuItems = observer(() => {
                                 <span className='app-header__menu-item-icon'>{item.icon}</span>
                                 <span className='app-header__menu-item-label'>{item.label}</span>
                             </button>
+                        ))}
+                        <div className='app-header__menu-more-divider' role='separator' />
+                        <div className='app-header__menu-more-heading'>
+                            <Localize i18n_default_text='Get Help' />
+                        </div>
+                        {HELP_OPTIONS.map(option => (
+                            <a
+                                key={option.key}
+                                role='menuitem'
+                                className='app-header__menu-more-item'
+                                href={option.href}
+                                target={option.external ? '_blank' : undefined}
+                                rel={option.external ? 'noopener noreferrer' : undefined}
+                                onClick={() => setIsMoreOpen(false)}
+                            >
+                                <span className='app-header__menu-item-icon'>{option.icon}</span>
+                                <span className='app-header__menu-item-label'>{option.label}</span>
+                            </a>
                         ))}
                     </div>
                 )}
