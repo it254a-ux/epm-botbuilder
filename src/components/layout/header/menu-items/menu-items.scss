@@ -143,10 +143,14 @@
 }
 
 // The header sits at z-index: 2 (header.scss) so it stays above Bot Builder,
-// but the Run panel wrapper (also z-index: 2, later in the DOM), the Dtrader
-// automated panel and other page panels then paint over the open "More"
-// dropdown. Lift the whole header above them only while the dropdown is
-// open, so nothing else in the app's stacking order changes.
-.app-header:has(.app-header__menu-more-dropdown) {
-    z-index: 1000;
+// but that also caps everything inside it: the Run panel wrapper (z-index: 2,
+// later in the DOM), the Dtrader panels (z-100 on desktop, z-9999 on mobile)
+// and other page panels then paint over the open "More" dropdown and the
+// account-switcher dropdown (.acc-dropdown, which already asks for 10000 but
+// can't escape the header's stacking context). Lift the whole header above
+// them only while one of those dropdowns is open, so nothing else in the app's
+// stacking order changes.
+.app-header:has(.app-header__menu-more-dropdown),
+.app-header:has(.acc-dropdown) {
+    z-index: 10000;
 }
