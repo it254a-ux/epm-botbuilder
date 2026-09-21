@@ -17,7 +17,7 @@ import './trading-view-page.scss';
 // iframe is shifted up by CROP_TOP px inside this (overflow: hidden) page, which
 // cuts off the tall "deriv" logo strip above the toolbar and gives that height
 // back to the chart. Tune CROP_TOP if more/less of the top should be hidden.
-const CROP_TOP = 67;
+const CROP_TOP = 72;
 
 export default function TradingViewPage() {
     const page_ref = useRef<HTMLDivElement | null>(null);
