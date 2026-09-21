@@ -1,3 +1,5 @@
+@use 'components/shared/styles/mixins' as *;
+
 .freebots {
     padding: 1.6rem;
     overflow-y: auto;
@@ -102,6 +104,26 @@
         // already used elsewhere for this kind of subtle fill.
         background: var(--general-section-1, rgba(255, 255, 255, 0.08));
         color: var(--text-less-prominent, #999);
+        font-weight: 600;
+
+        // Used on the risk-level tag in the details modal specifically
+        // (via riskLevelSlug() in freebots.tsx) so "Low"/"Medium"/"High"
+        // carry real visual meaning instead of all three looking
+        // identical to every other tag.
+        &--risk-low {
+            background: rgba(34, 197, 94, 0.16);
+            color: #22c55e;
+        }
+
+        &--risk-medium {
+            background: rgba(245, 158, 11, 0.16);
+            color: #f59e0b;
+        }
+
+        &--risk-high {
+            background: rgba(239, 68, 68, 0.16);
+            color: #ef4444;
+        }
     }
 
     &__card-description {
@@ -155,24 +177,92 @@
 // so it inherits its centered placement, backdrop, close button, and
 // click-outside/Escape handling for free, rather than reinventing any of
 // that.
+
+// dc-modal__container itself has overflow: hidden with no max-height set
+// for mobile (modal.scss) -- only one specific modal variant elsewhere
+// (dc-modal__container_sent-email__modal) opts into a fixed height plus
+// scroll. Ours needs the same treatment, or a long description just grows
+// the modal past the screen edge with nothing to scroll, exactly like a
+// short one with no cap at all. Named the same way that one is (className
+// prop becomes dc-modal__container_<className>, see modal.tsx), scoped so
+// only this modal is affected.
+.dc-modal__container_freebots-details-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4.8rem);
+
+    @include mobile-screen {
+        max-height: calc(100vh - 3.2rem);
+    }
+}
+
 .freebots-details-modal {
     &__body {
         display: flex;
         flex-direction: column;
-        gap: 1.6rem;
-        padding: 0.4rem 0 1.6rem;
+        gap: 2rem;
+        padding: 0.4rem 0 2rem;
+        overflow-y: auto;
+        // The container above is now capped; this is what actually
+        // scrolls when the description is long, while the tags row stays
+        // pinned at the top and the footer (Load Bot) stays pinned at the
+        // bottom -- neither of those should scroll away with the text.
+        min-height: 0;
     }
 
     &__tags {
         display: flex;
         gap: 0.8rem;
         flex-wrap: wrap;
+        flex-shrink: 0;
     }
 
     &__description {
+        display: flex;
+        flex-direction: column;
+        gap: 1.6rem;
+    }
+
+    &__paragraph {
         font-size: 1.4rem;
         line-height: 1.6;
         color: var(--text-general, #fff);
         white-space: pre-wrap;
+        margin: 0;
+    }
+
+    &__block {
+        border-left: 3px solid var(--button-primary-default, #3b82f6);
+        padding-left: 1.4rem;
+
+        p {
+            font-size: 1.4rem;
+            line-height: 1.6;
+            color: var(--text-general, #fff);
+            white-space: pre-wrap;
+            margin: 0;
+        }
+    }
+
+    &__block-heading {
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-prominent, #fff);
+        margin: 0 0 0.6rem;
+    }
+
+    // Sits in dc-modal-footer, which is outside dc-modal-body's scroll
+    // region (margin-top: auto keeps it pinned to the bottom of the fixed-
+    // height container above) -- so it's always visible and clickable
+    // regardless of how long the description is or how far it's scrolled.
+    &__footer {
+        border-top: 1px solid var(--border-normal, #333);
+        flex-shrink: 0;
+
+        .freebots__load-btn {
+            width: 100%;
+        }
     }
 }

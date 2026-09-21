@@ -27,6 +27,27 @@
     }
 }
 
+// Mobile only: the tab row (Dashboard / Bot Builder / Charts / Dtrader /
+// Tutorials / Trading Bots) is a normal-flow sibling of .bot-builder
+// (a completely separate element, not a descendant -- see
+// src/app/app-content.jsx, <Main /> and <BotBuilder /> are rendered side
+// by side). Desktop hides this row entirely (hide_list={isDesktop} in
+// main.tsx -- desktop's own nav lives in the header instead, via
+// menu-items.tsx), so there was never anything here for .bot-builder to
+// cover on desktop. On mobile this row IS shown, and .bot-builder starts
+// at the exact same top position it does; .bot-builder--active gets
+// z-index: 1 while this row has no z-index of its own (position: static
+// by default ignores z-index entirely), so the moment Bot Builder becomes
+// the active tab, its own content visually paints over this row --
+// it's still there and still in the DOM, just hidden underneath, with no
+// way to tap it or any other tab to navigate away without a full refresh.
+.dc-tabs__list--header--main__tabs {
+    @include mobile-or-tablet-screen {
+        position: relative;
+        z-index: 2;
+    }
+}
+
 .main {
     display: flex;
     align-items: flex-start;
