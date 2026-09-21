@@ -1,32 +1,14 @@
+// Height is set inline from index.tsx (measured from the viewport), not
+// inherited through CSS — see the comment there. Percentage/absolute
+// approaches both collapsed to zero because the parent grid cell
+// (.dc-tabs__content) has no resolved height for an iframe-only page.
 .trading-view-page {
-    // Height inheritance (height: 100% cascaded down from a wrapping div in
-    // main.tsx) never actually worked: Tabs.tsx's `React.Children.map`
-    // renders `child.props.children` only — the wrapping <div id='id-trading-view'
-    // style={{height:'100%'}}> in main.tsx never reaches the DOM at all, so
-    // that style was always discarded. Dtrader "worked" through this same
-    // pattern only because DtraderPage's own root carries its own real
-    // height class internally, independent of that wrapper -- it was never
-    // actually the wrapper doing the work there either.
-    //
-    // Even setting height: 100% directly here (this file, the page's real
-    // root) isn't reliable: this div's real parent is .dc-tabs__content, a
-    // CSS Grid item (.dc-tabs uses grid-template-rows: auto 1fr) which can
-    // render with a genuine visual height from the grid track without that
-    // height being "definite" for percentage-height children to resolve
-    // against -- a well-known Grid/percentage-height gap. TradingView's
-    // bare iframe has nothing else to fall back on, so it collapsed to a
-    // tiny intrinsic size instead.
-    //
-    // Anchoring with position: absolute + inset: 0 sidesteps percentage
-    // resolution entirely -- it sizes directly against the nearest
-    // positioned ancestor's real box. That ancestor is .dc-tabs__content
-    // itself (given position: relative below, scoped with :has() so only
-    // the instance actually containing this page is affected -- every
-    // other tab's .dc-tabs__content is completely untouched).
-    position: absolute;
-    inset: 0;
-}
+    width: 100%;
+    min-height: 300px;
+    overflow: hidden;
 
-.dc-tabs__content:has(> .trading-view-page) {
-    position: relative;
+    iframe {
+        display: block;
+        border: 0;
+    }
 }
