@@ -13,10 +13,11 @@ import './trading-view-page.scss';
 // iframe-only page, so both height: 100% and position: absolute collapsed it
 // to zero. A measured pixel height doesn't depend on any ancestor.
 // The chart page (charts.deriv.com) is a cross-origin iframe, so its own header
-// can't be styled from here. Instead the iframe is rendered at 1/SCALE of the
-// size and scaled down, which shrinks the whole thing (header text, height and
-// spacing included) to SCALE while still filling the page exactly.
-const SCALE = 0.75;
+// can't be restyled from here. What can be done from outside is cropping: the
+// iframe is shifted up by CROP_TOP px inside this (overflow: hidden) page, which
+// cuts off the tall "deriv" logo strip above the toolbar and gives that height
+// back to the chart. Tune CROP_TOP if more/less of the top should be hidden.
+const CROP_TOP = 90;
 
 export default function TradingViewPage() {
     const page_ref = useRef<HTMLDivElement | null>(null);
@@ -49,10 +50,8 @@ export default function TradingViewPage() {
         <div className='trading-view-page' ref={page_ref} style={height ? { height: `${height}px` } : undefined}>
             <div
                 style={{
-                    width: `${100 / SCALE}%`,
-                    height: height ? `${height / SCALE}px` : '100%',
-                    transform: `scale(${SCALE})`,
-                    transformOrigin: 'top left',
+                    marginTop: `-${CROP_TOP}px`,
+                    height: height ? `${height + CROP_TOP}px` : '100%',
                 }}
             >
                 <TradingViewComponent />
