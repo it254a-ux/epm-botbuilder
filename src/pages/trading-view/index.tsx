@@ -17,7 +17,7 @@ import './trading-view-page.scss';
 // iframe is shifted up by CROP_TOP px inside this (overflow: hidden) page, which
 // cuts off the tall "deriv" logo strip above the toolbar and gives that height
 // back to the chart. Tune CROP_TOP if more/less of the top should be hidden.
-const CROP_TOP = 90;
+const CROP_TOP = 55;
 
 export default function TradingViewPage() {
     const page_ref = useRef<HTMLDivElement | null>(null);
@@ -29,7 +29,13 @@ export default function TradingViewPage() {
         // Off-screen background preload sits at a large negative top — treat
         // that as "starts at 0" so it doesn't get an absurd height.
         const top = Math.max(0, el.getBoundingClientRect().top);
-        setHeight(Math.max(300, window.innerHeight - top));
+        // Measure to the bottom of the real content area (.main-body clips
+        // everything below it), not the window: anything else in the layout
+        // below the body would otherwise push the chart's bottom toolbar out
+        // of view.
+        const body_el = el.closest('.main-body');
+        const bottom = body_el ? body_el.getBoundingClientRect().bottom : window.innerHeight;
+        setHeight(Math.max(300, bottom - top));
     };
 
     useLayoutEffect(() => {
