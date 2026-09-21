@@ -50,6 +50,7 @@ const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 const EpmTradingBots = lazy(() => import('../epm-trading-bots'));
 const DtraderPage = lazy(() => import('../dtrader'));
+const TradingViewPage = lazy(() => import('../trading-view'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -83,7 +84,7 @@ const AppWrapper = observer(() => {
     const { clear } = summary_card;
     const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'dtrader', 'tutorial', 'epm_trading_bots'];
+    const hash = ['dashboard', 'bot_builder', 'epm_trading_bots', 'chart', 'dtrader', 'trading_view', 'tutorial'];
     const { isDesktop } = useDevice();
     const location = useLocation();
     const navigate = useNavigate();
@@ -510,6 +511,25 @@ const AppWrapper = observer(() => {
                             <div
                                 label={
                                     <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>🤖</span>
+                                        <Localize i18n_default_text='EPM Trading bots' />
+                                    </>
+                                }
+                                id='id-epm-trading-bots'
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader
+                                            message={localize('Please wait, loading EPM Trading bots...')}
+                                        />
+                                    }
+                                >
+                                    <EpmTradingBots />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
                                         <LabelPairedChartLineCaptionRegularIcon
                                             height='18px'
                                             width='18px'
@@ -562,6 +582,28 @@ const AppWrapper = observer(() => {
                             <div
                                 label={
                                     <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>📉</span>
+                                        <Localize i18n_default_text='TradingView' />
+                                    </>
+                                }
+                                id='id-trading-view'
+                                // Same reasoning as Dtrader above -- this panel's
+                                // content needs an explicit height to fill the
+                                // tab area instead of shrinking to its own
+                                // content.
+                                style={{ height: '100%' }}
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader message={localize('Please wait, loading TradingView...')} />
+                                    }
+                                >
+                                    <TradingViewPage />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
                                         <LegacyGuide1pxIcon
                                             height='12px'
                                             width='12px'
@@ -582,25 +624,6 @@ const AppWrapper = observer(() => {
                                         <Tutorial handleTabChange={handleTabChange} />
                                     </Suspense>
                                 </div>
-                            </div>
-                            <div
-                                label={
-                                    <>
-                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>🤖</span>
-                                        <Localize i18n_default_text='EPM Trading bots' />
-                                    </>
-                                }
-                                id='id-epm-trading-bots'
-                            >
-                                <Suspense
-                                    fallback={
-                                        <ChunkLoader
-                                            message={localize('Please wait, loading EPM Trading bots...')}
-                                        />
-                                    }
-                                >
-                                    <EpmTradingBots />
-                                </Suspense>
                             </div>
                         </Tabs>
                                 {!isDesktop && right_tab_shadow && (
@@ -639,6 +662,34 @@ const AppWrapper = observer(() => {
                                 </Suspense>
                             </div>
                         )}
+                        {/* Same hidden-preload approach as Charts above, for the
+                            same reason — TradingView's own remote page (an
+                            iframe) takes real time to load, so starting that
+                            early means it's already loaded by the time someone
+                            actually opens the tab. Safe to preload
+                            unconditionally like this: unlike Dtrader's OTP-based
+                            auth (see the commit history for why that one was
+                            reverted), this iframe's URL is static with nothing
+                            session- or token-specific in it, so there's no
+                            staleness risk from loading it ahead of time. */}
+                        {active_tab !== DBOT_TABS.TRADING_VIEW && (
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: '-9999px',
+                                    left: '-9999px',
+                                    width: '1px',
+                                    height: '1px',
+                                    overflow: 'hidden',
+                                    pointerEvents: 'none',
+                                }}
+                                aria-hidden='true'
+                            >
+                                <Suspense fallback={null}>
+                                    <TradingViewPage />
+                                </Suspense>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -650,17 +701,20 @@ const AppWrapper = observer(() => {
                     flashed visible during dtrader's loading gap. A real
                     condition here removes it from the DOM outright, so
                     there's nothing to flash regardless of timing. */}
-                {!is_tutorial_only_embed && active_tab !== DBOT_TABS.DTRADER && (
-                    <div className='main__run-strategy-wrapper'>
-                        <RunStrategy />
-                        <RunPanel />
-                    </div>
-                )}
+                {!is_tutorial_only_embed &&
+                    (active_tab === DBOT_TABS.CHART || active_tab === DBOT_TABS.BOT_BUILDER) && (
+                        <div className='main__run-strategy-wrapper'>
+                            <RunStrategy />
+                            <RunPanel />
+                        </div>
+                    )}
                 <ChartModal />
                 <TradingViewModal />
             </DesktopWrapper>
             <MobileWrapper>
-                {!is_tutorial_only_embed && !is_open && active_tab !== DBOT_TABS.DTRADER && <RunPanel />}
+                {!is_tutorial_only_embed &&
+                    !is_open &&
+                    (active_tab === DBOT_TABS.CHART || active_tab === DBOT_TABS.BOT_BUILDER) && <RunPanel />}
             </MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
