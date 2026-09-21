@@ -120,6 +120,21 @@ body {
     overflow-x: hidden;
 }
 
+// The actual React mount point (a plain <div id="root"> inserted into body
+// by the HTML template) never had a height rule. html and body both have
+// height:100% above, which correctly resolves to the true viewport height
+// (html is a special case in the spec: its percentage heights resolve
+// against the viewport, not an ancestor). But #root itself, having no
+// height rule of its own, just sized to its own content -- meaning every
+// height:100% anywhere in the app, however many levels deep, was ultimately
+// cascading from a content-sized box, not the true viewport. Pages with
+// tall-enough content of their own happened to fill the screen anyway,
+// masking this; pages with minimal content (like TradingView's bare iframe
+// wrapper) visibly fell short.
+#root {
+    height: 100%;
+}
+
 ol,
 ul {
     list-style: none;

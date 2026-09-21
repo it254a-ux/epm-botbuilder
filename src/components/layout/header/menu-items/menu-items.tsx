@@ -112,6 +112,35 @@ const useVisibleItemCount = (itemCount: number) => {
         measure();
     }, [measure]);
 
+    // Re-measure once web fonts finish loading. The icon fonts and any
+    // custom label typefaces can render narrower with a fallback font
+    // before they load, then widen once the real font is ready -- if that
+    // happens after the layout-effect measurement above, an item can be
+    // undercounted as fitting when it doesn't, and instead of falling back
+    // to the "More" dropdown it just visually clips against this row's own
+    // overflow:hidden with no button to reach it.
+    useEffect(() => {
+        if (typeof document === 'undefined' || !('fonts' in document)) return undefined;
+        let cancelled = false;
+        document.fonts.ready.then(() => {
+            if (!cancelled) measure();
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [measure]);
+
+    // Belt-and-suspenders: several nav items use emoji icons (Trading Bots,
+    // Dtrader, TradingView), and emoji rendering doesn't go through the CSS
+    // Font Loading API at all -- document.fonts.ready above wouldn't catch
+    // their metrics settling. A single delayed re-measure shortly after
+    // mount is a simple, timing-agnostic catch-all for that and anything
+    // else that might shift item widths after the first paint.
+    useEffect(() => {
+        const timer = setTimeout(() => measure(), 300);
+        return () => clearTimeout(timer);
+    }, [measure]);
+
     useEffect(() => {
         const container = containerRef.current;
         if (!container || typeof ResizeObserver === 'undefined') return undefined;
