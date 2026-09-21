@@ -1,6 +1,17 @@
 @use 'components/shared/styles/constants' as *;
 @use 'components/shared/styles/mixins' as *;
 
+/** @define acc-info__wrapper */
+// Direct parent of both the trigger button (.acc-info) and the dropdown
+// panel (.acc-dropdown, position: absolute). This had no rule at all, so it
+// was `position: static` by default -- the dropdown's `position: absolute`
+// couldn't anchor to it and instead anchored against a further-up ancestor
+// (the header), rendering detached from its own trigger instead of directly
+// below it.
+.acc-info__wrapper {
+    position: relative;
+}
+
 /** @define acc-info */
 .acc-info {
     align-items: center;
