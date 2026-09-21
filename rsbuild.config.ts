@@ -55,6 +55,15 @@ export default defineConfig({
       // both standalone and inside the monorepo (npm workspaces hoist react to
       // the repo root, so a cwd-relative './node_modules/react' fails in CI).
       react: path.dirname(require.resolve('react/package.json')),
+      // The chart library (@deriv-com/smartcharts-champion >= 1.12) loads
+      // '@deriv-com/quill-ui' via require(), which resolves to quill-ui's CJS
+      // build. That build ships NO component CSS, so the chart's dialogs (Chart
+      // types, Indicators, Drawing tools, Share) rendered unstyled: not
+      // position:fixed, sitting invisibly at the bottom of <body> with page
+      // scroll locked. Pointing the exact package name at the ESM build pulls in
+      // the CSS the components import. Exact-match alias ($) so quill-ui subpath
+      // imports are unaffected.
+      '@deriv-com/quill-ui$': path.join(path.dirname(require.resolve('@deriv-com/quill-ui')), 'main.js'),
       'react-dom': path.dirname(require.resolve('react-dom/package.json')),
       '@/external': path.resolve(__dirname, './src/external'),
       '@/components': path.resolve(__dirname, './src/components'),
