@@ -17,6 +17,7 @@ import { DBOT_TABS } from '@/constants/bot-contents';
 const PREFETCHABLE_TABS = {
     [DBOT_TABS.CHART]: () => import('@/pages/chart/chart-wrapper'),
     [DBOT_TABS.DTRADER]: () => import('@/pages/dtrader'),
+    [DBOT_TABS.TRADING_VIEW]: () => import('@/pages/trading-view'),
     [DBOT_TABS.TUTORIAL]: () => import('@/pages/tutorials'),
     [DBOT_TABS.EPM_TRADING_BOTS]: () => import('@/pages/epm-trading-bots'),
 } as const;
