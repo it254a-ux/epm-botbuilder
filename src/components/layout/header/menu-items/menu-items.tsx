@@ -4,12 +4,15 @@
 // renders as its own row on mobile (see main.tsx's `hide_list` prop, which is
 // only passed on desktop), since there's no header space for it there.
 //
-// Overflow: this list keeps growing (Dashboard, Bot Builder, Trading Bots,
-// Charts, Dtrader, TradingView, Tutorials, and more planned later), so
-// rather than a fixed cutoff, the row measures its own available width and
-// moves whatever doesn't fit into a "More" dropdown — automatically, so
-// adding another item to NAV_ITEMS later doesn't require touching this
-// overflow logic again.
+// Two groups of items:
+// - PRIMARY_NAV_ITEMS render inline, as many as currently fit. This list
+//   keeps growing, so rather than a fixed cutoff, the row measures its own
+//   available width and moves whatever doesn't fit into the "More" dropdown
+//   — automatically, so adding another item later doesn't require touching
+//   this overflow logic again.
+// - PINNED_OVERFLOW_ITEMS (TradingView, Tutorials) always live in the "More"
+//   dropdown, deterministically, regardless of available width — a specific
+//   request, not measured/decided dynamically like the primary group.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
@@ -30,7 +33,7 @@ import { LegacyGuide1pxIcon } from '@deriv/quill-icons/Legacy';
 import { Localize } from '@deriv-com/translations';
 import './menu-items.scss';
 
-const NAV_ITEMS = [
+const PRIMARY_NAV_ITEMS = [
     {
         tab: DBOT_TABS.DASHBOARD,
         icon: <LabelPairedObjectsColumnCaptionRegularIcon height='16px' width='16px' fill='currentColor' />,
@@ -56,6 +59,12 @@ const NAV_ITEMS = [
         icon: <span className='app-header__menu-item-emoji'>📈</span>,
         label: <Localize i18n_default_text='Dtrader' />,
     },
+];
+
+// Always rendered inside the "More" dropdown, never measured/inline —
+// unlike PRIMARY_NAV_ITEMS above, these two don't participate in the width
+// measurement at all.
+const PINNED_OVERFLOW_ITEMS = [
     {
         tab: DBOT_TABS.TRADING_VIEW,
         icon: <span className='app-header__menu-item-emoji'>📉</span>,
@@ -68,43 +77,43 @@ const NAV_ITEMS = [
     },
 ];
 
-// How many items fit before we need the "More" button, given the row's
-// current width. Re-measured whenever the row resizes (window resize,
-// sidebar toggling, zoom level, etc.) or NAV_ITEMS' length changes.
-const useVisibleItemCount = (itemCount: number) => {
+// How many of PRIMARY_NAV_ITEMS fit before the row runs out of room, given
+// its current width. Re-measured whenever the row resizes (window resize,
+// sidebar toggling, zoom level, etc.) or the item count changes.
+const useVisiblePrimaryCount = (itemCount: number) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const moreButtonRef = useRef<HTMLButtonElement | null>(null);
-    // Start optimistic (everything visible, no "More" button) so there's
-    // nothing to measure against on a first paint before refs exist —
-    // avoids a flash of an empty/near-empty nav before the real measurement
-    // runs a moment later.
+    // Start optimistic (everything visible) so there's nothing to measure
+    // against on a first paint before refs exist — avoids a flash of an
+    // empty/near-empty nav before the real measurement runs a moment later.
     const [visible_count, setVisibleCount] = useState(itemCount);
 
     const measure = useCallback(() => {
         const container = containerRef.current;
         if (!container) return;
 
+        // The More button is always present now (PINNED_OVERFLOW_ITEMS is
+        // never empty), so room for it must always be reserved — unlike a
+        // dynamic-only overflow list, there's no "last item, no button
+        // needed" case here.
         const available_width = container.clientWidth;
         const more_button_width = moreButtonRef.current?.offsetWidth ?? 40;
+        const budget = available_width - more_button_width;
 
         let used_width = 0;
         let fit_count = 0;
 
         for (let i = 0; i < itemCount; i += 1) {
             const item_width = itemRefs.current[i]?.offsetWidth ?? 0;
-            // Reserve room for the More button unless this is the very last
-            // item (in which case nothing would be left over to put in it).
-            const needs_more_button_room = i < itemCount - 1;
-            const budget = needs_more_button_room ? available_width - more_button_width : available_width;
-
             if (used_width + item_width > budget) break;
             used_width += item_width;
             fit_count += 1;
         }
 
         // Always show at least one item, even if the row is extremely
-        // narrow — an empty nav is worse than one slightly-clipped item.
+        // narrow — an empty primary row is worse than one slightly-clipped
+        // item.
         setVisibleCount(Math.max(1, fit_count));
     }, [itemCount]);
 
@@ -130,12 +139,12 @@ const useVisibleItemCount = (itemCount: number) => {
         };
     }, [measure]);
 
-    // Belt-and-suspenders: several nav items use emoji icons (Trading Bots,
-    // Dtrader, TradingView), and emoji rendering doesn't go through the CSS
-    // Font Loading API at all -- document.fonts.ready above wouldn't catch
-    // their metrics settling. A single delayed re-measure shortly after
-    // mount is a simple, timing-agnostic catch-all for that and anything
-    // else that might shift item widths after the first paint.
+    // Belt-and-suspenders: Trading Bots and Dtrader use emoji icons, and
+    // emoji rendering doesn't go through the CSS Font Loading API at all --
+    // document.fonts.ready above wouldn't catch their metrics settling. A
+    // single delayed re-measure shortly after mount is a simple,
+    // timing-agnostic catch-all for that and anything else that might shift
+    // item widths after the first paint.
     useEffect(() => {
         const timer = setTimeout(() => measure(), 300);
         return () => clearTimeout(timer);
@@ -159,7 +168,9 @@ export const MenuItems = observer(() => {
     const [is_more_open, setIsMoreOpen] = useState(false);
     const more_wrapper_ref = useRef<HTMLDivElement | null>(null);
 
-    const { containerRef, itemRefs, moreButtonRef, visible_count } = useVisibleItemCount(NAV_ITEMS.length);
+    const { containerRef, itemRefs, moreButtonRef, visible_count } = useVisiblePrimaryCount(
+        PRIMARY_NAV_ITEMS.length
+    );
 
     // Close the "More" dropdown on outside click or Escape — same pattern
     // used by the account switcher elsewhere in this header.
@@ -189,7 +200,10 @@ export const MenuItems = observer(() => {
 
     const { active_tab, setActiveTab } = dashboard;
 
-    const overflow_items = NAV_ITEMS.slice(visible_count);
+    // Dynamic overflow from the primary row (if the window is narrow enough
+    // that even Dashboard..Dtrader don't all fit) comes first, then the two
+    // pinned items always follow, in their own fixed order.
+    const overflow_items = [...PRIMARY_NAV_ITEMS.slice(visible_count), ...PINNED_OVERFLOW_ITEMS];
     const active_item_is_overflowed = overflow_items.some(item => item.tab === active_tab);
 
     const handleSelect = (tab: number) => {
@@ -199,11 +213,12 @@ export const MenuItems = observer(() => {
 
     return (
         <nav className='app-header__menu-items' aria-label='Primary' ref={containerRef}>
-            {/* Every item always renders (off-screen ones are just visually
-                hidden, not unmounted) so their real widths stay measurable —
-                unmounting them would make it impossible to detect when the
-                row has grown back enough room to show them again. */}
-            {NAV_ITEMS.map((item, index) => (
+            {/* Every primary item always renders (off-screen ones are just
+                visually hidden, not unmounted) so their real widths stay
+                measurable — unmounting them would make it impossible to
+                detect when the row has grown back enough room to show them
+                again. */}
+            {PRIMARY_NAV_ITEMS.map((item, index) => (
                 <button
                     key={item.tab}
                     ref={el => {
@@ -226,44 +241,44 @@ export const MenuItems = observer(() => {
                 </button>
             ))}
 
-            {overflow_items.length > 0 && (
-                <div className='app-header__menu-more' ref={more_wrapper_ref}>
-                    <button
-                        ref={moreButtonRef}
-                        type='button'
-                        className={clsx('app-header__menu-item', 'app-header__menu-more-toggle', {
-                            'app-header__menu-item--active': active_item_is_overflowed,
-                        })}
-                        onClick={() => setIsMoreOpen(open => !open)}
-                        aria-haspopup='true'
-                        aria-expanded={is_more_open}
-                    >
-                        <span className='app-header__menu-item-label'>
-                            <Localize i18n_default_text='More' />
-                        </span>
-                        <LabelPairedChevronDownLgRegularIcon height='14px' width='14px' fill='currentColor' />
-                    </button>
-                    {is_more_open && (
-                        <div className='app-header__menu-more-dropdown' role='menu'>
-                            {overflow_items.map(item => (
-                                <button
-                                    key={item.tab}
-                                    type='button'
-                                    role='menuitem'
-                                    className={clsx('app-header__menu-more-item', {
-                                        'app-header__menu-more-item--active': active_tab === item.tab,
-                                    })}
-                                    onClick={() => handleSelect(item.tab)}
-                                    onMouseEnter={() => prefetchTab(item.tab)}
-                                >
-                                    <span className='app-header__menu-item-icon'>{item.icon}</span>
-                                    <span className='app-header__menu-item-label'>{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Always rendered — PINNED_OVERFLOW_ITEMS guarantees this is
+                never empty, even when every primary item also fits inline. */}
+            <div className='app-header__menu-more' ref={more_wrapper_ref}>
+                <button
+                    ref={moreButtonRef}
+                    type='button'
+                    className={clsx('app-header__menu-item', 'app-header__menu-more-toggle', {
+                        'app-header__menu-item--active': active_item_is_overflowed,
+                    })}
+                    onClick={() => setIsMoreOpen(open => !open)}
+                    aria-haspopup='true'
+                    aria-expanded={is_more_open}
+                >
+                    <span className='app-header__menu-item-label'>
+                        <Localize i18n_default_text='More' />
+                    </span>
+                    <LabelPairedChevronDownLgRegularIcon height='14px' width='14px' fill='currentColor' />
+                </button>
+                {is_more_open && (
+                    <div className='app-header__menu-more-dropdown' role='menu'>
+                        {overflow_items.map(item => (
+                            <button
+                                key={item.tab}
+                                type='button'
+                                role='menuitem'
+                                className={clsx('app-header__menu-more-item', {
+                                    'app-header__menu-more-item--active': active_tab === item.tab,
+                                })}
+                                onClick={() => handleSelect(item.tab)}
+                                onMouseEnter={() => prefetchTab(item.tab)}
+                            >
+                                <span className='app-header__menu-item-icon'>{item.icon}</span>
+                                <span className='app-header__menu-item-label'>{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             <div className='app-header__menu-utility-icons'>
                 <FullScreen />

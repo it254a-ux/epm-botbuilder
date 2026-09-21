@@ -587,11 +587,12 @@ const AppWrapper = observer(() => {
                                     </>
                                 }
                                 id='id-trading-view'
-                                // Same reasoning as Dtrader above -- this panel's
-                                // content needs an explicit height to fill the
-                                // tab area instead of shrinking to its own
-                                // content.
-                                style={{ height: '100%' }}
+                                // No style/height prop here on purpose: Tabs.tsx's
+                                // React.Children.map renders `child.props.children`
+                                // only -- this wrapping <div> itself (and any style
+                                // prop on it) never actually reaches the DOM. The
+                                // real height fix lives in trading-view-page.scss,
+                                // on the page's own root element instead.
                             >
                                 <Suspense
                                     fallback={
