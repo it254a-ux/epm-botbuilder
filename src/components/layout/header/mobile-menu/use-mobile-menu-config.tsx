@@ -4,6 +4,7 @@ import RootStore from '@/stores/root-store';
 import { LegacyLogout1pxIcon, LegacyTheme1pxIcon } from '@deriv/quill-icons/Legacy';
 import { useTranslations } from '@deriv-com/translations';
 import { ToggleSwitch } from '@deriv-com/ui';
+import { HELP_OPTIONS } from '@/components/get-help';
 
 export type TSubmenuSection = 'accountSettings' | 'cashier' | 'reports';
 
@@ -58,6 +59,16 @@ const useMobileMenuConfig = (
                     RightComponent: <ToggleSwitch value={is_dark_mode_on} onChange={toggleTheme} />,
                 },
             ].filter(Boolean) as TMenuConfig,
+            // Get Help — same WhatsApp / Message / Call links the floating
+            // button used to show (see components/get-help), now inside the
+            // hamburger drawer instead.
+            HELP_OPTIONS.map(option => ({
+                as: 'a',
+                label: option.label,
+                LeftComponent: () => option.icon,
+                href: option.href,
+                target: option.external ? '_blank' : undefined,
+            })) as TMenuConfig,
             [
                 client?.is_logged_in &&
                     onLogout && {
