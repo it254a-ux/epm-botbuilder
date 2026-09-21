@@ -12,6 +12,12 @@ import './trading-view-page.scss';
 // (.dc-tabs__content in a grid row) never resolves to a real height for an
 // iframe-only page, so both height: 100% and position: absolute collapsed it
 // to zero. A measured pixel height doesn't depend on any ancestor.
+// The chart page (charts.deriv.com) is a cross-origin iframe, so its own header
+// can't be styled from here. Instead the iframe is rendered at 1/SCALE of the
+// size and scaled down, which shrinks the whole thing (header text, height and
+// spacing included) to SCALE while still filling the page exactly.
+const SCALE = 0.75;
+
 export default function TradingViewPage() {
     const page_ref = useRef<HTMLDivElement | null>(null);
     const [height, setHeight] = useState<number | undefined>(undefined);
@@ -41,7 +47,16 @@ export default function TradingViewPage() {
 
     return (
         <div className='trading-view-page' ref={page_ref} style={height ? { height: `${height}px` } : undefined}>
-            <TradingViewComponent />
+            <div
+                style={{
+                    width: `${100 / SCALE}%`,
+                    height: height ? `${height / SCALE}px` : '100%',
+                    transform: `scale(${SCALE})`,
+                    transformOrigin: 'top left',
+                }}
+            >
+                <TradingViewComponent />
+            </div>
         </div>
     );
 }
