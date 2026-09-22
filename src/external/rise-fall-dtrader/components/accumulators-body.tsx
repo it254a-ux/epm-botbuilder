@@ -201,7 +201,7 @@ export function AccumulatorsBody({
             <Skeleton className="lg:h-full h-48 w-full rounded-xl" />
           ) : (
             <Card className="lg:h-full lg:min-h-0 lg:overflow-y-auto">
-              <CardContent className="pt-4">
+              <CardContent className="pt-2.5">
                 <TradeModeToggle
                   label="Accumulators"
                   activeTradeType={activeTradeType}

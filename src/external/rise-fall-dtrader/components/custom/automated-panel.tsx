@@ -39,7 +39,7 @@ export function AutomatedPanel({
   };
 
   return (
-    <div className="w-full max-w-none mx-0 space-y-2 lg:space-y-2.5">
+    <div className="w-full max-w-none mx-0 space-y-1.5 lg:space-y-2">
       <ToggleGroup
         type="single"
         value={direction}

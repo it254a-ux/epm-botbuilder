@@ -19,7 +19,7 @@ interface TradeModeToggleProps {
  */
 export function TradeModeToggle({ label = 'Rise/Fall', activeTradeType, onSelectTradeType }: TradeModeToggleProps) {
   return (
-    <div className="mb-3">
+    <div className="mb-2">
       <ModeRail activeTradeType={activeTradeType} onSelectTradeType={onSelectTradeType} />
       <div className="flex items-center gap-1 text-[13px] font-semibold text-foreground">
         Automate {label}

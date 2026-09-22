@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS_COL =
   'flex flex-col gap-3 pt-3 lg:pt-0 border-t border-border lg:border-0 flex-1 min-h-0 lg:h-full';
 const DEFAULT_CARD =
   'max-lg:w-full max-lg:rounded-none max-lg:border-0 max-lg:shadow-none max-lg:bg-transparent lg:h-full lg:overflow-y-auto thin-scrollbar';
-const DEFAULT_CARD_CONTENT = 'pt-4 max-lg:px-3';
+const DEFAULT_CARD_CONTENT = 'pt-2.5 max-lg:px-3';
 const DEFAULT_SKELETON = 'lg:h-full h-48 w-full rounded-xl';
 
 export function TradeBody({

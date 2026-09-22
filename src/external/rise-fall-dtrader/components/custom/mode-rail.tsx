@@ -46,12 +46,12 @@ const MARKET_CONTRACT_TYPES = [
  */
 export function ModeRail({ activeTradeType, onSelectTradeType }: ModeRailProps) {
   return (
-    <div className="flex flex-col gap-2.5 mb-3 max-lg:relative max-lg:z-[9999]">
+    <div className="flex flex-col gap-1.5 mb-2 max-lg:relative max-lg:z-[9999]">
       {/* Automated trading — always-on status badge, no longer a toggle
           since Manual mode no longer exists. */}
       <div
         title="Automated trading"
-        className="flex items-center gap-1.5 self-start rounded-full pl-2.5 pr-3.5 py-1.5 bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500 text-white shadow-md shadow-orange-500/30"
+        className="flex items-center gap-1.5 self-start rounded-full pl-2.5 pr-3.5 py-1 bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500 text-white shadow-md shadow-orange-500/30"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <rect x="3" y="5" width="10" height="8" rx="2" stroke="currentColor" strokeWidth="1.3" />
@@ -80,7 +80,7 @@ export function ModeRail({ activeTradeType, onSelectTradeType }: ModeRailProps) 
               role="tab"
               aria-selected={activeTradeType === item.value}
               onClick={() => onSelectTradeType(item.value)}
-              className={`px-2 py-2 text-center text-[11.5px] font-medium leading-tight transition-colors border-border/60 ${
+              className={`px-2 py-1.5 text-center text-[11.5px] font-medium leading-tight transition-colors border-border/60 ${
                 index % 3 !== 2 ? 'border-r' : ''
               } ${index < 3 ? 'border-b' : ''} ${
                 activeTradeType === item.value
