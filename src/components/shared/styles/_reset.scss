@@ -112,12 +112,14 @@ html {
     height: 100%;
     font-size: 10px;
     overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 body {
     line-height: 1;
     height: 100%;
     overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 // The actual React mount point (a plain <div id="root"> inserted into body
