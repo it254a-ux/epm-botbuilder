@@ -39,7 +39,7 @@
             padding: 0.8rem;
             border-radius: 4px;
             border: 1px solid var(--border-normal, #444);
-            background: #131b28;
+            background: var(--general-main-2);
             color: var(--text-general, #fff);
         }
     }
@@ -64,7 +64,7 @@
             padding: 0.8rem;
             border-radius: 4px;
             border: 1px solid var(--border-normal, #444);
-            background: #131b28;
+            background: var(--general-main-2);
             color: var(--text-general, #fff);
             font-size: 1.3rem;
         }
