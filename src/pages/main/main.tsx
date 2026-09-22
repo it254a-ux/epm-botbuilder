@@ -169,6 +169,49 @@ const AppWrapper = observer(() => {
         resetUrlParamProcessing();
     }, [location.search]);
 
+    // Measures the mobile tab row's actual rendered height and exposes it
+    // as a CSS variable on the document root, so .bot-builder (main.scss)
+    // can position itself to start exactly where the row ends on mobile,
+    // instead of overlapping it (the row was previously getting covered by
+    // .bot-builder's content; fixing that with z-index alone left the row
+    // visible again but still overlapping .bot-builder's own top edge).
+    // Measured rather than hardcoded because the row's height comes from
+    // font-size + padding, not an explicit height value, so any future
+    // change to either would silently break a fixed px/rem guess. A
+    // ResizeObserver (not just a mount-time read) keeps this correct
+    // through font loading, orientation changes, and content changes like
+    // the "More" overflow menu resizing the row.
+    React.useEffect(() => {
+        if (isDesktop) return undefined;
+
+        const root = document.documentElement;
+        let observer: ResizeObserver | null = null;
+
+        const applyHeight = (height: number) => {
+            if (height > 0) {
+                root.style.setProperty('--mobile-tab-row-height', `${height}px`);
+            }
+        };
+
+        const tab_row_el = document.querySelector<HTMLElement>('.dc-tabs__list--header--main__tabs');
+        if (tab_row_el) {
+            applyHeight(tab_row_el.getBoundingClientRect().height);
+
+            if (typeof ResizeObserver !== 'undefined') {
+                observer = new ResizeObserver(entries => {
+                    for (const entry of entries) {
+                        applyHeight(entry.contentRect.height);
+                    }
+                });
+                observer.observe(tab_row_el);
+            }
+        }
+
+        return () => {
+            observer?.disconnect();
+        };
+    }, [isDesktop, active_tab]);
+
     // Warm the other lazy tab chunks in the background, but only after
     // Charts has fully loaded (or the safety timeout fires) -- otherwise
     // this ran independently on browser idle-time and could overlap with

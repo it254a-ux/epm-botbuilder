@@ -779,10 +779,22 @@
     }
 
     @include mobile-or-tablet-screen {
-        top: 0;
+        // Was top: 0, height: 100% -- same start position as the mobile
+        // tab row (a separate sibling element, not a descendant here; see
+        // src/app/app-content.jsx), so once the row's own z-index fix made
+        // it render on top instead of getting covered, .bot-builder's own
+        // content still started underneath/behind it rather than below it.
+        // --mobile-tab-row-height is measured in main.tsx (ResizeObserver
+        // on the actual row) rather than a guessed fixed value, since the
+        // row's real height comes from font-size + padding, not an
+        // explicit height anywhere. height is reduced by that same amount
+        // so the bottom edge still lands exactly at the container's own
+        // bottom -- otherwise pushing top down without adjusting height
+        // would overflow past the bottom by the same amount.
+        top: var(--mobile-tab-row-height, 4rem);
         inset-inline-start: 0;
         width: 100vw;
-        height: 100%;
+        height: calc(100% - var(--mobile-tab-row-height, 4rem));
     }
 }
 
