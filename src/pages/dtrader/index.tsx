@@ -120,7 +120,7 @@ function RiseFallPage() {
   if (activeTradeType === 'accumulators') {
     return (
       <main
-        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
+        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-[calc(100vh-5.6rem)] lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         {isExhausted && (
@@ -196,7 +196,7 @@ function RiseFallPage() {
   if (isDigitsTab) {
     return (
       <main
-        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
+        className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-[calc(100vh-5.6rem)] lg:overflow-hidden"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         {isExhausted && (
@@ -275,7 +275,7 @@ function RiseFallPage() {
 
   return (
     <main
-      className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-full lg:overflow-hidden"
+      className="flex flex-col bg-background max-lg:h-full max-lg:overflow-y-auto lg:h-[calc(100vh-5.6rem)] lg:overflow-hidden"
       style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       {isExhausted && (

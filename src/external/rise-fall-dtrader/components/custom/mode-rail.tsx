@@ -43,12 +43,12 @@ const MARKET_CONTRACT_TYPES = [
  */
 export function ModeRail({ activeTradeType, onSelectTradeType }: ModeRailProps) {
   return (
-    <div className="flex flex-col gap-2 mb-2 max-lg:relative max-lg:z-[9999]">
-      {/* Automated trading — always-on status badge, no longer a toggle
-          since Manual mode no longer exists. */}
+    <div className="flex flex-row items-start gap-2 mb-2 max-lg:relative max-lg:z-[9999]">
+      {/* Column 1: Automated trading — always-on status badge, no longer a
+          toggle since Manual mode no longer exists. */}
       <div
         title="Automated trading"
-        className="flex items-center gap-1.5 self-start rounded-full pl-2 pr-3 py-1.5 bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500 text-white shadow-md shadow-orange-500/30"
+        className="flex items-center gap-1.5 shrink-0 rounded-full pl-2 pr-3 py-1.5 bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500 text-white shadow-md shadow-orange-500/30"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <rect x="3" y="5" width="10" height="8" rx="2" stroke="currentColor" strokeWidth="1.3" />
@@ -60,8 +60,10 @@ export function ModeRail({ activeTradeType, onSelectTradeType }: ModeRailProps) 
         <span className="text-[10px] font-semibold tracking-wide">Automated</span>
       </div>
 
+      {/* Column 2: trade-type grid, taking the remaining width, wrapping
+          into two rows (3 + 2) within that column. */}
       {onSelectTradeType && (
-        <div className="grid grid-cols-3 gap-1.5" role="tablist" aria-label="Trade type">
+        <div className="grid grid-cols-3 gap-1.5 flex-1 min-w-0" role="tablist" aria-label="Trade type">
           {MARKET_CONTRACT_TYPES.map((item) => (
             <button
               key={item.value}
