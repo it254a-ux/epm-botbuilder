@@ -241,14 +241,14 @@ const AppHeader = observer(() => {
             >
                 <Wrapper variant='left'>
                     <MobileMenu onLogout={handleLogout} />
-                    <AppLogo />
-                    {isDesktop ? <MenuItems /> : renderAccountSection('left')}
-                </Wrapper>
-                <Wrapper variant='right'>
                     {/* Desktop already has this in MenuItems' utility-icons
                         cluster — only add it here for mobile, where there's
                         otherwise no theme toggle at all. */}
                     {!isDesktop && <ChangeTheme />}
+                    <AppLogo />
+                    {isDesktop ? <MenuItems /> : renderAccountSection('left')}
+                </Wrapper>
+                <Wrapper variant='right'>
                     {renderAccountSection('right')}
                 </Wrapper>
             </Header>

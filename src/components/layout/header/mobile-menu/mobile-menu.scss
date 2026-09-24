@@ -1,6 +1,18 @@
 .mobile-menu {
     height: 100%;
 
+    // @deriv-com/ui's Drawer uses position:absolute + top/bottom:0 on its
+    // container and overlay, expecting to span the viewport. Since this
+    // component lives inside .app-header (position:relative, needed for its
+    // own z-index stacking — see header.scss), that header becomes the
+    // containing block instead, collapsing the drawer to the header's height
+    // and clipping its content to just the header row. Force both back to
+    // the viewport.
+    .deriv-drawer__container,
+    .deriv-drawer__overlay {
+        position: fixed;
+    }
+
     &__toggle {
         padding-inline-start: 1rem;
         padding-inline-end: 1rem;
