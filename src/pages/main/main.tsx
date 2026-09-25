@@ -746,7 +746,9 @@ const AppWrapper = observer(() => {
                     condition here removes it from the DOM outright, so
                     there's nothing to flash regardless of timing. */}
                 {!is_tutorial_only_embed &&
-                    (active_tab === DBOT_TABS.CHART || active_tab === DBOT_TABS.BOT_BUILDER) && (
+                    (active_tab === DBOT_TABS.CHART ||
+                        active_tab === DBOT_TABS.BOT_BUILDER ||
+                        active_tab === DBOT_TABS.TRADING_VIEW) && (
                         <div className='main__run-strategy-wrapper'>
                             <RunStrategy />
                             <RunPanel />
@@ -758,7 +760,9 @@ const AppWrapper = observer(() => {
             <MobileWrapper>
                 {!is_tutorial_only_embed &&
                     !is_open &&
-                    (active_tab === DBOT_TABS.CHART || active_tab === DBOT_TABS.BOT_BUILDER) && <RunPanel />}
+                    (active_tab === DBOT_TABS.CHART ||
+                        active_tab === DBOT_TABS.BOT_BUILDER ||
+                        active_tab === DBOT_TABS.TRADING_VIEW) && <RunPanel />}
             </MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
