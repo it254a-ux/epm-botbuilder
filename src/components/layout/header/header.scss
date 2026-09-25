@@ -11,8 +11,18 @@
     // nav -- once Bot Builder became the active tab. Same root cause as
     // the mobile tab-row fix (main.scss, .dc-tabs--main__tabs &__list),
     // just the desktop-nav half of it, never covered by that earlier fix.
+    //
+    // z-index: 3, not 2 — that tab-row fix landed on the same value (2),
+    // and since the two are unrelated siblings (not nested), a tie there
+    // is broken by DOM order, which favors the tab row (it comes later in
+    // the document). That let it paint over this header's entire subtree,
+    // including the mobile menu drawer once the drawer was fixed to be a
+    // real fixed-position overlay (see mobile-menu.scss): a stacking
+    // context traps ALL its descendants, position:fixed ones included, so
+    // no z-index on the drawer itself could ever have won this — only
+    // raising the context-creating ancestor (here) can.
     position: relative;
-    z-index: 2;
+    z-index: 3;
 
     // @deriv-com/ui's Header is a flex row (`justify-content: space-between`)
     // holding two Wrapper columns (left / right), but each Wrapper ships
@@ -42,17 +52,29 @@
         flex: 0 0 auto;
     }
 
-    // Mobile-only: the theme toggle sits directly in the right Wrapper here
-    // (desktop has it inside MenuItems' own utility-icons cluster instead,
-    // which already sizes it), so give it matching padding/spacing here too.
+    // Mobile-only: the theme toggle sits in the left Wrapper now, directly
+    // after the hamburger icon (desktop has its own copy inside MenuItems'
+    // utility-icons cluster, already sized there). It used to live in the
+    // right Wrapper, and this padding/margin pair was tuned for that spot's
+    // neighbors (Transfer button, account switcher). Two problems now that
+    // it's moved: the fixed 6px padding sizes a box taller than the header
+    // itself, so the icon spilled past the header's bottom edge instead of
+    // filling it; and the margins were pushing space in the wrong
+    // direction for its new neighbor, leaving a gap where the icon should
+    // sit tight against the hamburger instead. height: 100% matches how
+    // the hamburger button (.mobile-menu__toggle) sizes itself, and the
+    // wrapper's own gap replaces the old margins for spacing.
     &--mobile {
-        .app-footer__icon {
-            padding: 6px;
-            margin-inline-end: 0.4rem;
+        .deriv-wrapper__left {
+            gap: 0.4rem;
         }
 
-        .app-footer__icon--theme {
-            margin-inline-start: -0.3rem;
+        .app-footer__icon {
+            height: 100%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     }
 
