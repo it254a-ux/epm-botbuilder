@@ -79,6 +79,17 @@
             align-items: center;
             justify-content: center;
         }
+
+        // The account/currency trigger (.acc-info, account-switcher.scss)
+        // ships with 1.6rem of its own inline padding — on top of the
+        // wrapper gap and logo padding above, that's what was keeping the
+        // logo-to-next-icon gap wide even after halving those. Halved here
+        // too, mobile-only so the desktop trigger (right Wrapper) keeps its
+        // original padding.
+        .acc-info {
+            padding-inline-start: 0.8rem;
+            padding-inline-end: 0.8rem;
+        }
     }
 
     &__account-settings {
