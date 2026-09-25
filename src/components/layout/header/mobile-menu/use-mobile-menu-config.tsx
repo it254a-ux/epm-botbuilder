@@ -1,6 +1,14 @@
 import { ComponentProps, ReactNode, useMemo } from 'react';
 import RootStore from '@/stores/root-store';
-import { LegacyGuide1pxIcon, LegacyLogout1pxIcon } from '@deriv/quill-icons/Legacy';
+import {
+    LegacyCheck1pxIcon,
+    LegacyEmailIcon,
+    LegacyGuide1pxIcon,
+    LegacyInfo1pxIcon,
+    LegacyLock1pxIcon,
+    LegacyLogout1pxIcon,
+    LegacyWarningIcon,
+} from '@deriv/quill-icons/Legacy';
 import { useTranslations } from '@deriv-com/translations';
 import { HELP_OPTIONS } from '@/components/get-help';
 
@@ -88,6 +96,49 @@ const useMobileMenuConfig = (
                     href: option.href,
                     target: option.external ? '_blank' : undefined,
                 })) as TMenuConfig,
+            },
+            // Standalone pages (src/pages/info/) — plain routes, not
+            // DBOT_TABS tabs, so these are real links (full navigation),
+            // same pattern as Customer support's WhatsApp/Message/Call above.
+            {
+                title: localize('Company'),
+                items: [
+                    {
+                        as: 'a',
+                        label: localize('About us'),
+                        LeftComponent: LegacyInfo1pxIcon,
+                        href: '/about',
+                    },
+                    {
+                        as: 'a',
+                        label: localize('Contact us'),
+                        LeftComponent: LegacyEmailIcon,
+                        href: '/contact',
+                    },
+                ] as TMenuConfig,
+            },
+            {
+                title: localize('Legal'),
+                items: [
+                    {
+                        as: 'a',
+                        label: localize('Risk disclosure'),
+                        LeftComponent: LegacyWarningIcon,
+                        href: '/legal/risk-disclosure',
+                    },
+                    {
+                        as: 'a',
+                        label: localize('Terms & conditions'),
+                        LeftComponent: LegacyCheck1pxIcon,
+                        href: '/legal/terms',
+                    },
+                    {
+                        as: 'a',
+                        label: localize('Privacy policy'),
+                        LeftComponent: LegacyLock1pxIcon,
+                        href: '/legal/privacy-policy',
+                    },
+                ] as TMenuConfig,
             },
             {
                 items: [

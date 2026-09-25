@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import React from 'react';
-import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, Outlet, Route, RouterProvider } from 'react-router-dom';
 import { cleanupUrl, handleOAuthCallback } from '@/external/deriv-core';
 import ChunkLoader from '@/components/loader/chunk-loader';
 import LocalStorageSyncWrapper from '@/components/localStorage-sync-wrapper';
@@ -17,6 +17,11 @@ import './app-root.scss';
 const Layout = lazy(() => import('../components/layout'));
 const AppRoot = lazy(() => import('./app-root'));
 const DtraderPage = lazy(() => import('../pages/dtrader'));
+const AboutPage = lazy(() => import('../pages/info/about'));
+const ContactPage = lazy(() => import('../pages/info/contact'));
+const RiskDisclosurePage = lazy(() => import('../pages/info/risk-disclosure'));
+const TermsPage = lazy(() => import('../pages/info/terms'));
+const PrivacyPolicyPage = lazy(() => import('../pages/info/privacy-policy'));
 
 /**
  * Component wrapper to handle language URL parameter
@@ -34,34 +39,64 @@ const routerBasename = isPreviewMode() ? PREVIEW_BASE_PATH : undefined;
 
 const router = createBrowserRouter(
     createRoutesFromElements(
-        <Route
-            path='/'
-            element={
-                <Suspense
-                    fallback={<ChunkLoader message={localize('Please wait while we connect to the server...')} />}
-                >
-                    <TranslationProvider defaultLang='EN' i18nInstance={i18nInstance}>
-                        <LanguageHandler>
-                            <StoreProvider>
-                                <LocalStorageSyncWrapper>
-                                    <RoutePromptDialog />
-                                    <CoreStoreProvider>
-                                        <Layout />
-                                    </CoreStoreProvider>
-                                </LocalStorageSyncWrapper>
-                            </StoreProvider>
-                        </LanguageHandler>
-                    </TranslationProvider>
-                </Suspense>
-            }
-        >
-            {/* All child routes will be passed as children to Layout */}
-            <Route index element={<AppRoot />} />
-            {/* App Builder embeds the template at /preview — render the same app shell */}
-            <Route path='preview' element={<AppRoot />} />
-            {/* Ported Rise/Fall trading page (formerly its own repo) */}
-            <Route path='dtrader' element={<DtraderPage />} />
-        </Route>
+        <>
+            <Route
+                path='/'
+                element={
+                    <Suspense
+                        fallback={
+                            <ChunkLoader message={localize('Please wait while we connect to the server...')} />
+                        }
+                    >
+                        <TranslationProvider defaultLang='EN' i18nInstance={i18nInstance}>
+                            <LanguageHandler>
+                                <StoreProvider>
+                                    <LocalStorageSyncWrapper>
+                                        <RoutePromptDialog />
+                                        <CoreStoreProvider>
+                                            <Layout />
+                                        </CoreStoreProvider>
+                                    </LocalStorageSyncWrapper>
+                                </StoreProvider>
+                            </LanguageHandler>
+                        </TranslationProvider>
+                    </Suspense>
+                }
+            >
+                {/* All child routes will be passed as children to Layout */}
+                <Route index element={<AppRoot />} />
+                {/* App Builder embeds the template at /preview — render the same app shell */}
+                <Route path='preview' element={<AppRoot />} />
+                {/* Ported Rise/Fall trading page (formerly its own repo) */}
+                <Route path='dtrader' element={<DtraderPage />} />
+            </Route>
+            {/* Standalone info/legal pages — see src/pages/info/. Siblings of
+                the '/' route above, not children of it: they're plain public
+                pages with no trading state, so they skip
+                StoreProvider/CoreStoreProvider (which set up the WS
+                connection and account state) and Layout (the app-header/tab
+                chrome) entirely — just translation + a loading fallback,
+                same as everything else here needs at minimum. */}
+            <Route
+                element={
+                    <Suspense
+                        fallback={
+                            <ChunkLoader message={localize('Please wait while we connect to the server...')} />
+                        }
+                    >
+                        <TranslationProvider defaultLang='EN' i18nInstance={i18nInstance}>
+                            <Outlet />
+                        </TranslationProvider>
+                    </Suspense>
+                }
+            >
+                <Route path='about' element={<AboutPage />} />
+                <Route path='contact' element={<ContactPage />} />
+                <Route path='legal/risk-disclosure' element={<RiskDisclosurePage />} />
+                <Route path='legal/terms' element={<TermsPage />} />
+                <Route path='legal/privacy-policy' element={<PrivacyPolicyPage />} />
+            </Route>
+        </>
     ),
     { basename: routerBasename }
 );

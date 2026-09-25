@@ -30,7 +30,7 @@ import {
     LabelPairedObjectsColumnCaptionRegularIcon,
     LabelPairedPuzzlePieceTwoCaptionBoldIcon,
 } from '@deriv/quill-icons/LabelPaired';
-import { LegacyGuide1pxIcon } from '@deriv/quill-icons/Legacy';
+import { LegacyCheck1pxIcon, LegacyEmailIcon, LegacyGuide1pxIcon, LegacyInfo1pxIcon, LegacyLock1pxIcon, LegacyWarningIcon } from '@deriv/quill-icons/Legacy';
 import { Localize } from '@deriv-com/translations';
 import './menu-items.scss';
 
@@ -76,6 +76,20 @@ const PINNED_OVERFLOW_ITEMS = [
         icon: <LegacyGuide1pxIcon height='12px' width='12px' fill='currentColor' />,
         label: <Localize i18n_default_text='Tutorials' />,
     },
+];
+
+// Standalone pages (src/pages/info/) — plain routes, not DBOT_TABS tabs, so
+// these render as real links in the "More" dropdown, same as the Get Help
+// section below them.
+const COMPANY_LINKS = [
+    { key: 'about', href: '/about', icon: <LegacyInfo1pxIcon height='12px' width='12px' fill='currentColor' />, label: <Localize i18n_default_text='About us' /> },
+    { key: 'contact', href: '/contact', icon: <LegacyEmailIcon height='12px' width='12px' fill='currentColor' />, label: <Localize i18n_default_text='Contact us' /> },
+];
+
+const LEGAL_LINKS = [
+    { key: 'risk-disclosure', href: '/legal/risk-disclosure', icon: <LegacyWarningIcon height='12px' width='12px' fill='currentColor' />, label: <Localize i18n_default_text='Risk disclosure' /> },
+    { key: 'terms', href: '/legal/terms', icon: <LegacyCheck1pxIcon height='12px' width='12px' fill='currentColor' />, label: <Localize i18n_default_text='Terms & conditions' /> },
+    { key: 'privacy', href: '/legal/privacy-policy', icon: <LegacyLock1pxIcon height='12px' width='12px' fill='currentColor' />, label: <Localize i18n_default_text='Privacy policy' /> },
 ];
 
 // How many of PRIMARY_NAV_ITEMS fit before the row runs out of room, given
@@ -293,6 +307,38 @@ export const MenuItems = observer(() => {
                             >
                                 <span className='app-header__menu-item-icon'>{option.icon}</span>
                                 <span className='app-header__menu-item-label'>{option.label}</span>
+                            </a>
+                        ))}
+                        <div className='app-header__menu-more-divider' role='separator' />
+                        <div className='app-header__menu-more-heading'>
+                            <Localize i18n_default_text='Company' />
+                        </div>
+                        {COMPANY_LINKS.map(link => (
+                            <a
+                                key={link.key}
+                                role='menuitem'
+                                className='app-header__menu-more-item'
+                                href={link.href}
+                                onClick={() => setIsMoreOpen(false)}
+                            >
+                                <span className='app-header__menu-item-icon'>{link.icon}</span>
+                                <span className='app-header__menu-item-label'>{link.label}</span>
+                            </a>
+                        ))}
+                        <div className='app-header__menu-more-divider' role='separator' />
+                        <div className='app-header__menu-more-heading'>
+                            <Localize i18n_default_text='Legal' />
+                        </div>
+                        {LEGAL_LINKS.map(link => (
+                            <a
+                                key={link.key}
+                                role='menuitem'
+                                className='app-header__menu-more-item'
+                                href={link.href}
+                                onClick={() => setIsMoreOpen(false)}
+                            >
+                                <span className='app-header__menu-item-icon'>{link.icon}</span>
+                                <span className='app-header__menu-item-label'>{link.label}</span>
                             </a>
                         ))}
                     </div>
