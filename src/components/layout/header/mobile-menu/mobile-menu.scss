@@ -85,6 +85,19 @@
                 border-bottom: 1px solid var(--general-section-1);
             }
 
+            // Groups WhatsApp/Message/Call under one visible heading instead
+            // of three unlabelled rows that don't obviously belong together.
+            // Sits inside the same padded block as its items (inherits their
+            // 4.8rem/1.6rem inline padding from &--padding above), so its
+            // text lines up with the item labels below it, not their icons.
+            &__section-title {
+                display: block;
+                padding-block: 1.2rem 0.4rem;
+                color: var(--text-less-prominent);
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
+
             &__item {
                 height: 5.6rem;
                 cursor: pointer;

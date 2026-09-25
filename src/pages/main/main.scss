@@ -72,6 +72,33 @@
         padding: 0;
     }
 
+    // Overlays the gap .dc-tabs--main__tabs &__list already reserves at its
+    // own left edge (see that rule, further down) instead of sitting in the
+    // tab row's normal flow — absolute positioning means this can never
+    // push or resize the tab row itself, only its own icon box is sized
+    // here. z-index matches the tab row's own (2) since both are siblings
+    // under &__container, which isn't a stacking context on its own (no
+    // z-index of its own) -- so this needs its own to paint above the tab
+    // row's background instead of under it.
+    &__mobile-theme-toggle {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        height: var(--mobile-tab-row-height, 4rem);
+        display: flex;
+        align-items: center;
+        padding-inline-start: 0.8rem;
+
+        .app-footer__icon {
+            padding: 0;
+        }
+
+        @include desktop-screen {
+            display: none;
+        }
+    }
+
     &__container {
         position: relative;
         border: none;

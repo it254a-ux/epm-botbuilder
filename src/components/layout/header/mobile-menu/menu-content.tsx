@@ -7,22 +7,24 @@ import useMobileMenuConfig from './use-mobile-menu-config';
 
 type TMenuContentProps = {
     enableThemeToggle?: boolean;
+    onNavigateToTutorials?: () => void;
     onOpenSubmenu?: (submenu: string) => void;
     onLogout?: () => void;
 };
 
-const MenuContent = observer(({ enableThemeToggle = true, onOpenSubmenu, onLogout }: TMenuContentProps) => {
+const MenuContent = observer(
+    ({ enableThemeToggle = true, onNavigateToTutorials, onOpenSubmenu, onLogout }: TMenuContentProps) => {
     const { isDesktop } = useDevice();
     const { client } = useStore();
     const textSize = isDesktop ? 'sm' : 'md';
     // Pass enableThemeToggle to control theme toggle visibility
-    const { config } = useMobileMenuConfig(client, onLogout, enableThemeToggle);
+    const { config } = useMobileMenuConfig(client, onLogout, enableThemeToggle, onNavigateToTutorials);
 
     return (
         <div className='mobile-menu__content'>
             <div className='mobile-menu__content__items'>
-                {config.map((item, index) => {
-                    const removeBorderBottom = item.find(({ removeBorderBottom }) => removeBorderBottom);
+                {config.map((section, index) => {
+                    const removeBorderBottom = section.items.find(({ removeBorderBottom }) => removeBorderBottom);
                     const isLastSection = index === config.length - 1;
 
                     return (
@@ -33,7 +35,16 @@ const MenuContent = observer(({ enableThemeToggle = true, onOpenSubmenu, onLogou
                             data-testid='dt_menu_item'
                             key={index}
                         >
-                            {item.map(
+                            {section.title && (
+                                <Text
+                                    className='mobile-menu__content__items__section-title'
+                                    size='xs'
+                                    weight='bold'
+                                >
+                                    {section.title}
+                                </Text>
+                            )}
+                            {section.items.map(
                                 (
                                     {
                                         LeftComponent,

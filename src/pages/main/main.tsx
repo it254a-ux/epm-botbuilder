@@ -40,6 +40,7 @@ import {
 import { LegacyGuide1pxIcon } from '@deriv/quill-icons/Legacy';
 import { Localize, localize } from '@deriv-com/translations';
 import { useDevice } from '@deriv-com/ui';
+import ChangeTheme from '../../components/layout/footer/ChangeTheme';
 import RunPanel from '../../components/run-panel';
 import ChartModal from '../chart/chart-modal';
 import Dashboard from '../dashboard';
@@ -486,6 +487,22 @@ const AppWrapper = observer(() => {
                         'main__container--embedded-header': is_embedded_in_parent,
                     })}
                 >
+                    {/* Sits in the gap the tab row already reserves at its
+                        left edge for an embedding parent page's own
+                        menu-toggle/theme-toggle icons (see
+                        .dc-tabs--main__tabs &__list in main.scss). On
+                        standalone mobile that gap goes unused, so put our
+                        own theme toggle there instead of in the header nav,
+                        where it kept fighting that row's own stacking
+                        context (see header.tsx history). Absolutely
+                        positioned so it can never affect the tab row's own
+                        layout/spacing -- only the icon's own box is sized
+                        here. */}
+                    {!isDesktop && (
+                        <div className='main__mobile-theme-toggle'>
+                            <ChangeTheme />
+                        </div>
+                    )}
                     <div>
                         {/* Charts and Dtrader share the same underlying chart
                             engine (SmartCharts' CanvasKit/WASM bundle, tens of

@@ -3,6 +3,7 @@
 // Controls language settings and theme toggle via brand.config.json
 import { useState } from 'react';
 import brandConfig from '@/../brand.config.json';
+import { DBOT_TABS } from '@/constants/bot-contents';
 import useModalManager from '@/hooks/useModalManager';
 // [AI] Import useStore to check if menu has items
 import { useStore } from '@/hooks/useStore';
@@ -34,15 +35,12 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
     const { hideModal, isModalOpenFor, showModal } = useModalManager();
     const { isDesktop } = useDevice();
     // [AI] Get client from store to check menu items
-    const { client } = useStore() ?? {};
+    const { client, dashboard } = useStore() ?? {};
     // [/AI]
 
     // Get mobile menu configuration from brand.config.json
     const enableLanguageSettings = brandConfig.platform.footer?.enable_language_settings ?? true;
     const enableThemeToggle = brandConfig.platform.footer?.enable_theme_toggle ?? true;
-
-    // Check if menu has any items to determine if mobile menu should be shown
-    const { hasMenuItems } = useMobileMenuConfig(client, onLogout, enableThemeToggle);
 
     const openDrawer = () => setIsDrawerOpen(true);
     const closeDrawer = () => {
@@ -58,6 +56,17 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
     const closeSubmenu = () => setActiveSubmenu(null);
     const openLanguageSetting = () => showModal('MobileLanguagesDrawer');
     const isLanguageSettingVisible = Boolean(isModalOpenFor('MobileLanguagesDrawer'));
+    // Same tab the desktop nav's "More" dropdown links to (menu-items.tsx) —
+    // closes the drawer first so the tab actually becomes visible underneath.
+    const navigateToTutorials = dashboard
+        ? () => {
+              closeDrawer();
+              dashboard.setActiveTab(DBOT_TABS.TUTORIAL);
+          }
+        : undefined;
+
+    // Check if menu has any items to determine if mobile menu should be shown
+    const { hasMenuItems } = useMobileMenuConfig(client, onLogout, enableThemeToggle, navigateToTutorials);
 
     if (isDesktop) return null;
     // [AI] Hide mobile menu if there are no menu items to display
@@ -118,6 +127,7 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
                     ) : (
                         <MenuContent
                             enableThemeToggle={enableThemeToggle}
+                            onNavigateToTutorials={navigateToTutorials}
                             onOpenSubmenu={openSubmenu}
                             onLogout={() => {
                                 closeDrawer();
