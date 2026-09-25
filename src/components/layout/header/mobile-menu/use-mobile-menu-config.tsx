@@ -1,9 +1,7 @@
 import { ComponentProps, ReactNode, useMemo } from 'react';
-import useThemeSwitcher from '@/hooks/useThemeSwitcher';
 import RootStore from '@/stores/root-store';
-import { LegacyGuide1pxIcon, LegacyLogout1pxIcon, LegacyTheme1pxIcon } from '@deriv/quill-icons/Legacy';
+import { LegacyGuide1pxIcon, LegacyLogout1pxIcon } from '@deriv/quill-icons/Legacy';
 import { useTranslations } from '@deriv-com/translations';
-import { ToggleSwitch } from '@deriv-com/ui';
 import { HELP_OPTIONS } from '@/components/get-help';
 
 export type TSubmenuSection = 'accountSettings' | 'cashier' | 'reports';
@@ -39,7 +37,6 @@ const useMobileMenuConfig = (
     onNavigateToTutorials?: () => void
 ) => {
     const { localize } = useTranslations();
-    const { is_dark_mode_on, toggleTheme } = useThemeSwitcher();
 
     const menuConfig = useMemo((): TMenuSection[] => {
 
@@ -63,13 +60,10 @@ const useMobileMenuConfig = (
                     // For desktop menu items, see:
                     // src/components/layout/header/header-config.tsx
 
-                    // Conditionally include theme toggle based on brand config
-                    enableThemeToggle && {
-                        as: 'button',
-                        label: localize('Dark theme'),
-                        LeftComponent: LegacyTheme1pxIcon,
-                        RightComponent: <ToggleSwitch value={is_dark_mode_on} onChange={toggleTheme} />,
-                    },
+                    // Theme toggle used to be a row here (behind enableThemeToggle);
+                    // it now lives in the drawer header next to "Settings" instead
+                    // (see MenuHeader / mobile-menu.tsx's showThemeToggle prop).
+
                     // Same tab the desktop nav's "More" dropdown links to
                     // (see menu-items.tsx's PINNED_OVERFLOW_ITEMS) — mobile
                     // had no equivalent entry point to it at all.
@@ -108,15 +102,7 @@ const useMobileMenuConfig = (
                 ].filter(Boolean) as TMenuConfig,
             },
         ].filter(section => section.items.length > 0);
-    }, [
-        client,
-        onLogout,
-        is_dark_mode_on,
-        toggleTheme,
-        localize,
-        enableThemeToggle, // [AI] Added to recalculate menu when theme toggle config changes
-        onNavigateToTutorials,
-    ]);
+    }, [client, onLogout, localize, onNavigateToTutorials]);
 
     // [AI] Check if menu has any items to determine if mobile menu should be shown
     const hasMenuItems = menuConfig.some(section => section.items.length > 0);

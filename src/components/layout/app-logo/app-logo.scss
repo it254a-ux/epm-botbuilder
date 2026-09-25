@@ -50,9 +50,12 @@
     // tighten the padding and show the logo only — the app name is desktop-only
     // here to avoid crowding. (The mobile drawer header still shows the name.)
     &--mobile {
+        // Halved from 0.8rem each side — this padding is what was widening
+        // the hamburger→logo and logo→next-icon gaps; only inline (width)
+        // padding changes, not height.
         .app-header__logo {
-            padding-inline-start: 0.8rem;
-            padding-inline-end: 0.8rem;
+            padding-inline-start: 0.4rem;
+            padding-inline-end: 0.4rem;
         }
 
         .app-header__logo-text {

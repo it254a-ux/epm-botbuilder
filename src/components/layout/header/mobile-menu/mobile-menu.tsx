@@ -84,6 +84,7 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
                     <MenuHeader
                         hideLanguageSetting={!enableLanguageSettings || isLanguageSettingVisible}
                         openLanguageSetting={openLanguageSetting}
+                        showThemeToggle={enableThemeToggle}
                     />
                     {/* [/AI] */}
                 </Drawer.Header>
@@ -126,7 +127,9 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
                         </>
                     ) : (
                         <MenuContent
-                            enableThemeToggle={enableThemeToggle}
+                            // Theme toggle now lives in the drawer header next to
+                            // "Settings" (see MenuHeader) instead of as a row here.
+                            enableThemeToggle={false}
                             onNavigateToTutorials={navigateToTutorials}
                             onOpenSubmenu={openSubmenu}
                             onLogout={() => {
