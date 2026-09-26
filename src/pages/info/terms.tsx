@@ -1,7 +1,7 @@
 import InfoPageLayout from './info-page-layout';
 
 const TermsPage = () => (
-    <InfoPageLayout title='Terms & conditions' updated='[TODO: date]'>
+    <InfoPageLayout title='Terms & conditions' updated='26 September 2026'>
         <p>
             These terms govern your use of the Executive Prime Markets (EPM) bot builder, charting, and
             automation interface (&ldquo;the software&rdquo;). By using it, you agree to them.

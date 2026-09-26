@@ -1,7 +1,7 @@
 import InfoPageLayout from './info-page-layout';
 
 const RiskDisclosurePage = () => (
-    <InfoPageLayout title='Risk disclosure' updated='[TODO: date]'>
+    <InfoPageLayout title='Risk disclosure' updated='26 September 2026'>
         <p>
             <strong>
                 Trading derivatives, options, and CFDs carries a high level of risk and may not be suitable
