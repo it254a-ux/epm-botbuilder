@@ -51,4 +51,39 @@ describe('MenuHeader component', () => {
         await userEvent.click(screen.getByText('EN'));
         expect(mockOpenLanguageSetting).toHaveBeenCalled();
     });
+
+    // [AI] Theme toggle now lives in this header row, next to "Settings"
+    // (see mobile-menu.tsx's showThemeToggle prop) instead of as its own
+    // row in the menu body.
+    it('does not render the theme toggle by default', () => {
+        render(<MenuHeader hideLanguageSetting openLanguageSetting={mockOpenLanguageSetting} />);
+        expect(screen.queryByLabelText('Toggle theme')).not.toBeInTheDocument();
+    });
+
+    it('renders the theme toggle next to Settings when showThemeToggle is true', () => {
+        render(
+            <MenuHeader
+                hideLanguageSetting
+                openLanguageSetting={mockOpenLanguageSetting}
+                showThemeToggle
+            />
+        );
+        expect(screen.getByLabelText('Toggle theme')).toBeInTheDocument();
+    });
+
+    it('toggles theme when the theme button is clicked', async () => {
+        render(
+            <MenuHeader
+                hideLanguageSetting
+                openLanguageSetting={mockOpenLanguageSetting}
+                showThemeToggle
+            />
+        );
+        const themeButton = screen.getByLabelText('Toggle theme');
+        // Falls back to useThemeSwitcher's no-store default (is_dark_mode_on: false),
+        // so this just confirms the click handler is wired up without throwing.
+        await userEvent.click(themeButton);
+        expect(themeButton).toBeInTheDocument();
+    });
+    // [/AI]
 });

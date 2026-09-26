@@ -277,7 +277,7 @@ const RunPanel = observer(() => {
     const { statistics } = transactions;
     const { active_tour, active_tab } = dashboard;
     const { total_payout, total_profit, total_stake, won_contracts, lost_contracts, number_of_runs } = statistics;
-    const { BOT_BUILDER, CHART } = DBOT_TABS;
+    const { BOT_BUILDER, CHART, TRADING_VIEW } = DBOT_TABS;
 
     React.useEffect(() => {
         onMount();
@@ -320,14 +320,15 @@ const RunPanel = observer(() => {
         />
     );
 
-    const show_run_panel = [BOT_BUILDER, CHART].includes(active_tab) || active_tour;
+    const show_run_panel = [BOT_BUILDER, CHART, TRADING_VIEW].includes(active_tab) || active_tour;
     // NOTE: this used to be `if ((!show_run_panel && isDesktop) || active_tour === 'bot_builder') return null;`
     // That only hid the panel when `isDesktop` was true. Inside the Executive Prime Markets
     // dashboard iframe, useDevice()'s isDesktop can be falsely `false` even on large screens
     // (see comment above SHOW_EMBEDDED_MOBILE_DRAWER_FOOTER), so on non-Bot-Builder/Chart tabs
     // (Dashboard, Tutorials, etc.) this never returned null — RunPanel's Drawer kept mounting
     // its fixed mobile toggle bar at the bottom of every page. The visibility of RunPanel
-    // should not depend on isDesktop at all: hide it whenever we're not on Bot Builder/Chart.
+    // should not depend on isDesktop at all: hide it whenever we're not on Bot Builder/Chart/
+    // Trading view.
     if (!show_run_panel || active_tour === 'bot_builder') return null;
 
     return (
