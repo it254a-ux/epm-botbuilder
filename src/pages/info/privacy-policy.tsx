@@ -1,7 +1,8 @@
-import InfoPageLayout from './info-page-layout';
+import { Link } from 'react-router-dom';
+import InfoPageLayout, { Callout } from './info-page-layout';
 
 const PrivacyPolicyPage = () => (
-    <InfoPageLayout title='Privacy policy' updated='26 September 2026'>
+    <InfoPageLayout eyebrow='Legal' title='Privacy policy' accent='var(--brand-success)' updated='26 September 2026'>
         <p>
             This page explains what data Executive Prime Markets (EPM) collects when you use our bot
             builder and trading interface, and how we handle it.
@@ -47,7 +48,7 @@ const PrivacyPolicyPage = () => (
         </p>
 
         <h2>What we don&apos;t do</h2>
-        <p>We do not sell your personal data, and we do not have access to your trading funds.</p>
+        <Callout>We do not sell your personal data, and we do not have access to your trading funds.</Callout>
 
         <h2>Your rights</h2>
         <p>
@@ -60,7 +61,7 @@ const PrivacyPolicyPage = () => (
 
         <h2>Contact</h2>
         <p>
-            For any privacy question or request, see our <a href='/contact'>Contact us</a> page.
+            For any privacy question or request, see our <Link to='/contact'>Contact us</Link> page.
         </p>
     </InfoPageLayout>
 );

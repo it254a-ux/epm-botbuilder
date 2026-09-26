@@ -1,7 +1,8 @@
-import InfoPageLayout from './info-page-layout';
+import { Link } from 'react-router-dom';
+import InfoPageLayout, { Callout } from './info-page-layout';
 
 const TermsPage = () => (
-    <InfoPageLayout title='Terms & conditions' updated='26 September 2026'>
+    <InfoPageLayout eyebrow='Legal' title='Terms & conditions' accent='var(--brand-tertiary)' updated='26 September 2026'>
         <p>
             These terms govern your use of the Executive Prime Markets (EPM) bot builder, charting, and
             automation interface (&ldquo;the software&rdquo;). By using it, you agree to them.
@@ -15,8 +16,8 @@ const TermsPage = () => (
         </p>
 
         <h2>We do not hold your funds</h2>
+        <Callout>EPM does not hold, custody, or have access to your trading funds at any point.</Callout>
         <p>
-            <strong>EPM does not hold, custody, or have access to your trading funds at any point.</strong>{' '}
             All deposits, withdrawals, balances, and trade execution are handled directly by Deriv on your
             Deriv account. We never see or store your Deriv account password; authentication happens through
             Deriv&apos;s own OAuth login flow.
@@ -37,8 +38,8 @@ const TermsPage = () => (
         <p>
             The software is provided &ldquo;as is&rdquo;, without warranty of any kind. We do not guarantee
             that it will be uninterrupted, error-free, or free of bugs, or that any bot or strategy will
-            perform as expected. See our <a href='/legal/risk-disclosure'>Risk disclosure</a> for trading-
-            specific risks.
+            perform as expected. See our <Link to='/legal/risk-disclosure'>Risk disclosure</Link> for
+            trading-specific risks.
         </p>
 
         <h2>Limitation of liability</h2>
@@ -57,7 +58,7 @@ const TermsPage = () => (
 
         <h2>Contact</h2>
         <p>
-            Questions about these terms can be sent through our <a href='/contact'>Contact us</a> page.
+            Questions about these terms can be sent through our <Link to='/contact'>Contact us</Link> page.
         </p>
     </InfoPageLayout>
 );

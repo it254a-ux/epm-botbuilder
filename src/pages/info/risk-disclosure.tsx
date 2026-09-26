@@ -1,14 +1,18 @@
-import InfoPageLayout from './info-page-layout';
+import { Link } from 'react-router-dom';
+import InfoPageLayout, { Callout } from './info-page-layout';
 
 const RiskDisclosurePage = () => (
-    <InfoPageLayout title='Risk disclosure' updated='26 September 2026'>
-        <p>
-            <strong>
-                Trading derivatives, options, and CFDs carries a high level of risk and may not be suitable
-                for everyone. You could lose some or all of your invested capital.
-            </strong>{' '}
-            Please read this page in full before using Executive Prime Markets (EPM) to trade.
-        </p>
+    <InfoPageLayout
+        eyebrow='Legal'
+        title='Risk disclosure'
+        accent='var(--brand-warning)'
+        updated='26 September 2026'
+    >
+        <Callout>
+            Trading derivatives, options, and CFDs carries a high level of risk and may not be suitable for
+            everyone. You could lose some or all of your invested capital.
+        </Callout>
+        <p>Please read this page in full before using Executive Prime Markets (EPM) to trade.</p>
 
         <h2>Leverage and volatility</h2>
         <p>
@@ -38,8 +42,8 @@ const RiskDisclosurePage = () => (
         <h2>We do not hold your funds</h2>
         <p>
             All funds, trades, and account balances are held and executed by Deriv, not by EPM. See our{' '}
-            <a href='/about'>About us</a> and <a href='/legal/terms'>Terms &amp; conditions</a> for detail on
-            this relationship.
+            <Link to='/about'>About us</Link> and <Link to='/legal/terms'>Terms &amp; conditions</Link> for
+            detail on this relationship.
         </p>
 
         <p>

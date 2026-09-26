@@ -3,6 +3,11 @@
 // full-viewport page, so this needs its own height + scroll rather than
 // min-height: 100vh (which would just get clipped by that overflow: hidden
 // once the header above it takes its own real space).
+//
+// --info-accent is set inline per page (info-page-layout.tsx), pulled from
+// one of the app's existing --brand-* tokens (_themes.scss) -- so each page
+// reads as its own thing (Risk Disclosure in amber, Terms in violet, ...)
+// without introducing a single new color to the app's palette.
 .info-page {
     height: 100%;
     overflow-y: auto;
@@ -16,64 +21,135 @@
         width: 100%;
         max-width: 72rem;
         margin: 0 auto;
-        padding: 3.2rem 2.4rem 6.4rem;
-        line-height: 1.6;
+        padding: 4.8rem 2.4rem 6.4rem;
+        line-height: 1.65;
+        counter-reset: info-section;
 
-        h1 {
-            font-size: 2.4rem;
-            margin-bottom: 0.4rem;
+        // A short mark above the eyebrow instead of a banner/hero block --
+        // reads as a signature accent, not a decoration competing with the
+        // content.
+        &::before {
+            content: '';
+            display: block;
+            width: 4.8rem;
+            height: 0.4rem;
+            border-radius: 0.2rem;
+            margin-bottom: 2rem;
+            background: var(--info-accent);
         }
+    }
 
-        h2 {
-            font-size: 1.8rem;
-            margin-top: 3.2rem;
-            margin-bottom: 0.8rem;
-        }
+    &__eyebrow {
+        font-size: 1.2rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--info-accent);
+        margin-bottom: 0.8rem;
+    }
 
-        p,
-        ul,
-        ol {
-            font-size: 1.4rem;
-            color: var(--text-general);
-            margin-bottom: 1.2rem;
-        }
+    h1 {
+        font-size: 3.2rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.4rem;
+    }
 
-        ul,
-        ol {
-            padding-inline-start: 2rem;
-        }
+    h2 {
+        counter-increment: info-section;
+        display: flex;
+        align-items: baseline;
+        gap: 1.2rem;
+        font-size: 1.9rem;
+        font-weight: 700;
+        margin-top: 3.6rem;
+        margin-bottom: 1.2rem;
 
-        a {
-            color: var(--brand-primary, var(--text-general));
+        &::before {
+            content: counter(info-section, decimal-leading-zero);
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--info-accent);
+            flex-shrink: 0;
         }
+    }
 
-        strong {
-            color: var(--text-general);
+    p,
+    ul,
+    ol {
+        font-size: 1.5rem;
+        color: var(--text-general);
+        margin-bottom: 1.2rem;
+    }
+
+    ul,
+    ol {
+        padding-inline-start: 2rem;
+    }
+
+    a {
+        color: var(--info-accent);
+        font-weight: 600;
+
+        &:hover {
+            text-decoration: none;
         }
+    }
+
+    strong {
+        font-weight: 700;
     }
 
     &__updated {
         font-size: 1.2rem;
         color: var(--text-less-prominent);
-        margin-bottom: 2.4rem;
+        margin-bottom: 2.8rem;
+    }
+
+    // The one sentence on a page that matters most (a core risk warning, a
+    // no-custody statement) -- pulled out of the regular paragraph flow
+    // instead of leaning on <strong> alone.
+    &__callout {
+        border-inline-start: 0.3rem solid var(--info-accent);
+        background: color-mix(in srgb, var(--info-accent) 8%, transparent);
+        border-radius: 0 0.6rem 0.6rem 0;
+        padding: 1.6rem 2rem;
+        margin: 2rem 0;
+        font-size: 1.6rem;
+        font-weight: 600;
+        line-height: 1.5;
     }
 
     &__footer {
         border-top: 1px solid var(--general-section-1);
-        padding: 1.6rem 2.4rem;
-        text-align: center;
+        padding: 2.4rem;
 
         nav {
-            font-size: 1.2rem;
-            color: var(--text-less-prominent);
+            max-width: 72rem;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.8rem;
         }
 
         a {
-            color: inherit;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-less-prominent);
             text-decoration: none;
+            padding: 0.6rem 1.4rem;
+            border-radius: 999px;
+            border: 1px solid var(--general-section-1);
 
             &:hover {
                 color: var(--text-general);
+                border-color: var(--text-less-prominent);
+            }
+
+            &.is-current {
+                color: var(--general-main-1);
+                background: var(--info-accent);
+                border-color: var(--info-accent);
             }
         }
     }

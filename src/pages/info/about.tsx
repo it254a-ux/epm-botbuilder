@@ -1,7 +1,8 @@
-import InfoPageLayout from './info-page-layout';
+import { Link } from 'react-router-dom';
+import InfoPageLayout, { Callout } from './info-page-layout';
 
 const AboutPage = () => (
-    <InfoPageLayout title='About us'>
+    <InfoPageLayout eyebrow='Company' title='About us' accent='var(--brand-primary)'>
         <p>
             Executive Prime Markets (EPM) builds tools for people who trade on Deriv &mdash; a bot builder,
             charting, and automation interface layered on top of Deriv&apos;s own trading infrastructure.
@@ -19,9 +20,12 @@ const AboutPage = () => (
         <p>
             All trades placed through this platform are executed directly on your Deriv account via the
             Deriv API. We do not act as a broker, and we do not place ourselves between you and Deriv as a
-            counterparty to your trades. Deriv, not EPM, is the counterparty responsible for executing and
-            settling your trades, holding your funds, and handling withdrawals and deposits.
+            counterparty to your trades.
         </p>
+        <Callout>
+            Deriv, not EPM, is the counterparty responsible for executing and settling your trades, holding
+            your funds, and handling withdrawals and deposits.
+        </Callout>
 
         <h2>Our mission</h2>
         <p>
@@ -32,10 +36,10 @@ const AboutPage = () => (
 
         <h2>Questions</h2>
         <p>
-            See our <a href='/contact'>Contact us</a> page for how to reach us, and our{' '}
-            <a href='/legal/risk-disclosure'>Risk disclosure</a>,{' '}
-            <a href='/legal/terms'>Terms &amp; conditions</a>, and{' '}
-            <a href='/legal/privacy-policy'>Privacy policy</a> for the legal detail.
+            See our <Link to='/contact'>Contact us</Link> page for how to reach us, and our{' '}
+            <Link to='/legal/risk-disclosure'>Risk disclosure</Link>,{' '}
+            <Link to='/legal/terms'>Terms &amp; conditions</Link>, and{' '}
+            <Link to='/legal/privacy-policy'>Privacy policy</Link> for the legal detail.
         </p>
     </InfoPageLayout>
 );
