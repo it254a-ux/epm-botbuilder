@@ -17,6 +17,7 @@ import { CONNECTION_STATUS } from '@/external/bot-skeleton/services/api/observab
 import { isDbotRTL } from '@/external/bot-skeleton/utils/workspace';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
+import { prefetchInfoPagesWhenIdle } from '@/utils/prefetch-info-pages';
 import { prefetchAllTabsWhenIdle } from '@/utils/prefetch-tabs';
 import { fetchAndCacheBots } from '@/utils/freebots-cache';
 import {
@@ -219,6 +220,9 @@ const AppWrapper = observer(() => {
     React.useEffect(() => {
         if (chart_store.is_chart_loading || charts_preload_timed_out) {
             prefetchAllTabsWhenIdle();
+            // About/Contact/Legal pages aren't DBOT_TABS tabs, so they're not
+            // part of that call — same idle-timing rationale though.
+            prefetchInfoPagesWhenIdle();
         }
     }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 

@@ -1,11 +1,11 @@
 // Shared chrome for the standalone info/legal pages (About, Contact, Risk
-// Disclosure, Terms, Privacy). These are plain routes (see App.tsx), not
-// DBOT_TABS tabs -- there's no trading dashboard state to preserve, so they
-// render outside the app's tab/Layout system entirely, with just enough of
-// their own header/footer to feel like part of the same product.
+// Disclosure, Terms, Privacy). These are plain routes (see App.tsx) nested
+// inside the same Layout/AppHeader as every other page (Dashboard, Bot
+// Builder, Chart, ...) -- so the real nav bar, account switcher, etc. all
+// render above this automatically. This component is just the page body:
+// title, content, and a small footer cross-linking the other four.
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AppLogo } from '@/components/layout/app-logo';
 import './info-page-layout.scss';
 
 const FOOTER_LINKS: { to: string; label: string }[] = [
@@ -25,13 +25,6 @@ type TInfoPageLayout = {
 const InfoPageLayout = ({ title, updated, children }: TInfoPageLayout) => {
     return (
         <div className='info-page'>
-            <header className='info-page__header'>
-                <AppLogo />
-                <Link className='info-page__back' to='/'>
-                    &larr; Back to app
-                </Link>
-            </header>
-
             <main className='info-page__content'>
                 <h1>{title}</h1>
                 {updated && <p className='info-page__updated'>Last updated: {updated}</p>}

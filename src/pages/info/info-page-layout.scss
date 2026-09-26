@@ -1,27 +1,15 @@
+// Rendered inside Layout's <Body> (.main-body: flex-grow: 1; overflow:
+// hidden -- see components/layout/main-body/main-body.scss), not a bare
+// full-viewport page, so this needs its own height + scroll rather than
+// min-height: 100vh (which would just get clipped by that overflow: hidden
+// once the header above it takes its own real space).
 .info-page {
-    min-height: 100vh;
+    height: 100%;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     background: var(--general-main-1);
     color: var(--text-general);
-
-    &__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.6rem 2.4rem;
-        border-bottom: 1px solid var(--general-section-1);
-    }
-
-    &__back {
-        color: var(--text-less-prominent);
-        font-size: 1.4rem;
-        text-decoration: none;
-
-        &:hover {
-            color: var(--text-general);
-        }
-    }
 
     &__content {
         flex: 1;
