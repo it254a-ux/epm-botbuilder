@@ -8,9 +8,20 @@
     // containing block instead, collapsing the drawer to the header's height
     // and clipping its content to just the header row. Force both back to
     // the viewport.
+    //
+    // z-index: neither element had an explicit one of its own — whatever
+    // the library ships by default. header.scss gives the mobile tab row
+    // z-index: 2 (a separate fix, for it not to be covered by Bot Builder's
+    // own content), and that turned out to be higher than this drawer's
+    // effective stacking, so opening the drawer showed it rendering BEHIND
+    // that row instead of covering the whole screen like a drawer should.
+    // Matches modal_root's z-index (app.scss) — the app's other full-screen
+    // overlay — so this and any other overlay stay above ordinary page
+    // content consistently, not just above this one specific row.
     .deriv-drawer__container,
     .deriv-drawer__overlay {
         position: fixed;
+        z-index: 9998;
     }
 
     &__toggle {
