@@ -36,23 +36,33 @@
     .deriv-wrapper__left {
         flex: 1 1 auto;
         min-width: 0;
+        // @deriv-com/ui's Wrapper ships its own default gap between
+        // children, sized for its typical 1-2 items. This left column now
+        // holds three on mobile (MobileMenu, ChangeTheme, AppLogo) since a
+        // separate commit moved the theme toggle here — with the library's
+        // wider default gap, three items read as spread out/"displaced"
+        // rather than sitting together as one compact icon group. Pinned
+        // to a small explicit value so it stays tight regardless of the
+        // library's own default.
+        gap: 0.4rem;
     }
 
     .deriv-wrapper__right {
         flex: 0 0 auto;
     }
 
-    // Mobile-only: the theme toggle sits directly in the right Wrapper here
-    // (desktop has it inside MenuItems' own utility-icons cluster instead,
-    // which already sizes it), so give it matching padding/spacing here too.
+    // Mobile-only: the theme toggle sits in the LEFT Wrapper here, right
+    // after the hamburger menu icon and before the logo (moved there in a
+    // separate commit — desktop keeps its own copy inside MenuItems'
+    // utility-icons cluster, sized separately, untouched by this rule).
+    // Tight, symmetric padding so it reads as part of one compact icon
+    // group with the hamburger icon next to it, not a separately-spaced
+    // element — the .deriv-wrapper__left gap above already provides the
+    // spacing between it and its neighbors, so this only needs to size the
+    // icon's own tap target, not add extra margin on top of that gap.
     &--mobile {
         .app-footer__icon {
             padding: 6px;
-            margin-inline-end: 0.4rem;
-        }
-
-        .app-footer__icon--theme {
-            margin-inline-start: -0.3rem;
         }
     }
 
