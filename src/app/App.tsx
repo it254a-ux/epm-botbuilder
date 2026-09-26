@@ -17,6 +17,11 @@ import './app-root.scss';
 const Layout = lazy(() => import('../components/layout'));
 const AppRoot = lazy(() => import('./app-root'));
 const DtraderPage = lazy(() => import('../pages/dtrader'));
+const AboutPage = lazy(() => import('../pages/info/about'));
+const ContactPage = lazy(() => import('../pages/info/contact'));
+const RiskDisclosurePage = lazy(() => import('../pages/info/risk-disclosure'));
+const TermsPage = lazy(() => import('../pages/info/terms'));
+const PrivacyPolicyPage = lazy(() => import('../pages/info/privacy-policy'));
 
 /**
  * Component wrapper to handle language URL parameter
@@ -61,6 +66,17 @@ const router = createBrowserRouter(
             <Route path='preview' element={<AppRoot />} />
             {/* Ported Rise/Fall trading page (formerly its own repo) */}
             <Route path='dtrader' element={<DtraderPage />} />
+            {/* Standalone info/legal pages — see src/pages/info/. Nested
+                here (not siblings of '/') so they render inside the same
+                Layout/AppHeader as every other page -- same nav bar,
+                same account context, rather than a bare, unfamiliar-
+                looking page. The only cost is the same WS/store setup
+                every other route here already pays. */}
+            <Route path='about' element={<AboutPage />} />
+            <Route path='contact' element={<ContactPage />} />
+            <Route path='legal/risk-disclosure' element={<RiskDisclosurePage />} />
+            <Route path='legal/terms' element={<TermsPage />} />
+            <Route path='legal/privacy-policy' element={<PrivacyPolicyPage />} />
         </Route>
     ),
     { basename: routerBasename }

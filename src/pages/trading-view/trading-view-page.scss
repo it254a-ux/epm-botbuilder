@@ -2,8 +2,9 @@
 // inherited through CSS — see the comment there. Percentage/absolute
 // approaches both collapsed to zero because the parent grid cell
 // (.dc-tabs__content) has no resolved height for an iframe-only page.
+// Width is also set inline now, reserving space for the Run Panel drawer
+// when it's open (desktop only) — see DESKTOP_DRAWER_OPEN_WIDTH there.
 .trading-view-page {
-    width: 100%;
     min-height: 300px;
     overflow: hidden;
 
