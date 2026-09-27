@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EPM Analysis Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#334155; --border:#334155;
+    --text:#f8fafc; --sub:#94a3b8; --accent:#3B82F6; --accent2:#f59e0b;
+    --red:#ef4444; --green:#10b981; --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:24px; line-height:1.5;
+  }
+  h1{font-size:20px; margin:0 0 4px 0; letter-spacing:.2px;}
+  .sub{color:var(--sub); font-size:13px; margin-bottom:20px;}
+  .grid{display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:16px 18px;
+  }
+  .panel + .panel{margin-top:18px;}
+  .panel h2{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--sub); margin:0 0 14px 0; font-weight:600;}
+  label{display:block; font-size:12px; color:var(--sub); margin:12px 0 5px;}
+  select, input, button{
+    width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:9px 10px; border-radius:7px; font-size:14px; font-family:inherit;
+  }
+  select:focus, input:focus{outline:1px solid var(--accent);}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  button{cursor:pointer; font-weight:600; transition:.15s;}
+  button:hover{filter:brightness(1.15);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  .btn-primary{background:var(--accent); border-color:var(--accent); color:#ffffff;}
+  .btn-danger{background:var(--red); border-color:var(--red); color:#ffffff;}
+  .status{
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--sub); margin-top:12px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--sub);}
+  .dot.live{background:var(--green); box-shadow:0 0 6px var(--green);}
+  .dot.off{background:var(--red);}
+  .tabs{display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border);}
+  .tab{
+    padding:9px 14px; font-size:13px; color:var(--sub); cursor:pointer; border-bottom:2px solid transparent;
+    user-select:none;
+  }
+  .tab.active{color:var(--text); border-bottom-color:var(--accent);}
+  .view{display:none;}
+  .view.active{display:block;}
+  .statgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px;}
+  .stat{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:12px;}
+  .stat .n{font-size:22px; font-weight:700; font-family:var(--mono);}
+  .stat .l{font-size:11px; color:var(--sub); margin-top:2px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th, td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border);}
+  th{color:var(--sub); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.4px;}
+  td.num{font-family:var(--mono); text-align:right;}
+  .bar-cell{position:relative; min-width:110px;}
+  .bar-bg{background:var(--panel2); border-radius:4px; height:8px; overflow:hidden;}
+  .bar-fill{height:100%; background:var(--accent); border-radius:4px;}
+  .ticklog{
+    font-family:var(--mono); font-size:13px; display:flex; flex-wrap:wrap; gap:5px;
+    max-height:120px; overflow-y:auto; padding:4px 0;
+  }
+  .digit{
+    width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+    border-radius:5px; background:var(--panel2); border:1px solid var(--border); font-size:12px;
+  }
+  .digit.low{background:rgba(229,83,75,.18); border-color:var(--red); color:#ff8983;}
+  .note{font-size:12px; color:var(--sub); background:var(--panel2); border-left:3px solid var(--accent2); padding:10px 12px; border-radius:0 6px 6px 0; margin-top:14px;}
+  .note b{color:var(--text);}
+  .warn{border-left-color:var(--red);}
+  .disclaim{
+    background:rgba(229,83,75,.08); border:1px solid rgba(229,83,75,.35); border-radius:8px;
+    padding:12px 14px; font-size:12.5px; color:#f0b8b4; margin-bottom:18px;
+  }
+  canvas{max-width:100%;}
+  .contract-card{
+    background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px;
+  }
+  .contract-card h3{margin:0 0 4px 0; font-size:14px;}
+  .contract-card p{margin:0; font-size:12.5px; color:var(--sub);}
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<h1 style="display:flex; align-items:center; gap:8px;">
+  EPM Analysis Tool
+  <span style="position:relative; display:inline-block;" class="info-wrap">
+    <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; border:1px solid var(--sub); color:var(--sub); font-size:11px; cursor:default; user-select:none;">i</span>
+    <span class="info-tooltip" style="
+      display:none; position:absolute; top:22px; left:0; width:260px; z-index:10;
+      background:var(--panel2); border:1px solid var(--border); border-radius:6px;
+      padding:10px 12px; font-size:11.5px; font-weight:400; color:var(--sub); line-height:1.5;
+      box-shadow:0 4px 12px rgba(0,0,0,.4);
+    ">Figures are observed and backtested, not forecasts.</span>
+  </span>
+</h1>
+<div class="sub">Live statistical analysis and strategy backtesting for synthetic index tick data.</div>
+<style>
+  .info-wrap:hover .info-tooltip{ display:block !important; }
+</style>
+
+<div class="grid">
+  <!-- LEFT: Controls -->
+  <div>
+    <div class="panel">
+      <h2>Connection</h2>
+      <label>Volatility Index</label>
+      <select id="symbolSelect">
+        <optgroup label="1s indices">
+          <option value="1HZ10V">Volatility 10 (1s)</option>
+          <option value="1HZ25V">Volatility 25 (1s)</option>
+          <option value="1HZ50V">Volatility 50 (1s)</option>
+          <option value="1HZ75V" selected>Volatility 75 (1s)</option>
+          <option value="1HZ100V">Volatility 100 (1s)</option>
+        </optgroup>
+        <optgroup label="Standard indices">
+          <option value="R_10">Volatility 10</option>
+          <option value="R_25">Volatility 25</option>
+          <option value="R_50">Volatility 50</option>
+          <option value="R_75">Volatility 75</option>
+          <option value="R_100">Volatility 100</option>
+        </optgroup>
+        <optgroup label="Jump indices">
+          <option value="JD10">Jump 10</option>
+          <option value="JD25">Jump 25</option>
+          <option value="JD50">Jump 50</option>
+          <option value="JD75">Jump 75</option>
+          <option value="JD100">Jump 100</option>
+        </optgroup>
+      </select>
+      <button class="btn-primary" id="connectBtn" style="margin-top:12px;">Connect &amp; Start Tracking</button>
+      <button class="btn-danger" id="disconnectBtn" style="margin-top:8px; display:none;">Disconnect</button>
+      <div class="status"><div class="dot" id="statusDot"></div><span id="statusText">Not connected</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>Contract Type Reference</h2>
+      <div class="contract-card">
+        <h3>Rise/Fall</h3>
+        <p>Simplest binary — payout if the price is higher/lower than entry at expiry. No streak-based edge; each contract is a fresh coin flip on direction.</p>
+      </div>
+      <div class="contract-card">
+        <h3>Call/Put (Vanillas), Turbos</h3>
+        <p>Fixed payout if price is above/below a strike at expiry. Strike distance changes your odds and payout, not the underlying randomness.</p>
+      </div>
+      <div class="contract-card">
+        <h3>Multipliers</h3>
+        <p>Leveraged directional exposure. Stop-out risk scales with leverage — most exposed to a single bad streak.</p>
+      </div>
+      <div class="contract-card">
+        <h3>Accumulators</h3>
+        <p>Payout grows each tick the price stays inside a range; wipes out on exit. Effectively a "how long will this streak of calm continue" bet.</p>
+      </div>
+      <div class="note">This is a reference, not a recommendation engine — no contract type is "correct" for a given streak, they just express different bets on the same random ticks.</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Views -->
+  <div>
+    <div class="tabs">
+      <div class="tab active" data-view="live">Live Tracker</div>
+      <div class="tab" data-view="backtest">Martingale Backtester</div>
+    </div>
+
+    <!-- LIVE VIEW -->
+    <div class="view active" id="view-live">
+      <div class="panel">
+        <h2>Session Stats <span id="liveSymbolLabel" style="color:var(--sub); font-weight:400; text-transform:none;"></span></h2>
+        <div class="statgrid">
+          <div class="stat"><div class="n" id="tickCount">0</div><div class="l">ticks observed</div></div>
+          <div class="stat"><div class="n" id="lastDigit">–</div><div class="l">last digit</div></div>
+          <div class="stat"><div class="n" id="streakUnder2">0</div><div class="l">ticks since digit &lt; 2</div></div>
+          <div class="stat"><div class="n" id="longestStreakUnder2">0</div><div class="l">longest such streak (session)</div></div>
+        </div>
+
+        <h2>Under-N Frequency (this session)</h2>
+        <table>
+          <thead><tr><th>Threshold</th><th>Digits that qualify</th><th>Observed frequency</th><th>Theoretical (fair RNG)</th><th>Current streak w/o hit</th></tr></thead>
+          <tbody id="thresholdTable"></tbody>
+        </table>
+
+        <h2 style="margin-top:18px;">Over-N Frequency (this session)</h2>
+        <table>
+          <thead><tr><th>Threshold</th><th>Digits that qualify</th><th>Observed frequency</th><th>Theoretical (fair RNG)</th><th>Current streak w/o hit</th></tr></thead>
+          <tbody id="overThresholdTable"></tbody>
+        </table>
+
+        <h2 style="margin-top:18px;">Last-Digit Distribution</h2>
+        <canvas id="digitChart" height="90"></canvas>
+
+        <h2 style="margin-top:18px;">Recent Ticks (last digit)</h2>
+        <div class="ticklog" id="tickLog"></div>
+
+        <div class="note">
+          Frequencies converge toward theoretical values as sample size grows. Early in a session, expect visible
+          deviation — that's sampling noise, not a market condition. Reload / reconnect resets the session.
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKTEST VIEW -->
+    <div class="view" id="view-backtest">
+      <div class="panel">
+        <h2>Backtest Setup</h2>
+        <div class="row">
+          <div>
+            <label>History size (ticks)</label>
+            <select id="btCount">
+              <option value="1000">1,000</option>
+              <option value="3000" selected>3,000</option>
+              <option value="5000">5,000 (max)</option>
+            </select>
+          </div>
+          <div>
+            <label>Direction</label>
+            <select id="btDirection">
+              <option value="under" selected>Under</option>
+              <option value="over">Over</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Threshold</label>
+            <select id="btThreshold">
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+            </select>
+          </div>
+          <div>
+            <label>Enter after streak length ≥</label>
+            <input type="number" id="btStreak" value="8" min="1" max="50">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Base stake</label>
+            <input type="number" id="btStake" value="1" min="0.1" step="0.1">
+          </div>
+          <div></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Martingale multiplier on loss</label>
+            <input type="number" id="btMult" value="2" min="1" step="0.1">
+          </div>
+          <div>
+            <label>Max martingale steps before reset</label>
+            <input type="number" id="btMaxSteps" value="6" min="1" max="15">
+          </div>
+        </div>
+        <label>Payout multiplier on win (net stake return — check your broker's actual quoted payout for this threshold, they vary)</label>
+        <input type="number" id="btPayout" value="4.9" min="1" step="0.01">
+        <div class="note">Narrower bands (under 2/3, over 6/7) pay more per win because they hit less often — that's
+          why one win can offset several losses. It is a reshaping of variance, not extra edge: plug your broker's
+          real payout number in above and the backtest will show you the true breakeven point for that specific
+          multiplier against the real hit-rate.</div>
+        <button class="btn-primary" id="runBacktest" style="margin-top:14px;">Fetch History &amp; Run Backtest</button>
+        <div class="status"><div class="dot" id="btStatusDot"></div><span id="btStatusText">Idle</span></div>
+      </div>
+
+      <div class="panel" id="btResults" style="display:none;">
+        <h2>Result — Equity Curve</h2>
+        <canvas id="equityChart" height="110"></canvas>
+        <div class="statgrid" style="margin-top:16px;">
+          <div class="stat"><div class="n" id="btTrades">–</div><div class="l">strategy triggers</div></div>
+          <div class="stat"><div class="n" id="btWinRate">–</div><div class="l">per-trigger win rate</div></div>
+          <div class="stat"><div class="n" id="btMaxDD">–</div><div class="l">max drawdown (stake units)</div></div>
+          <div class="stat"><div class="n" id="btLongestLoss">–</div><div class="l">longest losing run within a trigger</div></div>
+          <div class="stat"><div class="n" id="btRuins">–</div><div class="l">times max steps exceeded (ruin events)</div></div>
+          <div class="stat"><div class="n" id="btFinalPnl">–</div><div class="l">net P/L (stake units)</div></div>
+        </div>
+        <div class="note" id="btVerdict"></div>
+
+        <h2 style="margin-top:18px;">Trigger Occurrences</h2>
+        <div class="note" style="margin-top:0; margin-bottom:10px;">
+          Every point in the history where your exact rule fired, in order, with the outcome that followed.
+          This is the raw sample the summary stats above are computed from.
+        </div>
+        <div style="max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
+          <table style="margin:0;">
+            <thead style="position:sticky; top:0; background:var(--panel2);">
+              <tr><th>#</th><th>Tick index</th><th>Streak at trigger</th><th>Outcome</th><th>Digit hit</th><th>Stake</th><th>Result</th><th>Equity after</th></tr>
+            </thead>
+            <tbody id="triggerLog"></tbody>
+          </table>
+        </div>
+
+        <div class="note warn">
+          This replays your rule against <b>one historical sample</b> from one index. A good result here is not proof
+          of a real edge — re-run across different indices, different history windows, and larger streak thresholds
+          before trusting it. A single favorable backtest is exactly the kind of thing random noise produces some of
+          the time by chance.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089";
+let ws = null;
+let ticks = [];               // {price, digit, time}
+let streakUnder2 = 0;
+let longestStreakUnder2 = 0;
+let digitCounts = new Array(10).fill(0);
+let digitChart, equityChart;
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('view-' + t.dataset.view).classList.add('active');
+  });
+});
+
+// ---------- Helpers ----------
+function lastDigitOf(priceStr, pipSize) {
+  // priceStr as returned by Deriv already respects pip size; take last char of the numeric string minus decimal point
+  const clean = priceStr.replace('.', '');
+  return parseInt(clean[clean.length - 1], 10);
+}
+
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+
+// ---------- Live digit chart ----------
+function initDigitChart() {
+  const ctx = document.getElementById('digitChart');
+  digitChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['0','1','2','3','4','5','6','7','8','9'],
+      datasets: [{ label: 'Occurrences', data: new Array(10).fill(0), backgroundColor: '#3fb8af' }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' } },
+        y: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderThresholdTable() {
+  const tbody = document.getElementById('thresholdTable');
+  tbody.innerHTML = '';
+  const total = ticks.length || 1;
+  for (let n = 2; n <= 7; n++) {
+    const qualifying = n; // digits 0..n-1
+    const hits = ticks.filter(t => t.digit < n).length;
+    const freq = hits / total;
+    const theo = n / 10;
+    // current streak without a hit under n
+    let streak = 0;
+    for (let i = ticks.length - 1; i >= 0; i--) {
+      if (ticks[i].digit < n) break;
+      streak++;
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>Under ${n}</td>
+      <td class="num">0–${n-1}</td>
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(freq*100,100)}%"></div></div>
+        <div style="font-family:var(--mono); font-size:12px; margin-top:3px;">${fmtPct(freq)}</div>
+      </td>
+      <td class="num">${fmtPct(theo)}</td>
+      <td class="num">${streak}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderOverThresholdTable() {
+  const tbody = document.getElementById('overThresholdTable');
+  tbody.innerHTML = '';
+  const total = ticks.length || 1;
+  for (let n = 2; n <= 7; n++) {
+    const qualifyingCount = 9 - n; // digits n+1..9
+    const hits = ticks.filter(t => t.digit > n).length;
+    const freq = hits / total;
+    const theo = qualifyingCount / 10;
+    let streak = 0;
+    for (let i = ticks.length - 1; i >= 0; i--) {
+      if (ticks[i].digit > n) break;
+      streak++;
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>Over ${n}</td>
+      <td class="num">${n+1}–9</td>
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(freq*100,100)}%; background:var(--accent2);"></div></div>
+        <div style="font-family:var(--mono); font-size:12px; margin-top:3px;">${fmtPct(freq)}</div>
+      </td>
+      <td class="num">${fmtPct(theo)}</td>
+      <td class="num">${streak}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderTickLog() {
+  const el = document.getElementById('tickLog');
+  const recent = ticks.slice(-60);
+  el.innerHTML = recent.map(t =>
+    `<div class="digit ${t.digit < 2 ? 'low' : ''}">${t.digit}</div>`
+  ).join('');
+  el.scrollLeft = el.scrollWidth;
+}
+
+function onNewTick(digit) {
+  digitCounts[digit]++;
+  if (digit < 2) {
+    if (streakUnder2 > longestStreakUnder2) longestStreakUnder2 = streakUnder2;
+    streakUnder2 = 0;
+  } else {
+    streakUnder2++;
+  }
+  document.getElementById('tickCount').textContent = ticks.length;
+  document.getElementById('lastDigit').textContent = digit;
+  document.getElementById('streakUnder2').textContent = streakUnder2;
+  document.getElementById('longestStreakUnder2').textContent = Math.max(longestStreakUnder2, streakUnder2);
+  digitChart.data.datasets[0].data = digitCounts;
+  digitChart.update('none');
+  renderThresholdTable();
+  renderOverThresholdTable();
+  renderTickLog();
+}
+
+// ---------- WebSocket: live ----------
+document.getElementById('connectBtn').addEventListener('click', () => {
+  const symbol = document.getElementById('symbolSelect').value;
+  ticks = []; streakUnder2 = 0; longestStreakUnder2 = 0; digitCounts = new Array(10).fill(0);
+  if (!digitChart) initDigitChart();
+  digitChart.data.datasets[0].data = digitCounts; digitChart.update();
+  document.getElementById('tickLog').innerHTML = '';
+  renderThresholdTable();
+  renderOverThresholdTable();
+
+  ws = new WebSocket(WS_URL);
+  document.getElementById('statusDot').className = 'dot';
+  document.getElementById('statusText').textContent = 'Connecting…';
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
+    document.getElementById('statusDot').className = 'dot live';
+    document.getElementById('statusText').textContent = 'Live — ' + symbol;
+    document.getElementById('liveSymbolLabel').textContent = '· ' + symbol;
+    document.getElementById('connectBtn').style.display = 'none';
+    document.getElementById('disconnectBtn').style.display = 'block';
+  };
+
+  ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if (data.msg_type === 'tick' && data.tick) {
+      const priceStr = String(data.tick.quote);
+      const digit = lastDigitOf(priceStr);
+      ticks.push({ price: data.tick.quote, digit, time: data.tick.epoch });
+      onNewTick(digit);
+    } else if (data.error) {
+      document.getElementById('statusText').textContent = 'Error: ' + data.error.message;
+      document.getElementById('statusDot').className = 'dot off';
+    }
+  };
+
+  ws.onerror = () => {
+    document.getElementById('statusDot').className = 'dot off';
+    document.getElementById('statusText').textContent = 'Connection error — check network/ad-blockers and retry.';
+  };
+
+  ws.onclose = () => {
+    document.getElementById('statusDot').className = 'dot off';
+    document.getElementById('statusText').textContent = 'Disconnected';
+    document.getElementById('connectBtn').style.display = 'block';
+    document.getElementById('disconnectBtn').style.display = 'none';
+  };
+});
+
+document.getElementById('disconnectBtn').addEventListener('click', () => {
+  if (ws) ws.close();
+});
+
+// ---------- Backtest ----------
+document.getElementById('runBacktest').addEventListener('click', () => {
+  const symbol = document.getElementById('symbolSelect').value;
+  const count = parseInt(document.getElementById('btCount').value, 10);
+  const btStatusDot = document.getElementById('btStatusDot');
+  const btStatusText = document.getElementById('btStatusText');
+  btStatusDot.className = 'dot';
+  btStatusText.textContent = 'Fetching ' + count + ' historical ticks for ' + symbol + '…';
+  document.getElementById('runBacktest').disabled = true;
+
+  const btWs = new WebSocket(WS_URL);
+  btWs.onopen = () => {
+    btWs.send(JSON.stringify({
+      ticks_history: symbol,
+      count: count,
+      end: 'latest',
+      style: 'ticks'
+    }));
+  };
+  btWs.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if (data.error) {
+      btStatusDot.className = 'dot off';
+      btStatusText.textContent = 'Error: ' + data.error.message;
+      document.getElementById('runBacktest').disabled = false;
+      return;
+    }
+    if (data.msg_type === 'history' && data.history) {
+      const prices = data.history.prices;
+      const digits = prices.map(p => {
+        const clean = String(p).replace('.', '');
+        return parseInt(clean[clean.length - 1], 10);
+      });
+      btStatusDot.className = 'dot live';
+      btStatusText.textContent = 'Fetched ' + digits.length + ' ticks. Running backtest…';
+      runBacktestOnDigits(digits);
+      btStatusText.textContent = 'Done — ' + digits.length + ' ticks analyzed for ' + symbol;
+      document.getElementById('runBacktest').disabled = false;
+      btWs.close();
+    }
+  };
+  btWs.onerror = () => {
+    btStatusDot.className = 'dot off';
+    btStatusText.textContent = 'Connection error — check network/ad-blockers and retry.';
+    document.getElementById('runBacktest').disabled = false;
+  };
+});
+
+function runBacktestOnDigits(digits) {
+  const direction = document.getElementById('btDirection').value; // 'under' | 'over'
+  const threshold = parseInt(document.getElementById('btThreshold').value, 10);
+  const streakTrigger = parseInt(document.getElementById('btStreak').value, 10);
+  const qualifies = (d) => direction === 'under' ? d < threshold : d > threshold;
+  const baseStake = parseFloat(document.getElementById('btStake').value);
+  const mult = parseFloat(document.getElementById('btMult').value);
+  const maxSteps = parseInt(document.getElementById('btMaxSteps').value, 10);
+  const payoutMult = parseFloat(document.getElementById('btPayout').value);
+
+  let equity = 0;
+  const equityCurve = [0];
+  let streak = 0;
+  let inSequence = false;
+  let step = 0;
+  let stake = baseStake;
+  let triggers = 0;
+  let wins = 0;
+  let ruins = 0;
+  let longestLossRunInTrigger = 0;
+  let curLossRun = 0;
+  let peak = 0;
+  let maxDD = 0;
+  const triggerLog = [];
+  let curTriggerStartIndex = 0;
+  let curTriggerStartStreak = 0;
+
+  for (let i = 0; i < digits.length; i++) {
+    const d = digits[i];
+
+    if (!inSequence) {
+      if (qualifies(d)) { streak = 0; }
+      else { streak++; }
+      if (streak >= streakTrigger) {
+        inSequence = true;
+        step = 0;
+        stake = baseStake;
+        triggers++;
+        curLossRun = 0;
+        curTriggerStartIndex = i;
+        curTriggerStartStreak = streak;
+      }
+      continue;
+    }
+
+    // in a trade sequence: this tick is the "entry" outcome
+    const win = qualifies(d);
+    if (win) {
+      equity += stake * (payoutMult - 1);
+      wins++;
+      inSequence = false;
+      streak = 0;
+      curLossRun = 0;
+      triggerLog.push({
+        n: triggers, tickIndex: curTriggerStartIndex, streak: curTriggerStartStreak,
+        outcome: 'WIN', digit: d, stake: stake.toFixed(2),
+        result: '+' + (stake * (payoutMult - 1)).toFixed(2), equity: equity.toFixed(2)
+      });
+    } else {
+      equity -= stake;
+      curLossRun++;
+      if (curLossRun > longestLossRunInTrigger) longestLossRunInTrigger = curLossRun;
+      step++;
+      if (step >= maxSteps) {
+        ruins++;
+        inSequence = false;
+        streak = 0;
+        curLossRun = 0;
+        triggerLog.push({
+          n: triggers, tickIndex: curTriggerStartIndex, streak: curTriggerStartStreak,
+          outcome: 'RUIN (max steps hit)', digit: d, stake: stake.toFixed(2),
+          result: '-' + stake.toFixed(2), equity: equity.toFixed(2)
+        });
+      } else {
+        stake = stake * mult; // martingale up, stay in sequence, next tick is next attempt
+      }
+    }
+
+    equityCurve.push(equity);
+    if (equity > peak) peak = equity;
+    const dd = peak - equity;
+    if (dd > maxDD) maxDD = dd;
+  }
+
+  // Render
+  document.getElementById('btResults').style.display = 'block';
+  document.getElementById('btTrades').textContent = triggers;
+  document.getElementById('btWinRate').textContent = triggers ? fmtPct(wins / triggers) : '–';
+  document.getElementById('btMaxDD').textContent = maxDD.toFixed(2);
+  document.getElementById('btLongestLoss').textContent = longestLossRunInTrigger;
+  document.getElementById('btRuins').textContent = ruins;
+  document.getElementById('btFinalPnl').textContent = (equity >= 0 ? '+' : '') + equity.toFixed(2);
+
+  const triggerLogBody = document.getElementById('triggerLog');
+  triggerLogBody.innerHTML = triggerLog.map(row => `
+    <tr>
+      <td class="num">${row.n}</td>
+      <td class="num">${row.tickIndex}</td>
+      <td class="num">${row.streak}</td>
+      <td style="color:${row.outcome === 'WIN' ? 'var(--green)' : 'var(--red)'}">${row.outcome}</td>
+      <td class="num">${row.digit}</td>
+      <td class="num">${row.stake}</td>
+      <td class="num" style="color:${row.result.startsWith('+') ? 'var(--green)' : 'var(--red)'}">${row.result}</td>
+      <td class="num">${row.equity}</td>
+    </tr>
+  `).join('');
+
+  const verdict = document.getElementById('btVerdict');
+  if (ruins > 0) {
+    verdict.innerHTML = `<b>${ruins} time(s)</b> the losing streak exceeded your max martingale steps within this
+      sample — meaning your staking plan would have hit its ceiling and stopped compounding stakes (in real trading,
+      this is where a bankroll gets wiped or you're forced to walk away at the worst point). A per-trigger win rate
+      alone would not have shown you this.`;
+  } else {
+    verdict.innerHTML = `No ruin event occurred in this specific sample of ${digits.length} ticks. That does not
+      mean the strategy is safe — it means the longest losing streak in this window stayed within your configured
+      max steps. Re-run with more history and a larger max-steps ceiling to see how close you actually came, and
+      remember: the losing streak that breaks a martingale strategy can arrive on tick 5,001, not tick 3,000.`;
+  }
+
+  if (equityChart) equityChart.destroy();
+  const ctx = document.getElementById('equityChart');
+  equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: equityCurve.map((_, i) => i),
+      datasets: [{
+        label: 'Equity (stake units)',
+        data: equityCurve,
+        borderColor: '#3fb8af',
+        backgroundColor: 'rgba(63,184,175,0.08)',
+        fill: true,
+        pointRadius: 0,
+        borderWidth: 1.5,
+        tension: 0.05
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5', maxTicksLimit: 10 } },
+        y: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' } }
+      }
+    }
+  });
+}
+
+// init
+initDigitChart();
+renderThresholdTable();
+</script>
+</body>
+</html>

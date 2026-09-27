@@ -52,6 +52,11 @@ const PRIMARY_NAV_ITEMS = [
         label: <Localize i18n_default_text='Trading Bots' />,
     },
     {
+        tab: DBOT_TABS.EPM_ANALYSIS_TOOL,
+        icon: <span className='app-header__menu-item-emoji'>📊</span>,
+        label: <Localize i18n_default_text='Analysis Tool' />,
+    },
+    {
         tab: DBOT_TABS.CHART,
         icon: <LabelPairedChartLineCaptionRegularIcon height='16px' width='16px' fill='currentColor' />,
         label: <Localize i18n_default_text='Charts' />,
