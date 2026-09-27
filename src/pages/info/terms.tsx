@@ -38,7 +38,16 @@ const TermsPage = () => (
             <p>
                 All deposits, withdrawals, balances, and trade execution are handled directly by Deriv on
                 your Deriv account. We never see or store your Deriv account password; authentication
-                happens through Deriv&apos;s own OAuth login flow.
+                happens through Deriv&apos;s own OAuth login flow, so your credentials pass straight to
+                Deriv and never through our servers.
+            </p>
+            <p>
+                The software only ever sends trade instructions &mdash; built by you, or by a bot you
+                configured &mdash; to Deriv&apos;s API using a session token Deriv issues after you log in.
+                It cannot move funds between accounts, change your withdrawal details, or access your
+                Deriv wallet outside of placing the trades you&apos;ve set up. If you ever revoke access
+                from your Deriv account settings, the software immediately loses the ability to place any
+                further trades on your behalf.
             </p>
         </section>
 

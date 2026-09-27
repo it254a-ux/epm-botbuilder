@@ -66,6 +66,15 @@
     // Each topical block, as its own card in the grid above. A faint tint of
     // the page's own accent (not a solid color) plus a lift on hover, so the
     // grid feels considered rather than a mechanical, identical repeat.
+    //
+    // Deliberately NOT height: 100% -- with grid-auto-flow: dense, a card
+    // shares its implicit row with whichever other card(s) land next to it,
+    // and a row's height is set by the tallest card in it. height: 100%
+    // used to force every card to stretch to match that tallest neighbor,
+    // which is exactly what turned a short card (e.g. "We do not hold your
+    // funds") into a mostly-empty box. Sizing to content (default) means a
+    // short card is just short -- any leftover space is page background in
+    // the gap below it, not a card visibly padded with nothing in it.
     &__section {
         position: relative;
         overflow: hidden;
@@ -73,7 +82,13 @@
         border: 1px solid color-mix(in srgb, var(--info-accent) 12%, var(--general-section-1));
         border-radius: 1.2rem;
         padding: 2.8rem;
-        height: 100%;
+        // Cap + internal scroll for the rare card whose content runs long,
+        // so one verbose section can't stretch the whole grid row (and every
+        // shorter neighbor in it) to match it.
+        max-height: 46rem;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(in srgb, var(--info-accent) 40%, transparent) transparent;
         transition:
             transform 0.2s ease,
             box-shadow 0.2s ease;
@@ -81,6 +96,15 @@
         &:hover {
             transform: translateY(-0.2rem);
             box-shadow: 0 0.8rem 2.4rem color-mix(in srgb, var(--info-accent) 10%, transparent);
+        }
+
+        &::-webkit-scrollbar {
+            width: 0.6rem;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--info-accent) 40%, transparent);
+            border-radius: 999px;
         }
 
         // One section per page is marked --featured (see each page's .tsx)
@@ -117,6 +141,10 @@
         margin-bottom: 0.8rem;
     }
 
+    // A fixed brand blue (not the per-page --info-accent) so every page's
+    // headings read as one consistent, premium identity, while --info-accent
+    // keeps doing its job on the smaller per-page details (numerals, the
+    // signature mark, callouts, links).
     h1 {
         font-family: Georgia, 'Times New Roman', Times, serif;
         font-size: 4rem;
@@ -125,14 +153,16 @@
         line-height: 1.15;
         margin-bottom: 0.6rem;
         max-width: 56rem;
+        color: var(--brand-primary);
     }
 
     h2 {
         position: relative;
         counter-increment: info-section;
         font-size: 1.8rem;
-        font-weight: 700;
+        font-weight: 800;
         margin-bottom: 1.2rem;
+        color: var(--brand-primary);
     }
 
     p,
