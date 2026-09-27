@@ -65,9 +65,19 @@
         // A short mark above the eyebrow instead of a banner/hero block --
         // reads as a signature accent, not a decoration competing with the
         // content.
+        //
+        // grid-column: 1/-1 here isn't decorative -- it's load-bearing. A
+        // ::before generated on a grid CONTAINER becomes an actual grid item
+        // (per spec), and without an explicit column it auto-placed into
+        // column 1 alone. grid-auto-flow: dense then saw the empty columns
+        // next to it in that same row and packed the section cards straight
+        // into them -- which is exactly what was pushing the real eyebrow/
+        // h1/intro text down below the cards, and leaving that big blank
+        // area on the left next to the first row of cards.
         &::before {
             content: '';
             display: block;
+            grid-column: 1 / -1;
             width: 4.8rem;
             height: 0.4rem;
             border-radius: 0.2rem;
