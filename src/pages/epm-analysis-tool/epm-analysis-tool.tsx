@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import { Localize, localize } from '@deriv-com/translations';
 import { useEpmTickStats, fetchBacktestDigits, RECENT_TICKS_SHOWN } from './use-epm-tick-stats';
-import { buildUnderTable, buildOverTable } from './frequency-tables';
+import {
+    buildOverUnderRows,
+    buildOddEvenRows,
+    buildRiseFallRows,
+    computeAccumulatorReading,
+    type ContractType,
+} from './contract-analysis';
 import { runMartingaleBacktest, type BacktestResult } from './martingale-backtest';
 import './epm-analysis-tool.scss';
 
@@ -43,9 +49,17 @@ function fmtPct(n: number) {
     return `${n.toFixed(1)}%`;
 }
 
+const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: string }> = [
+    { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction vs the previous tick — theoretical baseline 50/50.' },
+    { type: 'odd_even', name: 'Odd/Even', description: "Last digit's parity — theoretical baseline 50/50." },
+    { type: 'over_under', name: 'Over/Under', description: 'Fixed at the 80/20 barriers: Over 1 and Under 8.' },
+    { type: 'accumulator', name: 'Accumulator', description: 'No digit split — reads current vs session volatility instead.' },
+];
+
 function EpmAnalysisTool() {
     const [symbol, setSymbol] = useState('1HZ75V');
     const [activeView, setActiveView] = useState<'live' | 'backtest'>('live');
+    const [contractType, setContractType] = useState<ContractType>('over_under');
 
     // Same DerivWS connection mechanism Dtrader already uses successfully
     // elsewhere in this app -- public/unauthenticated, no login required
@@ -54,8 +68,23 @@ function EpmAnalysisTool() {
     const { ws, isConnected } = useDerivWS();
     const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
 
-    const underRows = useMemo(() => buildUnderTable(ticks), [ticks]);
-    const overRows = useMemo(() => buildOverTable(ticks), [ticks]);
+    const contractRows = useMemo(() => {
+        switch (contractType) {
+            case 'over_under':
+                return buildOverUnderRows(ticks);
+            case 'odd_even':
+                return buildOddEvenRows(ticks);
+            case 'rise_fall':
+                return buildRiseFallRows(ticks);
+            default:
+                return null;
+        }
+    }, [ticks, contractType]);
+
+    const accumulatorReading = useMemo(
+        () => (contractType === 'accumulator' ? computeAccumulatorReading(ticks) : null),
+        [ticks, contractType]
+    );
 
     const { digitCounts, lastDigit, streakUnder2, longestStreakUnder2 } = useMemo(() => {
         const counts = new Array(10).fill(0);
@@ -170,36 +199,24 @@ function EpmAnalysisTool() {
 
                     <div className='epm-analysis-tool__panel'>
                         <h2 className='epm-analysis-tool__panel-title'>
-                            <Localize i18n_default_text='Contract Type Reference' />
+                            <Localize i18n_default_text='Contract Type' />
                         </h2>
                         <div className='epm-analysis-tool__contract-grid'>
-                            <div className='epm-analysis-tool__contract-card'>
-                                <h3>Rise/Fall</h3>
-                                <p>
-                                    <Localize i18n_default_text='Fresh coin flip on direction each contract — no streak-based edge.' />
-                                </p>
-                            </div>
-                            <div className='epm-analysis-tool__contract-card'>
-                                <h3>Call/Put (Vanillas), Turbos</h3>
-                                <p>
-                                    <Localize i18n_default_text="Strike distance changes odds/payout, not the underlying randomness." />
-                                </p>
-                            </div>
-                            <div className='epm-analysis-tool__contract-card'>
-                                <h3>Multipliers</h3>
-                                <p>
-                                    <Localize i18n_default_text='Leveraged exposure — most exposed to a single bad streak.' />
-                                </p>
-                            </div>
-                            <div className='epm-analysis-tool__contract-card'>
-                                <h3>Accumulators</h3>
-                                <p>
-                                    <Localize i18n_default_text='Grows while price stays in range; a "how long does calm last" bet.' />
-                                </p>
-                            </div>
+                            {CONTRACT_TYPES.map(c => (
+                                <div
+                                    key={c.type}
+                                    className={`epm-analysis-tool__contract-card ${
+                                        contractType === c.type ? 'epm-analysis-tool__contract-card--active' : ''
+                                    }`}
+                                    onClick={() => setContractType(c.type)}
+                                >
+                                    <h3>{c.name}</h3>
+                                    <p>{c.description}</p>
+                                </div>
+                            ))}
                         </div>
                         <div className='epm-analysis-tool__note'>
-                            <Localize i18n_default_text='Reference only, not a recommendation engine — no contract type is "correct" for a given streak.' />
+                            <Localize i18n_default_text='Choosing a type changes the result on the right to what that contract actually settles on — it does not make one type "better" for a given streak.' />
                         </div>
                     </div>
                 </div>
@@ -255,30 +272,34 @@ function EpmAnalysisTool() {
                                 </div>
                             </div>
 
-                            <div className='epm-analysis-tool__cols-2'>
-                                <div className='epm-analysis-tool__panel'>
-                                    <h2 className='epm-analysis-tool__panel-title'>
-                                        <Localize i18n_default_text='Under-N Frequency' />
-                                    </h2>
+                            <div className='epm-analysis-tool__panel'>
+                                <h2 className='epm-analysis-tool__panel-title'>
+                                    <Localize i18n_default_text='Contract Result' />{' '}
+                                    <span className='epm-analysis-tool__muted'>
+                                        · {CONTRACT_TYPES.find(c => c.type === contractType)?.name}
+                                    </span>
+                                </h2>
+
+                                {contractRows && (
                                     <table className='epm-analysis-tool__table'>
                                         <thead>
                                             <tr>
-                                                <th>Thr.</th>
-                                                <th>Digits</th>
+                                                <th>Side</th>
+                                                <th>Qualifies</th>
                                                 <th>Observed</th>
                                                 <th>Theory</th>
                                                 <th>Streak</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {underRows.map(row => (
-                                                <tr key={row.threshold}>
-                                                    <td>&lt;{row.threshold}</td>
-                                                    <td className='epm-analysis-tool__num'>{row.digitsLabel}</td>
+                                            {contractRows.map((row, i) => (
+                                                <tr key={row.label}>
+                                                    <td>{row.label}</td>
+                                                    <td className='epm-analysis-tool__num'>{row.qualifyingLabel}</td>
                                                     <td>
                                                         <div className='epm-analysis-tool__bar-bg'>
                                                             <div
-                                                                className='epm-analysis-tool__bar-fill'
+                                                                className={`epm-analysis-tool__bar-fill ${i === 1 ? 'epm-analysis-tool__bar-fill--alt' : ''}`}
                                                                 style={{ width: `${Math.min(row.observedPct, 100)}%` }}
                                                             />
                                                         </div>
@@ -290,41 +311,53 @@ function EpmAnalysisTool() {
                                             ))}
                                         </tbody>
                                     </table>
-                                </div>
-                                <div className='epm-analysis-tool__panel'>
-                                    <h2 className='epm-analysis-tool__panel-title'>
-                                        <Localize i18n_default_text='Over-N Frequency' />
-                                    </h2>
-                                    <table className='epm-analysis-tool__table'>
-                                        <thead>
-                                            <tr>
-                                                <th>Thr.</th>
-                                                <th>Digits</th>
-                                                <th>Observed</th>
-                                                <th>Theory</th>
-                                                <th>Streak</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {overRows.map(row => (
-                                                <tr key={row.threshold}>
-                                                    <td>&gt;{row.threshold}</td>
-                                                    <td className='epm-analysis-tool__num'>{row.digitsLabel}</td>
-                                                    <td>
-                                                        <div className='epm-analysis-tool__bar-bg'>
-                                                            <div
-                                                                className='epm-analysis-tool__bar-fill epm-analysis-tool__bar-fill--alt'
-                                                                style={{ width: `${Math.min(row.observedPct, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <div className='epm-analysis-tool__bar-label'>{fmtPct(row.observedPct)}</div>
-                                                    </td>
-                                                    <td className='epm-analysis-tool__num'>{fmtPct(row.theoreticalPct)}</td>
-                                                    <td className='epm-analysis-tool__num'>{row.currentStreak}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                )}
+
+                                {contractType === 'accumulator' &&
+                                    (accumulatorReading ? (
+                                        <div className='epm-analysis-tool__statgrid'>
+                                            <div className='epm-analysis-tool__stat'>
+                                                <div className='epm-analysis-tool__stat-n'>
+                                                    {accumulatorReading.recentVolatilityPct.toFixed(3)}%
+                                                </div>
+                                                <div className='epm-analysis-tool__stat-l'>
+                                                    <Localize i18n_default_text='recent avg. move (last 100 ticks)' />
+                                                </div>
+                                            </div>
+                                            <div className='epm-analysis-tool__stat'>
+                                                <div className='epm-analysis-tool__stat-n'>
+                                                    {accumulatorReading.sessionVolatilityPct.toFixed(3)}%
+                                                </div>
+                                                <div className='epm-analysis-tool__stat-l'>
+                                                    <Localize i18n_default_text='session avg. move' />
+                                                </div>
+                                            </div>
+                                            <div className='epm-analysis-tool__stat'>
+                                                <div className='epm-analysis-tool__stat-n'>{accumulatorReading.sampleSize}</div>
+                                                <div className='epm-analysis-tool__stat-l'>
+                                                    <Localize i18n_default_text='ticks sampled' />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className='epm-analysis-tool__muted'>
+                                            <Localize i18n_default_text='Collecting ticks…' />
+                                        </div>
+                                    ))}
+
+                                <div className='epm-analysis-tool__note'>
+                                    {contractType === 'over_under' && (
+                                        <Localize i18n_default_text='Fixed at Over 1 / Under 8 only, as requested — not a sweep of every barrier.' />
+                                    )}
+                                    {contractType === 'odd_even' && (
+                                        <Localize i18n_default_text='Even and Odd are structurally 50/50 for a fair generator — persistent deviation here would be unusual, not a signal to chase.' />
+                                    )}
+                                    {contractType === 'rise_fall' && (
+                                        <Localize i18n_default_text='Rise/Fall on a synthetic index has no memory between ticks — this is a live read, not a forecast of the next one.' />
+                                    )}
+                                    {contractType === 'accumulator' && (
+                                        <Localize i18n_default_text='Purely descriptive — a busier recent window than the session average is not a cue to enter or exit.' />
+                                    )}
                                 </div>
                             </div>
 
