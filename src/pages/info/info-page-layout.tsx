@@ -5,8 +5,10 @@
 // render above this automatically. This component is just the page body:
 // eyebrow + title, content (with auto-numbered h2 sections via CSS
 // counters), and a small footer cross-linking the other four.
-import { CSSProperties, ReactNode } from 'react';
+import { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import Modal from '@/components/shared_ui/modal';
+import { Localize } from '@deriv-com/translations';
 import './info-page-layout.scss';
 
 const FOOTER_LINKS: { to: string; label: string }[] = [
@@ -57,5 +59,70 @@ const InfoPageLayout = ({ eyebrow, title, accent, updated, children }: TInfoPage
  *  (a core risk warning, a no-custody statement) -- pulls it out of the
  *  regular paragraph flow instead of leaning on <strong> alone. */
 export const Callout = ({ children }: { children: ReactNode }) => <div className='info-page__callout'>{children}</div>;
+
+// One topic block, rendered as a fixed-height card (all cards on a page are
+// the same height -- see info-page-layout.scss -- a --featured one is
+// deliberately taller for a section that typically carries more content,
+// not "as tall as whatever this section's own text needs"). Whatever
+// doesn't fit is clipped behind a fade at the card's own bottom edge;
+// clicking anywhere on the card (not just a specific button) opens the same
+// content in full via a modal -- the same fixed-card + pop-out-modal
+// pattern already used for the bot cards on the Trading Bots tab
+// (src/pages/epm-trading-bots/freebots/freebots.tsx).
+export const InfoSection = ({
+    title,
+    featured,
+    children,
+}: {
+    title: string;
+    featured?: boolean;
+    children: ReactNode;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    // A card can contain a real <Link> (e.g. "see our Risk disclosure") --
+    // clicking that should navigate, not also pop the modal open behind it.
+    const handleCardClick = (event: MouseEvent<HTMLElement>) => {
+        if ((event.target as HTMLElement).closest('a')) return;
+        setIsOpen(true);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setIsOpen(true);
+        }
+    };
+
+    return (
+        <>
+            <section
+                className={`info-page__section${featured ? ' info-page__section--featured' : ''}`}
+                onClick={handleCardClick}
+                onKeyDown={handleKeyDown}
+                role='button'
+                tabIndex={0}
+                aria-haspopup='dialog'
+            >
+                <h2>{title}</h2>
+                <div className='info-page__section-body'>{children}</div>
+                <span className='info-page__section-more'>
+                    <Localize i18n_default_text='Read more' />
+                </span>
+            </section>
+
+            <Modal
+                is_open={isOpen}
+                toggleModal={() => setIsOpen(false)}
+                title={title}
+                width='560px'
+                className='info-section-details-modal'
+                should_header_stick_body={false}
+            >
+                <Modal.Body className='info-section-details-modal__body'>{children}</Modal.Body>
+            </Modal>
+        </>
+    );
+};
 
 export default InfoPageLayout;

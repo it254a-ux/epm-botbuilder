@@ -3,6 +3,8 @@
 // full-viewport page, so this needs its own height + scroll rather than
 // min-height: 100vh (which would just get clipped by that overflow: hidden
 // once the header above it takes its own real space).
+@use 'components/shared/styles/mixins' as *;
+
 //
 // --info-accent is set inline per page (info-page-layout.tsx), pulled from
 // one of the app's existing --brand-* tokens (_themes.scss) -- so each page
@@ -101,14 +103,14 @@
     // the page's own accent (not a solid color) plus a lift on hover, so the
     // grid feels considered rather than a mechanical, identical repeat.
     //
-    // Deliberately NOT height: 100% -- with grid-auto-flow: dense, a card
-    // shares its implicit row with whichever other card(s) land next to it,
-    // and a row's height is set by the tallest card in it. height: 100%
-    // used to force every card to stretch to match that tallest neighbor,
-    // which is exactly what turned a short card (e.g. "We do not hold your
-    // funds") into a mostly-empty box. Sizing to content (default) means a
-    // short card is just short -- any leftover space is page background in
-    // the gap below it, not a card visibly padded with nothing in it.
+    // Fixed height (not height: 100%, and not the earlier internal-scroll
+    // cap) -- every card is now the SAME height as its siblings on both
+    // desktop and mobile, like the card grid in EPM's own Trading Bots tab
+    // (freebots.tsx/.scss). Content that doesn't fit is clipped by the
+    // fade below and revealed by clicking the card (see InfoSection in
+    // info-page-layout.tsx), the same "fixed card + pop-out modal" pattern
+    // those bot cards already use, rather than a card that grows/shrinks
+    // per section or scrolls internally.
     &__section {
         position: relative;
         overflow: hidden;
@@ -116,13 +118,10 @@
         border: 1px solid color-mix(in srgb, var(--info-accent) 12%, var(--general-section-1));
         border-radius: 1.2rem;
         padding: 2.8rem;
-        // Cap + internal scroll for the rare card whose content runs long,
-        // so one verbose section can't stretch the whole grid row (and every
-        // shorter neighbor in it) to match it.
-        max-height: 46rem;
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: color-mix(in srgb, var(--info-accent) 40%, transparent) transparent;
+        height: 26rem;
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
         transition:
             transform 0.2s ease,
             box-shadow 0.2s ease;
@@ -132,20 +131,19 @@
             box-shadow: 0 0.8rem 2.4rem color-mix(in srgb, var(--info-accent) 10%, transparent);
         }
 
-        &::-webkit-scrollbar {
-            width: 0.6rem;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: color-mix(in srgb, var(--info-accent) 40%, transparent);
-            border-radius: 999px;
+        &:focus-visible {
+            outline: 2px solid var(--info-accent);
+            outline-offset: 2px;
         }
 
         // One section per page is marked --featured (see each page's .tsx)
-        // to break the grid's rhythm -- a page of uniformly-sized cards
-        // reads as a template; one deliberately wider one reads as designed.
+        // to break the grid's rhythm AND because it typically holds more
+        // content (a callout plus extra paragraphs) -- a taller fixed
+        // height of its own, not the same 26rem as a plain one-paragraph
+        // card, so it doesn't need to clip as aggressively.
         &--featured {
             grid-column: span 2;
+            height: 32rem;
 
             // Only one column exists once the grid has collapsed to a
             // single mobile column, so spanning 2 has nothing left to mean
@@ -159,10 +157,57 @@
         // Desktop padding (2.8rem) is generous on purpose for a 34rem+ wide
         // card; on a single narrow mobile column it just eats into the
         // reading width without adding anything, so it's trimmed down.
+        // Height stays fixed on mobile too (same reasoning as desktop --
+        // one consistent card height, not "whatever this section's text
+        // happens to need").
         @media (max-width: 60rem) {
             padding: 2rem;
-            max-height: none;
-            overflow-y: visible;
+            height: 22rem;
+
+            &.info-page__section--featured {
+                height: 27rem;
+            }
+        }
+    }
+
+    // Wraps everything below the h2 (paragraphs, lists, Callouts). flex: 1
+    // lets it claim exactly the card's remaining fixed height, and
+    // overflow: hidden + the ::after fade below are what let a card sized
+    // for a one-paragraph section also hold a five-paragraph one -- clipped
+    // instead of stretching the card (which is exactly the empty-box and
+    // uneven-row problems fixed earlier) or overflowing it.
+    &__section-body {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+
+        &::after {
+            content: '';
+            position: absolute;
+            inset-inline: 0;
+            bottom: 0;
+            height: 3.2rem;
+            background: linear-gradient(to bottom, transparent, var(--general-section-1));
+            pointer-events: none;
+        }
+    }
+
+    // Sits over the fade, bottom-right -- the visual cue that there's more
+    // to read and that the card itself is the thing to click, rather than
+    // hunting for a separate "Learn more" button somewhere in the text.
+    &__section-more {
+        position: absolute;
+        bottom: 0.8rem;
+        inset-inline-end: 2rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--info-accent);
+        background: var(--general-section-1);
+        padding-inline-start: 0.4rem;
+
+        @media (max-width: 60rem) {
+            inset-inline-end: 1.4rem;
         }
     }
 
@@ -230,6 +275,9 @@
         font-weight: 800;
         margin-bottom: 1.2rem;
         color: var(--brand-primary);
+        // Inside a card, h2 is a flex child above the flex: 1 body -- pinned
+        // to its own size so a tall body never squeezes the heading itself.
+        flex-shrink: 0;
     }
 
     p,
@@ -335,5 +383,56 @@
                 border-color: var(--info-accent);
             }
         }
+    }
+}
+
+// The pop-out modal opened by clicking any InfoSection card (see
+// info-page-layout.tsx) -- same underlying Modal (shared_ui/modal) and same
+// treatment as the bot-details modal on the Trading Bots tab
+// (freebots.scss): dc-modal__container has no max-height of its own, so a
+// long section (or a small phone viewport) would otherwise grow the modal
+// straight past the screen edge with nothing to scroll.
+.dc-modal__container_info-section-details-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4.8rem);
+
+    @include mobile-screen {
+        max-height: calc(100vh - 3.2rem);
+    }
+}
+
+.info-section-details-modal__body {
+    font-size: 1.5rem;
+    line-height: 1.65;
+    color: var(--text-general);
+    overflow-y: auto;
+
+    p,
+    ul,
+    ol {
+        margin-bottom: 1.2rem;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    ul,
+    ol {
+        padding-inline-start: 2rem;
+    }
+
+    a {
+        color: var(--brand-primary);
+        font-weight: 600;
+    }
+
+    // A Callout reads fine inline in a card, but inside the modal it no
+    // longer needs the card's own faint background tint doubled on top of
+    // the modal's -- kept as a bordered strip, dropped the fill.
+    .info-page__callout {
+        background: none;
+        border: 1px solid var(--general-section-1);
     }
 }
