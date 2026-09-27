@@ -32,7 +32,7 @@ const TermsPage = () => (
             </p>
         </section>
 
-        <section className='info-page__section'>
+        <section className='info-page__section info-page__section--featured'>
             <h2>We do not hold your funds</h2>
             <Callout>EPM does not hold, custody, or have access to your trading funds at any point.</Callout>
             <p>

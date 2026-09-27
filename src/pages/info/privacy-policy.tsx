@@ -14,7 +14,7 @@ const PrivacyPolicyPage = () => (
         </p>
         <Callout>We do not sell your personal data, and we do not have access to your trading funds.</Callout>
 
-        <section className='info-page__section'>
+        <section className='info-page__section info-page__section--featured'>
             <h2>Data from your Deriv account</h2>
             <p>
                 When you log in, Deriv&apos;s own OAuth flow shares a limited set of account details with us

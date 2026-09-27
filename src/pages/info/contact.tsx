@@ -12,7 +12,7 @@ const ContactPage = () => (
             below.
         </p>
 
-        <section className='info-page__section'>
+        <section className='info-page__section info-page__section--featured'>
             <h2>Support channels</h2>
             <ul>
                 {HELP_OPTIONS.map(option => (

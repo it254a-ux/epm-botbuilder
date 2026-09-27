@@ -39,7 +39,7 @@ const AboutPage = () => (
             </p>
         </section>
 
-        <section className='info-page__section'>
+        <section className='info-page__section info-page__section--featured'>
             <h2>Our relationship with Deriv</h2>
             <p>
                 All trades placed through this platform are executed directly on your Deriv account via the

@@ -24,7 +24,7 @@ const RiskDisclosurePage = () => (
             </p>
         </section>
 
-        <section className='info-page__section'>
+        <section className='info-page__section info-page__section--featured'>
             <h2>Automated trading (bots) carries its own risks</h2>
             <p>
                 This platform lets you build and run automated trading bots. A bot executes its programmed

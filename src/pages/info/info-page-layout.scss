@@ -8,6 +8,11 @@
 // one of the app's existing --brand-* tokens (_themes.scss) -- so each page
 // reads as its own thing (Risk Disclosure in amber, Terms in violet, ...)
 // without introducing a single new color to the app's palette.
+//
+// Headlines use the brand's own secondary serif (brand.config.json ->
+// font_family.secondary, Georgia) against the sans body copy -- an
+// editorial pairing already defined for this brand but unused anywhere
+// else in the app, rather than a new font or a decorative effect.
 .info-page {
     height: 100%;
     overflow-y: auto;
@@ -32,6 +37,7 @@
         counter-reset: info-section;
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(34rem, 1fr));
+        grid-auto-flow: dense;
         gap: 2rem 2.4rem;
         align-items: start;
 
@@ -57,12 +63,49 @@
         }
     }
 
-    // Each topical block, as its own card in the grid above.
+    // Each topical block, as its own card in the grid above. A faint tint of
+    // the page's own accent (not a solid color) plus a lift on hover, so the
+    // grid feels considered rather than a mechanical, identical repeat.
     &__section {
+        position: relative;
+        overflow: hidden;
         background: var(--general-section-1);
+        border: 1px solid color-mix(in srgb, var(--info-accent) 12%, var(--general-section-1));
         border-radius: 1.2rem;
-        padding: 2.4rem 2.8rem;
+        padding: 2.8rem;
         height: 100%;
+        transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+
+        &:hover {
+            transform: translateY(-0.2rem);
+            box-shadow: 0 0.8rem 2.4rem color-mix(in srgb, var(--info-accent) 10%, transparent);
+        }
+
+        // One section per page is marked --featured (see each page's .tsx)
+        // to break the grid's rhythm -- a page of uniformly-sized cards
+        // reads as a template; one deliberately wider one reads as designed.
+        &--featured {
+            grid-column: span 2;
+        }
+    }
+
+    // A large, low-opacity serif numeral behind each card's heading, instead
+    // of a small inline prefix -- the numbering does real work (skimming,
+    // referencing "section 3") without competing with the heading text.
+    &__section h2::before {
+        content: counter(info-section, decimal-leading-zero);
+        position: absolute;
+        top: -1.6rem;
+        inset-inline-end: 0.8rem;
+        font-family: Georgia, 'Times New Roman', Times, serif;
+        font-size: 7.2rem;
+        font-weight: 700;
+        color: var(--info-accent);
+        opacity: 0.1;
+        line-height: 1;
+        pointer-events: none;
     }
 
     &__eyebrow {
@@ -75,29 +118,21 @@
     }
 
     h1 {
-        font-size: 3.4rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.4rem;
+        font-family: Georgia, 'Times New Roman', Times, serif;
+        font-size: 4rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        margin-bottom: 0.6rem;
         max-width: 56rem;
     }
 
     h2 {
+        position: relative;
         counter-increment: info-section;
-        display: flex;
-        align-items: baseline;
-        gap: 1.2rem;
         font-size: 1.8rem;
         font-weight: 700;
         margin-bottom: 1.2rem;
-
-        &::before {
-            content: counter(info-section, decimal-leading-zero);
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: var(--info-accent);
-            flex-shrink: 0;
-        }
     }
 
     p,
@@ -146,6 +181,7 @@
     // no-custody statement) -- pulled out of the regular paragraph flow
     // instead of leaning on <strong> alone.
     &__callout {
+        position: relative;
         border-inline-start: 0.3rem solid var(--info-accent);
         background: color-mix(in srgb, var(--info-accent) 8%, transparent);
         border-radius: 0 0.6rem 0.6rem 0;
@@ -187,6 +223,9 @@
             padding: 0.6rem 1.4rem;
             border-radius: 999px;
             border: 1px solid var(--general-section-1);
+            transition:
+                color 0.15s ease,
+                border-color 0.15s ease;
 
             &:hover {
                 color: var(--text-general);
