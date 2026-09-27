@@ -210,13 +210,14 @@ export const MenuItems = observer(() => {
         };
     }, [is_more_open]);
 
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+
     // No dashboard store yet (very first render tick) — render nothing rather
     // than a nav that can't actually switch tabs.
     if (!dashboard) return null;
 
     const { active_tab, setActiveTab } = dashboard;
-    const navigate = useNavigate();
-    const { pathname } = useLocation();
 
     // Tabs (Dashboard, Bot Builder, Charts, ...) only exist inside AppRoot,
     // mounted on '/' and '/preview' -- setActiveTab alone is a MobX store
