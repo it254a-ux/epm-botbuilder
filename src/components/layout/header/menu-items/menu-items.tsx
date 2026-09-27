@@ -61,17 +61,18 @@ const PRIMARY_NAV_ITEMS = [
         icon: <LabelPairedChartLineCaptionRegularIcon height='16px' width='16px' fill='currentColor' />,
         label: <Localize i18n_default_text='Charts' />,
     },
+];
+
+// Always rendered inside the "More" dropdown, never measured/inline —
+// unlike PRIMARY_NAV_ITEMS above, these don't participate in the width
+// measurement at all. Dtrader was moved here (previously primary) once
+// adding the Analysis Tool tab left the primary row too full.
+const PINNED_OVERFLOW_ITEMS = [
     {
         tab: DBOT_TABS.DTRADER,
         icon: <span className='app-header__menu-item-emoji'>📈</span>,
         label: <Localize i18n_default_text='Dtrader' />,
     },
-];
-
-// Always rendered inside the "More" dropdown, never measured/inline —
-// unlike PRIMARY_NAV_ITEMS above, these two don't participate in the width
-// measurement at all.
-const PINNED_OVERFLOW_ITEMS = [
     {
         tab: DBOT_TABS.TRADING_VIEW,
         icon: <span className='app-header__menu-item-emoji'>📉</span>,

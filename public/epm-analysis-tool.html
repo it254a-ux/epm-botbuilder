@@ -9,34 +9,39 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+  /* Fallback palette only -- overwritten at runtime by applyHostTheme() to
+     match whatever the host app's current theme (light/dark + brand colors)
+     actually is. These values just cover the brief flash before that first
+     runs, and standalone viewing of this file outside the app. */
   :root{
     --bg:#0f172a; --panel:#1e293b; --panel2:#334155; --border:#334155;
     --text:#f8fafc; --sub:#94a3b8; --accent:#3B82F6; --accent2:#f59e0b;
     --red:#ef4444; --green:#10b981; --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
   }
   *{box-sizing:border-box;}
+  html,body{height:100%;}
   body{
     margin:0; background:var(--bg); color:var(--text);
     font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    padding:24px; line-height:1.5;
+    padding:14px; line-height:1.4;
   }
-  h1{font-size:20px; margin:0 0 4px 0; letter-spacing:.2px;}
-  .sub{color:var(--sub); font-size:13px; margin-bottom:20px;}
-  .grid{display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start;}
-  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  h1{font-size:17px; margin:0 0 2px 0; letter-spacing:.2px;}
+  .sub{color:var(--sub); font-size:11.5px; margin-bottom:10px;}
+  .layout{display:grid; grid-template-columns:230px 1fr; gap:12px; align-items:start;}
+  @media(max-width:820px){.layout{grid-template-columns:1fr;}}
   .panel{
-    background:var(--panel); border:1px solid var(--border); border-radius:10px;
-    padding:16px 18px;
+    background:var(--panel); border:1px solid var(--border); border-radius:9px;
+    padding:11px 13px;
   }
-  .panel + .panel{margin-top:18px;}
-  .panel h2{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--sub); margin:0 0 14px 0; font-weight:600;}
-  label{display:block; font-size:12px; color:var(--sub); margin:12px 0 5px;}
+  .panel + .panel{margin-top:12px;}
+  .panel h2{font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin:0 0 9px 0; font-weight:600;}
+  label{display:block; font-size:11px; color:var(--sub); margin:8px 0 4px;}
   select, input, button{
     width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
-    padding:9px 10px; border-radius:7px; font-size:14px; font-family:inherit;
+    padding:7px 9px; border-radius:6px; font-size:13px; font-family:inherit;
   }
   select:focus, input:focus{outline:1px solid var(--accent);}
-  .row{display:flex; gap:10px;}
+  .row{display:flex; gap:8px;}
   .row > *{flex:1;}
   button{cursor:pointer; font-weight:600; transition:.15s;}
   button:hover{filter:brightness(1.15);}
@@ -44,53 +49,53 @@
   .btn-primary{background:var(--accent); border-color:var(--accent); color:#ffffff;}
   .btn-danger{background:var(--red); border-color:var(--red); color:#ffffff;}
   .status{
-    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--sub); margin-top:12px;
+    display:flex; align-items:center; gap:7px; font-size:11px; color:var(--sub); margin-top:9px;
   }
-  .dot{width:8px; height:8px; border-radius:50%; background:var(--sub);}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--sub); flex:none;}
   .dot.live{background:var(--green); box-shadow:0 0 6px var(--green);}
   .dot.off{background:var(--red);}
-  .tabs{display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border);}
+  .tabs{display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid var(--border);}
   .tab{
-    padding:9px 14px; font-size:13px; color:var(--sub); cursor:pointer; border-bottom:2px solid transparent;
+    padding:7px 12px; font-size:12.5px; color:var(--sub); cursor:pointer; border-bottom:2px solid transparent;
     user-select:none;
   }
   .tab.active{color:var(--text); border-bottom-color:var(--accent);}
   .view{display:none;}
   .view.active{display:block;}
-  .statgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px;}
-  .stat{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:12px;}
-  .stat .n{font-size:22px; font-weight:700; font-family:var(--mono);}
-  .stat .l{font-size:11px; color:var(--sub); margin-top:2px;}
-  table{width:100%; border-collapse:collapse; font-size:13px;}
-  th, td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border);}
-  th{color:var(--sub); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.4px;}
+  .cols-2{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start;}
+  @media(max-width:600px){.cols-2{grid-template-columns:1fr;}}
+  .statgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px;}
+  .stat{background:var(--panel2); border:1px solid var(--border); border-radius:7px; padding:9px 10px;}
+  .stat .n{font-size:17px; font-weight:700; font-family:var(--mono);}
+  .stat .l{font-size:10px; color:var(--sub); margin-top:1px;}
+  table{width:100%; border-collapse:collapse; font-size:11.5px;}
+  th, td{text-align:left; padding:5px 7px; border-bottom:1px solid var(--border);}
+  th{color:var(--sub); font-weight:600; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px;}
   td.num{font-family:var(--mono); text-align:right;}
-  .bar-cell{position:relative; min-width:110px;}
-  .bar-bg{background:var(--panel2); border-radius:4px; height:8px; overflow:hidden;}
+  .bar-cell{position:relative; min-width:70px;}
+  .bar-bg{background:var(--panel2); border-radius:4px; height:6px; overflow:hidden;}
   .bar-fill{height:100%; background:var(--accent); border-radius:4px;}
   .ticklog{
-    font-family:var(--mono); font-size:13px; display:flex; flex-wrap:wrap; gap:5px;
-    max-height:120px; overflow-y:auto; padding:4px 0;
+    font-family:var(--mono); font-size:11px; display:flex; flex-wrap:wrap; gap:4px;
+    max-height:52px; overflow:hidden; align-content:flex-start;
   }
   .digit{
-    width:26px; height:26px; display:flex; align-items:center; justify-content:center;
-    border-radius:5px; background:var(--panel2); border:1px solid var(--border); font-size:12px;
+    width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+    border-radius:4px; background:var(--panel2); border:1px solid var(--border); font-size:10.5px; flex:none;
   }
   .digit.low{background:rgba(229,83,75,.18); border-color:var(--red); color:#ff8983;}
-  .note{font-size:12px; color:var(--sub); background:var(--panel2); border-left:3px solid var(--accent2); padding:10px 12px; border-radius:0 6px 6px 0; margin-top:14px;}
+  .note{font-size:10.5px; color:var(--sub); background:var(--panel2); border-left:3px solid var(--accent2); padding:8px 10px; border-radius:0 6px 6px 0; margin-top:10px;}
   .note b{color:var(--text);}
   .warn{border-left-color:var(--red);}
-  .disclaim{
-    background:rgba(229,83,75,.08); border:1px solid rgba(229,83,75,.35); border-radius:8px;
-    padding:12px 14px; font-size:12.5px; color:#f0b8b4; margin-bottom:18px;
-  }
   canvas{max-width:100%;}
+  .contract-mini{display:grid; grid-template-columns:1fr; gap:6px;}
   .contract-card{
-    background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:7px; padding:8px 10px;
   }
-  .contract-card h3{margin:0 0 4px 0; font-size:14px;}
-  .contract-card p{margin:0; font-size:12.5px; color:var(--sub);}
+  .contract-card h3{margin:0 0 2px 0; font-size:12px;}
+  .contract-card p{margin:0; font-size:10.5px; color:var(--sub); line-height:1.35;}
   a{color:var(--accent);}
+  .empty-hint{font-size:12px; color:var(--sub); padding:30px 10px; text-align:center;}
 </style>
 </head>
 <body>
@@ -112,7 +117,7 @@
   .info-wrap:hover .info-tooltip{ display:block !important; }
 </style>
 
-<div class="grid">
+<div class="layout">
   <!-- LEFT: Controls -->
   <div>
     <div class="panel">
@@ -141,30 +146,32 @@
           <option value="JD100">Jump 100</option>
         </optgroup>
       </select>
-      <button class="btn-primary" id="connectBtn" style="margin-top:12px;">Connect &amp; Start Tracking</button>
-      <button class="btn-danger" id="disconnectBtn" style="margin-top:8px; display:none;">Disconnect</button>
-      <div class="status"><div class="dot" id="statusDot"></div><span id="statusText">Not connected</span></div>
+      <button class="btn-primary" id="connectBtn" style="margin-top:9px;">Start Analyzing</button>
+      <button class="btn-danger" id="disconnectBtn" style="margin-top:7px; display:none;">Stop Analyzing</button>
+      <div class="status"><div class="dot" id="statusDot"></div><span id="statusText">Not analyzing</span></div>
     </div>
 
     <div class="panel">
       <h2>Contract Type Reference</h2>
-      <div class="contract-card">
-        <h3>Rise/Fall</h3>
-        <p>Simplest binary — payout if the price is higher/lower than entry at expiry. No streak-based edge; each contract is a fresh coin flip on direction.</p>
+      <div class="contract-mini">
+        <div class="contract-card">
+          <h3>Rise/Fall</h3>
+          <p>Fresh coin flip on direction each contract — no streak-based edge.</p>
+        </div>
+        <div class="contract-card">
+          <h3>Call/Put (Vanillas), Turbos</h3>
+          <p>Strike distance changes odds/payout, not the underlying randomness.</p>
+        </div>
+        <div class="contract-card">
+          <h3>Multipliers</h3>
+          <p>Leveraged exposure — most exposed to a single bad streak.</p>
+        </div>
+        <div class="contract-card">
+          <h3>Accumulators</h3>
+          <p>Grows while price stays in range; a "how long does calm last" bet.</p>
+        </div>
       </div>
-      <div class="contract-card">
-        <h3>Call/Put (Vanillas), Turbos</h3>
-        <p>Fixed payout if price is above/below a strike at expiry. Strike distance changes your odds and payout, not the underlying randomness.</p>
-      </div>
-      <div class="contract-card">
-        <h3>Multipliers</h3>
-        <p>Leveraged directional exposure. Stop-out risk scales with leverage — most exposed to a single bad streak.</p>
-      </div>
-      <div class="contract-card">
-        <h3>Accumulators</h3>
-        <p>Payout grows each tick the price stays inside a range; wipes out on exit. Effectively a "how long will this streak of calm continue" bet.</p>
-      </div>
-      <div class="note">This is a reference, not a recommendation engine — no contract type is "correct" for a given streak, they just express different bets on the same random ticks.</div>
+      <div class="note">Reference only, not a recommendation engine — no contract type is "correct" for a given streak.</div>
     </div>
   </div>
 
@@ -183,132 +190,129 @@
           <div class="stat"><div class="n" id="tickCount">0</div><div class="l">ticks observed</div></div>
           <div class="stat"><div class="n" id="lastDigit">–</div><div class="l">last digit</div></div>
           <div class="stat"><div class="n" id="streakUnder2">0</div><div class="l">ticks since digit &lt; 2</div></div>
-          <div class="stat"><div class="n" id="longestStreakUnder2">0</div><div class="l">longest such streak (session)</div></div>
+          <div class="stat"><div class="n" id="longestStreakUnder2">0</div><div class="l">longest streak (session)</div></div>
         </div>
+      </div>
 
-        <h2>Under-N Frequency (this session)</h2>
-        <table>
-          <thead><tr><th>Threshold</th><th>Digits that qualify</th><th>Observed frequency</th><th>Theoretical (fair RNG)</th><th>Current streak w/o hit</th></tr></thead>
-          <tbody id="thresholdTable"></tbody>
-        </table>
-
-        <h2 style="margin-top:18px;">Over-N Frequency (this session)</h2>
-        <table>
-          <thead><tr><th>Threshold</th><th>Digits that qualify</th><th>Observed frequency</th><th>Theoretical (fair RNG)</th><th>Current streak w/o hit</th></tr></thead>
-          <tbody id="overThresholdTable"></tbody>
-        </table>
-
-        <h2 style="margin-top:18px;">Last-Digit Distribution</h2>
-        <canvas id="digitChart" height="90"></canvas>
-
-        <h2 style="margin-top:18px;">Recent Ticks (last digit)</h2>
-        <div class="ticklog" id="tickLog"></div>
-
-        <div class="note">
-          Frequencies converge toward theoretical values as sample size grows. Early in a session, expect visible
-          deviation — that's sampling noise, not a market condition. Reload / reconnect resets the session.
+      <div class="cols-2" style="margin-top:12px;">
+        <div class="panel">
+          <h2>Under-N Frequency</h2>
+          <table>
+            <thead><tr><th>Thr.</th><th>Digits</th><th>Observed</th><th>Theory</th><th>Streak</th></tr></thead>
+            <tbody id="thresholdTable"></tbody>
+          </table>
         </div>
+        <div class="panel">
+          <h2>Over-N Frequency</h2>
+          <table>
+            <thead><tr><th>Thr.</th><th>Digits</th><th>Observed</th><th>Theory</th><th>Streak</th></tr></thead>
+            <tbody id="overThresholdTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="cols-2" style="margin-top:12px;">
+        <div class="panel">
+          <h2>Last-Digit Distribution</h2>
+          <canvas id="digitChart" height="70"></canvas>
+        </div>
+        <div class="panel">
+          <h2>Recent Ticks</h2>
+          <div class="ticklog" id="tickLog"></div>
+        </div>
+      </div>
+
+      <div class="note">
+        Frequencies converge toward theoretical values as sample size grows — early deviation is sampling noise, not a market condition.
       </div>
     </div>
 
     <!-- BACKTEST VIEW -->
     <div class="view" id="view-backtest">
-      <div class="panel">
-        <h2>Backtest Setup</h2>
-        <div class="row">
-          <div>
-            <label>History size (ticks)</label>
-            <select id="btCount">
-              <option value="1000">1,000</option>
-              <option value="3000" selected>3,000</option>
-              <option value="5000">5,000 (max)</option>
-            </select>
+      <div class="cols-2" style="grid-template-columns:290px 1fr; align-items:start;">
+        <div class="panel">
+          <h2>Backtest Setup</h2>
+          <div class="row">
+            <div>
+              <label>History (ticks)</label>
+              <select id="btCount">
+                <option value="1000">1,000</option>
+                <option value="3000" selected>3,000</option>
+                <option value="5000">5,000 (max)</option>
+              </select>
+            </div>
+            <div>
+              <label>Direction</label>
+              <select id="btDirection">
+                <option value="under" selected>Under</option>
+                <option value="over">Over</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label>Direction</label>
-            <select id="btDirection">
-              <option value="under" selected>Under</option>
-              <option value="over">Over</option>
-            </select>
+          <div class="row">
+            <div>
+              <label>Threshold</label>
+              <select id="btThreshold">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+              </select>
+            </div>
+            <div>
+              <label>Enter after streak ≥</label>
+              <input type="number" id="btStreak" value="8" min="1" max="50">
+            </div>
           </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Threshold</label>
-            <select id="btThreshold">
-              <option value="2" selected>2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-            </select>
+          <div class="row">
+            <div>
+              <label>Base stake</label>
+              <input type="number" id="btStake" value="1" min="0.1" step="0.1">
+            </div>
+            <div>
+              <label>Martingale mult. on loss</label>
+              <input type="number" id="btMult" value="2" min="1" step="0.1">
+            </div>
           </div>
-          <div>
-            <label>Enter after streak length ≥</label>
-            <input type="number" id="btStreak" value="8" min="1" max="50">
-          </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Base stake</label>
-            <input type="number" id="btStake" value="1" min="0.1" step="0.1">
-          </div>
-          <div></div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Martingale multiplier on loss</label>
-            <input type="number" id="btMult" value="2" min="1" step="0.1">
-          </div>
-          <div>
-            <label>Max martingale steps before reset</label>
-            <input type="number" id="btMaxSteps" value="6" min="1" max="15">
-          </div>
-        </div>
-        <label>Payout multiplier on win (net stake return — check your broker's actual quoted payout for this threshold, they vary)</label>
-        <input type="number" id="btPayout" value="4.9" min="1" step="0.01">
-        <div class="note">Narrower bands (under 2/3, over 6/7) pay more per win because they hit less often — that's
-          why one win can offset several losses. It is a reshaping of variance, not extra edge: plug your broker's
-          real payout number in above and the backtest will show you the true breakeven point for that specific
-          multiplier against the real hit-rate.</div>
-        <button class="btn-primary" id="runBacktest" style="margin-top:14px;">Fetch History &amp; Run Backtest</button>
-        <div class="status"><div class="dot" id="btStatusDot"></div><span id="btStatusText">Idle</span></div>
-      </div>
-
-      <div class="panel" id="btResults" style="display:none;">
-        <h2>Result — Equity Curve</h2>
-        <canvas id="equityChart" height="110"></canvas>
-        <div class="statgrid" style="margin-top:16px;">
-          <div class="stat"><div class="n" id="btTrades">–</div><div class="l">strategy triggers</div></div>
-          <div class="stat"><div class="n" id="btWinRate">–</div><div class="l">per-trigger win rate</div></div>
-          <div class="stat"><div class="n" id="btMaxDD">–</div><div class="l">max drawdown (stake units)</div></div>
-          <div class="stat"><div class="n" id="btLongestLoss">–</div><div class="l">longest losing run within a trigger</div></div>
-          <div class="stat"><div class="n" id="btRuins">–</div><div class="l">times max steps exceeded (ruin events)</div></div>
-          <div class="stat"><div class="n" id="btFinalPnl">–</div><div class="l">net P/L (stake units)</div></div>
-        </div>
-        <div class="note" id="btVerdict"></div>
-
-        <h2 style="margin-top:18px;">Trigger Occurrences</h2>
-        <div class="note" style="margin-top:0; margin-bottom:10px;">
-          Every point in the history where your exact rule fired, in order, with the outcome that followed.
-          This is the raw sample the summary stats above are computed from.
-        </div>
-        <div style="max-height:280px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
-          <table style="margin:0;">
-            <thead style="position:sticky; top:0; background:var(--panel2);">
-              <tr><th>#</th><th>Tick index</th><th>Streak at trigger</th><th>Outcome</th><th>Digit hit</th><th>Stake</th><th>Result</th><th>Equity after</th></tr>
-            </thead>
-            <tbody id="triggerLog"></tbody>
-          </table>
+          <label>Max martingale steps before reset</label>
+          <input type="number" id="btMaxSteps" value="6" min="1" max="15">
+          <label>Payout mult. on win (check your broker's real payout)</label>
+          <input type="number" id="btPayout" value="4.9" min="1" step="0.01">
+          <div class="note">Narrower bands pay more per win because they hit less often — a reshaping of variance, not extra edge.</div>
+          <button class="btn-primary" id="runBacktest" style="margin-top:10px;">Run Backtest</button>
+          <div class="status"><div class="dot" id="btStatusDot"></div><span id="btStatusText">Idle</span></div>
         </div>
 
-        <div class="note warn">
-          This replays your rule against <b>one historical sample</b> from one index. A good result here is not proof
-          of a real edge — re-run across different indices, different history windows, and larger streak thresholds
-          before trusting it. A single favorable backtest is exactly the kind of thing random noise produces some of
-          the time by chance.
+        <div class="panel" id="btResults" style="display:none; min-height:200px;">
+          <h2>Result — Equity Curve</h2>
+          <canvas id="equityChart" height="80"></canvas>
+          <div class="statgrid" style="margin-top:10px;">
+            <div class="stat"><div class="n" id="btTrades">–</div><div class="l">triggers</div></div>
+            <div class="stat"><div class="n" id="btWinRate">–</div><div class="l">win rate</div></div>
+            <div class="stat"><div class="n" id="btMaxDD">–</div><div class="l">max drawdown</div></div>
+            <div class="stat"><div class="n" id="btLongestLoss">–</div><div class="l">longest loss run</div></div>
+            <div class="stat"><div class="n" id="btRuins">–</div><div class="l">ruin events</div></div>
+            <div class="stat"><div class="n" id="btFinalPnl">–</div><div class="l">net P/L</div></div>
+          </div>
+          <div class="note" id="btVerdict"></div>
+
+          <h2 style="margin-top:12px;">Trigger Occurrences</h2>
+          <div style="max-height:170px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
+            <table style="margin:0;">
+              <thead style="position:sticky; top:0; background:var(--panel2);">
+                <tr><th>#</th><th>Tick</th><th>Streak</th><th>Outcome</th><th>Digit</th><th>Stake</th><th>Result</th><th>Equity</th></tr>
+              </thead>
+              <tbody id="triggerLog"></tbody>
+            </table>
+          </div>
+
+          <div class="note warn">
+            Replays your rule against one historical sample — not proof of a real edge. Re-run across different indices and windows before trusting it.
+          </div>
         </div>
+        <div class="panel empty-hint" id="btEmptyHint">Set your parameters and run a backtest to see results here.</div>
       </div>
     </div>
   </div>
@@ -322,6 +326,73 @@ let streakUnder2 = 0;
 let longestStreakUnder2 = 0;
 let digitCounts = new Array(10).fill(0);
 let digitChart, equityChart;
+
+// ---------- Host theme sync ----------
+// This page is served same-origin from the host app's own /public folder,
+// so it's safe to read the parent document's live CSS variables and body
+// theme class directly -- no postMessage bridge needed. Falls back to the
+// hardcoded :root values above if window.parent is ever unreachable
+// (e.g. this file opened standalone, outside the app).
+function readHostVar(name, fallback) {
+  try {
+    const val = getComputedStyle(window.parent.document.body).getPropertyValue(name).trim();
+    return val || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+const THEME_VAR_MAP = {
+  '--bg': ['--general-main-1', '#0f172a'],
+  '--panel': ['--general-section-1', '#1e293b'],
+  '--panel2': ['--general-hover', '#334155'],
+  '--border': ['--border-normal', '#334155'],
+  '--text': ['--text-prominent', '#f8fafc'],
+  '--sub': ['--text-less-prominent', '#94a3b8'],
+  '--accent': ['--brand-primary', '#3B82F6'],
+  '--accent2': ['--brand-warning', '#f59e0b'],
+  '--red': ['--brand-danger', '#ef4444'],
+  '--green': ['--brand-success', '#10b981'],
+};
+
+function chartColors() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    grid: s.getPropertyValue('--border').trim() || '#2a333f',
+    tick: s.getPropertyValue('--sub').trim() || '#8b96a5',
+    accent: s.getPropertyValue('--accent').trim() || '#3fb8af',
+  };
+}
+
+function applyHostTheme() {
+  const root = document.documentElement.style;
+  Object.entries(THEME_VAR_MAP).forEach(([localVar, [hostVar, fallback]]) => {
+    root.setProperty(localVar, readHostVar(hostVar, fallback));
+  });
+  const c = chartColors();
+  [digitChart, equityChart].forEach(chart => {
+    if (!chart) return;
+    chart.options.scales.x.grid.color = c.grid;
+    chart.options.scales.x.ticks.color = c.tick;
+    chart.options.scales.y.grid.color = c.grid;
+    chart.options.scales.y.ticks.color = c.tick;
+    chart.data.datasets[0].borderColor = c.accent;
+    if (chart.data.datasets[0].backgroundColor && typeof chart.data.datasets[0].backgroundColor === 'string' && chart.data.datasets[0].backgroundColor.startsWith('rgba')) {
+      // equity chart's fill -- leave as-is, it's already translucent
+    } else if (chart === digitChart) {
+      chart.data.datasets[0].backgroundColor = c.accent;
+    }
+    chart.update('none');
+  });
+}
+
+applyHostTheme();
+try {
+  const mo = new MutationObserver(applyHostTheme);
+  mo.observe(window.parent.document.body, { attributes: true, attributeFilter: ['class'] });
+} catch (e) {
+  // standalone / cross-origin fallback -- static fallback palette stands as-is
+}
 
 // ---------- Tabs ----------
 document.querySelectorAll('.tab').forEach(t => {
@@ -345,18 +416,19 @@ function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
 // ---------- Live digit chart ----------
 function initDigitChart() {
   const ctx = document.getElementById('digitChart');
+  const c = chartColors();
   digitChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: ['0','1','2','3','4','5','6','7','8','9'],
-      datasets: [{ label: 'Occurrences', data: new Array(10).fill(0), backgroundColor: '#3fb8af' }]
+      datasets: [{ label: 'Occurrences', data: new Array(10).fill(0), backgroundColor: c.accent }]
     },
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' } },
-        y: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' }, beginAtZero: true }
+        x: { grid: { color: c.grid }, ticks: { color: c.tick } },
+        y: { grid: { color: c.grid }, ticks: { color: c.tick }, beginAtZero: true }
       }
     }
   });
@@ -379,11 +451,11 @@ function renderThresholdTable() {
     }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>Under ${n}</td>
+      <td>&lt;${n}</td>
       <td class="num">0–${n-1}</td>
       <td class="bar-cell">
         <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(freq*100,100)}%"></div></div>
-        <div style="font-family:var(--mono); font-size:12px; margin-top:3px;">${fmtPct(freq)}</div>
+        <div style="font-family:var(--mono); font-size:10.5px; margin-top:2px;">${fmtPct(freq)}</div>
       </td>
       <td class="num">${fmtPct(theo)}</td>
       <td class="num">${streak}</td>
@@ -408,11 +480,11 @@ function renderOverThresholdTable() {
     }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>Over ${n}</td>
+      <td>&gt;${n}</td>
       <td class="num">${n+1}–9</td>
       <td class="bar-cell">
         <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(freq*100,100)}%; background:var(--accent2);"></div></div>
-        <div style="font-family:var(--mono); font-size:12px; margin-top:3px;">${fmtPct(freq)}</div>
+        <div style="font-family:var(--mono); font-size:10.5px; margin-top:2px;">${fmtPct(freq)}</div>
       </td>
       <td class="num">${fmtPct(theo)}</td>
       <td class="num">${streak}</td>
@@ -423,11 +495,10 @@ function renderOverThresholdTable() {
 
 function renderTickLog() {
   const el = document.getElementById('tickLog');
-  const recent = ticks.slice(-60);
+  const recent = ticks.slice(-40);
   el.innerHTML = recent.map(t =>
     `<div class="digit ${t.digit < 2 ? 'low' : ''}">${t.digit}</div>`
   ).join('');
-  el.scrollLeft = el.scrollWidth;
 }
 
 function onNewTick(digit) {
@@ -466,7 +537,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   ws.onopen = () => {
     ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
     document.getElementById('statusDot').className = 'dot live';
-    document.getElementById('statusText').textContent = 'Live — ' + symbol;
+    document.getElementById('statusText').textContent = 'Analyzing — ' + symbol;
     document.getElementById('liveSymbolLabel').textContent = '· ' + symbol;
     document.getElementById('connectBtn').style.display = 'none';
     document.getElementById('disconnectBtn').style.display = 'block';
@@ -492,7 +563,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
 
   ws.onclose = () => {
     document.getElementById('statusDot').className = 'dot off';
-    document.getElementById('statusText').textContent = 'Disconnected';
+    document.getElementById('statusText').textContent = 'Not analyzing';
     document.getElementById('connectBtn').style.display = 'block';
     document.getElementById('disconnectBtn').style.display = 'none';
   };
@@ -635,6 +706,7 @@ function runBacktestOnDigits(digits) {
   }
 
   // Render
+  document.getElementById('btEmptyHint').style.display = 'none';
   document.getElementById('btResults').style.display = 'block';
   document.getElementById('btTrades').textContent = triggers;
   document.getElementById('btWinRate').textContent = triggers ? fmtPct(wins / triggers) : '–';
@@ -672,6 +744,7 @@ function runBacktestOnDigits(digits) {
 
   if (equityChart) equityChart.destroy();
   const ctx = document.getElementById('equityChart');
+  const c = chartColors();
   equityChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -679,7 +752,7 @@ function runBacktestOnDigits(digits) {
       datasets: [{
         label: 'Equity (stake units)',
         data: equityCurve,
-        borderColor: '#3fb8af',
+        borderColor: c.accent,
         backgroundColor: 'rgba(63,184,175,0.08)',
         fill: true,
         pointRadius: 0,
@@ -691,8 +764,8 @@ function runBacktestOnDigits(digits) {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5', maxTicksLimit: 10 } },
-        y: { grid: { color: '#2a333f' }, ticks: { color: '#8b96a5' } }
+        x: { grid: { color: c.grid }, ticks: { color: c.tick, maxTicksLimit: 8 } },
+        y: { grid: { color: c.grid }, ticks: { color: c.tick } }
       }
     }
   });
@@ -701,6 +774,7 @@ function runBacktestOnDigits(digits) {
 // init
 initDigitChart();
 renderThresholdTable();
+renderOverThresholdTable();
 </script>
 </body>
 </html>
