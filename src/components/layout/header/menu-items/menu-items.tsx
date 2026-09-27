@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
@@ -214,6 +215,21 @@ export const MenuItems = observer(() => {
     if (!dashboard) return null;
 
     const { active_tab, setActiveTab } = dashboard;
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+
+    // Tabs (Dashboard, Bot Builder, Charts, ...) only exist inside AppRoot,
+    // mounted on '/' and '/preview' -- setActiveTab alone is a MobX store
+    // write with nothing wrong with it, but on any other route (dtrader,
+    // about, contact, legal/*) nothing reads it, since AppRoot isn't even
+    // mounted there. The tab looked selected (nav highlighting reads
+    // active_tab directly) while the actual page never changed, until
+    // navigating back to '/' by some other means (the logo) finally mounted
+    // AppRoot, which then just showed whatever tab had already been set.
+    const goToTab = (tab: number) => {
+        if (pathname !== '/' && pathname !== '/preview') navigate('/');
+        setActiveTab(tab);
+    };
 
     // Dynamic overflow from the primary row (if the window is narrow enough
     // that even Dashboard..Dtrader don't all fit) comes first, then the two
@@ -222,7 +238,7 @@ export const MenuItems = observer(() => {
     const active_item_is_overflowed = overflow_items.some(item => item.tab === active_tab);
 
     const handleSelect = (tab: number) => {
-        setActiveTab(tab);
+        goToTab(tab);
         setIsMoreOpen(false);
     };
 
@@ -246,7 +262,7 @@ export const MenuItems = observer(() => {
                     style={index >= visible_count ? { position: 'absolute', visibility: 'hidden' } : undefined}
                     aria-hidden={index >= visible_count || undefined}
                     tabIndex={index >= visible_count ? -1 : undefined}
-                    onClick={() => setActiveTab(item.tab)}
+                    onClick={() => goToTab(item.tab)}
                     onMouseEnter={() => prefetchTab(item.tab)}
                     onFocus={() => prefetchTab(item.tab)}
                     aria-current={active_tab === item.tab ? 'page' : undefined}

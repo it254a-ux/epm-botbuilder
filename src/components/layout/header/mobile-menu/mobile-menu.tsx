@@ -2,6 +2,7 @@
 // Updated to use brand configuration for mobile menu elements visibility
 // Controls language settings and theme toggle via brand.config.json
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import brandConfig from '@/../brand.config.json';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import useModalManager from '@/hooks/useModalManager';
@@ -52,15 +53,23 @@ const MobileMenu = ({ onLogout }: TMobileMenuProps) => {
         if (isLanguageSettingVisible) hideModal();
     };
 
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+
     const openSubmenu = (submenu: string) => setActiveSubmenu(submenu);
     const closeSubmenu = () => setActiveSubmenu(null);
     const openLanguageSetting = () => showModal('MobileLanguagesDrawer');
     const isLanguageSettingVisible = Boolean(isModalOpenFor('MobileLanguagesDrawer'));
     // Same tab the desktop nav's "More" dropdown links to (menu-items.tsx) —
-    // closes the drawer first so the tab actually becomes visible underneath.
+    // closes the drawer first so the tab actually becomes visible
+    // underneath. Tabs only exist inside AppRoot (mounted on '/' and
+    // '/preview'), so setActiveTab alone does nothing when opened from a
+    // standalone route like /about — navigate back first, same fix as
+    // menu-items.tsx's goToTab.
     const navigateToTutorials = dashboard
         ? () => {
               closeDrawer();
+              if (pathname !== '/' && pathname !== '/preview') navigate('/');
               dashboard.setActiveTab(DBOT_TABS.TUTORIAL);
           }
         : undefined;

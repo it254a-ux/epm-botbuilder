@@ -16,14 +16,32 @@
     background: var(--general-main-1);
     color: var(--text-general);
 
+    // Grid, not a single centered column: on a wide desktop screen, each
+    // <section> (info-page__section) becomes its own card and the columns
+    // auto-fit to however many actually reach a comfortable reading width
+    // (minmax below), rather than one narrow strip of text with the rest of
+    // the screen sitting empty. Falls back to a single column on its own
+    // once the viewport can't fit two 34rem cards side by side -- no manual
+    // breakpoint needed.
     &__content {
-        flex: 1;
         width: 100%;
-        max-width: 72rem;
+        max-width: 128rem;
         margin: 0 auto;
-        padding: 4.8rem 2.4rem 6.4rem;
+        padding: 4.8rem 3.2rem 6.4rem;
         line-height: 1.65;
         counter-reset: info-section;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(34rem, 1fr));
+        gap: 2rem 2.4rem;
+        align-items: start;
+
+        // Everything that isn't a section (the eyebrow, h1, updated line,
+        // lead paragraph, and any top-level Callout) is the page's intro --
+        // spans the full width as its own row above the card grid, instead
+        // of becoming a lopsided grid cell of its own.
+        > :not(section) {
+            grid-column: 1 / -1;
+        }
 
         // A short mark above the eyebrow instead of a banner/hero block --
         // reads as a signature accent, not a decoration competing with the
@@ -39,6 +57,14 @@
         }
     }
 
+    // Each topical block, as its own card in the grid above.
+    &__section {
+        background: var(--general-section-1);
+        border-radius: 1.2rem;
+        padding: 2.4rem 2.8rem;
+        height: 100%;
+    }
+
     &__eyebrow {
         font-size: 1.2rem;
         font-weight: 700;
@@ -49,10 +75,11 @@
     }
 
     h1 {
-        font-size: 3.2rem;
+        font-size: 3.4rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         margin-bottom: 0.4rem;
+        max-width: 56rem;
     }
 
     h2 {
@@ -60,9 +87,8 @@
         display: flex;
         align-items: baseline;
         gap: 1.2rem;
-        font-size: 1.9rem;
+        font-size: 1.8rem;
         font-weight: 700;
-        margin-top: 3.6rem;
         margin-bottom: 1.2rem;
 
         &::before {
@@ -80,6 +106,16 @@
         font-size: 1.5rem;
         color: var(--text-general);
         margin-bottom: 1.2rem;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    // Intro paragraphs (outside any card) read best at article width even
+    // though the grid itself now spans the full wide container.
+    &__content > p {
+        max-width: 76rem;
     }
 
     ul,
@@ -114,10 +150,20 @@
         background: color-mix(in srgb, var(--info-accent) 8%, transparent);
         border-radius: 0 0.6rem 0.6rem 0;
         padding: 1.6rem 2rem;
-        margin: 2rem 0;
+        margin-bottom: 1.2rem;
         font-size: 1.6rem;
         font-weight: 600;
         line-height: 1.5;
+        max-width: 76rem;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    // Inside a card, the callout doesn't need the intro's article-width cap.
+    &__section &__callout {
+        max-width: none;
     }
 
     &__footer {
@@ -125,10 +171,11 @@
         padding: 2.4rem;
 
         nav {
-            max-width: 72rem;
+            max-width: 128rem;
             margin: 0 auto;
             display: flex;
             flex-wrap: wrap;
+            justify-content: center;
             gap: 0.8rem;
         }
 
