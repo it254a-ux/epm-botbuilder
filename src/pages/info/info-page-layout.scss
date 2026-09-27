@@ -28,6 +28,19 @@
     // the screen sitting empty. Falls back to a single column on its own
     // once the viewport can't fit two 34rem cards side by side -- no manual
     // breakpoint needed.
+    //
+    // minmax(min(34rem, 100%), 1fr) rather than plain minmax(34rem, 1fr):
+    // the plain version has a HARD 34rem floor on the track, so on any
+    // viewport narrower than that (every phone), the grid forced a column
+    // wider than the screen -- and since this renders inside .main-body
+    // (overflow: hidden, see the note above), that overflow wasn't even
+    // scrollable, it was just clipped off the edge of the screen. That's
+    // what made these pages look "cut" / "dragged" / "crashed" on mobile:
+    // it wasn't a phone-specific layout gone wrong, it was the desktop
+    // layout's own minimum width literally not fitting and getting sliced
+    // off. Wrapping the floor in min(34rem, 100%) lets the track shrink
+    // down to the container's actual width once it can't reach 34rem,
+    // instead of forcing the container wider than the screen.
     &__content {
         width: 100%;
         max-width: 128rem;
@@ -36,7 +49,7 @@
         line-height: 1.65;
         counter-reset: info-section;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(34rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(34rem, 100%), 1fr));
         grid-auto-flow: dense;
         gap: 2rem 2.4rem;
         align-items: start;
@@ -60,6 +73,17 @@
             border-radius: 0.2rem;
             margin-bottom: 2rem;
             background: var(--info-accent);
+        }
+
+        // Below this, the desktop paddings/font sizes (built for a 128rem-
+        // wide canvas) are themselves oversized for a phone screen -- large
+        // padding eats most of the readable width, and the 4rem heading /
+        // 7.2rem ghost numeral (comfortable at desktop card widths) crowd a
+        // single narrow mobile column. Scaled down together here instead of
+        // reusing the desktop sizes as-is.
+        @media (max-width: 60rem) {
+            padding: 2.8rem 1.6rem 4rem;
+            gap: 1.6rem;
         }
     }
 
@@ -112,6 +136,23 @@
         // reads as a template; one deliberately wider one reads as designed.
         &--featured {
             grid-column: span 2;
+
+            // Only one column exists once the grid has collapsed to a
+            // single mobile column, so spanning 2 has nothing left to mean
+            // -- made explicit here rather than relying on the browser to
+            // clamp it.
+            @media (max-width: 60rem) {
+                grid-column: span 1;
+            }
+        }
+
+        // Desktop padding (2.8rem) is generous on purpose for a 34rem+ wide
+        // card; on a single narrow mobile column it just eats into the
+        // reading width without adding anything, so it's trimmed down.
+        @media (max-width: 60rem) {
+            padding: 2rem;
+            max-height: none;
+            overflow-y: visible;
         }
     }
 
@@ -130,6 +171,15 @@
         opacity: 0.1;
         line-height: 1;
         pointer-events: none;
+
+        // At desktop size (7.2rem) against a ~310px-wide mobile card, this
+        // numeral was large enough to crowd or visually collide with the
+        // heading text next to it -- scaled down and pulled in so it still
+        // reads as a watermark, not a second heading fighting the first.
+        @media (max-width: 60rem) {
+            font-size: 4.4rem;
+            top: -0.8rem;
+        }
     }
 
     &__eyebrow {
@@ -154,6 +204,13 @@
         margin-bottom: 0.6rem;
         max-width: 56rem;
         color: var(--brand-primary);
+
+        // 4rem (40px) is sized for the desktop canvas; on a ~340px-wide
+        // phone screen it wraps to 2-3 lines and reads as oversized against
+        // everything else on the page.
+        @media (max-width: 60rem) {
+            font-size: 2.6rem;
+        }
     }
 
     h2 {
