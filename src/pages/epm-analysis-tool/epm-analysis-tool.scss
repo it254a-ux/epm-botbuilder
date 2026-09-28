@@ -424,6 +424,34 @@
         }
     }
 
+    &__rule {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        margin-bottom: 10px;
+        color: var(--text-general);
+    }
+
+    &__input--tiny {
+        width: 54px;
+        padding: 4px 6px;
+    }
+
+    &__badge {
+        display: inline-block;
+        margin-inline-start: 6px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        font-family: inherit;
+        background: var(--button-primary-default);
+        color: #fff;
+        white-space: nowrap;
+    }
+
     &__bot-list {
         display: flex;
         flex-direction: column;

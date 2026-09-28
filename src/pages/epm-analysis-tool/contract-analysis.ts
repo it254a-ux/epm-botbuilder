@@ -8,123 +8,77 @@ export interface ContractResultRow {
     observedPct: number;
     theoreticalPct: number;
     currentStreak: number;
+    /** How many of the last `windowN` ticks qualified for this side -- used by the user's own rule. */
+    recentCount: number;
 }
 
-/** Over/Under, restricted to the 80/20 splits only (no threshold sweep):
- *  Under 2 (0-1, 20%) vs Over 1 (2-9, 80%), and
- *  Over 7 (8-9, 20%) vs Under 8 (0-7, 80%).
- *  Each pair is complementary, so every row is either the 20% or 80% side. */
-export function buildOverUnderRows(ticks: EpmTick[]): ContractResultRow[] {
+const digitRow = (
+    ticks: EpmTick[],
+    windowN: number,
+    label: string,
+    qualifyingLabel: string,
+    theoreticalPct: number,
+    qualifies: (digit: number) => boolean
+): ContractResultRow => {
     const total = ticks.length || 1;
+    const hits = ticks.reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
+    let streak = 0;
+    for (let i = ticks.length - 1; i >= 0; i--) {
+        if (qualifies(ticks[i].digit)) break;
+        streak++;
+    }
+    const recentCount = ticks.slice(-windowN).reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
+    return { label, qualifyingLabel, observedPct: (hits / total) * 100, theoreticalPct, currentStreak: streak, recentCount };
+};
 
-    const makeRow = (
-        label: string,
-        qualifyingLabel: string,
-        theoreticalPct: number,
-        qualifies: (digit: number) => boolean
-    ): ContractResultRow => {
-        const hits = ticks.reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
-        let streak = 0;
-        for (let i = ticks.length - 1; i >= 0; i--) {
-            if (qualifies(ticks[i].digit)) break;
-            streak++;
-        }
-        return { label, qualifyingLabel, observedPct: (hits / total) * 100, theoreticalPct, currentStreak: streak };
-    };
-
+/** Over/Under: Under 2 (digits 0-1) vs Over 8 (digit 9). */
+export function buildOverUnderRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
     return [
-        makeRow('Under 2', '0–1', 20, d => d < 2),
-        makeRow('Over 1', '2–9', 80, d => d > 1),
-        makeRow('Over 7', '8–9', 20, d => d > 7),
-        makeRow('Under 8', '0–7', 80, d => d < 8),
+        digitRow(ticks, windowN, 'Under 2', '0–1', 20, d => d < 2),
+        digitRow(ticks, windowN, 'Over 8', '9', 10, d => d > 8),
     ];
 }
 
-/** Odd/Even -- theoretical baseline is 50/50, not 80/20; shown as-is. */
-export function buildOddEvenRows(ticks: EpmTick[]): ContractResultRow[] {
-    const total = ticks.length || 1;
-
-    const evenHits = ticks.reduce((acc, t) => acc + (t.digit % 2 === 0 ? 1 : 0), 0);
-    let evenStreak = 0;
-    for (let i = ticks.length - 1; i >= 0; i--) {
-        if (ticks[i].digit % 2 === 0) break;
-        evenStreak++;
-    }
-
-    const oddHits = total - evenHits;
-    let oddStreak = 0;
-    for (let i = ticks.length - 1; i >= 0; i--) {
-        if (ticks[i].digit % 2 !== 0) break;
-        oddStreak++;
-    }
-
+export function buildOddEvenRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
     return [
-        {
-            label: 'Even',
-            qualifyingLabel: '0,2,4,6,8',
-            observedPct: (evenHits / total) * 100,
-            theoreticalPct: 50,
-            currentStreak: evenStreak,
-        },
-        {
-            label: 'Odd',
-            qualifyingLabel: '1,3,5,7,9',
-            observedPct: (oddHits / total) * 100,
-            theoreticalPct: 50,
-            currentStreak: oddStreak,
-        },
+        digitRow(ticks, windowN, 'Even', '0,2,4,6,8', 50, d => d % 2 === 0),
+        digitRow(ticks, windowN, 'Odd', '1,3,5,7,9', 50, d => d % 2 !== 0),
     ];
 }
 
-/** Rise/Fall -- compares each tick's quote to the previous one.
- *  Theoretical baseline is 50/50, same as Odd/Even. Unchanged ticks
- *  (quote === previous quote) count toward neither side, same as how
- *  Deriv settles a Rise/Fall contract on an unchanged price. */
-export function buildRiseFallRows(ticks: EpmTick[]): ContractResultRow[] {
+/** Rise/Fall -- each tick's quote vs the previous one. Unchanged ticks count for neither side. */
+export function buildRiseFallRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
     let rises = 0;
     let falls = 0;
-    let decided = 0;
-    let riseStreak = 0;
-    let fallStreak = 0;
-
     for (let i = 1; i < ticks.length; i++) {
         const diff = ticks[i].quote - ticks[i - 1].quote;
-        if (diff > 0) {
-            rises++;
-            decided++;
-        } else if (diff < 0) {
-            falls++;
-            decided++;
-        }
+        if (diff > 0) rises++;
+        else if (diff < 0) falls++;
     }
+    const decided = rises + falls || 1;
 
+    let riseStreak = 0;
     for (let i = ticks.length - 1; i > 0; i--) {
-        const diff = ticks[i].quote - ticks[i - 1].quote;
-        if (diff <= 0) break;
+        if (ticks[i].quote - ticks[i - 1].quote > 0) break;
         riseStreak++;
     }
+    let fallStreak = 0;
     for (let i = ticks.length - 1; i > 0; i--) {
-        const diff = ticks[i].quote - ticks[i - 1].quote;
-        if (diff >= 0) break;
+        if (ticks[i].quote - ticks[i - 1].quote < 0) break;
         fallStreak++;
     }
 
-    const total = decided || 1;
+    let recentRises = 0;
+    let recentFalls = 0;
+    for (let i = Math.max(1, ticks.length - windowN); i < ticks.length; i++) {
+        const diff = ticks[i].quote - ticks[i - 1].quote;
+        if (diff > 0) recentRises++;
+        else if (diff < 0) recentFalls++;
+    }
+
     return [
-        {
-            label: 'Rise',
-            qualifyingLabel: 'quote > prev',
-            observedPct: (rises / total) * 100,
-            theoreticalPct: 50,
-            currentStreak: riseStreak,
-        },
-        {
-            label: 'Fall',
-            qualifyingLabel: 'quote < prev',
-            observedPct: (falls / total) * 100,
-            theoreticalPct: 50,
-            currentStreak: fallStreak,
-        },
+        { label: 'Rise', qualifyingLabel: 'quote > prev', observedPct: (rises / decided) * 100, theoreticalPct: 50, currentStreak: riseStreak, recentCount: recentRises },
+        { label: 'Fall', qualifyingLabel: 'quote < prev', observedPct: (falls / decided) * 100, theoreticalPct: 50, currentStreak: fallStreak, recentCount: recentFalls },
     ];
 }
 

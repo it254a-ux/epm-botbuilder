@@ -51,11 +51,11 @@ function fmtPct(n: number) {
 }
 
 const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: string }> = [
-    { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction vs the previous tick — theoretical baseline 50/50.' },
-    { type: 'odd_even', name: 'Odd/Even', description: "Last digit's parity — theoretical baseline 50/50." },
-    { type: 'over_under', name: 'Over/Under', description: '80/20 splits only: Under 2 vs Over 1, and Over 7 vs Under 8.' },
-    { type: 'accumulator', name: 'Accumulator', description: 'No digit split — reads current vs session volatility instead.' },
-    { type: 'multiplier', name: 'Multiplier', description: 'No digit split — same volatility read; leveraged, so a busy market cuts both ways.' },
+    { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction of each tick vs the previous one.' },
+    { type: 'odd_even', name: 'Odd/Even', description: "Whether the last digit is odd or even." },
+    { type: 'over_under', name: 'Over/Under', description: 'Under 2 vs Over 8.' },
+    { type: 'accumulator', name: 'Accumulator', description: 'Recent vs session volatility.' },
+    { type: 'multiplier', name: 'Multiplier', description: 'Recent vs session volatility.' },
 ];
 
 const usesVolatilityReading = (type: ContractType) => type === 'accumulator' || type === 'multiplier';
@@ -64,6 +64,9 @@ function EpmAnalysisTool() {
     const [symbol, setSymbol] = useState('1HZ75V');
     const [activeView, setActiveView] = useState<'live' | 'backtest'>('live');
     const [contractType, setContractType] = useState<ContractType>('over_under');
+    // The user's own rule: flag a side when it appeared at most `ruleMax` times in the last `ruleWindow` ticks.
+    const [ruleWindow, setRuleWindow] = useState(10);
+    const [ruleMax, setRuleMax] = useState(2);
 
     // Same DerivWS connection mechanism Dtrader already uses successfully
     // elsewhere in this app -- public/unauthenticated, no login required
@@ -75,15 +78,17 @@ function EpmAnalysisTool() {
     const contractRows = useMemo(() => {
         switch (contractType) {
             case 'over_under':
-                return buildOverUnderRows(ticks);
+                return buildOverUnderRows(ticks, ruleWindow);
             case 'odd_even':
-                return buildOddEvenRows(ticks);
+                return buildOddEvenRows(ticks, ruleWindow);
             case 'rise_fall':
-                return buildRiseFallRows(ticks);
+                return buildRiseFallRows(ticks, ruleWindow);
             default:
                 return null;
         }
-    }, [ticks, contractType]);
+    }, [ticks, contractType, ruleWindow]);
+
+    const isFlagged = (recentCount: number) => ticks.length >= ruleWindow && recentCount <= ruleMax;
 
     const accumulatorReading = useMemo(
         () => (usesVolatilityReading(contractType) ? computeAccumulatorReading(ticks) : null),
@@ -219,9 +224,6 @@ function EpmAnalysisTool() {
                                 </div>
                             ))}
                         </div>
-                        <div className='epm-analysis-tool__note'>
-                            <Localize i18n_default_text='Choosing a type changes the result on the right to what that contract actually settles on — it does not make one type "better" for a given streak.' />
-                        </div>
                     </div>
                 </div>
 
@@ -285,6 +287,35 @@ function EpmAnalysisTool() {
                                 </h2>
 
                                 {contractRows && (
+                                    <div className='epm-analysis-tool__rule'>
+                                        <span>
+                                            <Localize i18n_default_text='Your rule: flag a side when it appeared at most' />
+                                        </span>
+                                        <input
+                                            type='number'
+                                            className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
+                                            value={ruleMax}
+                                            min={0}
+                                            onChange={e => setRuleMax(Math.max(0, Number(e.target.value)))}
+                                        />
+                                        <span>
+                                            <Localize i18n_default_text='times in the last' />
+                                        </span>
+                                        <input
+                                            type='number'
+                                            className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
+                                            value={ruleWindow}
+                                            min={1}
+                                            max={200}
+                                            onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
+                                        />
+                                        <span>
+                                            <Localize i18n_default_text='ticks' />
+                                        </span>
+                                    </div>
+                                )}
+
+                                {contractRows && (
                                     <table className='epm-analysis-tool__table'>
                                         <thead>
                                             <tr>
@@ -293,6 +324,7 @@ function EpmAnalysisTool() {
                                                 <th>Observed</th>
                                                 <th>Theory</th>
                                                 <th>Streak</th>
+                                                <th>Last {ruleWindow}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -311,6 +343,14 @@ function EpmAnalysisTool() {
                                                     </td>
                                                     <td className='epm-analysis-tool__num'>{fmtPct(row.theoreticalPct)}</td>
                                                     <td className='epm-analysis-tool__num'>{row.currentStreak}</td>
+                                                    <td className='epm-analysis-tool__num'>
+                                                        {row.recentCount}/{ruleWindow}
+                                                        {isFlagged(row.recentCount) && (
+                                                            <span className='epm-analysis-tool__badge'>
+                                                                <Localize i18n_default_text='Rule met' />
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -348,26 +388,12 @@ function EpmAnalysisTool() {
                                             <Localize i18n_default_text='Collecting ticks…' />
                                         </div>
                                     ))}
-
-                                <div className='epm-analysis-tool__note'>
-                                    {contractType === 'over_under' && (
-                                        <Localize i18n_default_text='Shows the 80/20 splits only (Under 2 / Over 1 and Over 7 / Under 8) — not a sweep of every barrier.' />
-                                    )}
-                                    {contractType === 'odd_even' && (
-                                        <Localize i18n_default_text='Even and Odd are structurally 50/50 for a fair generator — persistent deviation here would be unusual, not a signal to chase.' />
-                                    )}
-                                    {contractType === 'rise_fall' && (
-                                        <Localize i18n_default_text='Rise/Fall on a synthetic index has no memory between ticks — this is a live read, not a forecast of the next one.' />
-                                    )}
-                                    {usesVolatilityReading(contractType) && (
-                                        <Localize i18n_default_text='Purely descriptive — a busier recent window than the session average is not a cue to enter or exit.' />
-                                    )}
-                                </div>
                             </div>
 
                             <BotShortcuts
                                 contractType={contractType}
                                 sides={contractRows ? contractRows.map(r => r.label) : [CONTRACT_TYPES.find(c => c.type === contractType)?.name ?? '']}
+                                flaggedSides={contractRows ? contractRows.filter(r => isFlagged(r.recentCount)).map(r => r.label) : []}
                             />
 
                             <div className='epm-analysis-tool__cols-2'>
@@ -404,10 +430,6 @@ function EpmAnalysisTool() {
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className='epm-analysis-tool__note'>
-                                <Localize i18n_default_text='Frequencies converge toward theoretical values as sample size grows — early deviation is sampling noise, not a market condition.' />
                             </div>
                         </>
                     )}

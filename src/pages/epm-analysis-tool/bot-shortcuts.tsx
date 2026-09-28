@@ -22,21 +22,20 @@ const readChoices = (): Record<string, number> => {
     }
 };
 
-const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 interface Props {
     contractType: ContractType;
     /** One entry per side shown in the result (or a single entry for types with no split). */
     sides: string[];
+    /** Sides where the user's own rule is currently met -- shown as a badge only. */
+    flaggedSides?: string[];
 }
 
 /**
- * Manual shortcuts: you choose which of your bots goes with each side, then
- * press "Load bot". Nothing here reads streaks or observed percentages --
- * it never suggests, highlights or auto-loads a bot based on the numbers,
- * and it only loads (never runs) the bot.
+ * Shortcuts: you choose which of your bots goes with each side, then press
+ * "Load bot". It loads the bot into Bot Builder and never runs it. A "Rule
+ * met" badge just repeats the user's own rule from the result table.
  */
-function BotShortcuts({ contractType, sides }: Props) {
+function BotShortcuts({ contractType, sides, flaggedSides = [] }: Props) {
     const { bots, loadingBotId, loadBot } = useBotLoader();
     const [choices, setChoices] = useState<Record<string, number>>(readChoices);
 
@@ -46,16 +45,7 @@ function BotShortcuts({ contractType, sides }: Props) {
 
     const keyFor = (side: string) => `${contractType}:${side}`;
 
-    // With no saved choice, pre-select a bot only for Over/Under, and only
-    // when exactly one bot in that category has the side's name in its own
-    // name (e.g. "Under 2" -> "Under 2 Sniper"). Anything else stays empty.
-    const defaultFor = (side: string): number | undefined => {
-        if (contractType !== 'over_under') return undefined;
-        const matches = inCategory.filter(b => normalize(b.name).includes(normalize(side)));
-        return matches.length === 1 ? matches[0].id : undefined;
-    };
-
-    const selectedFor = (side: string) => choices[keyFor(side)] ?? defaultFor(side);
+    const selectedFor = (side: string) => choices[keyFor(side)];
 
     const onChoose = (side: string, botId: number | undefined) => {
         const next = { ...choices };
@@ -80,7 +70,14 @@ function BotShortcuts({ contractType, sides }: Props) {
                     const selectedBot = bots.find(b => b.id === selectedId);
                     return (
                         <div className='epm-analysis-tool__bot-row' key={side}>
-                            <span className='epm-analysis-tool__bot-side'>{side}</span>
+                            <span className='epm-analysis-tool__bot-side'>
+                                {side}
+                                {flaggedSides.includes(side) && (
+                                    <span className='epm-analysis-tool__badge'>
+                                        <Localize i18n_default_text='Rule met' />
+                                    </span>
+                                )}
+                            </span>
                             <select
                                 className='epm-analysis-tool__select'
                                 value={selectedId ?? ''}
@@ -121,7 +118,7 @@ function BotShortcuts({ contractType, sides }: Props) {
                 })}
             </div>
             <div className='epm-analysis-tool__note'>
-                <Localize i18n_default_text='Loads the bot into Bot Builder — you still review and press Run yourself. This is a shortcut, not a signal: it never picks or loads a bot based on the numbers above.' />
+                <Localize i18n_default_text='Loads the bot into Bot Builder. You press Run yourself.' />
             </div>
         </div>
     );
