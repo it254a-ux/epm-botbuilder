@@ -31,6 +31,16 @@ const result_columns = (): TColumn[] => [
     { key: 'balance', label: localize('Balance') },
 ];
 
+// This popup is the record of every contract a bot placed (first stake to
+// last, e.g. a whole martingale stack), so it should open tall enough to show
+// as many of them as possible in ONE screenshot rather than at a fixed 404px
+// that needs scrolling after ~5 rows. Sized from the screen it's opened on,
+// minus room for the app header above it and a margin below; it can never be
+// smaller than the old 404px, and the resize handles still work as before.
+const MIN_MODAL_HEIGHT = 404;
+const VERTICAL_SPACE_RESERVED = 140;
+const getModalHeight = () => Math.max(MIN_MODAL_HEIGHT, window.innerHeight - VERTICAL_SPACE_RESERVED);
+
 const TransactionDetailsDesktop = observer(() => {
     const { client } = useStore();
     const { loginid, balance } = client;
@@ -50,9 +60,9 @@ const TransactionDetailsDesktop = observer(() => {
                     header={localize('Transactions detailed summary')}
                     onClose={() => toggleTransactionDetailsModal(false)}
                     modalWidth={882}
-                    modalHeight={404}
+                    modalHeight={getModalHeight()}
                     minWidth={882}
-                    minHeight={404}
+                    minHeight={MIN_MODAL_HEIGHT}
                     enableResizing
                 >
                     <DesktopTransactionTable
