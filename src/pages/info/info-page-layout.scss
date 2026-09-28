@@ -23,26 +23,21 @@
     background: var(--general-main-1);
     color: var(--text-general);
 
-    // Grid, not a single centered column: on a wide desktop screen, each
-    // <section> (info-page__section) becomes its own card and the columns
-    // auto-fit to however many actually reach a comfortable reading width
-    // (minmax below), rather than one narrow strip of text with the rest of
-    // the screen sitting empty. Falls back to a single column on its own
-    // once the viewport can't fit two 34rem cards side by side -- no manual
-    // breakpoint needed.
+    // A wrapping row of equal-height cards, not a single centered column: on
+    // a wide screen each <InfoSection> card sits beside its siblings, and
+    // falls back to fewer per row (down to one on a phone) on its own.
     //
-    // minmax(min(34rem, 100%), 1fr) rather than plain minmax(34rem, 1fr):
-    // the plain version has a HARD 34rem floor on the track, so on any
-    // viewport narrower than that (every phone), the grid forced a column
-    // wider than the screen -- and since this renders inside .main-body
-    // (overflow: hidden, see the note above), that overflow wasn't even
-    // scrollable, it was just clipped off the edge of the screen. That's
-    // what made these pages look "cut" / "dragged" / "crashed" on mobile:
-    // it wasn't a phone-specific layout gone wrong, it was the desktop
-    // layout's own minimum width literally not fitting and getting sliced
-    // off. Wrapping the floor in min(34rem, 100%) lets the track shrink
-    // down to the container's actual width once it can't reach 34rem,
-    // instead of forcing the container wider than the screen.
+    // Flex-wrap rather than CSS grid on purpose: every card has flex-grow: 1,
+    // so whatever cards land on the LAST row stretch to share that row's full
+    // width. A grid can't do that -- an odd card count always leaves empty
+    // cells beside the final card, which is the blank space that kept
+    // showing up at the bottom of each page. Widths flex, heights never do.
+    //
+    // The card's flex-basis is min(34rem, 100%) -- a plain 34rem basis would
+    // be wider than a phone screen, and since this renders inside .main-body
+    // (overflow: hidden, see the note above) that excess would be clipped
+    // off the edge rather than scrolled, which is what made these pages look
+    // "cut" / "crashed" on mobile before.
     &__content {
         width: 100%;
         max-width: 128rem;
@@ -50,36 +45,27 @@
         padding: 4.8rem 3.2rem 6.4rem;
         line-height: 1.65;
         counter-reset: info-section;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(34rem, 100%), 1fr));
-        grid-auto-flow: dense;
+        display: flex;
+        flex-wrap: wrap;
         gap: 2rem 2.4rem;
-        align-items: start;
+        align-items: flex-start;
 
         // Everything that isn't a section (the eyebrow, h1, updated line,
         // lead paragraph, and any top-level Callout) is the page's intro --
-        // spans the full width as its own row above the card grid, instead
-        // of becoming a lopsided grid cell of its own.
+        // takes a full row of its own above the cards.
         > :not(section) {
-            grid-column: 1 / -1;
+            flex: 0 0 100%;
         }
 
         // A short mark above the eyebrow instead of a banner/hero block --
         // reads as a signature accent, not a decoration competing with the
-        // content.
-        //
-        // grid-column: 1/-1 here isn't decorative -- it's load-bearing. A
-        // ::before generated on a grid CONTAINER becomes an actual grid item
-        // (per spec), and without an explicit column it auto-placed into
-        // column 1 alone. grid-auto-flow: dense then saw the empty columns
-        // next to it in that same row and packed the section cards straight
-        // into them -- which is exactly what was pushing the real eyebrow/
-        // h1/intro text down below the cards, and leaving that big blank
-        // area on the left next to the first row of cards.
+        // content. It's a flex item of the container (a ::before on a flex/
+        // grid container is one), but the intro rows after it each take a
+        // full 100% line, so it always ends up alone on its own line.
         &::before {
             content: '';
             display: block;
-            grid-column: 1 / -1;
+            flex: none;
             width: 4.8rem;
             height: 0.4rem;
             border-radius: 0.2rem;
@@ -99,29 +85,32 @@
         }
     }
 
-    // Each topical block, as its own card in the grid above. A faint tint of
-    // the page's own accent (not a solid color) plus a lift on hover, so the
-    // grid feels considered rather than a mechanical, identical repeat.
+    // Each topical block, as its own card. A faint tint of the page's own
+    // accent (not a solid color) plus a lift on hover.
     //
-    // Fixed height (not height: 100%, and not the earlier internal-scroll
-    // cap) -- every card is now the SAME height as its siblings on both
-    // desktop and mobile, like the card grid in EPM's own Trading Bots tab
-    // (freebots.tsx/.scss). Content that doesn't fit is clipped by the
-    // fade below and revealed by clicking the card (see InfoSection in
-    // info-page-layout.tsx), the same "fixed card + pop-out modal" pattern
-    // those bot cards already use, rather than a card that grows/shrinks
-    // per section or scrolls internally.
+    // EVERY card is the same fixed height -- desktop and mobile -- exactly
+    // like the bot cards on the Trading Bots tab (freebots.tsx/.scss).
+    // Content that doesn't fit is clipped behind a fade, and clicking
+    // anywhere on the card opens the full text in a modal (see InfoSection
+    // in info-page-layout.tsx). Width is the only thing that flexes (see
+    // &__content above), never height.
     &__section {
         position: relative;
         overflow: hidden;
+        flex: 1 1 min(34rem, 100%);
         background: var(--general-section-1);
         border: 1px solid color-mix(in srgb, var(--info-accent) 12%, var(--general-section-1));
         border-radius: 1.2rem;
-        padding: 2.8rem;
-        height: 26rem;
+        padding: 2.4rem;
+        height: 22rem;
         display: flex;
         flex-direction: column;
         cursor: pointer;
+        // The numbering lives on the card itself (see ::before below), so the
+        // counter has to tick up here, on the same element -- ticking it on
+        // the h2 inside would run AFTER this card's own ::before had already
+        // been generated, and every number would be one behind.
+        counter-increment: info-section;
         transition:
             transform 0.2s ease,
             box-shadow 0.2s ease;
@@ -136,46 +125,49 @@
             outline-offset: 2px;
         }
 
-        // One section per page is marked --featured (see each page's .tsx)
-        // to break the grid's rhythm AND because it typically holds more
-        // content (a callout plus extra paragraphs) -- a taller fixed
-        // height of its own, not the same 26rem as a plain one-paragraph
-        // card, so it doesn't need to clip as aggressively.
-        &--featured {
-            grid-column: span 2;
-            height: 32rem;
-
-            // Only one column exists once the grid has collapsed to a
-            // single mobile column, so spanning 2 has nothing left to mean
-            // -- made explicit here rather than relying on the browser to
-            // clamp it.
-            @media (max-width: 60rem) {
-                grid-column: span 1;
-            }
+        // A large, faint serif numeral in the card's top-right corner. It
+        // sits INSIDE the card (never bleeding above/outside it), and the
+        // h2 reserves room for it (padding-inline-end below) so a long,
+        // wrapping heading can't run underneath it -- that overlap is what
+        // the old, larger, h2-anchored numeral kept causing.
+        &::before {
+            content: counter(info-section, decimal-leading-zero);
+            position: absolute;
+            top: 1rem;
+            inset-inline-end: 1.6rem;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-size: 4.4rem;
+            font-weight: 700;
+            color: var(--info-accent);
+            opacity: 0.14;
+            line-height: 1;
+            pointer-events: none;
         }
 
-        // Desktop padding (2.8rem) is generous on purpose for a 34rem+ wide
-        // card; on a single narrow mobile column it just eats into the
-        // reading width without adding anything, so it's trimmed down.
-        // Height stays fixed on mobile too (same reasoning as desktop --
-        // one consistent card height, not "whatever this section's text
-        // happens to need").
+        h2 {
+            padding-inline-end: 6rem;
+        }
+
         @media (max-width: 60rem) {
             padding: 2rem;
-            height: 22rem;
+            height: 24rem;
 
-            &.info-page__section--featured {
-                height: 27rem;
+            &::before {
+                font-size: 3.4rem;
+                top: 0.8rem;
+                inset-inline-end: 1.4rem;
+            }
+
+            h2 {
+                padding-inline-end: 4.8rem;
             }
         }
     }
 
     // Wraps everything below the h2 (paragraphs, lists, Callouts). flex: 1
-    // lets it claim exactly the card's remaining fixed height, and
-    // overflow: hidden + the ::after fade below are what let a card sized
-    // for a one-paragraph section also hold a five-paragraph one -- clipped
-    // instead of stretching the card (which is exactly the empty-box and
-    // uneven-row problems fixed earlier) or overflowing it.
+    // lets it claim exactly the card's remaining fixed height; overflow:
+    // hidden + the ::after fade let a short section and a five-paragraph one
+    // sit in identical cards -- the long one is clipped, not stretched.
     &__section-body {
         position: relative;
         flex: 1;
@@ -193,9 +185,8 @@
         }
     }
 
-    // Sits over the fade, bottom-right -- the visual cue that there's more
-    // to read and that the card itself is the thing to click, rather than
-    // hunting for a separate "Learn more" button somewhere in the text.
+    // Sits over the fade, bottom-right -- the cue that the whole card is
+    // clickable for the full text, rather than hunting for a button.
     &__section-more {
         position: absolute;
         bottom: 0.8rem;
@@ -208,32 +199,6 @@
 
         @media (max-width: 60rem) {
             inset-inline-end: 1.4rem;
-        }
-    }
-
-    // A large, low-opacity serif numeral behind each card's heading, instead
-    // of a small inline prefix -- the numbering does real work (skimming,
-    // referencing "section 3") without competing with the heading text.
-    &__section h2::before {
-        content: counter(info-section, decimal-leading-zero);
-        position: absolute;
-        top: -1.6rem;
-        inset-inline-end: 0.8rem;
-        font-family: Georgia, 'Times New Roman', Times, serif;
-        font-size: 7.2rem;
-        font-weight: 700;
-        color: var(--info-accent);
-        opacity: 0.1;
-        line-height: 1;
-        pointer-events: none;
-
-        // At desktop size (7.2rem) against a ~310px-wide mobile card, this
-        // numeral was large enough to crowd or visually collide with the
-        // heading text next to it -- scaled down and pulled in so it still
-        // reads as a watermark, not a second heading fighting the first.
-        @media (max-width: 60rem) {
-            font-size: 4.4rem;
-            top: -0.8rem;
         }
     }
 
@@ -270,7 +235,6 @@
 
     h2 {
         position: relative;
-        counter-increment: info-section;
         font-size: 1.8rem;
         font-weight: 800;
         margin-bottom: 1.2rem;

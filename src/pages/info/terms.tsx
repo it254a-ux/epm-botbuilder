@@ -30,7 +30,7 @@ const TermsPage = () => (
             </p>
         </InfoSection>
 
-        <InfoSection title='We do not hold your funds' featured>
+        <InfoSection title='We do not hold your funds'>
             <Callout>EPM does not hold, custody, or have access to your trading funds at any point.</Callout>
             <p>
                 All deposits, withdrawals, balances, and trade execution are handled directly by Deriv on
@@ -114,7 +114,8 @@ const TermsPage = () => (
 
         <InfoSection title='Changes to these terms'>
             <p>
-                We may update these terms from time to time. Continued use of the software after a change
+                We may update these terms from time to time; the &ldquo;Last updated&rdquo; date at the top
+                of this page shows when they last changed. Continued use of the software after a change
                 means you accept the updated terms.
             </p>
         </InfoSection>
@@ -122,7 +123,7 @@ const TermsPage = () => (
         <InfoSection title='Contact'>
             <p>
                 Questions about these terms can be sent through our <Link to='/contact'>Contact us</Link>{' '}
-                page.
+                page. Please don&apos;t include your Deriv password or API tokens in any message to us.
             </p>
         </InfoSection>
     </InfoPageLayout>

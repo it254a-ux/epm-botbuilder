@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import InfoPageLayout, { Callout } from './info-page-layout';
+import InfoPageLayout, { Callout, InfoSection } from './info-page-layout';
 
 const AboutPage = () => (
     <InfoPageLayout eyebrow='Company' title='About us' accent='var(--brand-primary)'>
@@ -12,8 +12,7 @@ const AboutPage = () => (
             or endorsed by Deriv.
         </Callout>
 
-        <section className='info-page__section'>
-            <h2>Who we are</h2>
+        <InfoSection title='Who we are'>
             <p>
                 {/* TODO: replace with your real registered entity name/jurisdiction once available. */}
                 EPM builds and maintains client-side tools that connect to Deriv&apos;s public API using
@@ -21,10 +20,9 @@ const AboutPage = () => (
                 our own brokerage, and we don&apos;t issue our own trading accounts &mdash; every account
                 you use through this platform is a Deriv account.
             </p>
-        </section>
+        </InfoSection>
 
-        <section className='info-page__section'>
-            <h2>How the platform works</h2>
+        <InfoSection title='How the platform works'>
             <p>
                 Under the hood, three things happen when you use EPM: you authenticate with Deriv through
                 its standard OAuth screen, our interface talks to Deriv&apos;s API on your behalf to read
@@ -37,10 +35,9 @@ const AboutPage = () => (
                 infrastructure of ours before reaching Deriv &mdash; the API call goes straight from your
                 browser to Deriv.
             </p>
-        </section>
+        </InfoSection>
 
-        <section className='info-page__section info-page__section--featured'>
-            <h2>Our relationship with Deriv</h2>
+        <InfoSection title='Our relationship with Deriv'>
             <p>
                 All trades placed through this platform are executed directly on your Deriv account via the
                 Deriv API. We do not act as a broker, and we do not place ourselves between you and Deriv as
@@ -50,10 +47,9 @@ const AboutPage = () => (
                 Deriv, not EPM, is the counterparty responsible for executing and settling your trades,
                 holding your funds, and handling withdrawals and deposits.
             </Callout>
-        </section>
+        </InfoSection>
 
-        <section className='info-page__section'>
-            <h2>What we don&apos;t do</h2>
+        <InfoSection title='What we don&apos;t do'>
             <p>To be direct about the boundaries of what this platform is:</p>
             <ul>
                 <li>We don&apos;t hold, custody, or have access to your trading funds at any point.</li>
@@ -65,26 +61,24 @@ const AboutPage = () => (
                 See our <Link to='/legal/risk-disclosure'>Risk disclosure</Link> for the full detail on
                 trading risk.
             </p>
-        </section>
+        </InfoSection>
 
-        <section className='info-page__section'>
-            <h2>Our mission</h2>
+        <InfoSection title='Our mission'>
             <p>
                 We aim to make automated and discretionary trading on Deriv more accessible &mdash; through
                 a visual bot builder, ready-made strategies, and a cleaner interface &mdash; without asking
                 you to hand over custody of your funds or your account credentials to a third party.
             </p>
-        </section>
+        </InfoSection>
 
-        <section className='info-page__section'>
-            <h2>Questions</h2>
+        <InfoSection title='Questions'>
             <p>
                 See our <Link to='/contact'>Contact us</Link> page for how to reach us, and our{' '}
                 <Link to='/legal/risk-disclosure'>Risk disclosure</Link>,{' '}
                 <Link to='/legal/terms'>Terms &amp; conditions</Link>, and{' '}
                 <Link to='/legal/privacy-policy'>Privacy policy</Link> for the legal detail.
             </p>
-        </section>
+        </InfoSection>
     </InfoPageLayout>
 );
 

@@ -60,24 +60,15 @@ const InfoPageLayout = ({ eyebrow, title, accent, updated, children }: TInfoPage
  *  regular paragraph flow instead of leaning on <strong> alone. */
 export const Callout = ({ children }: { children: ReactNode }) => <div className='info-page__callout'>{children}</div>;
 
-// One topic block, rendered as a fixed-height card (all cards on a page are
-// the same height -- see info-page-layout.scss -- a --featured one is
-// deliberately taller for a section that typically carries more content,
-// not "as tall as whatever this section's own text needs"). Whatever
-// doesn't fit is clipped behind a fade at the card's own bottom edge;
+// One topic block, rendered as a fixed-height card. Every card on every
+// page is the SAME height (see info-page-layout.scss) -- not "as tall as
+// whatever this section's own text needs". Whatever doesn't fit is clipped
+// behind a fade at the card's own bottom edge;
 // clicking anywhere on the card (not just a specific button) opens the same
 // content in full via a modal -- the same fixed-card + pop-out-modal
 // pattern already used for the bot cards on the Trading Bots tab
 // (src/pages/epm-trading-bots/freebots/freebots.tsx).
-export const InfoSection = ({
-    title,
-    featured,
-    children,
-}: {
-    title: string;
-    featured?: boolean;
-    children: ReactNode;
-}) => {
+export const InfoSection = ({ title, children }: { title: string; children: ReactNode }) => {
     const [isOpen, setIsOpen] = useState(false);
 
     // A card can contain a real <Link> (e.g. "see our Risk disclosure") --
@@ -97,7 +88,7 @@ export const InfoSection = ({
     return (
         <>
             <section
-                className={`info-page__section${featured ? ' info-page__section--featured' : ''}`}
+                className='info-page__section'
                 onClick={handleCardClick}
                 onKeyDown={handleKeyDown}
                 role='button'
