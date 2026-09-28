@@ -31,11 +31,11 @@ const digitRow = (
     return { label, qualifyingLabel, observedPct: (hits / total) * 100, theoreticalPct, currentStreak: streak, recentCount };
 };
 
-/** Over/Under: Under 2 (digits 0-1) vs Over 8 (digit 9). */
+/** Over/Under: Under 2 (digits 0-1) vs Over 7 (digits 8-9). */
 export function buildOverUnderRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
     return [
         digitRow(ticks, windowN, 'Under 2', '0–1', 20, d => d < 2),
-        digitRow(ticks, windowN, 'Over 8', '9', 10, d => d > 8),
+        digitRow(ticks, windowN, 'Over 7', '8–9', 20, d => d > 7),
     ];
 }
 

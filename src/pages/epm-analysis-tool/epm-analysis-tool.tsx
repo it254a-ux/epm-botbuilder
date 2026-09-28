@@ -53,7 +53,7 @@ function fmtPct(n: number) {
 const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: string }> = [
     { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction of each tick vs the previous one.' },
     { type: 'odd_even', name: 'Odd/Even', description: "Whether the last digit is odd or even." },
-    { type: 'over_under', name: 'Over/Under', description: 'Under 2 vs Over 8.' },
+    { type: 'over_under', name: 'Over/Under', description: 'Under 2 vs Over 7.' },
     { type: 'accumulator', name: 'Accumulator', description: 'Recent vs session volatility.' },
     { type: 'multiplier', name: 'Multiplier', description: 'Recent vs session volatility.' },
 ];
@@ -88,7 +88,18 @@ function EpmAnalysisTool() {
         }
     }, [ticks, contractType, ruleWindow]);
 
-    const isFlagged = (recentCount: number) => ticks.length >= ruleWindow && recentCount <= ruleMax;
+    // Rise/Fall and Odd/Even: flag the side that appeared less in the window
+    // (the other side appeared most). Over/Under: flag a side that appeared at
+    // most `ruleMax` times in the window.
+    const isTwoSided = contractType === 'rise_fall' || contractType === 'odd_even';
+    const flaggedLabels: string[] =
+        contractRows && ticks.length >= ruleWindow
+            ? contractRows
+                  .filter((row, i) =>
+                      isTwoSided ? row.recentCount < contractRows[1 - i].recentCount : row.recentCount <= ruleMax
+                  )
+                  .map(row => row.label)
+            : [];
 
     const accumulatorReading = useMemo(
         () => (usesVolatilityReading(contractType) ? computeAccumulatorReading(ticks) : null),
@@ -288,30 +299,51 @@ function EpmAnalysisTool() {
 
                                 {contractRows && (
                                     <div className='epm-analysis-tool__rule'>
-                                        <span>
-                                            <Localize i18n_default_text='Your rule: flag a side when it appeared at most' />
-                                        </span>
-                                        <input
-                                            type='number'
-                                            className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                            value={ruleMax}
-                                            min={0}
-                                            onChange={e => setRuleMax(Math.max(0, Number(e.target.value)))}
-                                        />
-                                        <span>
-                                            <Localize i18n_default_text='times in the last' />
-                                        </span>
-                                        <input
-                                            type='number'
-                                            className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                            value={ruleWindow}
-                                            min={1}
-                                            max={200}
-                                            onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
-                                        />
-                                        <span>
-                                            <Localize i18n_default_text='ticks' />
-                                        </span>
+                                        {isTwoSided ? (
+                                            <>
+                                                <span>
+                                                    <Localize i18n_default_text='Your rule: flag the side that appeared less in the last' />
+                                                </span>
+                                                <input
+                                                    type='number'
+                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
+                                                    value={ruleWindow}
+                                                    min={1}
+                                                    max={200}
+                                                    onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
+                                                />
+                                                <span>
+                                                    <Localize i18n_default_text='ticks' />
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>
+                                                    <Localize i18n_default_text='Your rule: flag a side when it appeared at most' />
+                                                </span>
+                                                <input
+                                                    type='number'
+                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
+                                                    value={ruleMax}
+                                                    min={0}
+                                                    onChange={e => setRuleMax(Math.max(0, Number(e.target.value)))}
+                                                />
+                                                <span>
+                                                    <Localize i18n_default_text='times in the last' />
+                                                </span>
+                                                <input
+                                                    type='number'
+                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
+                                                    value={ruleWindow}
+                                                    min={1}
+                                                    max={200}
+                                                    onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
+                                                />
+                                                <span>
+                                                    <Localize i18n_default_text='ticks' />
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
                                 )}
 
@@ -324,7 +356,7 @@ function EpmAnalysisTool() {
                                                 <th>Observed</th>
                                                 <th>Theory</th>
                                                 <th>Streak</th>
-                                                <th>Last {ruleWindow}</th>
+                                                <th>Wins, last {ruleWindow}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -345,7 +377,7 @@ function EpmAnalysisTool() {
                                                     <td className='epm-analysis-tool__num'>{row.currentStreak}</td>
                                                     <td className='epm-analysis-tool__num'>
                                                         {row.recentCount}/{ruleWindow}
-                                                        {isFlagged(row.recentCount) && (
+                                                        {flaggedLabels.includes(row.label) && (
                                                             <span className='epm-analysis-tool__badge'>
                                                                 <Localize i18n_default_text='Rule met' />
                                                             </span>
@@ -393,7 +425,7 @@ function EpmAnalysisTool() {
                             <BotShortcuts
                                 contractType={contractType}
                                 sides={contractRows ? contractRows.map(r => r.label) : [CONTRACT_TYPES.find(c => c.type === contractType)?.name ?? '']}
-                                flaggedSides={contractRows ? contractRows.filter(r => isFlagged(r.recentCount)).map(r => r.label) : []}
+                                flaggedSides={flaggedLabels}
                             />
 
                             <div className='epm-analysis-tool__cols-2'>
