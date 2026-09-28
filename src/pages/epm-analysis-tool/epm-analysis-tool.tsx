@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { observer } from 'mobx-react-lite';
+import { useStore } from '@/hooks/useStore';
+import { useDevice } from '@deriv-com/ui';
 import { useDerivWS } from '@deriv/core';
 import { Localize, localize } from '@deriv-com/translations';
 import { useEpmTickStats, fetchBacktestDigits, RECENT_TICKS_SHOWN } from './use-epm-tick-stats';
@@ -60,13 +63,26 @@ const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: str
 
 const usesVolatilityReading = (type: ContractType) => type === 'accumulator' || type === 'multiplier';
 
-function EpmAnalysisTool() {
+// The Run panel is a position:fixed drawer (same as on Charts / TradingView),
+// so this page reserves its width on desktop to sit beside it instead of under it.
+const DESKTOP_DRAWER_OPEN_WIDTH = 366;
+const DESKTOP_DRAWER_CLOSED_WIDTH = 16;
+
+const EpmAnalysisTool = observer(() => {
+    const { run_panel } = useStore();
+    const { isDesktop } = useDevice();
+    const reservedWidth = isDesktop
+        ? run_panel.is_drawer_open
+            ? DESKTOP_DRAWER_OPEN_WIDTH
+            : DESKTOP_DRAWER_CLOSED_WIDTH
+        : 0;
+
     const [symbol, setSymbol] = useState('1HZ75V');
     const [activeView, setActiveView] = useState<'live' | 'backtest'>('live');
     const [contractType, setContractType] = useState<ContractType>('over_under');
-    // The user's own rule: flag a side when it appeared at most `ruleMax` times in the last `ruleWindow` ticks.
+    // The user's own rule: flag a side when at least `ruleFailPct`% of the last `ruleWindow` ticks were failures for it.
     const [ruleWindow, setRuleWindow] = useState(10);
-    const [ruleMax, setRuleMax] = useState(2);
+    const [ruleFailPct, setRuleFailPct] = useState(80);
 
     // Same DerivWS connection mechanism Dtrader already uses successfully
     // elsewhere in this app -- public/unauthenticated, no login required
@@ -90,13 +106,13 @@ function EpmAnalysisTool() {
 
     // Rise/Fall and Odd/Even: flag the side that appeared less in the window
     // (the other side appeared most). Over/Under: flag a side that appeared at
-    // most `ruleMax` times in the window.
+    // `ruleFailPct`% failures in the window.
     const isTwoSided = contractType === 'rise_fall' || contractType === 'odd_even';
     const flaggedLabels: string[] =
         contractRows && ticks.length >= ruleWindow
             ? contractRows
                   .filter((row, i) =>
-                      isTwoSided ? row.recentCount < contractRows[1 - i].recentCount : row.recentCount <= ruleMax
+                      isTwoSided ? row.recentCount < contractRows[1 - i].recentCount : ((ruleWindow - row.recentCount) / ruleWindow) * 100 >= ruleFailPct
                   )
                   .map(row => row.label)
             : [];
@@ -170,7 +186,10 @@ function EpmAnalysisTool() {
     };
 
     return (
-        <div className='epm-analysis-tool'>
+        <div
+            className='epm-analysis-tool'
+            style={{ width: `calc(100% - ${reservedWidth}px)`, transition: 'width 0.3s ease' }}
+        >
             <h1 className='epm-analysis-tool__title'>
                 <Localize i18n_default_text='EPM Analysis Tool' />
             </h1>
@@ -319,17 +338,18 @@ function EpmAnalysisTool() {
                                         ) : (
                                             <>
                                                 <span>
-                                                    <Localize i18n_default_text='Your rule: flag a side when it appeared at most' />
+                                                    <Localize i18n_default_text='Your rule: flag a side when at least' />
                                                 </span>
                                                 <input
                                                     type='number'
                                                     className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                                    value={ruleMax}
+                                                    value={ruleFailPct}
                                                     min={0}
-                                                    onChange={e => setRuleMax(Math.max(0, Number(e.target.value)))}
+                                                    max={100}
+                                                    onChange={e => setRuleFailPct(Math.min(100, Math.max(0, Number(e.target.value))))}
                                                 />
                                                 <span>
-                                                    <Localize i18n_default_text='times in the last' />
+                                                    <Localize i18n_default_text='% of the last' />
                                                 </span>
                                                 <input
                                                     type='number'
@@ -340,7 +360,7 @@ function EpmAnalysisTool() {
                                                     onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
                                                 />
                                                 <span>
-                                                    <Localize i18n_default_text='ticks' />
+                                                    <Localize i18n_default_text='ticks failed' />
                                                 </span>
                                             </>
                                         )}
@@ -376,7 +396,10 @@ function EpmAnalysisTool() {
                                                     <td className='epm-analysis-tool__num'>{fmtPct(row.theoreticalPct)}</td>
                                                     <td className='epm-analysis-tool__num'>{row.currentStreak}</td>
                                                     <td className='epm-analysis-tool__num'>
-                                                        {row.recentCount}/{ruleWindow}
+                                                        {row.recentCount}/{ruleWindow}{' '}
+                                                        <span className='epm-analysis-tool__muted'>
+                                                            ({Math.round(((ruleWindow - row.recentCount) / ruleWindow) * 100)}% failed)
+                                                        </span>
                                                         {flaggedLabels.includes(row.label) && (
                                                             <span className='epm-analysis-tool__badge'>
                                                                 <Localize i18n_default_text='Rule met' />
@@ -426,6 +449,7 @@ function EpmAnalysisTool() {
                                 contractType={contractType}
                                 sides={contractRows ? contractRows.map(r => r.label) : [CONTRACT_TYPES.find(c => c.type === contractType)?.name ?? '']}
                                 flaggedSides={flaggedLabels}
+                                requireFlag={!!contractRows}
                             />
 
                             <div className='epm-analysis-tool__cols-2'>
@@ -722,6 +746,6 @@ function EpmAnalysisTool() {
             </div>
         </div>
     );
-}
+});
 
 export default EpmAnalysisTool;

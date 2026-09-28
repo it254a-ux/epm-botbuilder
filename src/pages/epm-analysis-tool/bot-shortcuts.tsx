@@ -12,6 +12,15 @@ const BOT_CATEGORY: Record<ContractType, string> = {
     multiplier: 'Multiplier',
 };
 
+// Bots the user named for each side. Matched by exact name (ignoring case and
+// punctuation) against the bots on the EPM Bots page.
+const DEFAULT_BOT_NAMES: Record<string, string> = {
+    'over_under:Under 2': 'Apex Under 2 Sniper',
+    'over_under:Over 7': 'Apex Over 7 Striker',
+};
+
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const STORAGE_KEY = 'epm_analysis_bot_choices_v1';
 
 const readChoices = (): Record<string, number> => {
@@ -28,6 +37,8 @@ interface Props {
     sides: string[];
     /** Sides where the user's own rule is currently met -- shown as a badge only. */
     flaggedSides?: string[];
+    /** When true, the Load bot button only appears for sides where the rule is met. */
+    requireFlag?: boolean;
 }
 
 /**
@@ -35,7 +46,7 @@ interface Props {
  * "Load bot". It loads the bot into Bot Builder and never runs it. A "Rule
  * met" badge just repeats the user's own rule from the result table.
  */
-function BotShortcuts({ contractType, sides, flaggedSides = [] }: Props) {
+function BotShortcuts({ contractType, sides, flaggedSides = [], requireFlag = false }: Props) {
     const { bots, loadingBotId, loadBot } = useBotLoader();
     const [choices, setChoices] = useState<Record<string, number>>(readChoices);
 
@@ -45,7 +56,12 @@ function BotShortcuts({ contractType, sides, flaggedSides = [] }: Props) {
 
     const keyFor = (side: string) => `${contractType}:${side}`;
 
-    const selectedFor = (side: string) => choices[keyFor(side)];
+    const defaultFor = (side: string): number | undefined => {
+        const name = DEFAULT_BOT_NAMES[keyFor(side)];
+        return name ? bots.find(b => normalize(b.name) === normalize(name))?.id : undefined;
+    };
+
+    const selectedFor = (side: string) => choices[keyFor(side)] ?? defaultFor(side);
 
     const onChoose = (side: string, botId: number | undefined) => {
         const next = { ...choices };
@@ -103,22 +119,24 @@ function BotShortcuts({ contractType, sides, flaggedSides = [] }: Props) {
                                     </optgroup>
                                 )}
                             </select>
-                            <button
-                                type='button'
-                                className='epm-analysis-tool__btn-primary epm-analysis-tool__btn-inline'
-                                disabled={!selectedBot || loadingBotId !== null}
-                                onClick={() => selectedBot && loadBot(selectedBot)}
-                            >
-                                {loadingBotId === selectedId && selectedId !== undefined
-                                    ? localize('Loading…')
-                                    : localize('Load bot')}
-                            </button>
+                            {(!requireFlag || flaggedSides.includes(side)) && (
+                                <button
+                                    type='button'
+                                    className='epm-analysis-tool__btn-primary epm-analysis-tool__btn-inline'
+                                    disabled={!selectedBot || loadingBotId !== null}
+                                    onClick={() => selectedBot && loadBot(selectedBot)}
+                                >
+                                    {loadingBotId === selectedId && selectedId !== undefined
+                                        ? localize('Loading…')
+                                        : localize('Load bot')}
+                                </button>
+                            )}
                         </div>
                     );
                 })}
             </div>
             <div className='epm-analysis-tool__note'>
-                <Localize i18n_default_text='Loads the bot into Bot Builder. You press Run yourself.' />
+                <Localize i18n_default_text='Loads the bot here. You press Run in the panel yourself.' />
             </div>
         </div>
     );

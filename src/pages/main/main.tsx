@@ -781,7 +781,8 @@ const AppWrapper = observer(() => {
                 {!is_tutorial_only_embed &&
                     (active_tab === DBOT_TABS.CHART ||
                         active_tab === DBOT_TABS.BOT_BUILDER ||
-                        active_tab === DBOT_TABS.TRADING_VIEW) && (
+                        active_tab === DBOT_TABS.TRADING_VIEW ||
+                        active_tab === DBOT_TABS.EPM_ANALYSIS_TOOL) && (
                         <div className='main__run-strategy-wrapper'>
                             <RunStrategy />
                             <RunPanel />
@@ -795,7 +796,8 @@ const AppWrapper = observer(() => {
                     !is_open &&
                     (active_tab === DBOT_TABS.CHART ||
                         active_tab === DBOT_TABS.BOT_BUILDER ||
-                        active_tab === DBOT_TABS.TRADING_VIEW) && <RunPanel />}
+                        active_tab === DBOT_TABS.TRADING_VIEW ||
+                        active_tab === DBOT_TABS.EPM_ANALYSIS_TOOL) && <RunPanel />}
             </MobileWrapper>
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}

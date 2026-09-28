@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { DBOT_TABS } from '@/constants/bot-contents';
 import { load, save_types } from '@/external/bot-skeleton';
-import { useStore } from '@/hooks/useStore';
 import { bots_cache, fetchAndCacheBots, type TBotSummary } from '@/utils/freebots-cache';
 import { localize } from '@deriv-com/translations';
 
-/** Lists the bots from the EPM Bots page and loads one into Bot Builder --
+/** Lists the bots from the EPM Bots page and loads one into the workspace --
  *  the same request + Blockly load the Freebots page's own "Load" button
- *  uses. Loading only puts the bot in the workspace; it never runs it. */
+ *  uses -- but stays on this page so the Run panel here can run it.
+ *  Loading never runs the bot. */
 export function useBotLoader() {
-    const { dashboard } = useStore();
     const [bots, setBots] = useState<TBotSummary[]>(bots_cache ?? []);
     const [loadingBotId, setLoadingBotId] = useState<number | null>(null);
 
@@ -43,8 +41,7 @@ export function useBotLoader() {
                 strategy_id: null,
                 showIncompatibleStrategyDialog: false,
             });
-            dashboard.setActiveTab(DBOT_TABS.BOT_BUILDER);
-            toast.success(localize('Bot loaded into Bot Builder'));
+            toast.success(localize('Bot loaded — press Run in the panel'));
         } catch (err) {
             toast.error(err instanceof Error ? err.message : localize('Failed to load bot'));
         } finally {
