@@ -1,6 +1,6 @@
 import type { EpmTick } from './use-epm-tick-stats';
 
-export type ContractType = 'over_under' | 'odd_even' | 'rise_fall' | 'accumulator';
+export type ContractType = 'over_under' | 'odd_even' | 'rise_fall' | 'accumulator' | 'multiplier';
 
 export interface ContractResultRow {
     label: string;

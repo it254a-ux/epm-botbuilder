@@ -424,6 +424,32 @@
         }
     }
 
+    &__bot-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    &__bot-row {
+        display: grid;
+        grid-template-columns: 76px 1fr auto;
+        gap: 8px;
+        align-items: center;
+    }
+
+    &__bot-side {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-prominent);
+    }
+
+    &__btn-inline {
+        width: auto;
+        margin-top: 0;
+        padding: 7px 12px;
+        white-space: nowrap;
+    }
+
     &__empty-hint {
         display: flex;
         align-items: center;

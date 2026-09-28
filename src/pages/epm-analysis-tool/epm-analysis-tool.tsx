@@ -9,6 +9,7 @@ import {
     computeAccumulatorReading,
     type ContractType,
 } from './contract-analysis';
+import BotShortcuts from './bot-shortcuts';
 import { runMartingaleBacktest, type BacktestResult } from './martingale-backtest';
 import './epm-analysis-tool.scss';
 
@@ -54,7 +55,10 @@ const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: str
     { type: 'odd_even', name: 'Odd/Even', description: "Last digit's parity — theoretical baseline 50/50." },
     { type: 'over_under', name: 'Over/Under', description: '80/20 splits only: Under 2 vs Over 1, and Over 7 vs Under 8.' },
     { type: 'accumulator', name: 'Accumulator', description: 'No digit split — reads current vs session volatility instead.' },
+    { type: 'multiplier', name: 'Multiplier', description: 'No digit split — same volatility read; leveraged, so a busy market cuts both ways.' },
 ];
+
+const usesVolatilityReading = (type: ContractType) => type === 'accumulator' || type === 'multiplier';
 
 function EpmAnalysisTool() {
     const [symbol, setSymbol] = useState('1HZ75V');
@@ -82,7 +86,7 @@ function EpmAnalysisTool() {
     }, [ticks, contractType]);
 
     const accumulatorReading = useMemo(
-        () => (contractType === 'accumulator' ? computeAccumulatorReading(ticks) : null),
+        () => (usesVolatilityReading(contractType) ? computeAccumulatorReading(ticks) : null),
         [ticks, contractType]
     );
 
@@ -313,7 +317,7 @@ function EpmAnalysisTool() {
                                     </table>
                                 )}
 
-                                {contractType === 'accumulator' &&
+                                {usesVolatilityReading(contractType) &&
                                     (accumulatorReading ? (
                                         <div className='epm-analysis-tool__statgrid'>
                                             <div className='epm-analysis-tool__stat'>
@@ -355,11 +359,16 @@ function EpmAnalysisTool() {
                                     {contractType === 'rise_fall' && (
                                         <Localize i18n_default_text='Rise/Fall on a synthetic index has no memory between ticks — this is a live read, not a forecast of the next one.' />
                                     )}
-                                    {contractType === 'accumulator' && (
+                                    {usesVolatilityReading(contractType) && (
                                         <Localize i18n_default_text='Purely descriptive — a busier recent window than the session average is not a cue to enter or exit.' />
                                     )}
                                 </div>
                             </div>
+
+                            <BotShortcuts
+                                contractType={contractType}
+                                sides={contractRows ? contractRows.map(r => r.label) : [CONTRACT_TYPES.find(c => c.type === contractType)?.name ?? '']}
+                            />
 
                             <div className='epm-analysis-tool__cols-2'>
                                 <div className='epm-analysis-tool__panel'>
