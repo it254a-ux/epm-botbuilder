@@ -52,7 +52,7 @@ function fmtPct(n: number) {
 const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: string }> = [
     { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction vs the previous tick — theoretical baseline 50/50.' },
     { type: 'odd_even', name: 'Odd/Even', description: "Last digit's parity — theoretical baseline 50/50." },
-    { type: 'over_under', name: 'Over/Under', description: 'Fixed at the 80/20 barriers: Over 1 and Under 8.' },
+    { type: 'over_under', name: 'Over/Under', description: '80/20 splits only: Under 2 vs Over 1, and Over 7 vs Under 8.' },
     { type: 'accumulator', name: 'Accumulator', description: 'No digit split — reads current vs session volatility instead.' },
 ];
 
@@ -299,7 +299,7 @@ function EpmAnalysisTool() {
                                                     <td>
                                                         <div className='epm-analysis-tool__bar-bg'>
                                                             <div
-                                                                className={`epm-analysis-tool__bar-fill ${i === 1 ? 'epm-analysis-tool__bar-fill--alt' : ''}`}
+                                                                className={`epm-analysis-tool__bar-fill ${row.theoreticalPct === 20 || (row.theoreticalPct === 50 && i === 1) ? 'epm-analysis-tool__bar-fill--alt' : ''}`}
                                                                 style={{ width: `${Math.min(row.observedPct, 100)}%` }}
                                                             />
                                                         </div>
@@ -347,7 +347,7 @@ function EpmAnalysisTool() {
 
                                 <div className='epm-analysis-tool__note'>
                                     {contractType === 'over_under' && (
-                                        <Localize i18n_default_text='Fixed at Over 1 / Under 8 only, as requested — not a sweep of every barrier.' />
+                                        <Localize i18n_default_text='Shows the 80/20 splits only (Under 2 / Over 1 and Over 7 / Under 8) — not a sweep of every barrier.' />
                                     )}
                                     {contractType === 'odd_even' && (
                                         <Localize i18n_default_text='Even and Odd are structurally 50/50 for a fair generator — persistent deviation here would be unusual, not a signal to chase.' />

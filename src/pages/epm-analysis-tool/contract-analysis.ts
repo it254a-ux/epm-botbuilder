@@ -10,40 +10,33 @@ export interface ContractResultRow {
     currentStreak: number;
 }
 
-/** Over/Under, fixed at the 80/20 barriers only (Over 1, Under 8) --
- *  deliberately not the full 2..7 threshold sweep. */
+/** Over/Under, restricted to the 80/20 splits only (no threshold sweep):
+ *  Under 2 (0-1, 20%) vs Over 1 (2-9, 80%), and
+ *  Over 7 (8-9, 20%) vs Under 8 (0-7, 80%).
+ *  Each pair is complementary, so every row is either the 20% or 80% side. */
 export function buildOverUnderRows(ticks: EpmTick[]): ContractResultRow[] {
     const total = ticks.length || 1;
 
-    const overHits = ticks.reduce((acc, t) => acc + (t.digit > 1 ? 1 : 0), 0);
-    let overStreak = 0;
-    for (let i = ticks.length - 1; i >= 0; i--) {
-        if (ticks[i].digit > 1) break;
-        overStreak++;
-    }
-
-    const underHits = ticks.reduce((acc, t) => acc + (t.digit < 8 ? 1 : 0), 0);
-    let underStreak = 0;
-    for (let i = ticks.length - 1; i >= 0; i--) {
-        if (ticks[i].digit < 8) break;
-        underStreak++;
-    }
+    const makeRow = (
+        label: string,
+        qualifyingLabel: string,
+        theoreticalPct: number,
+        qualifies: (digit: number) => boolean
+    ): ContractResultRow => {
+        const hits = ticks.reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
+        let streak = 0;
+        for (let i = ticks.length - 1; i >= 0; i--) {
+            if (qualifies(ticks[i].digit)) break;
+            streak++;
+        }
+        return { label, qualifyingLabel, observedPct: (hits / total) * 100, theoreticalPct, currentStreak: streak };
+    };
 
     return [
-        {
-            label: 'Over 1',
-            qualifyingLabel: '2–9',
-            observedPct: (overHits / total) * 100,
-            theoreticalPct: 80,
-            currentStreak: overStreak,
-        },
-        {
-            label: 'Under 8',
-            qualifyingLabel: '0–7',
-            observedPct: (underHits / total) * 100,
-            theoreticalPct: 80,
-            currentStreak: underStreak,
-        },
+        makeRow('Under 2', '0–1', 20, d => d < 2),
+        makeRow('Over 1', '2–9', 80, d => d > 1),
+        makeRow('Over 7', '8–9', 20, d => d > 7),
+        makeRow('Under 8', '0–7', 80, d => d < 8),
     ];
 }
 
