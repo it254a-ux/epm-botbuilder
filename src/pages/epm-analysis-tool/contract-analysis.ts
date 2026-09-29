@@ -1,115 +1,72 @@
 import type { EpmTick } from './use-epm-tick-stats';
 
-export type ContractType = 'over_under' | 'odd_even' | 'rise_fall' | 'accumulator' | 'multiplier';
+export type ContractType = 'over_under' | 'rise_fall' | 'odd_even' | 'match_differ' | 'accumulator' | 'multiplier';
 
-export interface ContractResultRow {
+export interface SideResult {
     label: string;
-    qualifyingLabel: string;
-    observedPct: number;
-    theoreticalPct: number;
-    currentStreak: number;
-    /** How many of the last `windowN` ticks qualified for this side -- used by the user's own rule. */
-    recentCount: number;
+    /** % of the last N ticks that did NOT produce this outcome. */
+    failPct: number;
+    /** How many of the last N ticks were sampled (may be < N early in a session). */
+    sampleSize: number;
+    flagged: boolean;
 }
 
-const digitRow = (
+const sideResult = (
     ticks: EpmTick[],
     windowN: number,
+    thresholdPct: number,
     label: string,
-    qualifyingLabel: string,
-    theoreticalPct: number,
-    qualifies: (digit: number) => boolean
-): ContractResultRow => {
-    const total = ticks.length || 1;
-    const hits = ticks.reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
-    let streak = 0;
-    for (let i = ticks.length - 1; i >= 0; i--) {
-        if (qualifies(ticks[i].digit)) break;
-        streak++;
-    }
-    const recentCount = ticks.slice(-windowN).reduce((acc, t) => acc + (qualifies(t.digit) ? 1 : 0), 0);
-    return { label, qualifyingLabel, observedPct: (hits / total) * 100, theoreticalPct, currentStreak: streak, recentCount };
+    qualifies: (t: EpmTick, i: number, arr: EpmTick[]) => boolean
+): SideResult => {
+    const recent = ticks.slice(-windowN);
+    const qualifyCount = recent.reduce((acc, t, i) => acc + (qualifies(t, i, recent) ? 1 : 0), 0);
+    const failPct = recent.length ? ((recent.length - qualifyCount) / recent.length) * 100 : 0;
+    return {
+        label,
+        failPct,
+        sampleSize: recent.length,
+        flagged: recent.length >= windowN && failPct >= thresholdPct,
+    };
 };
 
-/** Over/Under: Under 2 (digits 0-1) vs Over 7 (digits 8-9). */
-export function buildOverUnderRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
+export function analyzeOverUnder(
+    ticks: EpmTick[],
+    windowN: number,
+    thresholdPct: number,
+    underBarrier: number,
+    overBarrier: number
+): SideResult[] {
     return [
-        digitRow(ticks, windowN, 'Under 2', '0–1', 20, d => d < 2),
-        digitRow(ticks, windowN, 'Over 7', '8–9', 20, d => d > 7),
+        sideResult(ticks, windowN, thresholdPct, `Under ${underBarrier}`, t => t.digit < underBarrier),
+        sideResult(ticks, windowN, thresholdPct, `Over ${overBarrier}`, t => t.digit > overBarrier),
     ];
 }
 
-export function buildOddEvenRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
+export function analyzeRiseFall(ticks: EpmTick[], windowN: number, thresholdPct: number): SideResult[] {
+    // Direction is relative to the previous tick, so it only exists from the 2nd tick on.
+    const isRise = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote > arr[i - 1].quote;
+    const isFall = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote < arr[i - 1].quote;
     return [
-        digitRow(ticks, windowN, 'Even', '0,2,4,6,8', 50, d => d % 2 === 0),
-        digitRow(ticks, windowN, 'Odd', '1,3,5,7,9', 50, d => d % 2 !== 0),
+        sideResult(ticks, windowN, thresholdPct, 'Rise', isRise),
+        sideResult(ticks, windowN, thresholdPct, 'Fall', isFall),
     ];
 }
 
-/** Rise/Fall -- each tick's quote vs the previous one. Unchanged ticks count for neither side. */
-export function buildRiseFallRows(ticks: EpmTick[], windowN: number): ContractResultRow[] {
-    let rises = 0;
-    let falls = 0;
-    for (let i = 1; i < ticks.length; i++) {
-        const diff = ticks[i].quote - ticks[i - 1].quote;
-        if (diff > 0) rises++;
-        else if (diff < 0) falls++;
-    }
-    const decided = rises + falls || 1;
-
-    let riseStreak = 0;
-    for (let i = ticks.length - 1; i > 0; i--) {
-        if (ticks[i].quote - ticks[i - 1].quote > 0) break;
-        riseStreak++;
-    }
-    let fallStreak = 0;
-    for (let i = ticks.length - 1; i > 0; i--) {
-        if (ticks[i].quote - ticks[i - 1].quote < 0) break;
-        fallStreak++;
-    }
-
-    let recentRises = 0;
-    let recentFalls = 0;
-    for (let i = Math.max(1, ticks.length - windowN); i < ticks.length; i++) {
-        const diff = ticks[i].quote - ticks[i - 1].quote;
-        if (diff > 0) recentRises++;
-        else if (diff < 0) recentFalls++;
-    }
-
+export function analyzeOddEven(ticks: EpmTick[], windowN: number, thresholdPct: number): SideResult[] {
     return [
-        { label: 'Rise', qualifyingLabel: 'quote > prev', observedPct: (rises / decided) * 100, theoreticalPct: 50, currentStreak: riseStreak, recentCount: recentRises },
-        { label: 'Fall', qualifyingLabel: 'quote < prev', observedPct: (falls / decided) * 100, theoreticalPct: 50, currentStreak: fallStreak, recentCount: recentFalls },
+        sideResult(ticks, windowN, thresholdPct, 'Even', t => t.digit % 2 === 0),
+        sideResult(ticks, windowN, thresholdPct, 'Odd', t => t.digit % 2 !== 0),
     ];
 }
 
-export interface AccumulatorReading {
-    recentVolatilityPct: number;
-    sessionVolatilityPct: number;
-    sampleSize: number;
-}
-
-/** Accumulator has no digit/direction split to show as a percentage pair --
- *  it pays out based on the price staying within a range, so the only
- *  honestly relevant read is current vs session-average volatility. No
- *  Low/Medium/High label: that would imply a threshold this tool doesn't
- *  actually know is meaningful for the chosen index. */
-export function computeAccumulatorReading(ticks: EpmTick[], recentWindow = 100): AccumulatorReading | null {
-    if (ticks.length < 10) return null;
-
-    const pctChanges: number[] = [];
-    for (let i = 1; i < ticks.length; i++) {
-        const prev = ticks[i - 1].quote;
-        if (prev === 0) continue;
-        pctChanges.push(Math.abs((ticks[i].quote - prev) / prev) * 100);
-    }
-    if (!pctChanges.length) return null;
-
-    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-    const recentSlice = pctChanges.slice(-recentWindow);
-
-    return {
-        recentVolatilityPct: avg(recentSlice),
-        sessionVolatilityPct: avg(pctChanges),
-        sampleSize: pctChanges.length,
-    };
+export function analyzeMatchDiffer(
+    ticks: EpmTick[],
+    windowN: number,
+    thresholdPct: number,
+    digit: number
+): SideResult[] {
+    return [
+        sideResult(ticks, windowN, thresholdPct, `Matches ${digit}`, t => t.digit === digit),
+        sideResult(ticks, windowN, thresholdPct, `Differs ${digit}`, t => t.digit !== digit),
+    ];
 }

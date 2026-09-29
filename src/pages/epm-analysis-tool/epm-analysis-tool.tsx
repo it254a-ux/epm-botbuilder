@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
+import { useDerivWS } from '@deriv/core';
 import { useStore } from '@/hooks/useStore';
 import { useDevice } from '@deriv-com/ui';
-import { useDerivWS } from '@deriv/core';
 import { Localize, localize } from '@deriv-com/translations';
-import { useEpmTickStats, fetchBacktestDigits, RECENT_TICKS_SHOWN } from './use-epm-tick-stats';
+import { useEpmTickStats } from './use-epm-tick-stats';
 import {
-    buildOverUnderRows,
-    buildOddEvenRows,
-    buildRiseFallRows,
-    computeAccumulatorReading,
+    analyzeOverUnder,
+    analyzeRiseFall,
+    analyzeOddEven,
+    analyzeMatchDiffer,
     type ContractType,
+    type SideResult,
 } from './contract-analysis';
 import BotShortcuts from './bot-shortcuts';
-import { runMartingaleBacktest, type BacktestResult } from './martingale-backtest';
 import './epm-analysis-tool.scss';
 
 const SYMBOL_GROUPS: Array<{ label: string; options: Array<{ value: string; label: string }> }> = [
@@ -49,22 +49,20 @@ const SYMBOL_GROUPS: Array<{ label: string; options: Array<{ value: string; labe
     },
 ];
 
-function fmtPct(n: number) {
-    return `${n.toFixed(1)}%`;
-}
-
-const CONTRACT_TYPES: Array<{ type: ContractType; name: string; description: string }> = [
-    { type: 'rise_fall', name: 'Rise/Fall', description: 'Direction of each tick vs the previous one.' },
-    { type: 'odd_even', name: 'Odd/Even', description: "Whether the last digit is odd or even." },
-    { type: 'over_under', name: 'Over/Under', description: 'Under 2 vs Over 7.' },
-    { type: 'accumulator', name: 'Accumulator', description: 'Recent vs session volatility.' },
-    { type: 'multiplier', name: 'Multiplier', description: 'Recent vs session volatility.' },
+const CONTRACT_OPTIONS: Array<{ value: ContractType; label: string; comingSoon?: boolean }> = [
+    { value: 'over_under', label: 'Over/Under' },
+    { value: 'rise_fall', label: 'Rise/Fall' },
+    { value: 'odd_even', label: 'Odd/Even' },
+    { value: 'match_differ', label: 'Digit Match/Differ' },
+    { value: 'accumulator', label: 'Accumulators', comingSoon: true },
+    { value: 'multiplier', label: 'Multiplier', comingSoon: true },
 ];
 
-const usesVolatilityReading = (type: ContractType) => type === 'accumulator' || type === 'multiplier';
+// Under 0 and Over 9 aren't real trades, so they're left out of these lists.
+const UNDER_BARRIERS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const OVER_BARRIERS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+const MATCH_DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-// The Run panel is a position:fixed drawer (same as on Charts / TradingView),
-// so this page reserves its width on desktop to sit beside it instead of under it.
 const DESKTOP_DRAWER_OPEN_WIDTH = 366;
 const DESKTOP_DRAWER_CLOSED_WIDTH = 16;
 
@@ -78,112 +76,63 @@ const EpmAnalysisTool = observer(() => {
         : 0;
 
     const [symbol, setSymbol] = useState('1HZ75V');
-    const [activeView, setActiveView] = useState<'live' | 'backtest'>('live');
     const [contractType, setContractType] = useState<ContractType>('over_under');
-    // The user's own rule: flag a side when at least `ruleFailPct`% of the last `ruleWindow` ticks were failures for it.
-    const [ruleWindow, setRuleWindow] = useState(10);
-    const [ruleFailPct, setRuleFailPct] = useState(80);
+    const [underBarrier, setUnderBarrier] = useState(2);
+    const [overBarrier, setOverBarrier] = useState(7);
+    const [matchDigit, setMatchDigit] = useState(5);
+    const [windowN, setWindowN] = useState(10);
+    const [thresholdPct, setThresholdPct] = useState(80);
+    const [results, setResults] = useState<SideResult[] | null>(null);
 
-    // Same DerivWS connection mechanism Dtrader already uses successfully
-    // elsewhere in this app -- public/unauthenticated, no login required
-    // for tick data. No manual "Connect" step: it connects on mount and
-    // stays connected while this tab is open.
     const { ws, isConnected } = useDerivWS();
     const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
 
-    const contractRows = useMemo(() => {
+    const canAnalyze =
+        status === 'analyzing' && ticks.length >= windowN && contractType !== 'accumulator' && contractType !== 'multiplier';
+
+    const runAnalysis = () => {
         switch (contractType) {
             case 'over_under':
-                return buildOverUnderRows(ticks, ruleWindow);
-            case 'odd_even':
-                return buildOddEvenRows(ticks, ruleWindow);
+                setResults(analyzeOverUnder(ticks, windowN, thresholdPct, underBarrier, overBarrier));
+                break;
             case 'rise_fall':
-                return buildRiseFallRows(ticks, ruleWindow);
+                setResults(analyzeRiseFall(ticks, windowN, thresholdPct));
+                break;
+            case 'odd_even':
+                setResults(analyzeOddEven(ticks, windowN, thresholdPct));
+                break;
+            case 'match_differ':
+                setResults(analyzeMatchDiffer(ticks, windowN, thresholdPct, matchDigit));
+                break;
             default:
-                return null;
-        }
-    }, [ticks, contractType, ruleWindow]);
-
-    // Rise/Fall and Odd/Even: flag the side that appeared less in the window
-    // (the other side appeared most). Over/Under: flag a side that appeared at
-    // `ruleFailPct`% failures in the window.
-    const isTwoSided = contractType === 'rise_fall' || contractType === 'odd_even';
-    const flaggedLabels: string[] =
-        contractRows && ticks.length >= ruleWindow
-            ? contractRows
-                  .filter((row, i) =>
-                      isTwoSided ? row.recentCount < contractRows[1 - i].recentCount : ((ruleWindow - row.recentCount) / ruleWindow) * 100 >= ruleFailPct
-                  )
-                  .map(row => row.label)
-            : [];
-
-    const accumulatorReading = useMemo(
-        () => (usesVolatilityReading(contractType) ? computeAccumulatorReading(ticks) : null),
-        [ticks, contractType]
-    );
-
-    const { digitCounts, lastDigit, streakUnder2, longestStreakUnder2 } = useMemo(() => {
-        const counts = new Array(10).fill(0);
-        let curStreak = 0;
-        let longest = 0;
-        ticks.forEach(t => {
-            counts[t.digit]++;
-            if (t.digit < 2) {
-                if (curStreak > longest) longest = curStreak;
-                curStreak = 0;
-            } else {
-                curStreak++;
-            }
-        });
-        if (curStreak > longest) longest = curStreak;
-        return {
-            digitCounts: counts,
-            lastDigit: ticks.length ? ticks[ticks.length - 1].digit : null,
-            streakUnder2: curStreak,
-            longestStreakUnder2: longest,
-        };
-    }, [ticks]);
-
-    const maxDigitCount = Math.max(1, ...digitCounts);
-    const recentTicks = ticks.slice(-RECENT_TICKS_SHOWN);
-
-    // ---- Backtester ----
-    const [btCount, setBtCount] = useState(3000);
-    const [btDirection, setBtDirection] = useState<'under' | 'over'>('under');
-    const [btThreshold, setBtThreshold] = useState(2);
-    const [btStreak, setBtStreak] = useState(8);
-    const [btStake, setBtStake] = useState(1);
-    const [btMult, setBtMult] = useState(2);
-    const [btMaxSteps, setBtMaxSteps] = useState(6);
-    const [btPayout, setBtPayout] = useState(4.9);
-    const [btBusy, setBtBusy] = useState(false);
-    const [btStatusText, setBtStatusText] = useState(localize('Idle'));
-    const [btResult, setBtResult] = useState<BacktestResult | null>(null);
-
-    const runBacktest = async () => {
-        if (!ws || !isConnected) return;
-        setBtBusy(true);
-        setBtStatusText(localize('Fetching {{count}} historical ticks for {{symbol}}…', { count: btCount, symbol }));
-        try {
-            const digits = await fetchBacktestDigits(ws, symbol, btCount);
-            setBtStatusText(localize('Fetched {{count}} ticks. Running backtest…', { count: digits.length }));
-            const result = runMartingaleBacktest(digits, {
-                direction: btDirection,
-                threshold: btThreshold,
-                streakTrigger: btStreak,
-                baseStake: btStake,
-                multiplier: btMult,
-                maxSteps: btMaxSteps,
-                payoutMultiplier: btPayout,
-            });
-            setBtResult(result);
-            setBtStatusText(localize('Done — {{count}} ticks analyzed for {{symbol}}', { count: digits.length, symbol }));
-        } catch (err) {
-            setBtStatusText(err instanceof Error ? err.message : localize('Backtest failed — try again.'));
-        } finally {
-            setBtBusy(false);
+                setResults(null);
         }
     };
+
+    // Reset the shown result whenever a setting changes, so a stale result
+    // for a different pick/symbol/contract never sits on screen.
+    const resetKey = `${symbol}|${contractType}|${underBarrier}|${overBarrier}|${matchDigit}|${windowN}|${thresholdPct}`;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
+        if (results) setResults(null);
+    }
+
+    const flaggedSides = useMemo(() => (results ? results.filter(r => r.flagged).map(r => r.label) : []), [results]);
+    const sideLabels = useMemo(() => {
+        switch (contractType) {
+            case 'over_under':
+                return [`Under ${underBarrier}`, `Over ${overBarrier}`];
+            case 'rise_fall':
+                return ['Rise', 'Fall'];
+            case 'odd_even':
+                return ['Even', 'Odd'];
+            case 'match_differ':
+                return [`Matches ${matchDigit}`, `Differs ${matchDigit}`];
+            default:
+                return [];
+        }
+    }, [contractType, underBarrier, overBarrier, matchDigit]);
 
     return (
         <div
@@ -193,25 +142,14 @@ const EpmAnalysisTool = observer(() => {
             <h1 className='epm-analysis-tool__title'>
                 <Localize i18n_default_text='EPM Analysis Tool' />
             </h1>
-            <div className='epm-analysis-tool__subtitle'>
-                <Localize i18n_default_text='Live statistical analysis and strategy backtesting for synthetic index tick data.' />
-            </div>
 
-            <div className='epm-analysis-tool__layout'>
-                {/* LEFT: connection + reference */}
-                <div>
-                    <div className='epm-analysis-tool__panel'>
-                        <h2 className='epm-analysis-tool__panel-title'>
-                            <Localize i18n_default_text='Connection' />
-                        </h2>
+            <div className='epm-analysis-tool__panel'>
+                <div className='epm-analysis-tool__picker-row'>
+                    <div>
                         <label className='epm-analysis-tool__label'>
                             <Localize i18n_default_text='Volatility Index' />
                         </label>
-                        <select
-                            className='epm-analysis-tool__select'
-                            value={symbol}
-                            onChange={e => setSymbol(e.target.value)}
-                        >
+                        <select className='epm-analysis-tool__select' value={symbol} onChange={e => setSymbol(e.target.value)}>
                             {SYMBOL_GROUPS.map(group => (
                                 <optgroup key={group.label} label={group.label}>
                                     {group.options.map(opt => (
@@ -222,528 +160,179 @@ const EpmAnalysisTool = observer(() => {
                                 </optgroup>
                             ))}
                         </select>
-                        <div className='epm-analysis-tool__status'>
-                            <span
-                                className={`epm-analysis-tool__dot epm-analysis-tool__dot--${
-                                    status === 'analyzing' ? 'live' : status === 'error' ? 'off' : 'idle'
-                                }`}
-                            />
-                            <span>
-                                {status === 'analyzing' && `${localize('Analyzing')} — ${symbol}`}
-                                {status === 'connecting' && localize('Connecting…')}
-                                {status === 'error' && (errorMessage || localize('Connection error'))}
-                            </span>
-                        </div>
                     </div>
 
-                    <div className='epm-analysis-tool__panel'>
-                        <h2 className='epm-analysis-tool__panel-title'>
-                            <Localize i18n_default_text='Contract Type' />
-                        </h2>
-                        <div className='epm-analysis-tool__contract-grid'>
-                            {CONTRACT_TYPES.map(c => (
-                                <div
-                                    key={c.type}
-                                    className={`epm-analysis-tool__contract-card ${
-                                        contractType === c.type ? 'epm-analysis-tool__contract-card--active' : ''
-                                    }`}
-                                    onClick={() => setContractType(c.type)}
-                                >
-                                    <h3>{c.name}</h3>
-                                    <p>{c.description}</p>
-                                </div>
+                    <div>
+                        <label className='epm-analysis-tool__label'>
+                            <Localize i18n_default_text='Market Contract' />
+                        </label>
+                        <select
+                            className='epm-analysis-tool__select'
+                            value={contractType}
+                            onChange={e => setContractType(e.target.value as ContractType)}
+                        >
+                            {CONTRACT_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                    {opt.comingSoon ? ` (${localize('coming soon')})` : ''}
+                                </option>
                             ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* RIGHT: live tracker / backtester */}
-                <div>
-                    <div className='epm-analysis-tool__tabs'>
-                        <div
-                            className={`epm-analysis-tool__tab ${activeView === 'live' ? 'epm-analysis-tool__tab--active' : ''}`}
-                            onClick={() => setActiveView('live')}
-                        >
-                            <Localize i18n_default_text='Live Tracker' />
-                        </div>
-                        <div
-                            className={`epm-analysis-tool__tab ${activeView === 'backtest' ? 'epm-analysis-tool__tab--active' : ''}`}
-                            onClick={() => setActiveView('backtest')}
-                        >
-                            <Localize i18n_default_text='Martingale Backtester' />
-                        </div>
+                        </select>
                     </div>
 
-                    {activeView === 'live' && (
+                    {contractType === 'over_under' && (
                         <>
-                            <div className='epm-analysis-tool__panel'>
-                                <h2 className='epm-analysis-tool__panel-title'>
-                                    <Localize i18n_default_text='Session Stats' /> <span className='epm-analysis-tool__muted'>· {symbol}</span>
-                                </h2>
-                                <div className='epm-analysis-tool__statgrid'>
-                                    <div className='epm-analysis-tool__stat'>
-                                        <div className='epm-analysis-tool__stat-n'>{ticks.length}</div>
-                                        <div className='epm-analysis-tool__stat-l'>
-                                            <Localize i18n_default_text='ticks observed' />
-                                        </div>
-                                    </div>
-                                    <div className='epm-analysis-tool__stat'>
-                                        <div className='epm-analysis-tool__stat-n'>{lastDigit ?? '–'}</div>
-                                        <div className='epm-analysis-tool__stat-l'>
-                                            <Localize i18n_default_text='last digit' />
-                                        </div>
-                                    </div>
-                                    <div className='epm-analysis-tool__stat'>
-                                        <div className='epm-analysis-tool__stat-n'>{streakUnder2}</div>
-                                        <div className='epm-analysis-tool__stat-l'>
-                                            <Localize i18n_default_text='ticks since digit < 2' />
-                                        </div>
-                                    </div>
-                                    <div className='epm-analysis-tool__stat'>
-                                        <div className='epm-analysis-tool__stat-n'>{Math.max(longestStreakUnder2, streakUnder2)}</div>
-                                        <div className='epm-analysis-tool__stat-l'>
-                                            <Localize i18n_default_text='longest streak (session)' />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className='epm-analysis-tool__panel'>
-                                <h2 className='epm-analysis-tool__panel-title'>
-                                    <Localize i18n_default_text='Contract Result' />{' '}
-                                    <span className='epm-analysis-tool__muted'>
-                                        · {CONTRACT_TYPES.find(c => c.type === contractType)?.name}
-                                    </span>
-                                </h2>
-
-                                {contractRows && (
-                                    <div className='epm-analysis-tool__rule'>
-                                        {isTwoSided ? (
-                                            <>
-                                                <span>
-                                                    <Localize i18n_default_text='Your rule: flag the side that appeared less in the last' />
-                                                </span>
-                                                <input
-                                                    type='number'
-                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                                    value={ruleWindow}
-                                                    min={1}
-                                                    max={200}
-                                                    onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
-                                                />
-                                                <span>
-                                                    <Localize i18n_default_text='ticks' />
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span>
-                                                    <Localize i18n_default_text='Your rule: flag a side when at least' />
-                                                </span>
-                                                <input
-                                                    type='number'
-                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                                    value={ruleFailPct}
-                                                    min={0}
-                                                    max={100}
-                                                    onChange={e => setRuleFailPct(Math.min(100, Math.max(0, Number(e.target.value))))}
-                                                />
-                                                <span>
-                                                    <Localize i18n_default_text='% of the last' />
-                                                </span>
-                                                <input
-                                                    type='number'
-                                                    className='epm-analysis-tool__input epm-analysis-tool__input--tiny'
-                                                    value={ruleWindow}
-                                                    min={1}
-                                                    max={200}
-                                                    onChange={e => setRuleWindow(Math.max(1, Number(e.target.value)))}
-                                                />
-                                                <span>
-                                                    <Localize i18n_default_text='ticks failed' />
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-
-                                {contractRows && (
-                                    <table className='epm-analysis-tool__table'>
-                                        <thead>
-                                            <tr>
-                                                <th>Side</th>
-                                                <th>Qualifies</th>
-                                                <th>Observed</th>
-                                                <th>Theory</th>
-                                                <th>Streak</th>
-                                                <th>Wins, last {ruleWindow}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {contractRows.map((row, i) => (
-                                                <tr key={row.label}>
-                                                    <td>{row.label}</td>
-                                                    <td className='epm-analysis-tool__num'>{row.qualifyingLabel}</td>
-                                                    <td>
-                                                        <div className='epm-analysis-tool__bar-bg'>
-                                                            <div
-                                                                className={`epm-analysis-tool__bar-fill ${row.theoreticalPct === 20 || (row.theoreticalPct === 50 && i === 1) ? 'epm-analysis-tool__bar-fill--alt' : ''}`}
-                                                                style={{ width: `${Math.min(row.observedPct, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <div className='epm-analysis-tool__bar-label'>{fmtPct(row.observedPct)}</div>
-                                                    </td>
-                                                    <td className='epm-analysis-tool__num'>{fmtPct(row.theoreticalPct)}</td>
-                                                    <td className='epm-analysis-tool__num'>{row.currentStreak}</td>
-                                                    <td className='epm-analysis-tool__num'>
-                                                        {row.recentCount}/{ruleWindow}{' '}
-                                                        <span className='epm-analysis-tool__muted'>
-                                                            ({Math.round(((ruleWindow - row.recentCount) / ruleWindow) * 100)}% failed)
-                                                        </span>
-                                                        {flaggedLabels.includes(row.label) && (
-                                                            <span className='epm-analysis-tool__badge'>
-                                                                <Localize i18n_default_text='Rule met' />
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-
-                                {usesVolatilityReading(contractType) &&
-                                    (accumulatorReading ? (
-                                        <div className='epm-analysis-tool__statgrid'>
-                                            <div className='epm-analysis-tool__stat'>
-                                                <div className='epm-analysis-tool__stat-n'>
-                                                    {accumulatorReading.recentVolatilityPct.toFixed(3)}%
-                                                </div>
-                                                <div className='epm-analysis-tool__stat-l'>
-                                                    <Localize i18n_default_text='recent avg. move (last 100 ticks)' />
-                                                </div>
-                                            </div>
-                                            <div className='epm-analysis-tool__stat'>
-                                                <div className='epm-analysis-tool__stat-n'>
-                                                    {accumulatorReading.sessionVolatilityPct.toFixed(3)}%
-                                                </div>
-                                                <div className='epm-analysis-tool__stat-l'>
-                                                    <Localize i18n_default_text='session avg. move' />
-                                                </div>
-                                            </div>
-                                            <div className='epm-analysis-tool__stat'>
-                                                <div className='epm-analysis-tool__stat-n'>{accumulatorReading.sampleSize}</div>
-                                                <div className='epm-analysis-tool__stat-l'>
-                                                    <Localize i18n_default_text='ticks sampled' />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className='epm-analysis-tool__muted'>
-                                            <Localize i18n_default_text='Collecting ticks…' />
-                                        </div>
+                            <div>
+                                <label className='epm-analysis-tool__label'>
+                                    <Localize i18n_default_text='Under' />
+                                </label>
+                                <select
+                                    className='epm-analysis-tool__select'
+                                    value={underBarrier}
+                                    onChange={e => setUnderBarrier(Number(e.target.value))}
+                                >
+                                    {UNDER_BARRIERS.map(n => (
+                                        <option key={n} value={n}>
+                                            {`Under ${n}`}
+                                        </option>
                                     ))}
+                                </select>
                             </div>
-
-                            <BotShortcuts
-                                contractType={contractType}
-                                sides={contractRows ? contractRows.map(r => r.label) : [CONTRACT_TYPES.find(c => c.type === contractType)?.name ?? '']}
-                                flaggedSides={flaggedLabels}
-                                requireFlag={!!contractRows}
-                            />
-
-                            <div className='epm-analysis-tool__cols-2'>
-                                <div className='epm-analysis-tool__panel'>
-                                    <h2 className='epm-analysis-tool__panel-title'>
-                                        <Localize i18n_default_text='Last-Digit Distribution' />
-                                    </h2>
-                                    <div className='epm-analysis-tool__digit-chart'>
-                                        {digitCounts.map((count, digit) => (
-                                            <div className='epm-analysis-tool__digit-bar-col' key={digit}>
-                                                <div className='epm-analysis-tool__digit-bar-track'>
-                                                    <div
-                                                        className='epm-analysis-tool__digit-bar-fill'
-                                                        style={{ height: `${(count / maxDigitCount) * 100}%` }}
-                                                    />
-                                                </div>
-                                                <div className='epm-analysis-tool__digit-bar-label'>{digit}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className='epm-analysis-tool__panel'>
-                                    <h2 className='epm-analysis-tool__panel-title'>
-                                        <Localize i18n_default_text='Recent Ticks' />
-                                    </h2>
-                                    <div className='epm-analysis-tool__ticklog'>
-                                        {recentTicks.map((t, i) => (
-                                            <div
-                                                key={`${t.epoch}-${i}`}
-                                                className={`epm-analysis-tool__digit ${t.digit < 2 ? 'epm-analysis-tool__digit--low' : ''}`}
-                                            >
-                                                {t.digit}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            <div>
+                                <label className='epm-analysis-tool__label'>
+                                    <Localize i18n_default_text='Over' />
+                                </label>
+                                <select
+                                    className='epm-analysis-tool__select'
+                                    value={overBarrier}
+                                    onChange={e => setOverBarrier(Number(e.target.value))}
+                                >
+                                    {OVER_BARRIERS.map(n => (
+                                        <option key={n} value={n}>
+                                            {`Over ${n}`}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </>
                     )}
 
-                    {activeView === 'backtest' && (
-                        <div className='epm-analysis-tool__cols-2 epm-analysis-tool__cols-2--backtest'>
-                            <div className='epm-analysis-tool__panel'>
-                                <h2 className='epm-analysis-tool__panel-title'>
-                                    <Localize i18n_default_text='Backtest Setup' />
-                                </h2>
-                                <div className='epm-analysis-tool__row'>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='History (ticks)' />
-                                        </label>
-                                        <select
-                                            className='epm-analysis-tool__select'
-                                            value={btCount}
-                                            onChange={e => setBtCount(Number(e.target.value))}
-                                        >
-                                            <option value={1000}>1,000</option>
-                                            <option value={3000}>3,000</option>
-                                            <option value={5000}>5,000 (max)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='Direction' />
-                                        </label>
-                                        <select
-                                            className='epm-analysis-tool__select'
-                                            value={btDirection}
-                                            onChange={e => setBtDirection(e.target.value as 'under' | 'over')}
-                                        >
-                                            <option value='under'>Under</option>
-                                            <option value='over'>Over</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className='epm-analysis-tool__row'>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='Threshold' />
-                                        </label>
-                                        <select
-                                            className='epm-analysis-tool__select'
-                                            value={btThreshold}
-                                            onChange={e => setBtThreshold(Number(e.target.value))}
-                                        >
-                                            {[2, 3, 4, 5, 6, 7].map(n => (
-                                                <option key={n} value={n}>
-                                                    {n}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='Enter after streak ≥' />
-                                        </label>
-                                        <input
-                                            type='number'
-                                            className='epm-analysis-tool__input'
-                                            value={btStreak}
-                                            min={1}
-                                            max={50}
-                                            onChange={e => setBtStreak(Number(e.target.value))}
-                                        />
-                                    </div>
-                                </div>
-                                <div className='epm-analysis-tool__row'>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='Base stake' />
-                                        </label>
-                                        <input
-                                            type='number'
-                                            className='epm-analysis-tool__input'
-                                            value={btStake}
-                                            min={0.1}
-                                            step={0.1}
-                                            onChange={e => setBtStake(Number(e.target.value))}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className='epm-analysis-tool__label'>
-                                            <Localize i18n_default_text='Martingale mult. on loss' />
-                                        </label>
-                                        <input
-                                            type='number'
-                                            className='epm-analysis-tool__input'
-                                            value={btMult}
-                                            min={1}
-                                            step={0.1}
-                                            onChange={e => setBtMult(Number(e.target.value))}
-                                        />
-                                    </div>
-                                </div>
-                                <label className='epm-analysis-tool__label'>
-                                    <Localize i18n_default_text='Max martingale steps before reset' />
-                                </label>
-                                <input
-                                    type='number'
-                                    className='epm-analysis-tool__input'
-                                    value={btMaxSteps}
-                                    min={1}
-                                    max={15}
-                                    onChange={e => setBtMaxSteps(Number(e.target.value))}
-                                />
-                                <label className='epm-analysis-tool__label'>
-                                    <Localize i18n_default_text="Payout mult. on win (check your broker's real payout)" />
-                                </label>
-                                <input
-                                    type='number'
-                                    className='epm-analysis-tool__input'
-                                    value={btPayout}
-                                    min={1}
-                                    step={0.01}
-                                    onChange={e => setBtPayout(Number(e.target.value))}
-                                />
-                                <div className='epm-analysis-tool__note'>
-                                    <Localize i18n_default_text="Narrower bands pay more per win because they hit less often — a reshaping of variance, not extra edge." />
-                                </div>
-                                <button
-                                    className='epm-analysis-tool__btn-primary'
-                                    onClick={runBacktest}
-                                    disabled={btBusy || !isConnected}
-                                >
-                                    <Localize i18n_default_text='Run Backtest' />
-                                </button>
-                                <div className='epm-analysis-tool__status'>
-                                    <span className={`epm-analysis-tool__dot epm-analysis-tool__dot--${btBusy ? 'live' : 'idle'}`} />
-                                    <span>{btStatusText}</span>
-                                </div>
-                            </div>
-
-                            {btResult ? (
-                                <div className='epm-analysis-tool__panel'>
-                                    <h2 className='epm-analysis-tool__panel-title'>
-                                        <Localize i18n_default_text='Result — Equity Curve' />
-                                    </h2>
-                                    <div className='epm-analysis-tool__equity-chart'>
-                                        {btResult.equityCurve.map((v, i) => {
-                                            const maxAbs = Math.max(1, ...btResult.equityCurve.map(Math.abs));
-                                            const heightPct = (Math.abs(v) / maxAbs) * 50;
-                                            return (
-                                                <div
-                                                    key={i}
-                                                    className={`epm-analysis-tool__equity-bar ${v >= 0 ? 'epm-analysis-tool__equity-bar--pos' : 'epm-analysis-tool__equity-bar--neg'}`}
-                                                    style={{ height: `${heightPct}%` }}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                    <div className='epm-analysis-tool__statgrid'>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>{btResult.triggers}</div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='triggers' />
-                                            </div>
-                                        </div>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>
-                                                {btResult.triggers ? fmtPct((btResult.wins / btResult.triggers) * 100) : '–'}
-                                            </div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='win rate' />
-                                            </div>
-                                        </div>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>{btResult.maxDrawdown.toFixed(2)}</div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='max drawdown' />
-                                            </div>
-                                        </div>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>{btResult.longestLossRun}</div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='longest loss run' />
-                                            </div>
-                                        </div>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>{btResult.ruins}</div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='ruin events' />
-                                            </div>
-                                        </div>
-                                        <div className='epm-analysis-tool__stat'>
-                                            <div className='epm-analysis-tool__stat-n'>
-                                                {btResult.finalEquity >= 0 ? '+' : ''}
-                                                {btResult.finalEquity.toFixed(2)}
-                                            </div>
-                                            <div className='epm-analysis-tool__stat-l'>
-                                                <Localize i18n_default_text='net P/L' />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className='epm-analysis-tool__note'>
-                                        {btResult.ruins > 0 ? (
-                                            <Localize
-                                                i18n_default_text='{{ruins}} time(s) the losing streak exceeded your max martingale steps within this sample — your staking plan would have hit its ceiling and stopped compounding stakes. A win-rate figure alone would not have shown you this.'
-                                                values={{ ruins: btResult.ruins }}
-                                            />
-                                        ) : (
-                                            <Localize i18n_default_text='No ruin event occurred in this sample. That does not mean the strategy is safe — only that the longest losing streak in this window stayed within your configured max steps. Re-run with more history before trusting it.' />
-                                        )}
-                                    </div>
-
-                                    <h2 className='epm-analysis-tool__panel-title' style={{ marginTop: 12 }}>
-                                        <Localize i18n_default_text='Trigger Occurrences' />
-                                    </h2>
-                                    <div className='epm-analysis-tool__trigger-log'>
-                                        <table className='epm-analysis-tool__table'>
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Tick</th>
-                                                    <th>Streak</th>
-                                                    <th>Outcome</th>
-                                                    <th>Digit</th>
-                                                    <th>Stake</th>
-                                                    <th>Result</th>
-                                                    <th>Equity</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {btResult.triggerLog.map((row, i) => (
-                                                    <tr key={i}>
-                                                        <td className='epm-analysis-tool__num'>{row.n}</td>
-                                                        <td className='epm-analysis-tool__num'>{row.tickIndex}</td>
-                                                        <td className='epm-analysis-tool__num'>{row.streak}</td>
-                                                        <td className={row.outcome === 'WIN' ? 'epm-analysis-tool__win' : 'epm-analysis-tool__loss'}>
-                                                            {row.outcome}
-                                                        </td>
-                                                        <td className='epm-analysis-tool__num'>{row.digit}</td>
-                                                        <td className='epm-analysis-tool__num'>{row.stake}</td>
-                                                        <td className={`epm-analysis-tool__num ${row.result.startsWith('+') ? 'epm-analysis-tool__win' : 'epm-analysis-tool__loss'}`}>
-                                                            {row.result}
-                                                        </td>
-                                                        <td className='epm-analysis-tool__num'>{row.equity}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className='epm-analysis-tool__note epm-analysis-tool__note--warn'>
-                                        <Localize i18n_default_text='Replays your rule against one historical sample — not proof of a real edge. Re-run across different indices and windows before trusting it.' />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className='epm-analysis-tool__panel epm-analysis-tool__empty-hint'>
-                                    <Localize i18n_default_text='Set your parameters and run a backtest to see results here.' />
-                                </div>
-                            )}
+                    {contractType === 'match_differ' && (
+                        <div>
+                            <label className='epm-analysis-tool__label'>
+                                <Localize i18n_default_text='Digit' />
+                            </label>
+                            <select
+                                className='epm-analysis-tool__select'
+                                value={matchDigit}
+                                onChange={e => setMatchDigit(Number(e.target.value))}
+                            >
+                                {MATCH_DIGITS.map(n => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     )}
+
+                    {(contractType === 'over_under' ||
+                        contractType === 'rise_fall' ||
+                        contractType === 'odd_even' ||
+                        contractType === 'match_differ') && (
+                        <>
+                            <div>
+                                <label className='epm-analysis-tool__label'>
+                                    <Localize i18n_default_text='Last N ticks' />
+                                </label>
+                                <input
+                                    type='number'
+                                    className='epm-analysis-tool__input'
+                                    value={windowN}
+                                    min={2}
+                                    max={200}
+                                    onChange={e => setWindowN(Math.max(2, Number(e.target.value)))}
+                                />
+                            </div>
+                            <div>
+                                <label className='epm-analysis-tool__label'>
+                                    <Localize i18n_default_text='Flag at % fail' />
+                                </label>
+                                <input
+                                    type='number'
+                                    className='epm-analysis-tool__input'
+                                    value={thresholdPct}
+                                    min={0}
+                                    max={100}
+                                    onChange={e => setThresholdPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {(contractType === 'accumulator' || contractType === 'multiplier') ? (
+                    <div className='epm-analysis-tool__note'>
+                        <Localize i18n_default_text='Coming soon.' />
+                    </div>
+                ) : (
+                    <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
+                        <Localize i18n_default_text='Analyze' />
+                    </button>
+                )}
+
+                <div className='epm-analysis-tool__status'>
+                    <span
+                        className={`epm-analysis-tool__dot epm-analysis-tool__dot--${
+                            status === 'analyzing' ? 'live' : status === 'error' ? 'off' : 'idle'
+                        }`}
+                    />
+                    <span>
+                        {status === 'analyzing' && `${symbol} — ${ticks.length} ${localize('ticks buffered')}`}
+                        {status === 'connecting' && localize('Connecting…')}
+                        {status === 'error' && (errorMessage || localize('Connection error'))}
+                    </span>
                 </div>
             </div>
+
+            {results && (
+                <div className='epm-analysis-tool__panel'>
+                    <table className='epm-analysis-tool__table'>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <Localize i18n_default_text='Side' />
+                                </th>
+                                <th>
+                                    <Localize i18n_default_text='Did not appear (last N)' />
+                                </th>
+                                <th>
+                                    <Localize i18n_default_text='Result' />
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {results.map(row => (
+                                <tr key={row.label}>
+                                    <td>{row.label}</td>
+                                    <td className='epm-analysis-tool__num'>
+                                        {row.failPct.toFixed(1)}% ({row.sampleSize} sampled)
+                                    </td>
+                                    <td>
+                                        {row.flagged && (
+                                            <span className='epm-analysis-tool__badge'>
+                                                <Localize i18n_default_text='Rule met' />
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            <BotShortcuts contractType={contractType} sides={results ? sideLabels : []} flaggedSides={flaggedSides} />
         </div>
     );
 });

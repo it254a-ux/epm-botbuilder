@@ -3,24 +3,24 @@ import { Localize, localize } from '@deriv-com/translations';
 import type { ContractType } from './contract-analysis';
 import { useBotLoader } from './use-bot-loader';
 
-// Category names as the EPM Bots page groups them (CONTRACT_TYPE_ORDER).
+// Category names as the EPM Bots page groups them.
 const BOT_CATEGORY: Record<ContractType, string> = {
     over_under: 'Over/Under',
     odd_even: 'Even/Odd',
     rise_fall: 'Rise/Fall',
+    match_differ: 'Matches/Differs',
     accumulator: 'Accumulators',
     multiplier: 'Multiplier',
 };
 
-// Bots the user named for each side. Matched by exact name (ignoring case and
-// punctuation) against the bots on the EPM Bots page.
+// Bot names given for specific sides. Matched by exact name (ignoring case
+// and punctuation) against the bots listed on the EPM Bots page.
 const DEFAULT_BOT_NAMES: Record<string, string> = {
     'over_under:Under 2': 'Apex Under 2 Sniper',
     'over_under:Over 7': 'Apex Over 7 Striker',
 };
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 const STORAGE_KEY = 'epm_analysis_bot_choices_v1';
 
 const readChoices = (): Record<string, number> => {
@@ -33,27 +33,19 @@ const readChoices = (): Record<string, number> => {
 
 interface Props {
     contractType: ContractType;
-    /** One entry per side shown in the result (or a single entry for types with no split). */
+    /** One entry per side, e.g. ["Under 2", "Over 7"]. */
     sides: string[];
-    /** Sides where the user's own rule is currently met -- shown as a badge only. */
-    flaggedSides?: string[];
-    /** When true, the Load bot button only appears for sides where the rule is met. */
-    requireFlag?: boolean;
+    /** Sides currently flagged -- Load bot only shows for these. */
+    flaggedSides: string[];
 }
 
-/**
- * Shortcuts: you choose which of your bots goes with each side, then press
- * "Load bot". It loads the bot into Bot Builder and never runs it. A "Rule
- * met" badge just repeats the user's own rule from the result table.
- */
-function BotShortcuts({ contractType, sides, flaggedSides = [], requireFlag = false }: Props) {
+function BotShortcuts({ contractType, sides, flaggedSides }: Props) {
     const { bots, loadingBotId, loadBot } = useBotLoader();
     const [choices, setChoices] = useState<Record<string, number>>(readChoices);
 
     const category = BOT_CATEGORY[contractType];
     const inCategory = bots.filter(b => b.contract_type === category);
     const others = bots.filter(b => b.contract_type !== category);
-
     const keyFor = (side: string) => `${contractType}:${side}`;
 
     const defaultFor = (side: string): number | undefined => {
@@ -75,6 +67,8 @@ function BotShortcuts({ contractType, sides, flaggedSides = [], requireFlag = fa
         }
     };
 
+    if (!sides.length) return null;
+
     return (
         <div className='epm-analysis-tool__panel'>
             <h2 className='epm-analysis-tool__panel-title'>
@@ -84,11 +78,12 @@ function BotShortcuts({ contractType, sides, flaggedSides = [], requireFlag = fa
                 {sides.map(side => {
                     const selectedId = selectedFor(side);
                     const selectedBot = bots.find(b => b.id === selectedId);
+                    const isFlagged = flaggedSides.includes(side);
                     return (
                         <div className='epm-analysis-tool__bot-row' key={side}>
                             <span className='epm-analysis-tool__bot-side'>
                                 {side}
-                                {flaggedSides.includes(side) && (
+                                {isFlagged && (
                                     <span className='epm-analysis-tool__badge'>
                                         <Localize i18n_default_text='Rule met' />
                                     </span>
@@ -119,24 +114,19 @@ function BotShortcuts({ contractType, sides, flaggedSides = [], requireFlag = fa
                                     </optgroup>
                                 )}
                             </select>
-                            {(!requireFlag || flaggedSides.includes(side)) && (
+                            {isFlagged && (
                                 <button
                                     type='button'
                                     className='epm-analysis-tool__btn-primary epm-analysis-tool__btn-inline'
                                     disabled={!selectedBot || loadingBotId !== null}
                                     onClick={() => selectedBot && loadBot(selectedBot)}
                                 >
-                                    {loadingBotId === selectedId && selectedId !== undefined
-                                        ? localize('Loading…')
-                                        : localize('Load bot')}
+                                    {loadingBotId === selectedId ? localize('Loading…') : localize('Load bot')}
                                 </button>
                             )}
                         </div>
                     );
                 })}
-            </div>
-            <div className='epm-analysis-tool__note'>
-                <Localize i18n_default_text='Loads the bot here. You press Run in the panel yourself.' />
             </div>
         </div>
     );
