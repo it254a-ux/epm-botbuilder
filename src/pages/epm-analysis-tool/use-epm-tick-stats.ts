@@ -50,7 +50,7 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
                 // (rather than guessing and re-deriving once the first live
                 // tick arrives).
                 const symbolsRes = await ws!.send<{ active_symbols?: Array<{ underlying_symbol: string; pip_size: number }> }>({
-                    active_symbols: 'brief',
+                    active_symbols: 'full',
                 });
                 if (disposed) return;
                 const match = symbolsRes.active_symbols?.find(s => s.underlying_symbol === symbol);
@@ -58,6 +58,7 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
 
                 const historyRes = await ws!.send<{ history?: { prices: number[]; times: number[] } }>({
                     ticks_history: symbol,
+                    start: 1,
                     count: HISTORY_TICK_COUNT,
                     end: 'latest',
                     style: 'ticks',
@@ -115,13 +116,14 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
  *  `ws` connection instead of opening a separate WebSocket. */
 export async function fetchBacktestDigits(ws: DerivWS, symbol: string, count: number): Promise<number[]> {
     const symbolsRes = await ws.send<{ active_symbols?: Array<{ underlying_symbol: string; pip_size: number }> }>({
-        active_symbols: 'brief',
+        active_symbols: 'full',
     });
     const match = symbolsRes.active_symbols?.find(s => s.underlying_symbol === symbol);
     const decimals = match ? pipSizeFromPip(match.pip_size) : 2;
 
     const historyRes = await ws.send<{ history?: { prices: number[] } }>({
         ticks_history: symbol,
+        start: 1,
         count,
         end: 'latest',
         style: 'ticks',
