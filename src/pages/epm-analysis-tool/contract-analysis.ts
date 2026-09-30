@@ -15,7 +15,6 @@ export interface SideResult {
 const sideResult = (
     window: EpmTick[],
     thresholdPct: number,
-    targetN: number,
     complete: boolean,
     label: string,
     qualifies: (t: EpmTick, i: number, arr: EpmTick[]) => boolean
@@ -26,7 +25,9 @@ const sideResult = (
         label,
         failPct,
         sampleSize: window.length,
-        flagged: complete && window.length >= targetN && failPct >= thresholdPct,
+        // `complete` alone is the gate -- it's only true once the scan has
+        // gone through the full N ticks the user asked for.
+        flagged: complete && window.length > 0 && failPct >= thresholdPct,
     };
 };
 
@@ -36,44 +37,48 @@ const sideResult = (
 const isRise = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote > arr[i - 1].quote;
 const isFall = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote < arr[i - 1].quote;
 
+/** Under X and Over Y are compared directly against EACH OTHER, not
+ *  against the full 0-9 spread: ticks outside both (the middle digits)
+ *  are set aside first, so the two shown percentages are complementary
+ *  and always add up to 100 -- e.g. Under 2 at 80% means Over 7 is at 20%
+ *  of the ticks that were one or the other. */
 export function analyzeOverUnder(
     window: EpmTick[],
     thresholdPct: number,
-    targetN: number,
     complete: boolean,
     underBarrier: number,
     overBarrier: number
 ): SideResult[] {
+    const relevant = window.filter(t => t.digit < underBarrier || t.digit > overBarrier);
     return [
-        sideResult(window, thresholdPct, targetN, complete, `Under ${underBarrier}`, t => t.digit < underBarrier),
-        sideResult(window, thresholdPct, targetN, complete, `Over ${overBarrier}`, t => t.digit > overBarrier),
+        sideResult(relevant, thresholdPct, complete, `Under ${underBarrier}`, t => t.digit < underBarrier),
+        sideResult(relevant, thresholdPct, complete, `Over ${overBarrier}`, t => t.digit > overBarrier),
     ];
 }
 
-export function analyzeRiseFall(window: EpmTick[], thresholdPct: number, targetN: number, complete: boolean): SideResult[] {
+export function analyzeRiseFall(window: EpmTick[], thresholdPct: number, complete: boolean): SideResult[] {
     return [
-        sideResult(window, thresholdPct, targetN, complete, 'Rise', isRise),
-        sideResult(window, thresholdPct, targetN, complete, 'Fall', isFall),
+        sideResult(window, thresholdPct, complete, 'Rise', isRise),
+        sideResult(window, thresholdPct, complete, 'Fall', isFall),
     ];
 }
 
-export function analyzeOddEven(window: EpmTick[], thresholdPct: number, targetN: number, complete: boolean): SideResult[] {
+export function analyzeOddEven(window: EpmTick[], thresholdPct: number, complete: boolean): SideResult[] {
     return [
-        sideResult(window, thresholdPct, targetN, complete, 'Even', t => t.digit % 2 === 0),
-        sideResult(window, thresholdPct, targetN, complete, 'Odd', t => t.digit % 2 !== 0),
+        sideResult(window, thresholdPct, complete, 'Even', t => t.digit % 2 === 0),
+        sideResult(window, thresholdPct, complete, 'Odd', t => t.digit % 2 !== 0),
     ];
 }
 
 export function analyzeMatchDiffer(
     window: EpmTick[],
     thresholdPct: number,
-    targetN: number,
     complete: boolean,
     digit: number
 ): SideResult[] {
     return [
-        sideResult(window, thresholdPct, targetN, complete, `Matches ${digit}`, t => t.digit === digit),
-        sideResult(window, thresholdPct, targetN, complete, `Differs ${digit}`, t => t.digit !== digit),
+        sideResult(window, thresholdPct, complete, `Matches ${digit}`, t => t.digit === digit),
+        sideResult(window, thresholdPct, complete, `Differs ${digit}`, t => t.digit !== digit),
     ];
 }
 

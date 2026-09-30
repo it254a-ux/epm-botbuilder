@@ -102,13 +102,13 @@ const EpmAnalysisTool = observer(() => {
     const computeAt = (window: EpmTick[], complete: boolean): SideResult[] | null => {
         switch (contractType) {
             case 'over_under':
-                return analyzeOverUnder(window, thresholdPct, windowN, complete, underBarrier, overBarrier);
+                return analyzeOverUnder(window, thresholdPct, complete, underBarrier, overBarrier);
             case 'rise_fall':
-                return analyzeRiseFall(window, thresholdPct, windowN, complete);
+                return analyzeRiseFall(window, thresholdPct, complete);
             case 'odd_even':
-                return analyzeOddEven(window, thresholdPct, windowN, complete);
+                return analyzeOddEven(window, thresholdPct, complete);
             case 'match_differ':
-                return analyzeMatchDiffer(window, thresholdPct, windowN, complete, matchDigit);
+                return analyzeMatchDiffer(window, thresholdPct, complete, matchDigit);
             default:
                 return null;
         }
