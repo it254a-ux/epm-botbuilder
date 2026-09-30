@@ -4,12 +4,13 @@ import { useDerivWS } from '@deriv/core';
 import { useStore } from '@/hooks/useStore';
 import { useDevice } from '@deriv-com/ui';
 import { Localize, localize } from '@deriv-com/translations';
-import { useEpmTickStats } from './use-epm-tick-stats';
+import { useEpmTickStats, type EpmTick } from './use-epm-tick-stats';
 import {
     analyzeOverUnder,
     analyzeRiseFall,
     analyzeOddEven,
     analyzeMatchDiffer,
+    sourceTicksFor,
     type ContractType,
     type SideResult,
 } from './contract-analysis';
@@ -83,30 +84,65 @@ const EpmAnalysisTool = observer(() => {
     const [windowN, setWindowN] = useState(10);
     const [thresholdPct, setThresholdPct] = useState(80);
     const [results, setResults] = useState<SideResult[] | null>(null);
+    const [scanning, setScanning] = useState(false);
+    const [scanProgress, setScanProgress] = useState(0); // 0..100
+    const [scanStep, setScanStep] = useState(0);
+    const [scanTotal, setScanTotal] = useState(0);
 
     const { ws, isConnected } = useDerivWS();
     const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
 
     const canAnalyze =
-        status === 'analyzing' && ticks.length >= windowN && contractType !== 'accumulator' && contractType !== 'multiplier';
+        status === 'analyzing' &&
+        ticks.length >= windowN &&
+        !scanning &&
+        contractType !== 'accumulator' &&
+        contractType !== 'multiplier';
 
-    const runAnalysis = () => {
+    const computeAt = (window: EpmTick[], complete: boolean): SideResult[] | null => {
         switch (contractType) {
             case 'over_under':
-                setResults(analyzeOverUnder(ticks, windowN, thresholdPct, underBarrier, overBarrier));
-                break;
+                return analyzeOverUnder(window, thresholdPct, windowN, complete, underBarrier, overBarrier);
             case 'rise_fall':
-                setResults(analyzeRiseFall(ticks, windowN, thresholdPct));
-                break;
+                return analyzeRiseFall(window, thresholdPct, windowN, complete);
             case 'odd_even':
-                setResults(analyzeOddEven(ticks, windowN, thresholdPct));
-                break;
+                return analyzeOddEven(window, thresholdPct, windowN, complete);
             case 'match_differ':
-                setResults(analyzeMatchDiffer(ticks, windowN, thresholdPct, matchDigit));
-                break;
+                return analyzeMatchDiffer(window, thresholdPct, windowN, complete, matchDigit);
             default:
-                setResults(null);
+                return null;
         }
+    };
+
+    // Real scan: steps through the actual last-N ticks one at a time --
+    // each number shown mid-scan is a genuine result computed on that many
+    // real ticks, not a placeholder. Paced (not instant) so the process is
+    // visible; total scan time stays short regardless of how large N is.
+    const runAnalysis = async () => {
+        const source = sourceTicksFor(ticks, windowN, contractType);
+        const revealCount = contractType === 'rise_fall' ? source.length - 1 : source.length;
+        if (revealCount <= 0) return;
+
+        setScanning(true);
+        setResults(null);
+        setScanTotal(revealCount);
+
+        const TOTAL_DURATION_MS = 1400;
+        const stepDelay = Math.max(15, Math.min(120, TOTAL_DURATION_MS / revealCount));
+
+        for (let step = 1; step <= revealCount; step++) {
+            const partialWindow = contractType === 'rise_fall' ? source.slice(0, step + 1) : source.slice(0, step);
+            const complete = step === revealCount;
+            setResults(computeAt(partialWindow, complete));
+            setScanStep(step);
+            setScanProgress(Math.round((step / revealCount) * 100));
+            if (!complete) {
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise(resolve => setTimeout(resolve, stepDelay));
+            }
+        }
+
+        setScanning(false);
     };
 
     // Reset the shown result whenever a setting changes, so a stale result
@@ -276,9 +312,30 @@ const EpmAnalysisTool = observer(() => {
                         <Localize i18n_default_text='Coming soon.' />
                     </div>
                 ) : (
-                    <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
-                        <Localize i18n_default_text='Analyze' />
-                    </button>
+                    <div className='epm-analysis-tool__scan-row'>
+                        <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
+                            {scanning ? (
+                                <Localize i18n_default_text='Scanning…' />
+                            ) : (
+                                <Localize i18n_default_text='Scan Market' />
+                            )}
+                        </button>
+                        {scanning && (
+                            <div className='epm-analysis-tool__scan-progress'>
+                                <span
+                                    className='epm-analysis-tool__scan-ring'
+                                    style={{
+                                        background: `conic-gradient(var(--button-primary-default) ${scanProgress * 3.6}deg, var(--general-section-2, var(--general-hover)) 0deg)`,
+                                    }}
+                                >
+                                    <span className='epm-analysis-tool__scan-ring-inner'>{scanProgress}%</span>
+                                </span>
+                                <span className='epm-analysis-tool__scan-label'>
+                                    {scanStep}/{scanTotal} <Localize i18n_default_text='ticks scanned' />
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 <div className='epm-analysis-tool__status'>
@@ -296,7 +353,7 @@ const EpmAnalysisTool = observer(() => {
             </div>
 
             {results && (
-                <div className='epm-analysis-tool__panel'>
+                <div className={`epm-analysis-tool__panel ${scanning ? 'epm-analysis-tool__panel--scanning' : ''}`}>
                     <table className='epm-analysis-tool__table'>
                         <thead>
                             <tr>

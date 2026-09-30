@@ -4,69 +4,82 @@ export type ContractType = 'over_under' | 'rise_fall' | 'odd_even' | 'match_diff
 
 export interface SideResult {
     label: string;
-    /** % of the last N ticks that did NOT produce this outcome. */
+    /** % of the ticks scanned so far that did NOT produce this outcome. */
     failPct: number;
-    /** How many of the last N ticks were sampled (may be < N early in a session). */
+    /** How many ticks have been scanned so far (grows to windowN as the scan runs). */
     sampleSize: number;
+    /** True only once the scan has gone through the full window -- never during a partial reveal. */
     flagged: boolean;
 }
 
 const sideResult = (
-    ticks: EpmTick[],
-    windowN: number,
+    window: EpmTick[],
     thresholdPct: number,
+    targetN: number,
+    complete: boolean,
     label: string,
     qualifies: (t: EpmTick, i: number, arr: EpmTick[]) => boolean
 ): SideResult => {
-    const recent = ticks.slice(-windowN);
-    const qualifyCount = recent.reduce((acc, t, i) => acc + (qualifies(t, i, recent) ? 1 : 0), 0);
-    const failPct = recent.length ? ((recent.length - qualifyCount) / recent.length) * 100 : 0;
+    const qualifyCount = window.reduce((acc, t, i) => acc + (qualifies(t, i, window) ? 1 : 0), 0);
+    const failPct = window.length ? ((window.length - qualifyCount) / window.length) * 100 : 0;
     return {
         label,
         failPct,
-        sampleSize: recent.length,
-        flagged: recent.length >= windowN && failPct >= thresholdPct,
+        sampleSize: window.length,
+        flagged: complete && window.length >= targetN && failPct >= thresholdPct,
     };
 };
 
+/** Direction is relative to the previous tick, so a `window` for Rise/Fall
+ *  should include one extra tick before the N being counted -- see
+ *  `sourceTicksFor` below, which handles that. */
+const isRise = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote > arr[i - 1].quote;
+const isFall = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote < arr[i - 1].quote;
+
 export function analyzeOverUnder(
-    ticks: EpmTick[],
-    windowN: number,
+    window: EpmTick[],
     thresholdPct: number,
+    targetN: number,
+    complete: boolean,
     underBarrier: number,
     overBarrier: number
 ): SideResult[] {
     return [
-        sideResult(ticks, windowN, thresholdPct, `Under ${underBarrier}`, t => t.digit < underBarrier),
-        sideResult(ticks, windowN, thresholdPct, `Over ${overBarrier}`, t => t.digit > overBarrier),
+        sideResult(window, thresholdPct, targetN, complete, `Under ${underBarrier}`, t => t.digit < underBarrier),
+        sideResult(window, thresholdPct, targetN, complete, `Over ${overBarrier}`, t => t.digit > overBarrier),
     ];
 }
 
-export function analyzeRiseFall(ticks: EpmTick[], windowN: number, thresholdPct: number): SideResult[] {
-    // Direction is relative to the previous tick, so it only exists from the 2nd tick on.
-    const isRise = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote > arr[i - 1].quote;
-    const isFall = (t: EpmTick, i: number, arr: EpmTick[]) => i > 0 && t.quote < arr[i - 1].quote;
+export function analyzeRiseFall(window: EpmTick[], thresholdPct: number, targetN: number, complete: boolean): SideResult[] {
     return [
-        sideResult(ticks, windowN, thresholdPct, 'Rise', isRise),
-        sideResult(ticks, windowN, thresholdPct, 'Fall', isFall),
+        sideResult(window, thresholdPct, targetN, complete, 'Rise', isRise),
+        sideResult(window, thresholdPct, targetN, complete, 'Fall', isFall),
     ];
 }
 
-export function analyzeOddEven(ticks: EpmTick[], windowN: number, thresholdPct: number): SideResult[] {
+export function analyzeOddEven(window: EpmTick[], thresholdPct: number, targetN: number, complete: boolean): SideResult[] {
     return [
-        sideResult(ticks, windowN, thresholdPct, 'Even', t => t.digit % 2 === 0),
-        sideResult(ticks, windowN, thresholdPct, 'Odd', t => t.digit % 2 !== 0),
+        sideResult(window, thresholdPct, targetN, complete, 'Even', t => t.digit % 2 === 0),
+        sideResult(window, thresholdPct, targetN, complete, 'Odd', t => t.digit % 2 !== 0),
     ];
 }
 
 export function analyzeMatchDiffer(
-    ticks: EpmTick[],
-    windowN: number,
+    window: EpmTick[],
     thresholdPct: number,
+    targetN: number,
+    complete: boolean,
     digit: number
 ): SideResult[] {
     return [
-        sideResult(ticks, windowN, thresholdPct, `Matches ${digit}`, t => t.digit === digit),
-        sideResult(ticks, windowN, thresholdPct, `Differs ${digit}`, t => t.digit !== digit),
+        sideResult(window, thresholdPct, targetN, complete, `Matches ${digit}`, t => t.digit === digit),
+        sideResult(window, thresholdPct, targetN, complete, `Differs ${digit}`, t => t.digit !== digit),
     ];
+}
+
+/** The real tick data a scan will step through, taken once at the moment
+ *  Scan Market is pressed. Rise/Fall needs one extra leading tick so its
+ *  very first counted tick still has a previous tick to compare against. */
+export function sourceTicksFor(ticks: EpmTick[], windowN: number, contractType: ContractType): EpmTick[] {
+    return contractType === 'rise_fall' ? ticks.slice(-(windowN + 1)) : ticks.slice(-windowN);
 }
