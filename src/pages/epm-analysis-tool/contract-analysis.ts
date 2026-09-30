@@ -8,6 +8,8 @@ export interface SideResult {
     failPct: number;
     /** How many ticks have been scanned so far (grows to windowN as the scan runs). */
     sampleSize: number;
+    /** Of `sampleSize`, how many were NOT this outcome -- the raw count failPct is built from. */
+    failCount: number;
     /** True only once the scan has gone through the full window -- never during a partial reveal. */
     flagged: boolean;
 }
@@ -20,11 +22,13 @@ const sideResult = (
     qualifies: (t: EpmTick, i: number, arr: EpmTick[]) => boolean
 ): SideResult => {
     const qualifyCount = window.reduce((acc, t, i) => acc + (qualifies(t, i, window) ? 1 : 0), 0);
-    const failPct = window.length ? ((window.length - qualifyCount) / window.length) * 100 : 0;
+    const failCount = window.length - qualifyCount;
+    const failPct = window.length ? (failCount / window.length) * 100 : 0;
     return {
         label,
         failPct,
         sampleSize: window.length,
+        failCount,
         // `complete` alone is the gate -- it's only true once the scan has
         // gone through the full N ticks the user asked for.
         flagged: complete && window.length > 0 && failPct >= thresholdPct,

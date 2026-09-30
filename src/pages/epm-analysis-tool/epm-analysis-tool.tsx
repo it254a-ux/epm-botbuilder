@@ -373,7 +373,7 @@ const EpmAnalysisTool = observer(() => {
                                 <tr key={row.label}>
                                     <td>{row.label}</td>
                                     <td className='epm-analysis-tool__num'>
-                                        {row.failPct.toFixed(1)}% ({row.sampleSize} sampled)
+                                        {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize} of the relevant ticks)
                                     </td>
                                     <td>
                                         {row.flagged && (
