@@ -11,7 +11,6 @@ import {
     analyzeOddEven,
     analyzeMatchDiffer,
     sourceTicksFor,
-    qualifiesFor,
     type ContractType,
     type SideResult,
 } from './contract-analysis';
@@ -90,10 +89,7 @@ const EpmAnalysisTool = observer(() => {
     const [scanning, setScanning] = useState(false);
     const [mode, setMode] = useState<'manual' | 'automatic'>('manual');
     const [autoMessage, setAutoMessage] = useState<string | null>(null);
-    const [confirmLabel, setConfirmLabel] = useState<string | null>(null);
-    const [confirmCount, setConfirmCount] = useState(0);
-    const [confirmMatched, setConfirmMatched] = useState(0);
-    const CONFIRM_TOTAL = 5;
+    const EXTRA_LIVE_TICKS = 5;
     const [confirmThresholdPct, setConfirmThresholdPct] = useState(90);
     const { bots, loadBot } = useBotLoader();
     const [scanProgress, setScanProgress] = useState(0); // 0..100
@@ -155,74 +151,62 @@ const EpmAnalysisTool = observer(() => {
     // visible; total scan time stays short regardless of how large N is.
     const runAnalysis = async () => {
         const source = sourceTicksFor(ticks, windowN, contractType);
-        const revealCount = contractType === 'rise_fall' ? source.length - 1 : source.length;
-        if (revealCount <= 0) return;
+        const bufferedCount = contractType === 'rise_fall' ? source.length - 1 : source.length;
+        if (bufferedCount <= 0) return;
+        const totalCount = bufferedCount + EXTRA_LIVE_TICKS;
 
         setScanning(true);
         setResults(null);
-        setConfirmLabel(null);
         setAutoMessage(null);
-        setScanTotal(revealCount);
+        setScanTotal(totalCount);
 
         const TOTAL_DURATION_MS = 1400;
-        const stepDelay = Math.max(15, Math.min(120, TOTAL_DURATION_MS / revealCount));
+        const stepDelay = Math.max(15, Math.min(120, TOTAL_DURATION_MS / bufferedCount));
 
         let finalResult: SideResult[] | null = null;
-        for (let step = 1; step <= revealCount; step++) {
+
+        // Phase 1: the already-buffered last N ticks -- fast, paced reveal.
+        for (let step = 1; step <= bufferedCount; step++) {
             const partialWindow = contractType === 'rise_fall' ? source.slice(0, step + 1) : source.slice(0, step);
-            const complete = step === revealCount;
+            const complete = step === totalCount; // only true if EXTRA_LIVE_TICKS is 0
             const stepResult = computeAt(partialWindow, complete);
             setResults(stepResult);
             if (complete) finalResult = stepResult;
             setScanStep(step);
-            setScanProgress(Math.round((step / revealCount) * 100));
+            setScanProgress(Math.round((step / totalCount) * 100));
             if (!complete) {
                 // eslint-disable-next-line no-await-in-loop
                 await new Promise(resolve => setTimeout(resolve, stepDelay));
             }
         }
 
+        // Phase 2: keeps extending the SAME window with real new ticks as
+        // they arrive live -- one continuous result over all
+        // bufferedCount + EXTRA_LIVE_TICKS ticks, not a separate number.
+        let combined = source.slice();
+        const startLen = ticksRef.current.length;
+        for (let extra = 1; extra <= EXTRA_LIVE_TICKS; extra++) {
+            while (ticksRef.current.length < startLen + extra) {
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            combined = [...combined, ticksRef.current[startLen + extra - 1]];
+            const step = bufferedCount + extra;
+            const complete = step === totalCount;
+            const stepResult = computeAt(combined, complete);
+            setResults(stepResult);
+            if (complete) finalResult = stepResult;
+            setScanStep(step);
+            setScanProgress(Math.round((step / totalCount) * 100));
+        }
+
+        setScanning(false);
+
         const flagged = finalResult?.find(r => r.flagged);
         if (!flagged) {
-            setScanning(false);
-            setConfirmLabel(null);
             if (mode === 'automatic') setAutoMessage(localize('Scan finished — no side met the rule this time.'));
             return;
         }
-
-        // Watch the next 5 REAL ticks as they arrive live (not re-using any
-        // of the ticks already scanned) -- shown for both modes, but this is
-        // now purely a live readout. It does NOT gate Automatic mode: with
-        // only 5 ticks to count, the match rate can only ever land on 0, 20,
-        // 40, 60, 80 or 100% -- so a 90%+ gate on it could only ever pass on
-        // a perfect 5-for-5, which is why trades weren't firing even when
-        // the scan itself showed 90%+. The real percentage to gate on is the
-        // scan's own result, checked below before this finishes.
-        setConfirmLabel(flagged.label);
-        setConfirmCount(0);
-        setConfirmMatched(0);
-        const qualifies = qualifiesFor(contractType, flagged.label, { underBarrier, overBarrier, matchDigit });
-        const startLen = ticksRef.current.length;
-        const watchNext5 = async () => {
-            let observed = 0;
-            let matched = 0;
-            while (observed < CONFIRM_TOTAL) {
-                while (ticksRef.current.length <= startLen + observed) {
-                    // eslint-disable-next-line no-await-in-loop
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-                const arr = ticksRef.current;
-                const idx = startLen + observed;
-                if (qualifies(arr[idx], idx, arr)) matched++;
-                observed++;
-                setConfirmCount(observed);
-                setConfirmMatched(matched);
-            }
-        };
-        // Keeps the scan circle/"Scanning…" state showing until this finishes
-        // too -- not awaited here for the trade decision below, which must
-        // not wait on it, but it still drives when `scanning` turns off.
-        watchNext5().finally(() => setScanning(false));
 
         if (mode === 'automatic' && flagged.failPct < confirmThresholdPct) {
             setAutoMessage(
@@ -432,7 +416,7 @@ const EpmAnalysisTool = observer(() => {
                         <>
                             <div>
                                 <label className='epm-analysis-tool__label'>
-                                    <Localize i18n_default_text='Last N ticks' />
+                                    <Localize i18n_default_text='Look back N ticks (+5 live)' />
                                 </label>
                                 <input
                                     type='number'
@@ -505,15 +489,6 @@ const EpmAnalysisTool = observer(() => {
                         {status === 'error' && (errorMessage || localize('Connection error'))}
                     </span>
                 </div>
-
-                {confirmLabel && (
-                    <div className='epm-analysis-tool__note'>
-                        <Localize
-                            i18n_default_text='Watching the next {{total}} real ticks for {{side}}: {{count}}/{{total}} so far — matched {{matched}}.'
-                            values={{ side: confirmLabel, count: confirmCount, total: CONFIRM_TOTAL, matched: confirmMatched }}
-                        />
-                    </div>
-                )}
 
                 {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
             </div>
