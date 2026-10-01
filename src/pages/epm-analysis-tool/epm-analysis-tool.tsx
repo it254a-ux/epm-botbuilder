@@ -183,14 +183,20 @@ const EpmAnalysisTool = observer(() => {
         // Phase 2: keeps extending the SAME window with real new ticks as
         // they arrive live -- one continuous result over all
         // bufferedCount + EXTRA_LIVE_TICKS ticks, not a separate number.
+        // Detects a new arrival by epoch, not array length: once the buffer
+        // hits its cap (see HISTORY_TICK_COUNT in use-epm-tick-stats.ts),
+        // old ticks fall off as new ones arrive, so length stops changing
+        // even though real new ticks keep coming in.
         let combined = source.slice();
-        const startLen = ticksRef.current.length;
+        let lastSeenEpoch = ticksRef.current[ticksRef.current.length - 1]?.epoch;
         for (let extra = 1; extra <= EXTRA_LIVE_TICKS; extra++) {
-            while (ticksRef.current.length < startLen + extra) {
+            while (ticksRef.current[ticksRef.current.length - 1]?.epoch === lastSeenEpoch) {
                 // eslint-disable-next-line no-await-in-loop
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
-            combined = [...combined, ticksRef.current[startLen + extra - 1]];
+            const newest = ticksRef.current[ticksRef.current.length - 1];
+            lastSeenEpoch = newest.epoch;
+            combined = [...combined, newest];
             const step = bufferedCount + extra;
             const complete = step === totalCount;
             const stepResult = computeAt(combined, complete);
