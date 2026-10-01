@@ -15,6 +15,8 @@ import {
     type SideResult,
 } from './contract-analysis';
 import BotShortcuts from './bot-shortcuts';
+import { useBotLoader } from './use-bot-loader';
+import { resolveBot, readChoices } from './bot-resolution';
 import './epm-analysis-tool.scss';
 
 const SYMBOL_GROUPS: Array<{ label: string; options: Array<{ value: string; label: string }> }> = [
@@ -85,11 +87,15 @@ const EpmAnalysisTool = observer(() => {
     const [thresholdPct, setThresholdPct] = useState(80);
     const [results, setResults] = useState<SideResult[] | null>(null);
     const [scanning, setScanning] = useState(false);
+    const [mode, setMode] = useState<'manual' | 'automatic'>('manual');
+    const [autoMessage, setAutoMessage] = useState<string | null>(null);
+    const { bots, loadBot } = useBotLoader();
     const [scanProgress, setScanProgress] = useState(0); // 0..100
     const [scanStep, setScanStep] = useState(0);
     const [scanTotal, setScanTotal] = useState(0);
 
     const { ws, isConnected } = useDerivWS();
+    const { run_panel: runPanelForAuto } = useStore();
     const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
 
     const canAnalyze =
@@ -130,10 +136,13 @@ const EpmAnalysisTool = observer(() => {
         const TOTAL_DURATION_MS = 1400;
         const stepDelay = Math.max(15, Math.min(120, TOTAL_DURATION_MS / revealCount));
 
+        let finalResult: SideResult[] | null = null;
         for (let step = 1; step <= revealCount; step++) {
             const partialWindow = contractType === 'rise_fall' ? source.slice(0, step + 1) : source.slice(0, step);
             const complete = step === revealCount;
-            setResults(computeAt(partialWindow, complete));
+            const stepResult = computeAt(partialWindow, complete);
+            setResults(stepResult);
+            if (complete) finalResult = stepResult;
             setScanStep(step);
             setScanProgress(Math.round((step / revealCount) * 100));
             if (!complete) {
@@ -143,6 +152,33 @@ const EpmAnalysisTool = observer(() => {
         }
 
         setScanning(false);
+
+        if (mode === 'automatic') {
+            const flagged = finalResult?.find(r => r.flagged);
+            if (!flagged) {
+                setAutoMessage(localize('Scan finished — no side met the rule this time.'));
+                return;
+            }
+            const bot = resolveBot(bots, contractType, flagged.label, readChoices());
+            if (!bot) {
+                setAutoMessage(
+                    localize('{{side}} met the rule, but no bot is set for it yet — pick one under "Your bots" first.', {
+                        side: flagged.label,
+                    })
+                );
+                return;
+            }
+            setAutoMessage(localize('{{side}} met the rule — loading {{bot}}…', { side: flagged.label, bot: bot.name }));
+            await loadBot(bot);
+            setAutoMessage(localize('Running {{bot}}…', { bot: bot.name }));
+            await runPanelForAuto.onRunButtonClick();
+            setAutoMessage(
+                localize('{{bot}} is running on {{side}}. Stop it from the Run panel, or wait for TP/SL.', {
+                    bot: bot.name,
+                    side: flagged.label,
+                })
+            );
+        }
     };
 
     // Reset the shown result whenever a setting changes, so a stale result
@@ -178,6 +214,31 @@ const EpmAnalysisTool = observer(() => {
             <h1 className='epm-analysis-tool__title'>
                 <Localize i18n_default_text='EPM Analysis Tool' />
             </h1>
+
+            <div className='epm-analysis-tool__mode-row'>
+                <label className='epm-analysis-tool__mode-option'>
+                    <input
+                        type='radio'
+                        name='epm-mode'
+                        checked={mode === 'manual'}
+                        onChange={() => setMode('manual')}
+                    />
+                    <span>
+                        <Localize i18n_default_text='Manual — I load and run the bot myself' />
+                    </span>
+                </label>
+                <label className='epm-analysis-tool__mode-option'>
+                    <input
+                        type='radio'
+                        name='epm-mode'
+                        checked={mode === 'automatic'}
+                        onChange={() => setMode('automatic')}
+                    />
+                    <span>
+                        <Localize i18n_default_text='Automatic — load and run the bot for me when the rule is met' />
+                    </span>
+                </label>
+            </div>
 
             <div className='epm-analysis-tool__panel'>
                 <div className='epm-analysis-tool__picker-row'>
@@ -316,6 +377,8 @@ const EpmAnalysisTool = observer(() => {
                         <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
                             {scanning ? (
                                 <Localize i18n_default_text='Scanning…' />
+                            ) : mode === 'automatic' ? (
+                                <Localize i18n_default_text='Scan & Trade' />
                             ) : (
                                 <Localize i18n_default_text='Scan Market' />
                             )}
@@ -350,6 +413,8 @@ const EpmAnalysisTool = observer(() => {
                         {status === 'error' && (errorMessage || localize('Connection error'))}
                     </span>
                 </div>
+
+                {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
             </div>
 
             {results && (

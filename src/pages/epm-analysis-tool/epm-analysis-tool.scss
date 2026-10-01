@@ -18,6 +18,26 @@
         color: var(--text-prominent);
     }
 
+    &__mode-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    &__mode-option {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
+        color: var(--text-general);
+        cursor: pointer;
+
+        input {
+            accent-color: var(--button-primary-default);
+        }
+    }
+
     &__panel {
         background: var(--general-section-1);
         border: 1px solid var(--border-normal);
