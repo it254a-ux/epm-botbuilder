@@ -94,6 +94,7 @@ const EpmAnalysisTool = observer(() => {
     const [confirmCount, setConfirmCount] = useState(0);
     const [confirmMatched, setConfirmMatched] = useState(0);
     const CONFIRM_TOTAL = 5;
+    const [confirmThresholdPct, setConfirmThresholdPct] = useState(90);
     const { bots, loadBot } = useBotLoader();
     const [scanProgress, setScanProgress] = useState(0); // 0..100
     const [scanStep, setScanStep] = useState(0);
@@ -198,6 +199,19 @@ const EpmAnalysisTool = observer(() => {
             setConfirmMatched(matched);
         }
 
+        const confirmPct = (matched / CONFIRM_TOTAL) * 100;
+
+        if (mode === 'automatic' && confirmPct < confirmThresholdPct) {
+            setAutoMessage(
+                localize('{{side}} only confirmed at {{pct}}% (needs {{needed}}%+) — not running.', {
+                    side: flagged.label,
+                    pct: confirmPct.toFixed(0),
+                    needed: confirmThresholdPct,
+                })
+            );
+            return;
+        }
+
         if (mode === 'automatic') {
             const bot = resolveBot(bots, contractType, flagged.label, readChoices());
             if (!bot) {
@@ -278,6 +292,21 @@ const EpmAnalysisTool = observer(() => {
                         <Localize i18n_default_text='Automatic — load and run the bot for me when the rule is met' />
                     </span>
                 </label>
+                {mode === 'automatic' && (
+                    <label className='epm-analysis-tool__mode-option'>
+                        <span>
+                            <Localize i18n_default_text='Only run at confirm %' />
+                        </span>
+                        <input
+                            type='number'
+                            className='epm-analysis-tool__input'
+                            value={confirmThresholdPct}
+                            min={0}
+                            max={100}
+                            onChange={e => setConfirmThresholdPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        />
+                    </label>
+                )}
             </div>
 
             <div className='epm-analysis-tool__panel'>
