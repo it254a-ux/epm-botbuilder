@@ -192,35 +192,41 @@ const EpmAnalysisTool = observer(() => {
         }
 
         // Watch the next 5 REAL ticks as they arrive live (not re-using any
-        // of the ticks already scanned) and count how many of them actually
-        // match the flagged side.
+        // of the ticks already scanned) -- shown for both modes, but this is
+        // now purely a live readout. It does NOT gate Automatic mode: with
+        // only 5 ticks to count, the match rate can only ever land on 0, 20,
+        // 40, 60, 80 or 100% -- so a 90%+ gate on it could only ever pass on
+        // a perfect 5-for-5, which is why trades weren't firing even when
+        // the scan itself showed 90%+. The real percentage to gate on is the
+        // scan's own result, checked below before this finishes.
         setConfirmLabel(flagged.label);
         setConfirmCount(0);
         setConfirmMatched(0);
         const qualifies = qualifiesFor(contractType, flagged.label, { underBarrier, overBarrier, matchDigit });
         const startLen = ticksRef.current.length;
-        let observed = 0;
-        let matched = 0;
-        while (observed < CONFIRM_TOTAL) {
-            while (ticksRef.current.length <= startLen + observed) {
-                // eslint-disable-next-line no-await-in-loop
-                await new Promise(resolve => setTimeout(resolve, 200));
+        const watchNext5 = async () => {
+            let observed = 0;
+            let matched = 0;
+            while (observed < CONFIRM_TOTAL) {
+                while (ticksRef.current.length <= startLen + observed) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                const arr = ticksRef.current;
+                const idx = startLen + observed;
+                if (qualifies(arr[idx], idx, arr)) matched++;
+                observed++;
+                setConfirmCount(observed);
+                setConfirmMatched(matched);
             }
-            const arr = ticksRef.current;
-            const idx = startLen + observed;
-            if (qualifies(arr[idx], idx, arr)) matched++;
-            observed++;
-            setConfirmCount(observed);
-            setConfirmMatched(matched);
-        }
+        };
+        watchNext5(); // not awaited -- runs alongside, doesn't block the trade below
 
-        const confirmPct = (matched / CONFIRM_TOTAL) * 100;
-
-        if (mode === 'automatic' && confirmPct < confirmThresholdPct) {
+        if (mode === 'automatic' && flagged.failPct < confirmThresholdPct) {
             setAutoMessage(
-                localize('{{side}} only confirmed at {{pct}}% (needs {{needed}}%+) — not running.', {
+                localize('{{side}} is at {{pct}}% (needs {{needed}}%+) — not running.', {
                     side: flagged.label,
-                    pct: confirmPct.toFixed(0),
+                    pct: flagged.failPct.toFixed(0),
                     needed: confirmThresholdPct,
                 })
             );
@@ -310,7 +316,7 @@ const EpmAnalysisTool = observer(() => {
                 {mode === 'automatic' && (
                     <label className='epm-analysis-tool__mode-option'>
                         <span>
-                            <Localize i18n_default_text='Only run at confirm %' />
+                            <Localize i18n_default_text='Only run at scan %' />
                         </span>
                         <input
                             type='number'
