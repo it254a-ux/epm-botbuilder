@@ -182,10 +182,9 @@ const EpmAnalysisTool = observer(() => {
             }
         }
 
-        setScanning(false);
-
         const flagged = finalResult?.find(r => r.flagged);
         if (!flagged) {
+            setScanning(false);
             setConfirmLabel(null);
             if (mode === 'automatic') setAutoMessage(localize('Scan finished — no side met the rule this time.'));
             return;
@@ -220,7 +219,10 @@ const EpmAnalysisTool = observer(() => {
                 setConfirmMatched(matched);
             }
         };
-        watchNext5(); // not awaited -- runs alongside, doesn't block the trade below
+        // Keeps the scan circle/"Scanning…" state showing until this finishes
+        // too -- not awaited here for the trade decision below, which must
+        // not wait on it, but it still drives when `scanning` turns off.
+        watchNext5().finally(() => setScanning(false));
 
         if (mode === 'automatic' && flagged.failPct < confirmThresholdPct) {
             setAutoMessage(
