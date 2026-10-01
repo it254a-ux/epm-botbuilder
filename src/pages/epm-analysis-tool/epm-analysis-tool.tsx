@@ -112,6 +112,21 @@ const EpmAnalysisTool = observer(() => {
         ticksRef.current = ticks;
     }, [ticks]);
 
+    // Bots call the page's native alert() to post a message while running
+    // (e.g. "CONTINUOUS TRADER - UNDER 4, EVERY TICK"). While this page is
+    // open, replace it with a styled in-panel notice instead of the
+    // browser's native popup -- same message, shown in the Run panel.
+    const [botNotice, setBotNotice] = useState<string | null>(null);
+    useEffect(() => {
+        const originalAlert = window.alert;
+        window.alert = (message?: unknown) => {
+            setBotNotice(message === undefined ? '' : String(message));
+        };
+        return () => {
+            window.alert = originalAlert;
+        };
+    }, []);
+
     const canAnalyze =
         status === 'analyzing' &&
         ticks.length >= windowN &&
@@ -533,6 +548,40 @@ const EpmAnalysisTool = observer(() => {
             )}
 
             <BotShortcuts contractType={contractType} sides={results ? sideLabels : []} flaggedSides={flaggedSides} />
+
+            {botNotice !== null && (
+                <div
+                    className='epm-analysis-tool__notice-overlay'
+                    style={isDesktop ? { width: `${DESKTOP_DRAWER_OPEN_WIDTH}px` } : undefined}
+                >
+                    <div className='epm-analysis-tool__notice-card'>
+                        <div className='epm-analysis-tool__notice-header'>
+                            <span className='epm-analysis-tool__notice-icon'>◆</span>
+                            <Localize i18n_default_text='Strategy Notice' />
+                        </div>
+                        <div className='epm-analysis-tool__notice-body'>{botNotice || localize('(no message)')}</div>
+                        <div className='epm-analysis-tool__notice-actions'>
+                            <button
+                                type='button'
+                                className='epm-analysis-tool__notice-cancel'
+                                onClick={() => {
+                                    setBotNotice(null);
+                                    runPanelForAuto.onStopButtonClick();
+                                }}
+                            >
+                                <Localize i18n_default_text='Stop Trading' />
+                            </button>
+                            <button
+                                type='button'
+                                className='epm-analysis-tool__notice-ok'
+                                onClick={() => setBotNotice(null)}
+                            >
+                                <Localize i18n_default_text='Acknowledge & Continue' />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });
