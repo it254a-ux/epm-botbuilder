@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useDerivWS } from '@deriv/core';
 import { useStore } from '@/hooks/useStore';
@@ -11,6 +11,7 @@ import {
     analyzeOddEven,
     analyzeMatchDiffer,
     sourceTicksFor,
+    qualifiesFor,
     type ContractType,
     type SideResult,
 } from './contract-analysis';
@@ -89,6 +90,10 @@ const EpmAnalysisTool = observer(() => {
     const [scanning, setScanning] = useState(false);
     const [mode, setMode] = useState<'manual' | 'automatic'>('manual');
     const [autoMessage, setAutoMessage] = useState<string | null>(null);
+    const [confirmLabel, setConfirmLabel] = useState<string | null>(null);
+    const [confirmCount, setConfirmCount] = useState(0);
+    const [confirmMatched, setConfirmMatched] = useState(0);
+    const CONFIRM_TOTAL = 5;
     const { bots, loadBot } = useBotLoader();
     const [scanProgress, setScanProgress] = useState(0); // 0..100
     const [scanStep, setScanStep] = useState(0);
@@ -97,6 +102,14 @@ const EpmAnalysisTool = observer(() => {
     const { ws, isConnected } = useDerivWS();
     const { run_panel: runPanelForAuto } = useStore();
     const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
+
+    // Mirrors `ticks` so the next-5 confirmation loop (running inside an
+    // async function whose closure was fixed at click time) can always read
+    // the latest live ticks as they arrive, not a stale snapshot.
+    const ticksRef = useRef(ticks);
+    useEffect(() => {
+        ticksRef.current = ticks;
+    }, [ticks]);
 
     const canAnalyze =
         status === 'analyzing' &&
@@ -131,6 +144,8 @@ const EpmAnalysisTool = observer(() => {
 
         setScanning(true);
         setResults(null);
+        setConfirmLabel(null);
+        setAutoMessage(null);
         setScanTotal(revealCount);
 
         const TOTAL_DURATION_MS = 1400;
@@ -153,12 +168,37 @@ const EpmAnalysisTool = observer(() => {
 
         setScanning(false);
 
-        if (mode === 'automatic') {
-            const flagged = finalResult?.find(r => r.flagged);
-            if (!flagged) {
-                setAutoMessage(localize('Scan finished — no side met the rule this time.'));
-                return;
+        const flagged = finalResult?.find(r => r.flagged);
+        if (!flagged) {
+            setConfirmLabel(null);
+            if (mode === 'automatic') setAutoMessage(localize('Scan finished — no side met the rule this time.'));
+            return;
+        }
+
+        // Watch the next 5 REAL ticks as they arrive live (not re-using any
+        // of the ticks already scanned) and count how many of them actually
+        // match the flagged side.
+        setConfirmLabel(flagged.label);
+        setConfirmCount(0);
+        setConfirmMatched(0);
+        const qualifies = qualifiesFor(contractType, flagged.label, { underBarrier, overBarrier, matchDigit });
+        const startLen = ticksRef.current.length;
+        let observed = 0;
+        let matched = 0;
+        while (observed < CONFIRM_TOTAL) {
+            while (ticksRef.current.length <= startLen + observed) {
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
+            const arr = ticksRef.current;
+            const idx = startLen + observed;
+            if (qualifies(arr[idx], idx, arr)) matched++;
+            observed++;
+            setConfirmCount(observed);
+            setConfirmMatched(matched);
+        }
+
+        if (mode === 'automatic') {
             const bot = resolveBot(bots, contractType, flagged.label, readChoices());
             if (!bot) {
                 setAutoMessage(
@@ -413,6 +453,15 @@ const EpmAnalysisTool = observer(() => {
                         {status === 'error' && (errorMessage || localize('Connection error'))}
                     </span>
                 </div>
+
+                {confirmLabel && (
+                    <div className='epm-analysis-tool__note'>
+                        <Localize
+                            i18n_default_text='Watching the next {{total}} real ticks for {{side}}: {{count}}/{{total}} so far — matched {{matched}}.'
+                            values={{ side: confirmLabel, count: confirmCount, total: CONFIRM_TOTAL, matched: confirmMatched }}
+                        />
+                    </div>
+                )}
 
                 {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
             </div>

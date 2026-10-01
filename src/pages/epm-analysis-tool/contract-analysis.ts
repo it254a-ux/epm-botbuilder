@@ -92,3 +92,29 @@ export function analyzeMatchDiffer(
 export function sourceTicksFor(ticks: EpmTick[], windowN: number, contractType: ContractType): EpmTick[] {
     return contractType === 'rise_fall' ? ticks.slice(-(windowN + 1)) : ticks.slice(-windowN);
 }
+
+/** The real qualifies-check for one labelled side, so the same "did this
+ *  tick match?" test used to build the scan result can be reused live on
+ *  brand-new ticks as they arrive (the next-5 confirmation step). */
+export function qualifiesFor(
+    contractType: ContractType,
+    label: string,
+    params: { underBarrier?: number; overBarrier?: number; matchDigit?: number }
+): (t: EpmTick, i: number, arr: EpmTick[]) => boolean {
+    switch (contractType) {
+        case 'over_under':
+            return label.startsWith('Under')
+                ? t => t.digit < (params.underBarrier ?? 0)
+                : t => t.digit > (params.overBarrier ?? 9);
+        case 'rise_fall':
+            return label === 'Rise' ? isRise : isFall;
+        case 'odd_even':
+            return label === 'Even' ? t => t.digit % 2 === 0 : t => t.digit % 2 !== 0;
+        case 'match_differ':
+            return label.startsWith('Matches')
+                ? t => t.digit === (params.matchDigit ?? -1)
+                : t => t.digit !== (params.matchDigit ?? -1);
+        default:
+            return () => false;
+    }
+}
