@@ -122,7 +122,7 @@
         /* results box only as wide as its content, bots box takes the rest */
         grid-template-columns: fit-content(420px) minmax(0, 1fr);
         gap: 14px;
-        align-items: start;
+        align-items: stretch;
         margin-bottom: 14px;
 
         @media (max-width: 700px) {
@@ -237,10 +237,7 @@
     &__btn-inline {
         padding: 7px 12px;
         white-space: nowrap;
-
-        @container (max-width: 520px) {
-            width: 100%;
-        }
+        width: 100%;
     }
 
     &__panel-bottom {
@@ -381,24 +378,28 @@
         white-space: nowrap;
     }
 
+    /* Under / Over side by side; each one is label -> dropdown -> Load bot */
     &__bot-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    &__bot-row {
         display: grid;
-        grid-template-columns: 140px 1fr auto;
-        gap: 8px;
-        align-items: center;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        align-items: start;
 
-        @container (max-width: 520px) {
+        @container (max-width: 300px) {
             grid-template-columns: minmax(0, 1fr);
         }
     }
 
+    &__bot-row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        min-width: 0;
+    }
+
     &__bot-side {
+        min-height: 22px; /* same height with or without the 'Rule met' badge, so dropdowns line up */
         font-size: 12px;
         font-weight: 600;
         color: var(--text-prominent);
