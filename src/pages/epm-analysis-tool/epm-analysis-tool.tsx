@@ -69,6 +69,23 @@ const MATCH_DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const DESKTOP_DRAWER_OPEN_WIDTH = 366;
 const DESKTOP_DRAWER_CLOSED_WIDTH = 16;
 
+// Decorative drifting digits for the background (fixed values so they don't change on re-render)
+const FLOATING_DIGITS = [
+    { value: '7', left: 4, size: 34, duration: 22, delay: 0, blur: 1 },
+    { value: '2', left: 11, size: 22, duration: 28, delay: -9, blur: 2 },
+    { value: '0', left: 19, size: 44, duration: 30, delay: -4, blur: 3 },
+    { value: '5', left: 27, size: 26, duration: 24, delay: -14, blur: 1 },
+    { value: '9', left: 35, size: 38, duration: 32, delay: -7, blur: 2 },
+    { value: '3', left: 43, size: 20, duration: 26, delay: -18, blur: 1 },
+    { value: '1', left: 51, size: 46, duration: 34, delay: -11, blur: 3 },
+    { value: '8', left: 58, size: 28, duration: 23, delay: -2, blur: 2 },
+    { value: '4', left: 66, size: 36, duration: 29, delay: -16, blur: 1 },
+    { value: '6', left: 73, size: 24, duration: 27, delay: -6, blur: 2 },
+    { value: '7', left: 81, size: 42, duration: 31, delay: -12, blur: 3 },
+    { value: '2', left: 88, size: 30, duration: 25, delay: -20, blur: 1 },
+    { value: '9', left: 94, size: 22, duration: 33, delay: -8, blur: 2 },
+];
+
 const EpmAnalysisTool = observer(() => {
     const { run_panel } = useStore();
     const { isDesktop } = useDevice();
@@ -278,33 +295,68 @@ const EpmAnalysisTool = observer(() => {
             className='epm-analysis-tool'
             style={{ width: `calc(100% - ${reservedWidth}px)`, transition: 'width 0.3s ease' }}
         >
+            <div className='epm-analysis-tool__bg' aria-hidden='true'>
+                {FLOATING_DIGITS.map((d, i) => (
+                    <span
+                        key={i}
+                        className='epm-analysis-tool__bg-digit'
+                        style={{
+                            left: `${d.left}%`,
+                            fontSize: `${d.size}px`,
+                            animationDuration: `${d.duration}s`,
+                            animationDelay: `${d.delay}s`,
+                            filter: `blur(${d.blur}px)`,
+                        }}
+                    >
+                        {d.value}
+                    </span>
+                ))}
+            </div>
+
             <h1 className='epm-analysis-tool__title'>
                 <Localize i18n_default_text='EPM Analysis Tool' />
             </h1>
 
             <div className='epm-analysis-tool__mode-row'>
-                <label className='epm-analysis-tool__mode-option'>
-                    <input
-                        type='radio'
-                        name='epm-mode'
-                        checked={mode === 'manual'}
-                        onChange={() => setMode('manual')}
-                    />
-                    <span>
-                        <Localize i18n_default_text='Manual — I load and run the bot myself' />
-                    </span>
-                </label>
-                <label className='epm-analysis-tool__mode-option'>
-                    <input
-                        type='radio'
-                        name='epm-mode'
-                        checked={mode === 'automatic'}
-                        onChange={() => setMode('automatic')}
-                    />
-                    <span>
-                        <Localize i18n_default_text='Automatic — load and run the bot for me when the rule is met' />
-                    </span>
-                </label>
+                <div className='epm-analysis-tool__mode-toggle' role='radiogroup' aria-label={localize('Mode')}>
+                    <button
+                        type='button'
+                        role='radio'
+                        aria-checked={mode === 'automatic'}
+                        title={localize('Load and run the bot for me when the rule is met')}
+                        className={`epm-analysis-tool__mode-btn ${
+                            mode === 'automatic' ? 'epm-analysis-tool__mode-btn--active' : ''
+                        }`}
+                        onClick={() => setMode('automatic')}
+                    >
+                        <svg viewBox='0 0 24 24' width='18' height='18' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                            <path d='M13 2 4 14h7l-1 8 9-12h-7l1-8Z' />
+                        </svg>
+                        <span>
+                            <Localize i18n_default_text='Automatic' />
+                        </span>
+                    </button>
+                    <button
+                        type='button'
+                        role='radio'
+                        aria-checked={mode === 'manual'}
+                        title={localize('I load and run the bot myself')}
+                        className={`epm-analysis-tool__mode-btn ${
+                            mode === 'manual' ? 'epm-analysis-tool__mode-btn--active' : ''
+                        }`}
+                        onClick={() => setMode('manual')}
+                    >
+                        <svg viewBox='0 0 24 24' width='18' height='18' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                            <path d='M18 11V6a2 2 0 0 0-4 0v5' />
+                            <path d='M14 10V4a2 2 0 0 0-4 0v6' />
+                            <path d='M10 10.5V6a2 2 0 0 0-4 0v8' />
+                            <path d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-5.9-2.4L3.4 16a2 2 0 0 1 3.2-2.4L8 15' />
+                        </svg>
+                        <span>
+                            <Localize i18n_default_text='Manual' />
+                        </span>
+                    </button>
+                </div>
                 {mode === 'automatic' && (
                     <label className='epm-analysis-tool__mode-option'>
                         <span>
