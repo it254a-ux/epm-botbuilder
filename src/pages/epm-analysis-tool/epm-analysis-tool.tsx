@@ -563,7 +563,11 @@ const EpmAnalysisTool = observer(() => {
 
             <div className='epm-analysis-tool__columns'>
                 {results && (
-                    <div className={`epm-analysis-tool__panel ${scanning ? 'epm-analysis-tool__panel--scanning' : ''}`}>
+                    <div
+                        className={`epm-analysis-tool__panel epm-analysis-tool__panel--results ${
+                            scanning ? 'epm-analysis-tool__panel--scanning' : ''
+                        }`}
+                    >
                         <table className='epm-analysis-tool__table'>
                             <thead>
                                 <tr>
