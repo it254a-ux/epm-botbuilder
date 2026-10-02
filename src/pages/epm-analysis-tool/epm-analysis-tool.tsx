@@ -571,11 +571,11 @@ const EpmAnalysisTool = observer(() => {
                             <tbody>
                                 {results.map(row => (
                                     <tr key={row.label}>
-                                        <td data-label={localize('Side')}>{row.label}</td>
-                                        <td className='epm-analysis-tool__num' data-label={localize('Did not appear (last N)')}>
-                                            {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize} of the relevant ticks)
+                                        <td>{row.label}</td>
+                                        <td className='epm-analysis-tool__num'>
+                                            {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize})
                                         </td>
-                                        <td data-label={localize('Result')}>
+                                        <td>
                                             {row.flagged && (
                                                 <span className='epm-analysis-tool__badge'>
                                                     <Localize i18n_default_text='Rule met' />
