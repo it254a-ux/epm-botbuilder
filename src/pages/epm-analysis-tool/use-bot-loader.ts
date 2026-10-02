@@ -40,8 +40,12 @@ export function useBotLoader() {
                 drop_event: {},
                 strategy_id: null,
                 showIncompatibleStrategyDialog: false,
+                // load() shows its own "You've successfully imported a bot."
+                // toast by default, stacking with the one below -- one toast
+                // is enough, and this one's wording is more useful here.
+                show_snackbar: false,
             });
-            toast.success(localize('Bot loaded — press Run in the panel'));
+            toast.success(localize('Bot loaded — press Run in the panel'), { autoClose: 3000 });
         } catch (err) {
             toast.error(err instanceof Error ? err.message : localize('Failed to load bot'));
         } finally {
