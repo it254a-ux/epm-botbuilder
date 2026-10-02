@@ -135,10 +135,13 @@ const Freebots = observer(() => {
                 drop_event: {},
                 strategy_id: null,
                 showIncompatibleStrategyDialog: false,
+                // load() shows its own "You've successfully imported a bot."
+                // toast by default, stacking with the one below -- one is enough.
+                show_snackbar: false,
             });
 
             setActiveTab(DBOT_TABS.BOT_BUILDER);
-            toast.success(localize('Bot loaded into Bot Builder'));
+            toast.success(localize('Bot loaded into Bot Builder'), { autoClose: 3000 });
         } catch (err: any) {
             toast.error(err?.message || localize('Failed to load bot'));
         } finally {
