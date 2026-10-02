@@ -156,12 +156,26 @@
     &__picker-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
         align-items: flex-end;
         margin-bottom: 12px;
 
+        /* compact fields: all on one row on wide screens, wraps only if there is truly no room */
         > div {
-            min-width: 140px;
+            flex: 1 1 0;
+            min-width: 100px;
+            max-width: 170px;
+        }
+
+        .epm-analysis-tool__select,
+        .epm-analysis-tool__input {
+            width: 100%;
+            height: 32px;
+            padding: 0 8px;
+        }
+
+        .epm-analysis-tool__label {
+            line-height: 1.2;
         }
 
         @media (max-width: 900px) {
