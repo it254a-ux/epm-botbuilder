@@ -152,7 +152,7 @@ export default class SaveModalStore implements ISaveModalStore {
         xml.setAttribute('collection', save_as_collection ? 'true' : 'false');
 
         if (is_local) {
-            save(bot_name, save_as_collection, xml);
+            await save(bot_name, save_as_collection, xml);
         } else {
             await saveFile({
                 name: bot_name,

@@ -5,10 +5,16 @@ import { v4 as uuidv4 } from 'uuid';
 import {
     getSavedWorkspaces,
     load,
+    observer as globalObserver,
     removeExistingWorkspace,
     save_types,
     saveWorkspaceToRecent,
 } from '@/external/bot-skeleton';
+import {
+    isLockedBuffer,
+    LOCKED_FILE_EXTENSION,
+    unlockStrategy,
+} from '@/external/bot-skeleton/scratch/epm-strategy-lock';
 import { inject_workspace_options, updateXmlValues } from '@/external/bot-skeleton/scratch/utils';
 import { isDbotRTL } from '@/external/bot-skeleton/utils/workspace';
 import { TStores } from '@deriv/stores/types';
@@ -417,7 +423,7 @@ export default class LoadModalStore {
         const [file] = files;
 
         if (!is_body) {
-            if (file.name.includes('xml')) {
+            if (file.name.includes('xml') || file.name.endsWith(`.${LOCKED_FILE_EXTENSION}`)) {
                 this.setLoadedLocalFile(file);
                 this.getDashboardStrategies();
             } else {
@@ -434,8 +440,21 @@ export default class LoadModalStore {
         const file_name = file?.name.replace(/\.[^/.]+$/, '') || '';
 
         reader.onload = action(async e => {
+            const raw = e?.target?.result as ArrayBuffer;
+            let block_string: string;
+            try {
+                // Files saved by this site are scrambled (see epm-strategy-lock.js);
+                // unlock them back into XML. Anything else is read as plain XML text,
+                // same as before, so older exports and strategies from elsewhere still load.
+                block_string = isLockedBuffer(raw) ? await unlockStrategy(raw) : new TextDecoder().decode(raw);
+            } catch (error) {
+                globalObserver.emit('Error', new Error(localize('This file could not be read.')));
+                this.setOpenButtonDisabled(false);
+                return;
+            }
+
             const load_options = {
-                block_string: e?.target?.result,
+                block_string,
                 drop_event,
                 from: save_types.LOCAL,
                 workspace: null as window.Blockly.WorkspaceSvg | null,
@@ -451,7 +470,7 @@ export default class LoadModalStore {
             this.setOpenButtonDisabled(false);
         });
 
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     };
 
     saveStrategyToLocalStorage = async () => {

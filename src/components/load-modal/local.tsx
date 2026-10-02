@@ -77,7 +77,7 @@ const LocalComponent = observer(() => {
                 <input
                     type='file'
                     ref={file_input_ref}
-                    accept='application/xml, text/xml'
+                    accept='application/xml, text/xml, .epmbot'
                     style={{ display: 'none' }}
                     onChange={e => {
                         const is_supported = handleFileChange(e, false);

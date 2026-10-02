@@ -10,6 +10,7 @@ import { observer as globalObserver } from '../../utils/observer';
 import { removeLimitedBlocks } from '../../utils/workspace';
 import BlockConversion from '../backward-compatibility';
 import DBotStore from '../dbot-store';
+import { LOCKED_FILE_EXTENSION, lockStrategy } from '../epm-strategy-lock';
 import { saveAs } from '../shared';
 
 export const inject_workspace_options = {
@@ -131,12 +132,15 @@ export const cleanUpOnLoad = (blocks_to_clean, drop_event, workspace) => {
     workspace.cleanUp(cursor_x, cursor_y, blocks_to_clean);
 };
 
-export const save = (filename = '@deriv/bot', collection = false, xmlDom) => {
+export const save = async (filename = '@deriv/bot', collection = false, xmlDom) => {
     xmlDom.setAttribute('is_dbot', 'true');
     xmlDom.setAttribute('collection', collection ? 'true' : 'false');
 
-    const data = window.Blockly.Xml.domToPrettyText(xmlDom);
-    saveAs({ data, type: 'text/xml;charset=utf-8', filename: `${filename}.xml` });
+    const xml_text = window.Blockly.Xml.domToPrettyText(xmlDom);
+    // Scramble the strategy before it leaves the browser, so the saved file
+    // only opens back up on this site. See epm-strategy-lock.js.
+    const locked = await lockStrategy(xml_text);
+    saveAs({ data: locked, type: 'application/octet-stream', filename: `${filename}.${LOCKED_FILE_EXTENSION}` });
 };
 
 const delayExecution = ms => new Promise(resolve => setTimeout(resolve, ms));
