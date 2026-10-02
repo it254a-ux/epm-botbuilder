@@ -235,6 +235,19 @@
         }
     }
 
+    &__panel-bottom {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px 20px;
+    }
+
+    &__panel-bottom-left {
+        flex: 1 1 220px;
+        min-width: 0;
+    }
+
     &__scan-row {
         display: flex;
         align-items: center;

@@ -15,6 +15,7 @@ import {
     type SideResult,
 } from './contract-analysis';
 import BotShortcuts from './bot-shortcuts';
+import DigitStatsWidget from './digit-stats-widget';
 import { useBotLoader } from './use-bot-loader';
 import { resolveBot, readChoices } from './bot-resolution';
 import './epm-analysis-tool.scss';
@@ -290,6 +291,10 @@ const EpmAnalysisTool = observer(() => {
         }
     }, [contractType, underBarrier, overBarrier, matchDigit]);
 
+    // Digits shown with the blue "selected" circle in the live digit stats
+    const highlightDigits =
+        contractType === 'over_under' ? [underBarrier, overBarrier] : contractType === 'match_differ' ? [matchDigit] : [];
+
     return (
         <div
             className='epm-analysis-tool'
@@ -502,53 +507,58 @@ const EpmAnalysisTool = observer(() => {
                     )}
                 </div>
 
-                {(contractType === 'accumulator' || contractType === 'multiplier') ? (
-                    <div className='epm-analysis-tool__note'>
-                        <Localize i18n_default_text='Coming soon.' />
-                    </div>
-                ) : (
-                    <div className='epm-analysis-tool__scan-row'>
-                        <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
-                            {scanning ? (
-                                <Localize i18n_default_text='Scanning…' />
-                            ) : mode === 'automatic' ? (
-                                <Localize i18n_default_text='Scan & Trade' />
-                            ) : (
-                                <Localize i18n_default_text='Scan Market' />
+                <div className='epm-analysis-tool__panel-bottom'>
+                    <div className='epm-analysis-tool__panel-bottom-left'>
+                    {(contractType === 'accumulator' || contractType === 'multiplier') ? (
+                        <div className='epm-analysis-tool__note'>
+                            <Localize i18n_default_text='Coming soon.' />
+                        </div>
+                    ) : (
+                        <div className='epm-analysis-tool__scan-row'>
+                            <button className='epm-analysis-tool__btn-primary' onClick={runAnalysis} disabled={!canAnalyze}>
+                                {scanning ? (
+                                    <Localize i18n_default_text='Scanning…' />
+                                ) : mode === 'automatic' ? (
+                                    <Localize i18n_default_text='Scan & Trade' />
+                                ) : (
+                                    <Localize i18n_default_text='Scan Market' />
+                                )}
+                            </button>
+                            {scanning && (
+                                <div className='epm-analysis-tool__scan-progress'>
+                                    <span
+                                        className='epm-analysis-tool__scan-ring'
+                                        style={{
+                                            background: `conic-gradient(var(--button-primary-default) ${scanProgress * 3.6}deg, var(--general-section-2, var(--general-hover)) 0deg)`,
+                                        }}
+                                    >
+                                        <span className='epm-analysis-tool__scan-ring-inner'>{scanProgress}%</span>
+                                    </span>
+                                    <span className='epm-analysis-tool__scan-label'>
+                                        {scanStep}/{scanTotal} <Localize i18n_default_text='ticks scanned' />
+                                    </span>
+                                </div>
                             )}
-                        </button>
-                        {scanning && (
-                            <div className='epm-analysis-tool__scan-progress'>
-                                <span
-                                    className='epm-analysis-tool__scan-ring'
-                                    style={{
-                                        background: `conic-gradient(var(--button-primary-default) ${scanProgress * 3.6}deg, var(--general-section-2, var(--general-hover)) 0deg)`,
-                                    }}
-                                >
-                                    <span className='epm-analysis-tool__scan-ring-inner'>{scanProgress}%</span>
-                                </span>
-                                <span className='epm-analysis-tool__scan-label'>
-                                    {scanStep}/{scanTotal} <Localize i18n_default_text='ticks scanned' />
-                                </span>
-                            </div>
-                        )}
+                        </div>
+                    )}
+
+                    <div className='epm-analysis-tool__status'>
+                        <span
+                            className={`epm-analysis-tool__dot epm-analysis-tool__dot--${
+                                status === 'analyzing' ? 'live' : status === 'error' ? 'off' : 'idle'
+                            }`}
+                        />
+                        <span>
+                            {status === 'analyzing' && `${symbol} — ${ticks.length} ${localize('ticks buffered')}`}
+                            {status === 'connecting' && localize('Connecting…')}
+                            {status === 'error' && (errorMessage || localize('Connection error'))}
+                        </span>
                     </div>
-                )}
 
-                <div className='epm-analysis-tool__status'>
-                    <span
-                        className={`epm-analysis-tool__dot epm-analysis-tool__dot--${
-                            status === 'analyzing' ? 'live' : status === 'error' ? 'off' : 'idle'
-                        }`}
-                    />
-                    <span>
-                        {status === 'analyzing' && `${symbol} — ${ticks.length} ${localize('ticks buffered')}`}
-                        {status === 'connecting' && localize('Connecting…')}
-                        {status === 'error' && (errorMessage || localize('Connection error'))}
-                    </span>
+                    {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
+                    </div>
+                    <DigitStatsWidget ticks={ticks} highlightDigits={highlightDigits} />
                 </div>
-
-                {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
             </div>
 
             <div className='epm-analysis-tool__columns'>
