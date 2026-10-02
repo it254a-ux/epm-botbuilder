@@ -114,6 +114,23 @@
         color: var(--text-general);
     }
 
+    &__columns {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        /* two boxes side by side when there is room, one column on narrow screens */
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+        gap: 14px;
+        align-items: start;
+        margin-bottom: 14px;
+
+        > .epm-analysis-tool__panel {
+            margin-bottom: 0;
+            min-width: 0;
+            container-type: inline-size;
+        }
+    }
+
     &__panel {
         position: relative;
         z-index: 1;
@@ -213,7 +230,7 @@
         padding: 7px 12px;
         white-space: nowrap;
 
-        @media (max-width: 900px) {
+        @container (max-width: 520px) {
             width: 100%;
         }
     }
@@ -322,7 +339,7 @@
             letter-spacing: 0.3px;
         }
 
-        @media (max-width: 900px) {
+        @container (max-width: 520px) {
             display: block;
 
             thead {
@@ -386,7 +403,7 @@
         gap: 8px;
         align-items: center;
 
-        @media (max-width: 900px) {
+        @container (max-width: 520px) {
             grid-template-columns: minmax(0, 1fr);
         }
     }

@@ -551,44 +551,46 @@ const EpmAnalysisTool = observer(() => {
                 {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
             </div>
 
-            {results && (
-                <div className={`epm-analysis-tool__panel ${scanning ? 'epm-analysis-tool__panel--scanning' : ''}`}>
-                    <table className='epm-analysis-tool__table'>
-                        <thead>
-                            <tr>
-                                <th>
-                                    <Localize i18n_default_text='Side' />
-                                </th>
-                                <th>
-                                    <Localize i18n_default_text='Did not appear (last N)' />
-                                </th>
-                                <th>
-                                    <Localize i18n_default_text='Result' />
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {results.map(row => (
-                                <tr key={row.label}>
-                                    <td data-label={localize('Side')}>{row.label}</td>
-                                    <td className='epm-analysis-tool__num' data-label={localize('Did not appear (last N)')}>
-                                        {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize} of the relevant ticks)
-                                    </td>
-                                    <td data-label={localize('Result')}>
-                                        {row.flagged && (
-                                            <span className='epm-analysis-tool__badge'>
-                                                <Localize i18n_default_text='Rule met' />
-                                            </span>
-                                        )}
-                                    </td>
+            <div className='epm-analysis-tool__columns'>
+                {results && (
+                    <div className={`epm-analysis-tool__panel ${scanning ? 'epm-analysis-tool__panel--scanning' : ''}`}>
+                        <table className='epm-analysis-tool__table'>
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <Localize i18n_default_text='Side' />
+                                    </th>
+                                    <th>
+                                        <Localize i18n_default_text='Did not appear (last N)' />
+                                    </th>
+                                    <th>
+                                        <Localize i18n_default_text='Result' />
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                            </thead>
+                            <tbody>
+                                {results.map(row => (
+                                    <tr key={row.label}>
+                                        <td data-label={localize('Side')}>{row.label}</td>
+                                        <td className='epm-analysis-tool__num' data-label={localize('Did not appear (last N)')}>
+                                            {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize} of the relevant ticks)
+                                        </td>
+                                        <td data-label={localize('Result')}>
+                                            {row.flagged && (
+                                                <span className='epm-analysis-tool__badge'>
+                                                    <Localize i18n_default_text='Rule met' />
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
-            <BotShortcuts contractType={contractType} sides={results ? sideLabels : []} flaggedSides={flaggedSides} />
+                <BotShortcuts contractType={contractType} sides={results ? sideLabels : []} flaggedSides={flaggedSides} />
+            </div>
 
             {botNotice !== null && (
                 <div
