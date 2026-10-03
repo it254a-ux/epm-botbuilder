@@ -258,15 +258,21 @@
     }
 
     &__panel-bottom {
-        display: flex;
-        flex-wrap: wrap;
+        /* Fixed two-column grid instead of flex-wrap: the right column's
+           position no longer depends on how wide the left side's text is
+           (e.g. "5 ticks buffered" growing to "1000 ticks buffered"), so it
+           can't drift or trigger a wrap as that text changes every tick. */
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 313px);
         align-items: flex-start;
-        justify-content: space-between;
-        gap: 14px 20px;
+        gap: 14px 28px;
+
+        @media (max-width: 700px) {
+            grid-template-columns: minmax(0, 1fr);
+        }
     }
 
     &__panel-bottom-left {
-        flex: 1 1 220px;
         min-width: 0;
     }
 
