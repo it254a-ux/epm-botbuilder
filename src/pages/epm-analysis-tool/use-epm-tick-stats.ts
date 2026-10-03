@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import type { DerivWS } from '@deriv/core';
 import { getLastDigit, pipSizeFromPip } from '@/external/rise-fall-dtrader/lib/digit-stats';
 
@@ -13,10 +13,16 @@ export interface EpmTick {
 
 export type EpmConnectionStatus = 'connecting' | 'analyzing' | 'error';
 
-interface UseEpmTickStatsReturn {
+export interface EpmTickSnapshot {
     ticks: EpmTick[];
     status: EpmConnectionStatus;
     errorMessage: string | null;
+}
+
+export interface EpmTickStore {
+    getSnapshot: () => EpmTickSnapshot;
+    /** Registers a listener fired after every update; call it again to unsubscribe. */
+    subscribe: (listener: () => void) => () => void;
 }
 
 /**
@@ -27,21 +33,36 @@ interface UseEpmTickStatsReturn {
  * `ws` is connected and a `symbol` is picked, this fetches history and
  * subscribes automatically, and cleans up its subscription on symbol
  * change / unmount.
+ *
+ * Unlike a normal hook, this does NOT put ticks in React state, so calling
+ * it does not re-render the caller on every tick (a 1s index can tick
+ * several times a second; the full Analysis Tool page -- picker row,
+ * results table, bot list -- is far too much to re-render that often, which
+ * is what made the live digit circles feel laggy/jerky). Instead it returns
+ * a small store: components that need to redraw every tick (the digit
+ * circles, the "N ticks buffered" line) subscribe to it directly with
+ * useEpmTickSnapshot below, so only those small pieces re-render. The page
+ * itself only needs occasional, derived facts (are we connected? have we
+ * buffered enough ticks yet?), which useEpmTickStatus / useEpmHasBuffered
+ * provide without subscribing to every tick.
  */
-export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol: string): UseEpmTickStatsReturn {
-    const [ticks, setTicks] = useState<EpmTick[]>([]);
-    const [status, setStatus] = useState<EpmConnectionStatus>('connecting');
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+export function useEpmTickStore(ws: DerivWS | null, isConnected: boolean, symbol: string): EpmTickStore {
+    const snapshotRef = useRef<EpmTickSnapshot>({ ticks: [], status: 'connecting', errorMessage: null });
+    const listenersRef = useRef<Set<() => void>>(new Set());
     const pipDecimalsRef = useRef<number>(2);
+
+    const notify = () => listenersRef.current.forEach(listener => listener());
+    const setSnapshot = (next: EpmTickSnapshot) => {
+        snapshotRef.current = next;
+        notify();
+    };
 
     useEffect(() => {
         if (!ws || !isConnected || !symbol) return;
         let disposed = false;
         let unsubscribe: (() => void) | null = null;
 
-        setStatus('connecting');
-        setErrorMessage(null);
-        setTicks([]);
+        setSnapshot({ ticks: [], status: 'connecting', errorMessage: null });
 
         async function run() {
             try {
@@ -72,7 +93,7 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
                     digit: getLastDigit(quote, pipDecimalsRef.current),
                     epoch: times[i] ?? 0,
                 }));
-                setTicks(historyTicks);
+                setSnapshot({ ...snapshotRef.current, ticks: historyTicks });
 
                 const sub = await ws!.subscribe({ ticks: symbol }, data => {
                     if (disposed) return;
@@ -80,22 +101,27 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
                     if (!tick) return;
                     if (tick.pip_size) pipDecimalsRef.current = pipSizeFromPip(tick.pip_size);
                     const digit = getLastDigit(tick.quote, pipDecimalsRef.current);
-                    setTicks(prev => {
-                        const next = [...prev, { quote: tick.quote, digit, epoch: tick.epoch }];
-                        return next.length > HISTORY_TICK_COUNT ? next.slice(-HISTORY_TICK_COUNT) : next;
+                    const prevTicks = snapshotRef.current.ticks;
+                    const nextTicks = [...prevTicks, { quote: tick.quote, digit, epoch: tick.epoch }];
+                    setSnapshot({
+                        ticks: nextTicks.length > HISTORY_TICK_COUNT ? nextTicks.slice(-HISTORY_TICK_COUNT) : nextTicks,
+                        status: 'analyzing',
+                        errorMessage: null,
                     });
-                    setStatus('analyzing');
                 });
                 if (disposed) {
                     sub.unsubscribe();
                     return;
                 }
                 unsubscribe = sub.unsubscribe;
-                setStatus('analyzing');
+                setSnapshot({ ...snapshotRef.current, status: 'analyzing' });
             } catch (err) {
                 if (!disposed) {
-                    setStatus('error');
-                    setErrorMessage(err instanceof Error ? err.message : 'Connection error');
+                    setSnapshot({
+                        ...snapshotRef.current,
+                        status: 'error',
+                        errorMessage: err instanceof Error ? err.message : 'Connection error',
+                    });
                 }
             }
         }
@@ -109,7 +135,70 @@ export function useEpmTickStats(ws: DerivWS | null, isConnected: boolean, symbol
         };
     }, [ws, isConnected, symbol]);
 
-    return { ticks, status, errorMessage };
+    // Stable identity across re-renders: a subscriber's `useEffect(() => store.subscribe(...), [store])`
+    // should only (re)run when it's really a different store, not on every render of whoever created it.
+    const storeRef = useRef<EpmTickStore>();
+    if (!storeRef.current) {
+        storeRef.current = {
+            getSnapshot: () => snapshotRef.current,
+            subscribe: listener => {
+                listenersRef.current.add(listener);
+                return () => listenersRef.current.delete(listener);
+            },
+        };
+    }
+    return storeRef.current;
+}
+
+/** Re-renders the caller on every tick. Use only in small, isolated components
+ *  (the digit circles, a "buffered" line) -- never in a large page. */
+export function useEpmTickSnapshot(store: EpmTickStore): EpmTickSnapshot {
+    const [, forceRender] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => store.subscribe(forceRender), [store]);
+    return store.getSnapshot();
+}
+
+/** Re-renders the caller only when connection status actually changes
+ *  (connecting -> analyzing -> error), not on every tick. Safe to use in a large page. */
+export function useEpmTickStatus(store: EpmTickStore): Pick<EpmTickSnapshot, 'status' | 'errorMessage'> {
+    const [, forceRender] = useReducer((n: number) => n + 1, 0);
+    const lastRef = useRef<{ status: EpmConnectionStatus; errorMessage: string | null } | null>(null);
+
+    useEffect(() => {
+        const sync = () => {
+            const snap = store.getSnapshot();
+            if (!lastRef.current || lastRef.current.status !== snap.status || lastRef.current.errorMessage !== snap.errorMessage) {
+                lastRef.current = { status: snap.status, errorMessage: snap.errorMessage };
+                forceRender();
+            }
+        };
+        sync();
+        return store.subscribe(sync);
+    }, [store]);
+
+    const snap = store.getSnapshot();
+    return { status: snap.status, errorMessage: snap.errorMessage };
+}
+
+/** Re-renders the caller only when the buffered tick count crosses `threshold`
+ *  (e.g. enough ticks to enable the Scan button), not on every tick. Safe to use in a large page. */
+export function useEpmHasBuffered(store: EpmTickStore, threshold: number): boolean {
+    const [, forceRender] = useReducer((n: number) => n + 1, 0);
+    const lastRef = useRef(store.getSnapshot().ticks.length >= threshold);
+
+    useEffect(() => {
+        const check = () => {
+            const now = store.getSnapshot().ticks.length >= threshold;
+            if (now !== lastRef.current) {
+                lastRef.current = now;
+                forceRender();
+            }
+        };
+        check();
+        return store.subscribe(check);
+    }, [store, threshold]);
+
+    return lastRef.current;
 }
 
 /** One-shot historical fetch for the backtester -- reuses the same shared

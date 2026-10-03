@@ -34,7 +34,7 @@
         width: 14.6cqw;
         aspect-ratio: 1;
         border-radius: 50%;
-        transition: transform 0.3s ease;
+        transition: transform 0.15s ease-out;
 
         &--current {
             transform: scale(1.25);
@@ -72,7 +72,7 @@
         stroke-linecap: butt;
         transform-box: fill-box;
         transform-origin: center;
-        transition: stroke-dasharray 0.35s ease, transform 0.35s ease, stroke 0.35s ease;
+        transition: stroke-dasharray 0.15s ease-out, transform 0.15s ease-out, stroke 0.15s ease-out;
 
         &--high {
             stroke: var(--brand-success, #1aa08c);

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useDerivWS } from '@deriv/core';
 import { useStore } from '@/hooks/useStore';
 import { useDevice } from '@deriv-com/ui';
 import { Localize, localize } from '@deriv-com/translations';
-import { useEpmTickStats, type EpmTick } from './use-epm-tick-stats';
+import { useEpmHasBuffered, useEpmTickStatus, useEpmTickStore, type EpmTick } from './use-epm-tick-stats';
 import {
     analyzeOverUnder,
     analyzeRiseFall,
@@ -16,6 +16,7 @@ import {
 } from './contract-analysis';
 import BotShortcuts from './bot-shortcuts';
 import DigitStatsWidget from './digit-stats-widget';
+import LiveStatusLine from './live-status-line';
 import { useBotLoader } from './use-bot-loader';
 import { resolveBot, readChoices } from './bot-resolution';
 import './epm-analysis-tool.scss';
@@ -119,15 +120,14 @@ const EpmAnalysisTool = observer(() => {
 
     const { ws, isConnected } = useDerivWS();
     const { run_panel: runPanelForAuto } = useStore();
-    const { ticks, status, errorMessage } = useEpmTickStats(ws, isConnected, symbol);
-
-    // Mirrors `ticks` so the next-5 confirmation loop (running inside an
-    // async function whose closure was fixed at click time) can always read
-    // the latest live ticks as they arrive, not a stale snapshot.
-    const ticksRef = useRef(ticks);
-    useEffect(() => {
-        ticksRef.current = ticks;
-    }, [ticks]);
+    // The tick store does NOT live in React state (see use-epm-tick-stats.ts),
+    // so calling this does not re-render this whole page on every tick -- a
+    // 1s index can tick several times a second, and this page (picker row,
+    // results table, bot list) is far too much to redraw that often. Only
+    // the small pieces that genuinely need to redraw every tick (the digit
+    // circles, the status line) subscribe to the store themselves, below.
+    const tickStore = useEpmTickStore(ws, isConnected, symbol);
+    const { status } = useEpmTickStatus(tickStore);
 
     // Bots call the page's native alert() to post a message while running
     // (e.g. "CONTINUOUS TRADER - UNDER 4, EVERY TICK"). While this page is
@@ -144,12 +144,11 @@ const EpmAnalysisTool = observer(() => {
         };
     }, []);
 
+    // Re-renders this page only when the buffered count crosses windowN
+    // (rare), not on every tick -- see useEpmHasBuffered.
+    const hasBuffered = useEpmHasBuffered(tickStore, windowN);
     const canAnalyze =
-        status === 'analyzing' &&
-        ticks.length >= windowN &&
-        !scanning &&
-        contractType !== 'accumulator' &&
-        contractType !== 'multiplier';
+        status === 'analyzing' && hasBuffered && !scanning && contractType !== 'accumulator' && contractType !== 'multiplier';
 
     const computeAt = (window: EpmTick[], complete: boolean): SideResult[] | null => {
         switch (contractType) {
@@ -171,7 +170,7 @@ const EpmAnalysisTool = observer(() => {
     // real ticks, not a placeholder. Paced (not instant) so the process is
     // visible; total scan time stays short regardless of how large N is.
     const runAnalysis = async () => {
-        const source = sourceTicksFor(ticks, windowN, contractType);
+        const source = sourceTicksFor(tickStore.getSnapshot().ticks, windowN, contractType);
         const bufferedCount = contractType === 'rise_fall' ? source.length - 1 : source.length;
         if (bufferedCount <= 0) return;
         const totalCount = bufferedCount + EXTRA_LIVE_TICKS;
@@ -209,13 +208,13 @@ const EpmAnalysisTool = observer(() => {
         // old ticks fall off as new ones arrive, so length stops changing
         // even though real new ticks keep coming in.
         let combined = source.slice();
-        let lastSeenEpoch = ticksRef.current[ticksRef.current.length - 1]?.epoch;
+        let lastSeenEpoch = tickStore.getSnapshot().ticks.at(-1)?.epoch;
         for (let extra = 1; extra <= EXTRA_LIVE_TICKS; extra++) {
-            while (ticksRef.current[ticksRef.current.length - 1]?.epoch === lastSeenEpoch) {
+            while (tickStore.getSnapshot().ticks.at(-1)?.epoch === lastSeenEpoch) {
                 // eslint-disable-next-line no-await-in-loop
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
-            const newest = ticksRef.current[ticksRef.current.length - 1];
+            const newest = tickStore.getSnapshot().ticks.at(-1) as EpmTick;
             lastSeenEpoch = newest.epoch;
             combined = [...combined, newest];
             const step = bufferedCount + extra;
@@ -544,22 +543,11 @@ const EpmAnalysisTool = observer(() => {
                         </div>
                     )}
 
-                    <div className='epm-analysis-tool__status'>
-                        <span
-                            className={`epm-analysis-tool__dot epm-analysis-tool__dot--${
-                                status === 'analyzing' ? 'live' : status === 'error' ? 'off' : 'idle'
-                            }`}
-                        />
-                        <span>
-                            {status === 'analyzing' && `${symbol} — ${ticks.length} ${localize('ticks buffered')}`}
-                            {status === 'connecting' && localize('Connecting…')}
-                            {status === 'error' && (errorMessage || localize('Connection error'))}
-                        </span>
-                    </div>
+                    <LiveStatusLine store={tickStore} symbol={symbol} />
 
                     {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
                     </div>
-                    <DigitStatsWidget ticks={ticks} highlightDigits={highlightDigits} />
+                    <DigitStatsWidget store={tickStore} highlightDigits={highlightDigits} />
                 </div>
             </div>
 

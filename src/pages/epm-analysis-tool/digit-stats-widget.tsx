@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import type { EpmTick } from './use-epm-tick-stats';
+import { useEpmTickSnapshot, type EpmTickStore } from './use-epm-tick-stats';
 import './digit-stats-widget.scss';
 
 interface DigitStatsWidgetProps {
-    /** The live, buffered ticks (each carries its last digit). */
-    ticks: EpmTick[];
+    /** Live tick store (see use-epm-tick-stats.ts). Subscribed to directly here,
+     *  so only this widget redraws on every tick -- not the whole page. */
+    store: EpmTickStore;
     /** Digits to show with the filled blue "selected" circle (e.g. the barriers). */
     highlightDigits?: number[];
 }
@@ -22,7 +23,9 @@ const arcDegrees = (pct: number) => {
  * the buffered ticks. Most frequent digit = teal arc, least frequent = red arc,
  * the latest tick's digit is enlarged with a red pointer.
  */
-function DigitStatsWidget({ ticks, highlightDigits = [] }: DigitStatsWidgetProps) {
+function DigitStatsWidget({ store, highlightDigits = [] }: DigitStatsWidgetProps) {
+    const { ticks } = useEpmTickSnapshot(store);
+
     const { percentages, highest, lowest } = useMemo(() => {
         const counts = new Array(10).fill(0) as number[];
         ticks.forEach(t => {
