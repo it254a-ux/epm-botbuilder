@@ -108,15 +108,21 @@
     }
 
     &__digit {
-        font-size: 4.5cqw;
-        font-weight: 700;
+        font-size: 4.7cqw;
+        font-weight: 800;
+        /* Same token the rest of the page's text uses (#333 in light mode,
+           white in dark) -- already "the same as the whole site". Crisper
+           rendering here so it actually reads that way at this small size,
+           surrounded by the grey rings/arcs. */
         color: var(--text-prominent);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
 
     &__pct {
         font-size: 3.1cqw;
-        font-weight: 500;
-        color: var(--text-less-prominent);
+        font-weight: 600;
+        color: var(--text-general);
         white-space: nowrap;
     }
 
