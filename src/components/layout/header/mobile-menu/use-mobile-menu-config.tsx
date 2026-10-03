@@ -10,7 +10,7 @@ import {
     LegacyWarningIcon,
 } from '@deriv/quill-icons/Legacy';
 import { useTranslations } from '@deriv-com/translations';
-import { HELP_OPTIONS } from '@/components/get-help';
+import { getHelpOptions } from '@/components/get-help';
 
 export type TSubmenuSection = 'accountSettings' | 'cashier' | 'reports';
 
@@ -87,9 +87,11 @@ const useMobileMenuConfig = (
             // "get help" button showed (see components/get-help), grouped
             // here under one heading instead of appearing as unlabelled,
             // unrelated-looking rows.
+            // Dropped automatically (empty sections are filtered out below) when the
+            // site has no support contacts configured.
             {
                 title: localize('Customer support'),
-                items: HELP_OPTIONS.map(option => ({
+                items: getHelpOptions().map(option => ({
                     as: 'a',
                     label: option.label,
                     LeftComponent: () => option.icon,

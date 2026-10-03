@@ -2,17 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import './get-help.scss';
 
-// ── Configure your real contact destinations here ──────────────────────────
-const WHATSAPP_NUMBER = '254115533208'; // digits only, country code, no + or spaces
-const WHATSAPP_MESSAGE = 'Hi, I need help with EPM Bot Builder';
-const PHONE_NUMBER = '+254115533208';
-// "Message" opens the native SMS composer (sms:), matching the original
-// contact button's behavior in the parent app — not email or live chat.
-const MESSAGE_HREF = `sms:${PHONE_NUMBER}`;
-// ─────────────────────────────────────────────────────────────────────────
-
-const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
-const PHONE_HREF = `tel:${PHONE_NUMBER}`;
+import {
+    getActiveSite,
+    getSiteContacts,
+    phoneHref,
+    smsHref,
+    telegramHref,
+    whatsappHref,
+} from '@/utils/site-settings';
+import { getAppName } from '@/utils/branding';
 
 const WhatsAppIcon = () => (
     <svg viewBox='0 0 24 24' width='11' height='11' fill='currentColor' aria-hidden='true'>
@@ -59,17 +57,43 @@ type TContactOption = {
     external?: boolean;
 };
 
-const OPTIONS: TContactOption[] = [
-    { key: 'whatsapp', label: 'WhatsApp', href: WHATSAPP_HREF, icon: <WhatsAppIcon />, className: 'get-help__option--whatsapp', external: true },
-    { key: 'message', label: 'Message', href: MESSAGE_HREF, icon: <MessageIcon />, className: 'get-help__option--message' },
-    { key: 'phone', label: 'Call', href: PHONE_HREF, icon: <PhoneIcon />, className: 'get-help__option--phone' },
-];
+const TelegramIcon = () => (
+    <svg viewBox='0 0 24 24' width='11' height='11' fill='currentColor' aria-hidden='true'>
+        <path d='M21.5 3.3 2.9 10.5c-1.3.5-1.3 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.1.8.7.8.5 0 .7-.2 1-.5l2.3-2.3 4.8 3.6c.9.5 1.5.2 1.7-.8L22.9 4.8c.3-1.2-.5-1.8-1.4-1.5ZM8.4 13 18.6 6.6c.5-.3.9-.1.5.2L10.7 14.4l-.3 3.6-2-5Z' />
+    </svg>
+);
 
-// Reused by the desktop header's "More" menu (menu-items.tsx), which shows
-// the same contact options instead of the floating button on desktop.
-export const HELP_OPTIONS = OPTIONS;
+// Builds the contact options from THIS site's settings. On the platform that is
+// your own WhatsApp/phone; on an operator's site it is only what the operator
+// filled in -- a blank field produces no button, and never falls back to yours.
+export const getHelpOptions = (): TContactOption[] => {
+    const contacts = getSiteContacts();
+    const options: TContactOption[] = [];
+
+    const wa = whatsappHref(contacts.whatsapp, `Hi, I need help with ${getAppName()}`);
+    if (wa) {
+        options.push({ key: 'whatsapp', label: 'WhatsApp', href: wa, icon: <WhatsAppIcon />, className: 'get-help__option--whatsapp', external: true });
+    }
+    const tg = telegramHref(contacts.telegram);
+    if (tg) {
+        options.push({ key: 'telegram', label: 'Telegram', href: tg, icon: <TelegramIcon />, className: 'get-help__option--telegram', external: true });
+    }
+    const sms = smsHref(contacts.phone);
+    if (sms) {
+        options.push({ key: 'message', label: 'Message', href: sms, icon: <MessageIcon />, className: 'get-help__option--message' });
+    }
+    const tel = phoneHref(contacts.phone);
+    if (tel) {
+        options.push({ key: 'phone', label: 'Call', href: tel, icon: <PhoneIcon />, className: 'get-help__option--phone' });
+    }
+    return options;
+};
+
+// True on an operator domain, so callers can tell "no contacts set up" apart from the platform.
+export const isOperatorSite = (): boolean => getActiveSite() !== null;
 
 const GetHelpWidget = () => {
+    const OPTIONS = getHelpOptions();
     const [is_open, setIsOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +116,8 @@ const GetHelpWidget = () => {
             document.removeEventListener('keydown', handleEscape);
         };
     }, [is_open]);
+
+    if (OPTIONS.length === 0) return null;
 
     return (
         <div className={clsx('get-help', { 'get-help--open': is_open })} ref={rootRef}>

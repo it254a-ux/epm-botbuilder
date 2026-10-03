@@ -11,6 +11,7 @@ import {
 } from '@/utils/live-branding-store';
 import { isPreviewMode } from '@/utils/is-preview-mode';
 import { getAppName, LOGO_CANDIDATES } from '../../../utils/branding';
+import { getActiveSite } from '@/utils/site-settings';
 
 type TLogoMarkProps = {
     height?: number;
@@ -28,6 +29,9 @@ export const LogoMark = ({ height = 32 }: TLogoMarkProps) => {
     // preview build ships no public/logo.* (the live App Builder logo arrives as a data URL),
     // so skip the file candidates there to avoid pointless 404 probes — fall back to the badge.
     const candidates = useMemo(() => {
+        // Operator domain: only the operator's own logo -- never the platform's /logo.* files.
+        const site = getActiveSite();
+        if (site) return site.logo_url ? [site.logo_url] : [];
         const fileFallbacks = isPreviewMode() ? [] : LOGO_CANDIDATES;
         return previewLogo ? [previewLogo, ...fileFallbacks] : [...fileFallbacks];
     }, [previewLogo]);

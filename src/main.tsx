@@ -1,6 +1,8 @@
 import { configure } from 'mobx';
 import ReactDOM from 'react-dom/client';
 import { AuthWrapper } from './app/AuthWrapper';
+import SiteUnavailable from './app/SiteUnavailable';
+import { loadSiteSettings } from './utils/site-settings';
 // Removed AnalyticsInitializer import - analytics dependency removed
 // See migrate-docs/ANALYTICS_IMPLEMENTATION_GUIDE.md for re-implementation
 import {
@@ -34,15 +36,35 @@ clearStaleServiceWorkers();
 // happens to call getAccountId() on its own.
 getAccountId();
 
-// Apply deploy-time document branding (tab title, favicon, web font, and primary color).
-applyDocumentTitle();
-applyFaviconFromLogo();
-applyBrandFontFromConfig();
-applyPrimaryColorFromConfig();
-
 // Removed AnalyticsInitializer() call - analytics dependency removed
 
 // App Builder preview branding (incl. PREVIEW_READY handshake) is handled by the
 // src/preview/ listener, mounted from app-content only in the preview deployment
 // (NEXT_PUBLIC_APP_BUILD === 'true') and stripped from standalone partner deploys.
-ReactDOM.createRoot(document.getElementById('root')!).render(<AuthWrapper />);
+//
+// One deployment serves many sites, so first find out which site this domain is
+// (see utils/site-settings.ts), THEN apply branding and mount. On your own domain
+// nothing changes: the settings come back as "platform" and the build-time EPM
+// branding is used exactly as before.
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+loadSiteSettings().then(settings => {
+    if (settings.kind === 'unconfigured' || settings.kind === 'error') {
+        document.title = settings.kind === 'error' ? 'Temporarily unavailable' : 'Site not set up';
+        root.render(
+            <SiteUnavailable
+                kind={settings.kind}
+                reason={settings.kind === 'unconfigured' ? settings.reason : undefined}
+            />
+        );
+        return;
+    }
+
+    // Apply document branding (tab title, favicon, web font, and primary color).
+    applyDocumentTitle();
+    applyFaviconFromLogo();
+    applyBrandFontFromConfig();
+    applyPrimaryColorFromConfig();
+
+    root.render(<AuthWrapper />);
+});

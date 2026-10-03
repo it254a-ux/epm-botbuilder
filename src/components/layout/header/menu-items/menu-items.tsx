@@ -21,7 +21,7 @@ import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { prefetchTab } from '@/utils/prefetch-tabs';
-import { HELP_OPTIONS } from '@/components/get-help';
+import { getHelpOptions } from '@/components/get-help';
 import ChangeTheme from '@/components/layout/footer/ChangeTheme';
 import FullScreen from '@/components/layout/footer/FullScreen';
 import LogoutFooter from '@/components/layout/footer/LogoutFooter';
@@ -314,11 +314,15 @@ export const MenuItems = observer(() => {
                                 <span className='app-header__menu-item-label'>{item.label}</span>
                             </button>
                         ))}
-                        <div className='app-header__menu-more-divider' role='separator' />
-                        <div className='app-header__menu-more-heading'>
-                            <Localize i18n_default_text='Get Help' />
-                        </div>
-                        {HELP_OPTIONS.map(option => (
+                        {getHelpOptions().length > 0 && (
+                            <>
+                                <div className='app-header__menu-more-divider' role='separator' />
+                                <div className='app-header__menu-more-heading'>
+                                    <Localize i18n_default_text='Get Help' />
+                                </div>
+                            </>
+                        )}
+                        {getHelpOptions().map(option => (
                             <a
                                 key={option.key}
                                 role='menuitem'

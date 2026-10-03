@@ -1,0 +1,110 @@
+// Per-domain site settings (name, colour, font, logo, support contacts).
+//
+// One deployment serves many sites. On startup we ask /api/site-settings which
+// site the current domain belongs to:
+//   platform      -> your own site: keep the build-time EPM branding and contacts
+//   site          -> an operator's site: use THEIR branding and THEIR contacts only
+//   unconfigured  -> unknown / suspended domain: show a "not set up" page
+//
+// Safety rule: an operator site never falls back to the platform's contact
+// details. A contact the operator left blank is simply not shown.
+
+export type TSiteContacts = {
+    whatsapp: string;
+    phone: string;
+    email: string;
+    telegram: string;
+};
+
+export type TSite = {
+    name: string;
+    primary_color: string;
+    font: string;
+    logo_url: string;
+    contacts: TSiteContacts;
+};
+
+export type TSiteSettings =
+    | { kind: 'platform' }
+    | { kind: 'site'; site: TSite }
+    | { kind: 'unconfigured'; reason?: string }
+    | { kind: 'error' };
+
+// Your own (platform) support details -- exactly what the app shows today.
+export const PLATFORM_CONTACTS: TSiteContacts = {
+    whatsapp: '254115533208',
+    phone: '+254115533208',
+    email: 'support@executiveprimemarkets.site',
+    telegram: '',
+};
+
+const PLATFORM_DEFAULT: TSiteSettings = { kind: 'platform' };
+let current: TSiteSettings = PLATFORM_DEFAULT;
+
+export const getSiteSettings = (): TSiteSettings => current;
+export const setSiteSettings = (settings: TSiteSettings): void => {
+    current = settings;
+};
+
+/** The operator's site when running on an operator domain, else null. */
+export const getActiveSite = (): TSite | null => (current.kind === 'site' ? current.site : null);
+
+/** Contacts to show: the operator's own on an operator site, yours on the platform. */
+export const getSiteContacts = (): TSiteContacts =>
+    current.kind === 'site' ? current.site.contacts : PLATFORM_CONTACTS;
+
+// Defensive re-validation: even though the API sanitizes, never build a link
+// from a string we haven't checked.
+const WHATSAPP_RE = /^[0-9]{7,15}$/;
+const PHONE_RE = /^\+?[0-9]{6,15}$/;
+const EMAIL_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
+const TELEGRAM_RE = /^[A-Za-z0-9_]{5,32}$/;
+
+export const whatsappHref = (n: string, text?: string) =>
+    WHATSAPP_RE.test(n) ? `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}` : '';
+export const phoneHref = (n: string) => (PHONE_RE.test(n) ? `tel:${n}` : '');
+export const smsHref = (n: string) => (PHONE_RE.test(n) ? `sms:${n}` : '');
+export const emailHref = (e: string) => (EMAIL_RE.test(e) ? `mailto:${e}` : '');
+export const telegramHref = (u: string) => (TELEGRAM_RE.test(u) ? `https://t.me/${u}` : '');
+
+// Hosts that are allowed to fall back to platform branding if the API is down.
+const platformHosts = (process.env.NEXT_PUBLIC_PLATFORM_HOSTS || '')
+    .split(',')
+    .map(h => h.trim().toLowerCase())
+    .filter(Boolean);
+
+const isPlatformHostHere = (): boolean => {
+    const host = window.location.hostname.toLowerCase();
+    return (
+        platformHosts.length === 0 ||
+        platformHosts.includes(host) ||
+        host === 'localhost' ||
+        host === '127.0.0.1'
+    );
+};
+
+const FETCH_TIMEOUT_MS = 3000;
+
+/**
+ * Loads the settings for this domain. Never throws. If the lookup fails we only
+ * fall back to the platform's branding on your own domains; on anyone else's
+ * domain we show the "temporarily unavailable" page instead of your branding.
+ */
+export const loadSiteSettings = async (): Promise<TSiteSettings> => {
+    try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const res = await fetch('/api/site-settings', { signal: controller.signal, credentials: 'omit' });
+        window.clearTimeout(timer);
+        if (!res.ok) throw new Error(`site-settings ${res.status}`);
+        const data = (await res.json()) as TSiteSettings;
+        if (data && (data.kind === 'platform' || data.kind === 'site' || data.kind === 'unconfigured')) {
+            current = data;
+            return data;
+        }
+        throw new Error('bad site-settings payload');
+    } catch {
+        current = isPlatformHostHere() ? PLATFORM_DEFAULT : { kind: 'error' };
+        return current;
+    }
+};
