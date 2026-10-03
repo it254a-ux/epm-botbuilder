@@ -42,6 +42,9 @@ export default defineConfig({
         // Partner app name. The BFF writes this into .env.production at deploy time; the header
         // logo+name mark and the document title read it (with brand.config / default fallback).
         NEXT_PUBLIC_DERIV_APP_NAME: JSON.stringify(process.env.NEXT_PUBLIC_DERIV_APP_NAME ?? ''),
+        // Comma-separated list of YOUR OWN domains. Only these may fall back to the platform
+        // branding if the site-settings lookup fails. Empty = legacy behaviour (every host).
+        NEXT_PUBLIC_PLATFORM_HOSTS: JSON.stringify(process.env.NEXT_PUBLIC_PLATFORM_HOSTS ?? ''),
         // Marks the static preview build (served under /bot/preview); drives the
         // router basename so React Router resolves under that path prefix.
         NEXT_PUBLIC_APP_BUILD: JSON.stringify(process.env.NEXT_PUBLIC_APP_BUILD ?? ''),

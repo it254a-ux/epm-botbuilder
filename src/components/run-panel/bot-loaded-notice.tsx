@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { dismissBotLoadedNotice, useBotLoadedNotice } from './bot-loaded-notice';
+import { dismissBotLoadedNotice, useBotLoadedNotice } from './bot-loaded-notice-store';
 import './bot-loaded-notice.scss';
 
 const AUTO_DISMISS_MS = 4000;

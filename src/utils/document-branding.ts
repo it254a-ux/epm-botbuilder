@@ -1,6 +1,7 @@
 import { applyBrandFont, applyPrimaryColor } from './apply-branding';
 import { getAppName, LOGO_CANDIDATES } from './branding';
 import { isPreviewMode } from './is-preview-mode';
+import { getActiveSite } from './site-settings';
 import brandConfig from '../../brand.config.json';
 
 /**
@@ -62,6 +63,22 @@ export function buildLetterFaviconUri(appName: string = getAppName()): string {
  * from the app name (matching the header LogoMark) rather than leaving the deriv default.
  */
 export function applyFaviconFromLogo(): void {
+    // Operator domain: use the operator's own logo (or a letter badge), and never
+    // probe or show the platform's /logo.* files.
+    const site = getActiveSite();
+    if (site) {
+        const badge = () => setFaviconHref(buildLetterFaviconUri(), 'image/svg+xml');
+        if (!site.logo_url) {
+            badge();
+            return;
+        }
+        const img = new Image();
+        img.onload = () => setFaviconHref(site.logo_url);
+        img.onerror = badge;
+        img.src = site.logo_url;
+        return;
+    }
+
     // The static preview build ships no public/logo.*, so there's nothing to probe — set
     // the letter badge directly (avoiding pointless 404s). A later PREVIEW_BRANDING message
     // overrides it with the App Builder logo, or clears back to the badge (use-preview-branding).
@@ -91,7 +108,7 @@ export function applyFaviconFromLogo(): void {
  * custom stacks (e.g. the default system stack) are left as-is.
  */
 export function applyBrandFontFromConfig(): void {
-    const family = brandConfig?.typography?.font_family?.primary;
+    const family = getActiveSite()?.font || brandConfig?.typography?.font_family?.primary;
     if (family) applyBrandFont(family);
 }
 
@@ -103,6 +120,6 @@ export function applyBrandFontFromConfig(): void {
  * PREVIEW_BRANDING message overrides this.
  */
 export function applyPrimaryColorFromConfig(): void {
-    const color = brandConfig?.colors?.primary;
+    const color = getActiveSite()?.primary_color || brandConfig?.colors?.primary;
     if (color) applyPrimaryColor(color);
 }

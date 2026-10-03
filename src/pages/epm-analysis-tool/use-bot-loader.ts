@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice';
+import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice-store';
 import { load, save_types } from '@/external/bot-skeleton';
 import { bots_cache, fetchAndCacheBots, type TBotSummary } from '@/utils/freebots-cache';
 import { localize } from '@deriv-com/translations';
