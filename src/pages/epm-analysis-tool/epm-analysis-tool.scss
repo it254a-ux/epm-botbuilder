@@ -2,12 +2,10 @@
     box-sizing: border-box;
     position: relative;
     max-width: 100%;
-    /* No scrollbar of its own: the page lays out to its full content height
-       instead of being boxed into a fixed, scrollable pane. */
-    min-height: var(--tab-content-height);
-    height: auto;
-    overflow-x: hidden;
-    overflow-y: visible;
+    /* No scroll at all, anywhere on this page -- not a nested scrollbar,
+       not the page growing taller than the screen either. */
+    height: var(--tab-content-height);
+    overflow: hidden;
     padding: 16px 20px 32px;
     color: var(--text-general);
     font-size: 13px;
@@ -19,8 +17,7 @@
     }
 
     @media (max-width: 900px) {
-        min-height: var(--tab-content-height-mobile);
-        height: auto;
+        height: var(--tab-content-height-mobile);
         width: 100% !important;
     }
 
