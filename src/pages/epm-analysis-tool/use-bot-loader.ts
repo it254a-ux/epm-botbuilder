@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice';
 import { load, save_types } from '@/external/bot-skeleton';
 import { bots_cache, fetchAndCacheBots, type TBotSummary } from '@/utils/freebots-cache';
 import { localize } from '@deriv-com/translations';
@@ -45,7 +46,7 @@ export function useBotLoader() {
                 // is enough, and this one's wording is more useful here.
                 show_snackbar: false,
             });
-            toast.success(localize('Bot loaded — press Run in the panel'), { autoClose: 3000 });
+            showBotLoadedNotice(localize('{{name}} — press Run in the panel', { name: bot.name }));
         } catch (err) {
             toast.error(err instanceof Error ? err.message : localize('Failed to load bot'));
         } finally {

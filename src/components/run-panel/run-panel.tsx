@@ -3,6 +3,7 @@ import React from 'react';
 import classNames from 'classnames';
 import { observer } from 'mobx-react-lite';
 import Journal from '@/components/journal';
+import BotLoadedNotice from '@/components/run-panel/bot-loaded-notice';
 import Button from '@/components/shared_ui/button';
 import Drawer from '@/components/shared_ui/drawer';
 import Modal from '@/components/shared_ui/modal';
@@ -351,6 +352,7 @@ const RunPanel = observer(() => {
                     {content}
                 </Drawer>
                 {!isDesktop && <MobileDrawerFooter />}
+                {is_drawer_open && <BotLoadedNotice />}
             </div>
 
             <StatisticsInfoModal

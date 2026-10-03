@@ -1,0 +1,93 @@
+.bot-loaded-notice {
+    position: fixed;
+    top: 58%;
+    right: 12px;
+    width: 342px;
+    transform: translateY(-50%);
+    z-index: 8500;
+    pointer-events: none; // only the card itself (and its button) can be clicked
+
+    @media (max-width: 900px) {
+        right: 50%;
+        transform: translate(50%, -50%);
+        width: calc(100% - 24px);
+        max-width: 342px;
+    }
+}
+
+.bot-loaded-notice__card {
+    position: relative;
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0f766e 0%, #2563eb 55%, #7c3aed 100%);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+    animation: bot-loaded-notice-pop 0.2s ease-out;
+}
+
+.bot-loaded-notice__icon {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.bot-loaded-notice__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.bot-loaded-notice__title {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+.bot-loaded-notice__message {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.bot-loaded-notice__close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+
+    &:hover {
+        color: #fff;
+    }
+}
+
+@keyframes bot-loaded-notice-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}

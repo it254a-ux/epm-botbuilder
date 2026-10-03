@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'react-toastify';
 import { load, save_types } from '@/external/bot-skeleton';
+import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { useStore } from '@/hooks/useStore';
 import Modal from '@/components/shared_ui/modal';
@@ -141,7 +142,7 @@ const Freebots = observer(() => {
             });
 
             setActiveTab(DBOT_TABS.BOT_BUILDER);
-            toast.success(localize('Bot loaded into Bot Builder'), { autoClose: 3000 });
+            showBotLoadedNotice(localize('{{name}} — ready in Bot Builder', { name: bot.name }));
         } catch (err: any) {
             toast.error(err?.message || localize('Failed to load bot'));
         } finally {
