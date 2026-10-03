@@ -175,7 +175,10 @@
         }
 
         .epm-analysis-tool__select {
+            /* a touch smaller so values like "Volatility 75 (1s)" fit on
+               one line at this box width without eliding */
             padding-right: 26px;
+            font-size: 12px;
         }
 
         .epm-analysis-tool__label {
@@ -230,6 +233,11 @@
         background-repeat: no-repeat;
         background-position: right 9px center;
         background-size: 10px 7px;
+        /* never wrap to a second line (which threw off vertical centering
+           in a fixed-height box) -- trail off with an ellipsis instead */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     &__input {
