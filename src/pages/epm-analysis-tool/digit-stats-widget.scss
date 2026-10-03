@@ -8,10 +8,8 @@
     box-sizing: border-box;
     width: min(100%, 313px);
     flex: 0 1 313px;
-    background: #0d0d0d;
-    border: 1px solid #1c1c1c;
-    border-radius: 14px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+    /* no fill of its own -- sits on whatever surface it's placed in, light or dark */
+    background: transparent;
     user-select: none;
 
     &__grid {
@@ -48,8 +46,8 @@
             position: absolute;
             inset: 6%;
             border-radius: 50%;
-            background: #2a2d49;
-            box-shadow: 0 0 2.2cqw rgba(60, 66, 130, 0.3);
+            background: color-mix(in srgb, var(--button-primary-default) 28%, transparent);
+            box-shadow: 0 0 2.2cqw color-mix(in srgb, var(--button-primary-default) 35%, transparent);
         }
     }
 
@@ -63,13 +61,13 @@
 
     &__ring {
         fill: none;
-        stroke: #1b1b1b;
+        stroke: var(--border-normal);
         stroke-width: 3;
     }
 
     &__arc {
         fill: none;
-        stroke: #4c4c4c;
+        stroke: var(--text-less-prominent);
         stroke-width: 8;
         stroke-linecap: butt;
         transform-box: fill-box;
@@ -77,11 +75,11 @@
         transition: stroke-dasharray 0.35s ease, transform 0.35s ease, stroke 0.35s ease;
 
         &--high {
-            stroke: #1aa08c;
+            stroke: var(--brand-success, #1aa08c);
         }
 
         &--low {
-            stroke: #d03146;
+            stroke: var(--brand-danger, #d03146);
         }
     }
 
@@ -99,13 +97,13 @@
     &__digit {
         font-size: 4.5cqw;
         font-weight: 700;
-        color: #f5f5f5;
+        color: var(--text-prominent);
     }
 
     &__pct {
         font-size: 3.1cqw;
         font-weight: 500;
-        color: #b5b5b5;
+        color: var(--text-less-prominent);
         white-space: nowrap;
     }
 
@@ -119,7 +117,7 @@
         transform: translateX(-50%);
         border-left: 1.6cqw solid transparent;
         border-right: 1.6cqw solid transparent;
-        border-bottom: 2.2cqw solid #f56052;
+        border-bottom: 2.2cqw solid var(--brand-danger, #f56052);
     }
 
     @media (prefers-reduced-motion: reduce) {

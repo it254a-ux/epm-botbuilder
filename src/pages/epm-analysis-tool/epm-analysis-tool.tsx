@@ -88,7 +88,7 @@ const FLOATING_DIGITS = [
 ];
 
 const EpmAnalysisTool = observer(() => {
-    const { run_panel } = useStore();
+    const { run_panel, chart_store } = useStore();
     const { isDesktop } = useDevice();
     const reservedWidth = isDesktop
         ? run_panel.is_drawer_open
@@ -96,7 +96,10 @@ const EpmAnalysisTool = observer(() => {
             : DESKTOP_DRAWER_CLOSED_WIDTH
         : 0;
 
-    const [symbol, setSymbol] = useState('1HZ75V');
+    // Same symbol as Charts / Bot Builder (chart_store is the shared source of
+    // truth both pages already use). Picking a symbol here moves Charts and
+    // Bot Builder to it too, via chart_store.onSymbolChange below.
+    const symbol = chart_store.symbol || '1HZ75V';
     const [contractType, setContractType] = useState<ContractType>('over_under');
     const [underBarrier, setUnderBarrier] = useState(2);
     const [overBarrier, setOverBarrier] = useState(7);
@@ -257,12 +260,7 @@ const EpmAnalysisTool = observer(() => {
             await loadBot(bot);
             setAutoMessage(localize('Running {{bot}}…', { bot: bot.name }));
             await runPanelForAuto.onRunButtonClick();
-            setAutoMessage(
-                localize('{{bot}} is running on {{side}}. Stop it from the Run panel, or wait for TP/SL.', {
-                    bot: bot.name,
-                    side: flagged.label,
-                })
-            );
+            setAutoMessage(localize('{{bot}} is running on {{side}}.', { bot: bot.name, side: flagged.label }));
         }
     };
 
@@ -385,7 +383,11 @@ const EpmAnalysisTool = observer(() => {
                         <label className='epm-analysis-tool__label'>
                             <Localize i18n_default_text='Volatility Index' />
                         </label>
-                        <select className='epm-analysis-tool__select' value={symbol} onChange={e => setSymbol(e.target.value)}>
+                        <select
+                            className='epm-analysis-tool__select'
+                            value={symbol}
+                            onChange={e => chart_store.onSymbolChange(e.target.value)}
+                        >
                             {SYMBOL_GROUPS.map(group => (
                                 <optgroup key={group.label} label={group.label}>
                                     {group.options.map(opt => (
