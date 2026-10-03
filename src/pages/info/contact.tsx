@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { getHelpOptions } from '@/components/get-help';
 import { getAppName } from '@/utils/branding';
-import { emailHref, getSiteContacts } from '@/utils/site-settings';
+import { emailHref, getActiveSite, getSiteContacts } from '@/utils/site-settings';
 import InfoPageLayout, { InfoSection } from './info-page-layout';
 
 const ContactPage = () => {
@@ -10,6 +10,7 @@ const ContactPage = () => {
     // Operator sites show only the email the operator set; the platform keeps its own.
     const supportEmail = getSiteContacts().email;
     const emailLink = emailHref(supportEmail);
+    const site = getActiveSite();
 
     return (
     <InfoPageLayout eyebrow='Company' title='Contact us' accent='var(--brand-info)'>
@@ -19,6 +20,11 @@ const ContactPage = () => {
         </p>
 
         <InfoSection title='Support channels'>
+            {site?.powered_by && (
+                <p>
+                    <em>This site is powered by Executive Prime Markets, which provides customer support for it.</em>
+                </p>
+            )}
             <p>{options.length > 0 || emailLink ? 'Pick whichever channel suits you best:' : 'Support contact details have not been added to this site yet.'}</p>
             <ul>
                 {options.map(option => (

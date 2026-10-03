@@ -17,6 +17,12 @@ export type TSiteContacts = {
 };
 
 export type TSite = {
+    plan: 'free' | 'custom';
+    /** Free sites show a small "Powered by" note and route support to the platform. */
+    powered_by: boolean;
+    about: string;
+    vision: string;
+    mission: string;
     name: string;
     primary_color: string;
     font: string;
@@ -49,9 +55,13 @@ export const setSiteSettings = (settings: TSiteSettings): void => {
 /** The operator's site when running on an operator domain, else null. */
 export const getActiveSite = (): TSite | null => (current.kind === 'site' ? current.site : null);
 
-/** Contacts to show: the operator's own on an operator site, yours on the platform. */
+/**
+ * Contacts to show:
+ *  - platform and FREE sites: yours (free-site clients talk to the platform)
+ *  - CUSTOM-domain sites: only what the operator filled in; blank means hidden
+ */
 export const getSiteContacts = (): TSiteContacts =>
-    current.kind === 'site' ? current.site.contacts : PLATFORM_CONTACTS;
+    current.kind === 'site' && current.site.plan === 'custom' ? current.site.contacts : PLATFORM_CONTACTS;
 
 // Defensive re-validation: even though the API sanitizes, never build a link
 // from a string we haven't checked.

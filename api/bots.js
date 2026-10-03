@@ -1,4 +1,13 @@
+const crypto = require('crypto');
 const { getDb } = require('./_lib/db');
+const { onPlatformHost } = require('./_lib/auth');
+
+// Constant-time password comparison (the old `!==` leaks timing).
+const passwordMatches = (provided, expected) => {
+    const a = crypto.createHash('sha256').update(String(provided || '')).digest();
+    const b = crypto.createHash('sha256').update(String(expected || '')).digest();
+    return crypto.timingSafeEqual(a, b);
+};
 
 const MAX_NAME_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -40,6 +49,13 @@ const CONTRACT_TYPE_OPTIONS = [
 //                                require re-uploading the XML.
 // DELETE /api/bots?id=X      -> admin only, same protection.
 module.exports = async function handler(req, res) {
+    // Adding / editing / deleting bots only works on YOUR domains. This is a no-op until
+    // PLATFORM_HOSTS is set, so today's behaviour is unchanged.
+    if (req.method !== 'GET' && !onPlatformHost(req, 'open')) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+    }
+
     let sql;
     try {
         sql = getDb();
@@ -99,7 +115,7 @@ module.exports = async function handler(req, res) {
             res.status(500).json({ error: 'ADMIN_PASSWORD is not set in environment variables' });
             return;
         }
-        if (!providedPassword || providedPassword !== adminPassword) {
+        if (!providedPassword || !passwordMatches(providedPassword, adminPassword)) {
             res.status(401).json({ error: 'Unauthorized' });
             return;
         }
@@ -165,7 +181,7 @@ module.exports = async function handler(req, res) {
             res.status(500).json({ error: 'ADMIN_PASSWORD is not set in environment variables' });
             return;
         }
-        if (!providedPassword || providedPassword !== adminPassword) {
+        if (!providedPassword || !passwordMatches(providedPassword, adminPassword)) {
             res.status(401).json({ error: 'Unauthorized' });
             return;
         }
@@ -260,7 +276,7 @@ module.exports = async function handler(req, res) {
             res.status(500).json({ error: 'ADMIN_PASSWORD is not set in environment variables' });
             return;
         }
-        if (!providedPassword || providedPassword !== adminPassword) {
+        if (!providedPassword || !passwordMatches(providedPassword, adminPassword)) {
             res.status(401).json({ error: 'Unauthorized' });
             return;
         }

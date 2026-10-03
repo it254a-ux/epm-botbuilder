@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
         const candidates = host.startsWith('www.') ? [host, host.slice(4)] : [host, `www.${host}`];
         const rows = await sql`
             SELECT domain, name, primary_color, font, logo_url, whatsapp, phone,
-                   support_email, telegram, status
+                   support_email, telegram, status, plan, about, vision, mission
             FROM sites
             WHERE domain = ANY(${candidates})
             LIMIT 1

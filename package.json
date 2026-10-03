@@ -9,6 +9,7 @@
     "dev": "rsbuild dev --port 4003",
     "build": "rsbuild build",
     "test": "jest",
+    "test:api": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.api.config.js",
     "type-check": "tsc --noEmit",
     "generate:brand-css": "node scripts/generate-brand-css.js",
     "prebuild": "node scripts/generate-brand-css.js"
@@ -83,6 +84,7 @@
     "next-themes": "^0.2.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@babel/core": "^7.29.6",
     "@babel/plugin-proposal-class-properties": "^7.18.6",
     "@babel/plugin-proposal-decorators": "^7.24.1",

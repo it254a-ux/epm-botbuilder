@@ -1,8 +1,30 @@
 import { Link } from 'react-router-dom';
+import { getActiveSite } from '@/utils/site-settings';
 import InfoPageLayout, { Callout, InfoSection } from './info-page-layout';
 
-const AboutPage = () => (
+const AboutPage = () => {
+    const site = getActiveSite();
+    return (
     <InfoPageLayout eyebrow='Company' title='About us' accent='var(--brand-primary)'>
+        {site && (site.about || site.vision || site.mission) && (
+            <>
+                {site.about && (
+                    <InfoSection title={`About ${site.name}`}>
+                        <p style={{ whiteSpace: 'pre-line' }}>{site.about}</p>
+                    </InfoSection>
+                )}
+                {site.vision && (
+                    <InfoSection title='Our vision'>
+                        <p style={{ whiteSpace: 'pre-line' }}>{site.vision}</p>
+                    </InfoSection>
+                )}
+                {site.mission && (
+                    <InfoSection title='Our mission'>
+                        <p style={{ whiteSpace: 'pre-line' }}>{site.mission}</p>
+                    </InfoSection>
+                )}
+            </>
+        )}
         <p>
             Executive Prime Markets (EPM) builds tools for people who trade on Deriv &mdash; a bot builder,
             charting, and automation interface layered on top of Deriv&apos;s own trading infrastructure.
@@ -116,6 +138,7 @@ const AboutPage = () => (
             </p>
         </InfoSection>
     </InfoPageLayout>
-);
+    );
+};
 
 export default AboutPage;

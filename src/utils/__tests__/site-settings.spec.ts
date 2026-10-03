@@ -8,10 +8,18 @@ import {
     whatsappHref,
 } from '../site-settings';
 
-const operator = (contacts: Partial<ReturnType<typeof getSiteContacts>> = {}) =>
+const operator = (
+    contacts: Partial<ReturnType<typeof getSiteContacts>> = {},
+    plan: 'free' | 'custom' = 'custom'
+) =>
     setSiteSettings({
         kind: 'site',
         site: {
+            plan,
+            powered_by: plan === 'free',
+            about: '',
+            vision: '',
+            mission: '',
             name: 'Alice Trading',
             primary_color: '#112233',
             font: 'Poppins',
@@ -46,6 +54,12 @@ describe('site settings', () => {
         expect(opts.map(o => o.key)).toEqual(['whatsapp', 'telegram']);
         expect(opts[0].href).toContain('https://wa.me/254700000001');
         expect(opts[1].href).toBe('https://t.me/alice_help');
+    });
+
+    it('free sites send clients to the platform, never to operator-entered contacts', () => {
+        operator({ whatsapp: '254700000001' }, 'free');
+        expect(getSiteContacts()).toEqual(PLATFORM_CONTACTS);
+        expect(getAppName()).toBe('Alice Trading');
     });
 
     it('refuses to build links from unchecked strings', () => {
