@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'react-toastify';
 import { load, save_types } from '@/external/bot-skeleton';
-import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice';
+import { showBotLoadedNotice } from '@/components/run-panel/bot-loaded-notice-store';
 import { DBOT_TABS } from '@/constants/bot-contents';
 import { useStore } from '@/hooks/useStore';
 import Modal from '@/components/shared_ui/modal';
