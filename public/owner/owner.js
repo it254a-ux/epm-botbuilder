@@ -74,7 +74,8 @@
         if (creating) {
             var free = el('input', { type: 'radio', name: 'plan', value: 'free', checked: 'checked' });
             var cust = el('input', { type: 'radio', name: 'plan', value: 'custom' });
-            subF = field('subdomain', 'Free address', 'text', '', 'Your site will be live at once at <name>.' + root + '. The platform keeps 25% of commission and handles customer support.');
+            subF = field('subdomain', 'Free address (just the name, e.g. julias)', 'text', '', 'Your site will be live at once at <name>.' + root + '. The platform keeps 25% of commission and handles customer support.');
+            subF.input.setAttribute('placeholder', 'yourname');
             domF = field('custom_domain', 'Your own domain', 'text', '', 'e.g. trade.yourbrand.com. Needs approval. The platform keeps 15% and you set your own support contacts.');
             domF.wrap.classList.add('hidden');
             var flip = function () { var c = cust.checked; domF.wrap.classList.toggle('hidden', !c); subF.wrap.classList.toggle('hidden', c); isCustom = c; contactBox.classList.toggle('hidden', !c); };

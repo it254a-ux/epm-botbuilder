@@ -76,8 +76,11 @@ module.exports = async function handler(req, res) {
             if (plan === 'free') {
                 const root = S.normalizeHost(process.env.PLATFORM_ROOT_DOMAIN);
                 if (!root) return send(res, 503, { error: 'Free sites are not enabled yet.' });
-                const sub = S.sanitizeSubdomain(body.subdomain);
-                if (!sub) errors.subdomain = 'Choose 3-30 letters, numbers or hyphens (some names are reserved).';
+                // People naturally type the whole address (julias.example.com); accept that too.
+                let typed = String(body.subdomain || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').split(/[/?#]/)[0];
+                if (typed.endsWith(`.${root}`)) typed = typed.slice(0, -(root.length + 1));
+                const sub = S.sanitizeSubdomain(typed);
+                if (!sub) errors.subdomain = 'Use just the name, e.g. "julias": 3-30 letters, numbers or hyphens (some names are reserved).';
                 else domain = `${sub}.${root}`;
             } else {
                 domain = S.sanitizeDomain(body.custom_domain);

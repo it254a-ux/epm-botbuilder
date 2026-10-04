@@ -103,6 +103,13 @@ describe('sites and plans', () => {
         expect((await call(mySite, { method: 'POST', cookie: c, body: { name: 'Again', subdomain: 'another' } })).status).toBe(409);
     });
 
+    it('free site: accepts the full address as well as just the name', async () => {
+        const c = await signup('k@x.com', '6.1.1.1');
+        const r = await call(mySite, { method: 'POST', cookie: c, body: { name: 'Julias', subdomain: `Julias.${HOST}` } });
+        expect(r.status).toBe(201);
+        expect(r.body.site.domain).toBe(`julias.${HOST}`);
+    });
+
     it('custom domain: pending until approved, 15% share, own contacts', async () => {
         const c = await signup('g@x.com', '6.6.6.6');
         expect((await call(mySite, { method: 'POST', cookie: c, body: { name: 'Mine', custom_domain: 'epm.test' } })).status).toBe(400);
