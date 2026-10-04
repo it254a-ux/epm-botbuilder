@@ -323,6 +323,19 @@
     }
 
     &__panel-bottom-left {
+        display: flex;
+        align-items: flex-start;
+        gap: 22px;
+        min-width: 0;
+        container-type: inline-size;
+
+        @media (max-width: 700px) {
+            flex-direction: column;
+        }
+    }
+
+    &__scan-status {
+        flex: 0 0 auto;
         min-width: 0;
     }
 

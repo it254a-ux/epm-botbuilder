@@ -17,6 +17,9 @@ export interface EpmTickSnapshot {
     ticks: EpmTick[];
     status: EpmConnectionStatus;
     errorMessage: string | null;
+    /** Decimal places for this symbol (e.g. 2 for most Volatility Indices),
+     *  so a consumer can format a tick's quote correctly: quote.toFixed(pipSize). */
+    pipSize: number;
 }
 
 export interface EpmTickStore {
@@ -47,7 +50,7 @@ export interface EpmTickStore {
  * provide without subscribing to every tick.
  */
 export function useEpmTickStore(ws: DerivWS | null, isConnected: boolean, symbol: string): EpmTickStore {
-    const snapshotRef = useRef<EpmTickSnapshot>({ ticks: [], status: 'connecting', errorMessage: null });
+    const snapshotRef = useRef<EpmTickSnapshot>({ ticks: [], status: 'connecting', errorMessage: null, pipSize: 2 });
     const listenersRef = useRef<Set<() => void>>(new Set());
     const pipDecimalsRef = useRef<number>(2);
 
@@ -62,7 +65,7 @@ export function useEpmTickStore(ws: DerivWS | null, isConnected: boolean, symbol
         let disposed = false;
         let unsubscribe: (() => void) | null = null;
 
-        setSnapshot({ ticks: [], status: 'connecting', errorMessage: null });
+        setSnapshot({ ticks: [], status: 'connecting', errorMessage: null, pipSize: snapshotRef.current.pipSize });
 
         async function run() {
             try {
@@ -76,6 +79,7 @@ export function useEpmTickStore(ws: DerivWS | null, isConnected: boolean, symbol
                 if (disposed) return;
                 const match = symbolsRes.active_symbols?.find(s => s.underlying_symbol === symbol);
                 if (match) pipDecimalsRef.current = pipSizeFromPip(match.pip_size);
+                setSnapshot({ ...snapshotRef.current, pipSize: pipDecimalsRef.current });
 
                 const historyRes = await ws!.send<{ history?: { prices: number[]; times: number[] } }>({
                     ticks_history: symbol,
@@ -107,6 +111,7 @@ export function useEpmTickStore(ws: DerivWS | null, isConnected: boolean, symbol
                         ticks: nextTicks.length > HISTORY_TICK_COUNT ? nextTicks.slice(-HISTORY_TICK_COUNT) : nextTicks,
                         status: 'analyzing',
                         errorMessage: null,
+                        pipSize: pipDecimalsRef.current,
                     });
                 });
                 if (disposed) {

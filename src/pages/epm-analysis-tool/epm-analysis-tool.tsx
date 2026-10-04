@@ -17,6 +17,7 @@ import {
 import BotShortcuts from './bot-shortcuts';
 import DigitStatsWidget from './digit-stats-widget';
 import LiveStatusLine from './live-status-line';
+import MarketProbabilityPanel from './market-probability-panel';
 import { useBotLoader } from './use-bot-loader';
 import { resolveBot, readChoices } from './bot-resolution';
 import './epm-analysis-tool.scss';
@@ -510,6 +511,7 @@ const EpmAnalysisTool = observer(() => {
 
                 <div className='epm-analysis-tool__panel-bottom'>
                     <div className='epm-analysis-tool__panel-bottom-left'>
+                    <div className='epm-analysis-tool__scan-status'>
                     {(contractType === 'accumulator' || contractType === 'multiplier') ? (
                         <div className='epm-analysis-tool__note'>
                             <Localize i18n_default_text='Coming soon.' />
@@ -546,6 +548,16 @@ const EpmAnalysisTool = observer(() => {
                     <LiveStatusLine store={tickStore} symbol={symbol} />
 
                     {mode === 'automatic' && autoMessage && <div className='epm-analysis-tool__note'>{autoMessage}</div>}
+                    </div>
+
+                    {contractType !== 'accumulator' && contractType !== 'multiplier' && (
+                        <MarketProbabilityPanel
+                            store={tickStore}
+                            contractType={contractType}
+                            underBarrier={underBarrier}
+                            overBarrier={overBarrier}
+                        />
+                    )}
                     </div>
                     <DigitStatsWidget store={tickStore} highlightDigits={highlightDigits} />
                 </div>
