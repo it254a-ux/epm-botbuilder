@@ -564,7 +564,7 @@ const EpmAnalysisTool = observer(() => {
             </div>
 
             <div className='epm-analysis-tool__columns'>
-                {results && (
+                {sideLabels.length > 0 && (
                     <div
                         className={`epm-analysis-tool__panel epm-analysis-tool__panel--results ${
                             scanning ? 'epm-analysis-tool__panel--scanning' : ''
@@ -585,27 +585,35 @@ const EpmAnalysisTool = observer(() => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {results.map(row => (
-                                    <tr key={row.label}>
-                                        <td>{row.label}</td>
-                                        <td className='epm-analysis-tool__num'>
-                                            {row.failPct.toFixed(1)}% ({row.failCount}/{row.sampleSize})
-                                        </td>
-                                        <td>
-                                            {row.flagged && (
-                                                <span className='epm-analysis-tool__badge'>
-                                                    <Localize i18n_default_text='Rule met' />
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {/* Before the first scan there's no results data yet -- show the
+                                    row structure for the current sides straight away (with a
+                                    placeholder reading), rather than an empty page until Scan
+                                    is clicked. */}
+                                {(results ?? sideLabels.map(label => ({ label, failPct: null, failCount: null, sampleSize: null, flagged: false }))).map(
+                                    row => (
+                                        <tr key={row.label}>
+                                            <td>{row.label}</td>
+                                            <td className='epm-analysis-tool__num'>
+                                                {row.failPct === null
+                                                    ? localize('Not scanned yet')
+                                                    : `${row.failPct.toFixed(1)}% (${row.failCount}/${row.sampleSize})`}
+                                            </td>
+                                            <td>
+                                                {row.flagged && (
+                                                    <span className='epm-analysis-tool__badge'>
+                                                        <Localize i18n_default_text='Rule met' />
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                )}
                             </tbody>
                         </table>
                     </div>
                 )}
 
-                <BotShortcuts contractType={contractType} sides={results ? sideLabels : []} flaggedSides={flaggedSides} />
+                <BotShortcuts contractType={contractType} sides={sideLabels} flaggedSides={flaggedSides} />
             </div>
 
             {botNotice !== null && (
