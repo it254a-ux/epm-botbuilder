@@ -1,3 +1,4 @@
+import { getOAuthRedirectUri } from '@/utils/oauth-redirect';
 import { lazy, Suspense } from 'react';
 import React from 'react';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router-dom';
@@ -102,7 +103,7 @@ function App() {
             try {
                 const authInfo = await handleOAuthCallback(window.location.href, {
                     clientId: process.env.NEXT_PUBLIC_DERIV_APP_ID || '',
-                    redirectUri: window.location.origin,
+                    redirectUri: getOAuthRedirectUri(),
                     scopes: 'trade',
                 });
 

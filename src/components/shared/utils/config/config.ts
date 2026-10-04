@@ -1,3 +1,4 @@
+import { decorateAuthUrl, getOAuthRedirectUri } from '@/utils/oauth-redirect';
 import {
     buildAuthorizationUrl,
     buildSignUpUrl,
@@ -105,7 +106,7 @@ export const generateOAuthURL = async (prompt?: string): Promise<string> => {
 
         const config: AuthConfig = {
             clientId,
-            redirectUri: window.location.origin,
+            redirectUri: getOAuthRedirectUri(),
             scopes: 'trade',
         };
 
@@ -152,9 +153,9 @@ export const generateOAuthURL = async (prompt?: string): Promise<string> => {
         }
 
         if (prompt === 'registration') {
-            return await buildSignUpUrl(config);
+            return decorateAuthUrl(await buildSignUpUrl(config));
         }
-        return await buildAuthorizationUrl(config);
+        return decorateAuthUrl(await buildAuthorizationUrl(config));
     } catch (error) {
         console.error('Error generating OAuth URL:', error);
         return '';

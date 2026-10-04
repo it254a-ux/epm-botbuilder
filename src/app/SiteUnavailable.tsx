@@ -2,18 +2,22 @@
 // the settings lookup failed on a domain that isn't one of the platform's own.
 // Deliberately plain and brand-neutral: it never shows the platform's logo,
 // name or contact details on someone else's domain.
-type TProps = { kind: 'unconfigured' | 'error'; reason?: string };
+type TProps = { kind: 'unconfigured' | 'error' | 'login'; reason?: string };
 
 const SiteUnavailable = ({ kind, reason }: TProps) => {
     const suspended = kind === 'unconfigured' && reason === 'suspended';
     const title =
-        kind === 'error'
+        kind === 'login'
+            ? "We couldn't complete your sign-in"
+            : kind === 'error'
             ? 'This site is temporarily unavailable'
             : suspended
               ? 'This site is currently unavailable'
               : "This site isn't set up yet";
     const body =
-        kind === 'error'
+        kind === 'login'
+            ? 'Please go back to the site you came from and sign in again.'
+            : kind === 'error'
             ? 'Please try again in a few minutes.'
             : suspended
               ? 'The owner of this site has been notified. Please check back later.'

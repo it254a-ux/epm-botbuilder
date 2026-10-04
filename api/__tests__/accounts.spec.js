@@ -9,6 +9,7 @@ jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
 const auth = require('../auth');
 const mySite = require('../my-site');
 const admin = require('../admin');
+const returnHost = require('../return-host');
 const siteSettings = require('../site-settings');
 const { hashPassword } = require('../_lib/auth');
 
@@ -149,6 +150,49 @@ describe('admin', () => {
         process.env.PLATFORM_HOSTS = HOST;
         expect((await call(admin, { cookie: boss })).status).toBe(200);
         expect((await call(admin, { method: 'POST', cookie: boss, origin: 'https://evil.com', body: { action: 'set_status', site_id: 1, status: 'active' } })).status).toBe(403);
+    });
+
+    it('deletes sites and operator accounts (never admins or yourself)', async () => {
+        const boss = await adminCookie();
+        const a = await signup('del1@x.com', '8.1.1.1');
+        const b = await signup('del2@x.com', '8.1.1.2');
+        const sa = (await call(mySite, { method: 'POST', cookie: a, body: { name: 'Gone Co', subdomain: 'gone-co' } })).body.site.id;
+        await call(mySite, { method: 'POST', cookie: b, body: { name: 'Stay Co', subdomain: 'stay-co' } });
+
+        // operators cannot call it
+        expect((await call(admin, { method: 'POST', cookie: a, body: { action: 'delete_site', site_id: sa } })).status).toBe(403);
+
+        expect((await call(admin, { method: 'POST', cookie: boss, body: { action: 'delete_site', site_id: sa } })).status).toBe(200);
+        expect((await global.__sql`SELECT 1 FROM sites WHERE id = ${sa}`).length).toBe(0);
+        expect((await global.__sql`SELECT 1 FROM site_rate_history WHERE site_id = ${sa}`).length).toBe(0);
+
+        const bId = (await global.__sql`SELECT id FROM owners WHERE email = 'del2@x.com'`)[0].id;
+        const r = await call(admin, { method: 'POST', cookie: boss, body: { action: 'delete_owner', owner_id: bId } });
+        expect(r.body).toEqual({ ok: true, sites_removed: 1 });
+        expect((await global.__sql`SELECT 1 FROM owners WHERE id = ${bId}`).length).toBe(0);
+        expect((await global.__sql`SELECT 1 FROM sites`).length).toBe(0);
+        expect((await call(auth, { query: { action: 'me' }, cookie: b })).body.owner).toBeNull();
+
+        const bossId = (await global.__sql`SELECT id FROM owners WHERE role = 'admin'`)[0].id;
+        expect((await call(admin, { method: 'POST', cookie: boss, body: { action: 'delete_owner', owner_id: bossId } })).status).toBe(400);
+        const log = await global.__sql`SELECT action FROM audit_log ORDER BY id`;
+        expect(log.map(l => l.action)).toEqual(['delete_site', 'delete_owner']);
+    });
+
+    it('return-host only approves active FREE sites under the root domain', async () => {
+        const op = await signup('rh@x.com', '8.2.2.2');
+        await call(mySite, { method: 'POST', cookie: op, body: { name: 'Bounce Co', subdomain: 'bounce-co' } });
+        const ask = host => call(returnHost, { query: { host } });
+        expect((await ask(`bounce-co.${HOST}`)).body).toEqual({ ok: true });
+        expect((await ask(`nobody.${HOST}`)).body).toEqual({ ok: false });
+        expect((await ask('evil.com')).body).toEqual({ ok: false });
+        expect((await ask(`bounce-co.${HOST}.evil.com`)).body).toEqual({ ok: false });
+        expect((await ask(HOST)).body).toEqual({ ok: false });
+        await global.__sql`UPDATE sites SET status = 'suspended'`;
+        expect((await ask(`bounce-co.${HOST}`)).body).toEqual({ ok: false });
+        await global.__sql`UPDATE sites SET status = 'active', plan = 'custom'`;
+        expect((await ask(`bounce-co.${HOST}`)).body).toEqual({ ok: false });
+        expect((await call(returnHost, { query: { host: `bounce-co.${HOST}` }, host: 'trade.alice.com' })).status).toBe(404);
     });
 
     it('approves, suspends, upgrades with a dated rate change, and disables accounts', async () => {

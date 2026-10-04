@@ -20,7 +20,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=sites | owners | audit
-//   POST /api/admin  { action: set_status | update_site | approve_custom | set_rate | disable_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -131,6 +131,28 @@ module.exports = async function handler(req, res) {
                 await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${siteId}, ${site.plan}, ${effective})`;
                 await audit(sql, me.id, 'set_rate', siteId, { platform_share: effective });
                 return send(res, 200, { ok: true });
+            }
+
+            // Permanently removes a site (and its rate history). Audit entry keeps what was removed.
+            case 'delete_site': {
+                const site = (await sql`SELECT id, domain, name, plan, owner_id FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                await sql`DELETE FROM sites WHERE id = ${siteId}`;
+                await audit(sql, me.id, 'delete_site', siteId, { domain: site.domain, name: site.name, plan: site.plan });
+                return send(res, 200, { ok: true });
+            }
+
+            // Permanently removes an operator account AND their site(s). Admin accounts cannot be deleted here.
+            case 'delete_owner': {
+                const ownerId = Number(body.owner_id);
+                if (ownerId === me.id) return send(res, 400, { error: 'You cannot delete your own account.' });
+                const owner = (await sql`SELECT id, email, role FROM owners WHERE id = ${ownerId} LIMIT 1`)[0];
+                if (!owner) return send(res, 404, { error: 'Account not found.' });
+                if (owner.role !== 'operator') return send(res, 400, { error: 'Only operator accounts can be deleted here.' });
+                const gone = await sql`DELETE FROM sites WHERE owner_id = ${ownerId} RETURNING domain`;
+                await sql`DELETE FROM owners WHERE id = ${ownerId}`; // sessions go with it (ON DELETE CASCADE)
+                await audit(sql, me.id, 'delete_owner', ownerId, { email: owner.email, sites_removed: gone.map(g => g.domain) });
+                return send(res, 200, { ok: true, sites_removed: gone.length });
             }
 
             case 'disable_owner': {

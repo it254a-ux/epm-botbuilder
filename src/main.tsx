@@ -2,6 +2,7 @@ import { configure } from 'mobx';
 import ReactDOM from 'react-dom/client';
 import { AuthWrapper } from './app/AuthWrapper';
 import SiteUnavailable from './app/SiteUnavailable';
+import { bounceToFreeSite } from './utils/oauth-redirect';
 import { loadSiteSettings } from './utils/site-settings';
 // Removed AnalyticsInitializer import - analytics dependency removed
 // See migrate-docs/ANALYTICS_IMPLEMENTATION_GUIDE.md for re-implementation
@@ -48,7 +49,7 @@ getAccountId();
 // branding is used exactly as before.
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
-loadSiteSettings().then(settings => {
+loadSiteSettings().then(async settings => {
     if (settings.kind === 'unconfigured' || settings.kind === 'error') {
         document.title = settings.kind === 'error' ? 'Temporarily unavailable' : 'Site not set up';
         root.render(
@@ -57,6 +58,13 @@ loadSiteSettings().then(settings => {
                 reason={settings.kind === 'unconfigured' ? settings.reason : undefined}
             />
         );
+        return;
+    }
+
+    // A free operator site's Deriv sign-in comes back to YOUR main domain first; forward it on.
+    if (settings.kind === 'platform' && (await bounceToFreeSite())) {
+        document.title = 'Signing you in…';
+        root.render(<SiteUnavailable kind='login' />);
         return;
     }
 

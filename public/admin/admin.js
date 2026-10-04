@@ -49,12 +49,18 @@
             btns.appendChild(el('button', { text: 'Set rate', onclick: function () {
                 var v = prompt('Platform share % for ' + s.name + ' (blank = plan default)', String(s.platform_share));
                 if (v === null) return; act({ action: 'set_rate', site_id: s.id, platform_share: v.trim() === '' ? null : Number(v) }); } }));
+            btns.appendChild(el('button', { text: 'Delete', onclick: function () {
+                if (confirm('Permanently delete the site "' + s.name + '" (' + s.domain + ')? This cannot be undone.')) act({ action: 'delete_site', site_id: s.id }); } }));
             return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', s.owner_email || '', btns];
         });
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Owner', 'Actions'], siteRows)]));
 
         var ownerRows = owners.map(function (o) {
-            var b = o.role === 'operator' ? el('button', { text: o.disabled ? 'Enable' : 'Disable', onclick: function () { act({ action: 'disable_owner', owner_id: o.id, disabled: !o.disabled }); } }) : el('span', { class: 'muted', text: 'admin' });
+            var b = o.role === 'operator' ? el('div', { class: 'row' }, [
+                el('button', { text: o.disabled ? 'Enable' : 'Disable', onclick: function () { act({ action: 'disable_owner', owner_id: o.id, disabled: !o.disabled }); } }),
+                el('button', { text: 'Delete', onclick: function () {
+                    if (confirm('Permanently delete the account ' + o.email + ' AND its site? This cannot be undone.')) act({ action: 'delete_owner', owner_id: o.id }); } })
+            ]) : el('span', { class: 'muted', text: 'admin' });
             return [o.email, o.name, o.role, o.disabled ? 'disabled' : 'active', b];
         });
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Accounts' }), table(['Email', 'Name', 'Role', 'State', ''], ownerRows)]));
