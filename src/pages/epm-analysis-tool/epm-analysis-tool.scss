@@ -167,11 +167,32 @@
             max-width: 170px;
         }
 
+        /* Volatility Index / Market Contract carry longer values
+           ("Volatility 100 (1s)", "Digit Differs"...) -- give them more room */
+        > div:nth-child(-n + 2) {
+            flex: 1.8 1 0;
+            min-width: 140px;
+            max-width: 260px;
+        }
+
+        /* Under / Over / Look back N ticks / Flag at % fail only ever hold a
+           couple of characters or a 1-2 digit number -- half the old width */
+        > div:nth-child(n + 3) {
+            flex: 0.5 1 0;
+            min-width: 70px;
+            max-width: 85px;
+        }
+
         .epm-analysis-tool__select,
         .epm-analysis-tool__input {
             width: 100%;
             height: 32px;
             padding: 0 8px;
+            /* content height (32px box minus the 1px border each side) --
+               the standard way to vertically centre a single line of text
+               in a fixed-height box; without this the text sat high,
+               pushed up by the page's own line-height */
+            line-height: 30px;
         }
 
         .epm-analysis-tool__select {
@@ -189,8 +210,12 @@
             flex-direction: column;
             align-items: stretch;
 
+            /* :nth-child above has higher specificity than a plain "> div",
+               so it would otherwise keep winning here even though this
+               media query comes later in the file */
             > div {
-                min-width: 0;
+                min-width: 0 !important;
+                max-width: none !important;
                 width: 100%;
             }
         }
