@@ -10,6 +10,7 @@ const auth = require('../auth');
 const mySite = require('../my-site');
 const admin = require('../admin');
 const returnHost = require('../return-host');
+const { checkDomain } = require('../_lib/dns-check');
 const siteSettings = require('../site-settings');
 const { hashPassword } = require('../_lib/auth');
 
@@ -43,7 +44,7 @@ const cookieOf = r => (r.headers['Set-Cookie'] || '').split(';')[0];
 const post = (h, action, body, extra = {}) => call(h, { method: 'POST', query: { action }, body, ...extra });
 
 async function signup(email, ip) {
-    const r = await post(auth, 'register', { email, name: 'Test User', password: 'correct horse battery' }, { ip });
+    const r = await post(auth, 'register', { email, name: 'Test User', password: 'correct horse battery', accept_terms: true }, { ip });
     expect(r.status).toBe(201);
     return cookieOf(r);
 }
@@ -63,14 +64,14 @@ describe('accounts', () => {
         const c = await signup('a@x.com', '2.2.2.2');
         expect(c).toMatch(/^epm_session=[0-9a-f]{64}$/);
         expect((await call(auth, { query: { action: 'me' }, cookie: c })).body.owner.email).toBe('a@x.com');
-        expect((await post(auth, 'register', { email: 'a@x.com', name: 'Al', password: 'correct horse battery' }, { ip: '3.3.3.3' })).status).toBe(409);
+        expect((await post(auth, 'register', { email: 'a@x.com', name: 'Al', password: 'correct horse battery', accept_terms: true }, { ip: '3.3.3.3' })).status).toBe(409);
         expect((await post(auth, 'login', { email: 'a@x.com', password: 'wrong password!!' })).status).toBe(401);
         expect((await post(auth, 'login', { email: 'nobody@x.com', password: 'wrong password!!' })).status).toBe(401);
         expect((await post(auth, 'login', { email: 'a@x.com', password: 'correct horse battery' })).status).toBe(200);
     });
 
     it('cannot self-register as admin, and stores only a session hash', async () => {
-        const r = await post(auth, 'register', { email: 'b@x.com', name: 'B B', password: 'correct horse battery', role: 'admin' });
+        const r = await post(auth, 'register', { email: 'b@x.com', name: 'B B', password: 'correct horse battery', role: 'admin', accept_terms: true });
         expect(r.body.owner.role).toBe('operator');
         const rows = await global.__sql`SELECT token_hash FROM sessions`;
         expect(cookieOf(r)).not.toContain(rows[0].token_hash);
@@ -84,7 +85,7 @@ describe('accounts', () => {
     });
 
     it('blocks cross-site posts and answers 404 on operator domains', async () => {
-        expect((await post(auth, 'register', { email: 'd@x.com', name: 'Dd', password: 'correct horse battery' }, { origin: 'https://evil.com' })).status).toBe(403);
+        expect((await post(auth, 'register', { email: 'd@x.com', name: 'Dd', password: 'correct horse battery', accept_terms: true }, { origin: 'https://evil.com' })).status).toBe(403);
         expect((await post(auth, 'login', { email: 'd@x.com', password: 'x' }, { host: 'trade.alice.com' })).status).toBe(404);
     });
 });
@@ -175,7 +176,7 @@ describe('admin', () => {
 
         const bossId = (await global.__sql`SELECT id FROM owners WHERE role = 'admin'`)[0].id;
         expect((await call(admin, { method: 'POST', cookie: boss, body: { action: 'delete_owner', owner_id: bossId } })).status).toBe(400);
-        const log = await global.__sql`SELECT action FROM audit_log ORDER BY id`;
+        const log = await global.__sql`SELECT action FROM audit_log WHERE action <> 'terms_accepted' ORDER BY id`;
         expect(log.map(l => l.action)).toEqual(['delete_site', 'delete_owner']);
     });
 
@@ -220,7 +221,85 @@ describe('admin', () => {
         expect((await call(auth, { query: { action: 'me' }, cookie: op })).body.owner).toBeNull();
         expect((await post(auth, 'login', { email: 'j@x.com', password: 'correct horse battery' })).status).toBe(401);
 
-        const log = await global.__sql`SELECT action FROM audit_log ORDER BY id`;
+        const log = await global.__sql`SELECT action FROM audit_log WHERE action <> 'terms_accepted' ORDER BY id`;
         expect(log.map(l => l.action)).toEqual(['set_status', 'set_status', 'approve_custom', 'set_rate', 'disable_owner']);
+    });
+});
+
+describe('dashboard support', () => {
+    it('sign-up needs the terms box ticked and records the acceptance', async () => {
+        const noTerms = await post(auth, 'register', { email: 't@x.com', name: 'Tee', password: 'correct horse battery' });
+        expect(noTerms.status).toBe(400);
+        expect(noTerms.body.error).toMatch(/Terms/);
+        const ok = await post(auth, 'register', { email: 't@x.com', name: 'Tee', password: 'correct horse battery', accept_terms: true });
+        expect(ok.status).toBe(201);
+        const log = await global.__sql`SELECT action, target, detail FROM audit_log`;
+        expect(log).toHaveLength(1);
+        expect(log[0]).toMatchObject({ action: 'terms_accepted', target: 't@x.com' });
+        expect(log[0].detail.version).toBe('2026-10-04');
+    });
+
+    it('owners can delete their own account and site, with password + DELETE', async () => {
+        const c = await signup('self@x.com', '5.9.9.1');
+        await call(mySite, { method: 'POST', cookie: c, body: { name: 'Self Co', subdomain: 'self-co' } });
+        expect((await post(auth, 'delete_account', { password: 'wrong wrong wrong', confirm: 'DELETE' }, { cookie: c })).status).toBe(401);
+        expect((await post(auth, 'delete_account', { password: 'correct horse battery', confirm: 'yes' }, { cookie: c })).status).toBe(400);
+        expect((await post(auth, 'delete_account', { password: 'correct horse battery', confirm: 'DELETE' }, {})).status).toBe(401);
+        const r = await post(auth, 'delete_account', { password: 'correct horse battery', confirm: 'DELETE' }, { cookie: c });
+        expect(r.status).toBe(200);
+        expect(r.headers['Set-Cookie']).toMatch(/Max-Age=0/);
+        expect((await global.__sql`SELECT 1 FROM owners WHERE email = 'self@x.com'`)).toHaveLength(0);
+        expect((await global.__sql`SELECT 1 FROM sites`)).toHaveLength(0);
+        expect((await call(auth, { query: { action: 'me' }, cookie: c })).body.owner).toBeNull();
+    });
+
+    it('admins cannot be deleted through the self-service route', async () => {
+        await global.__sql`INSERT INTO owners (email, name, password_hash, role) VALUES ('boss2@x.com','Boss',${await hashPassword('boss passphrase 123')},'admin')`;
+        const login = await post(auth, 'login', { email: 'boss2@x.com', password: 'boss passphrase 123' });
+        const r = await post(auth, 'delete_account', { password: 'boss passphrase 123', confirm: 'DELETE' }, { cookie: cookieOf(login) });
+        expect(r.status).toBe(403);
+    });
+
+    it('my-site returns DNS targets and a history that fills as things happen', async () => {
+        const c = await signup('hist@x.com', '5.9.9.2');
+        const empty = await call(mySite, { cookie: c });
+        expect(empty.body).toMatchObject({ site: null, events: [], dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' } });
+        await call(mySite, { method: 'POST', cookie: c, body: { name: 'Hist Co', subdomain: 'hist-co' } });
+        await call(mySite, { method: 'PUT', cookie: c, body: { action: 'request_custom_domain', domain: 'hist.example.org' } });
+        const full = await call(mySite, { cookie: c });
+        expect(full.body.events.map(e => e.event)).toEqual(['custom_domain_requested', 'site_created']);
+        expect(full.body.events[1].detail).toMatchObject({ plan: 'free', status: 'active' });
+    });
+
+    it('site creation still works if the history table has not been created yet', async () => {
+        await global.__sql`DROP TABLE site_events`;
+        const c = await signup('nohist@x.com', '5.9.9.3');
+        const r = await call(mySite, { method: 'POST', cookie: c, body: { name: 'No Hist', subdomain: 'no-hist' } });
+        expect(r.status).toBe(201);
+        expect((await call(mySite, { cookie: c })).body.events).toEqual([]);
+    });
+
+    it('DNS check validates a custom domain and rejects when there is nothing to check', async () => {
+        const c = await signup('dns@x.com', '5.9.9.4');
+        await call(mySite, { method: 'POST', cookie: c, body: { name: 'Dns Co', subdomain: 'dns-co' } });
+        expect((await call(mySite, { cookie: c, query: { check_dns: '1' } })).status).toBe(400);
+    });
+});
+
+describe('checkDomain', () => {
+    const fake = ({ cname = [], a = [] }) => ({
+        resolveCname: async () => { if (!cname.length) throw new Error('ENODATA'); return cname; },
+        resolve4: async () => { if (!a.length) throw new Error('ENODATA'); return a; },
+    });
+    it('recognises records that point at the platform', async () => {
+        expect((await checkDomain('t.x.com', fake({ cname: ['cname.vercel-dns-0.com'] }))).pointing).toBe(true);
+        expect((await checkDomain('t.x.com', fake({ cname: ['065d4578f0593369.vercel-dns-017.com'] }))).pointing).toBe(true);
+        expect((await checkDomain('x.com', fake({ a: ['76.76.21.21'] }))).pointing).toBe(true);
+        expect((await checkDomain('x.com', fake({ a: ['216.198.79.1'] }))).pointing).toBe(true);
+    });
+    it('reports domains that are elsewhere or missing', async () => {
+        expect((await checkDomain('x.com', fake({ a: ['1.2.3.4'] }))).pointing).toBe(false);
+        expect((await checkDomain('x.com', fake({ cname: ['example.net'] }))).pointing).toBe(false);
+        expect((await checkDomain('x.com', fake({}))).pointing).toBe(false);
     });
 });

@@ -1,6 +1,8 @@
 const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
+const { logEvent, listEvents } = require('./_lib/events');
+const { checkDomain } = require('./_lib/dns-check');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -55,7 +57,20 @@ module.exports = async function handler(req, res) {
 
         if (req.method === 'GET') {
             const row = await findOwn(sql, me.id);
-            return send(res, 200, { site: row ? view(row) : null });
+
+            // ?check_dns=1 -> is the domain you asked for (or already use) pointing at the platform yet?
+            if (req.query.check_dns) {
+                const target = row && (row.custom_domain_requested || (row.plan === 'custom' ? row.domain : ''));
+                if (!target) return send(res, 400, { error: 'No custom domain to check yet.' });
+                if ((await A.hit(sql, `dns:owner:${me.id}`, 3600)) > 30) return send(res, 429, { error: 'Too many checks. Try again in a while.' });
+                return send(res, 200, { dns_check: await checkDomain(target) });
+            }
+
+            return send(res, 200, {
+                site: row ? view(row) : null,
+                dns: { cname: process.env.DNS_CNAME_TARGET || 'cname.vercel-dns-0.com', a: process.env.DNS_A_TARGET || '76.76.21.21' },
+                events: row ? await listEvents(sql, row.id) : [],
+            });
         }
 
         if (req.method !== 'POST' && req.method !== 'PUT') return send(res, 405, { error: 'Method not allowed' });
@@ -109,6 +124,7 @@ module.exports = async function handler(req, res) {
                 throw err;
             }
             await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${created.id}, ${plan}, ${S.PLAN_SHARE[plan]})`;
+            await logEvent(sql, created.id, 'site_created', { plan, domain, status });
             return send(res, 201, { site: view(await findOwn(sql, me.id)) });
         }
 
@@ -124,6 +140,7 @@ module.exports = async function handler(req, res) {
             } catch (err) {
                 throw err;
             }
+            await logEvent(sql, row.id, 'custom_domain_requested', { domain });
             return send(res, 200, { site: view(await findOwn(sql, me.id)) });
         }
 
@@ -147,6 +164,7 @@ module.exports = async function handler(req, res) {
                 updated_at = now()
             WHERE id = ${row.id} AND owner_id = ${me.id}
         `;
+        await logEvent(sql, row.id, 'details_updated', {});
         return send(res, 200, { site: view(await findOwn(sql, me.id)) });
     } catch (err) {
         console.error('my-site error:', err);

@@ -1,6 +1,7 @@
 const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 
+const TERMS_VERSION = '2026-10-04';
 const send = (res, code, body) => res.status(code).json(body);
 const noStore = res => res.setHeader('Cache-Control', 'no-store');
 
@@ -11,6 +12,7 @@ const noStore = res => res.setHeader('Cache-Control', 'no-store');
 //   POST /api/auth?action=register   { email, name, password, registration_code? }
 //   POST /api/auth?action=login      { email, password }
 //   POST /api/auth?action=logout
+//   POST /api/auth?action=delete_account   { password, confirm: 'DELETE' }
 module.exports = async function handler(req, res) {
     noStore(res);
     if (!A.onPlatformHost(req, 'open')) return send(res, 404, { error: 'Not found' });
@@ -37,6 +39,7 @@ module.exports = async function handler(req, res) {
             if (code && String(body.registration_code || '') !== code) {
                 return send(res, 403, { error: 'A valid registration code is required.' });
             }
+            if (body.accept_terms !== true) return send(res, 400, { error: 'Please accept the Terms of Service and Privacy Policy to continue.' });
             const email = A.validateEmail(body.email);
             const name = typeof body.name === 'string' ? body.name.trim().replace(/[<>]/g, '') : '';
             if (!email) return send(res, 400, { error: 'Enter a valid email address.' });
@@ -57,6 +60,7 @@ module.exports = async function handler(req, res) {
                 if (err && err.code === '23505') return send(res, 409, { error: 'An account with this email already exists.' });
                 throw err;
             }
+            await sql`INSERT INTO audit_log (owner_id, action, target, detail) VALUES (${owner.id}, 'terms_accepted', ${email}, ${JSON.stringify({ version: TERMS_VERSION })}::jsonb)`;
             const token = await A.createSession(sql, owner.id);
             res.setHeader('Set-Cookie', A.sessionCookie(req, token, A.SESSION_DAYS * 86400));
             return send(res, 201, { owner });
@@ -82,6 +86,23 @@ module.exports = async function handler(req, res) {
             const token = await A.createSession(sql, row.id);
             res.setHeader('Set-Cookie', A.sessionCookie(req, token, A.SESSION_DAYS * 86400));
             return send(res, 200, { owner: { id: row.id, email: row.email, name: row.name, role: row.role } });
+        }
+
+        // Permanently deletes the signed-in operator's account AND their site. Needs the password and the word DELETE.
+        if (action === 'delete_account') {
+            const me = await A.getSession(sql, req);
+            if (!me) return send(res, 401, { error: 'Please sign in.' });
+            if (me.role !== 'operator') return send(res, 403, { error: 'Admin accounts cannot be deleted here.' });
+            if ((await A.hit(sql, `delete:owner:${me.id}`, 3600)) > 5) return send(res, 429, { error: 'Too many attempts. Please try again later.' });
+            if (String(body.confirm || '').trim() !== 'DELETE') return send(res, 400, { error: 'Type DELETE to confirm.' });
+            const row = (await sql`SELECT password_hash FROM owners WHERE id = ${me.id} LIMIT 1`)[0];
+            const okPw = row ? await A.verifyPassword(typeof body.password === 'string' ? body.password.slice(0, A.MAX_PASSWORD) : '', row.password_hash) : false;
+            if (!okPw) return send(res, 401, { error: 'Incorrect password.' });
+            const gone = await sql`DELETE FROM sites WHERE owner_id = ${me.id} RETURNING domain`;
+            await sql`DELETE FROM owners WHERE id = ${me.id}`; // sessions go with it
+            await sql`INSERT INTO audit_log (owner_id, action, target, detail) VALUES (${me.id}, 'account_deleted_by_owner', ${me.email}, ${JSON.stringify({ sites_removed: gone.map(g => g.domain) })}::jsonb)`;
+            res.setHeader('Set-Cookie', A.clearCookie(req));
+            return send(res, 200, { ok: true });
         }
 
         if (action === 'logout') {

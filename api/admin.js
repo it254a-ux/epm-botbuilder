@@ -1,6 +1,7 @@
 const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
+const { logEvent } = require('./_lib/events');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -67,6 +68,7 @@ module.exports = async function handler(req, res) {
                 const r = await sql`UPDATE sites SET status = ${body.status}, updated_at = now() WHERE id = ${siteId} RETURNING id`;
                 if (!r.length) return send(res, 404, { error: 'Site not found.' });
                 await audit(sql, me.id, 'set_status', siteId, { status: body.status });
+                await logEvent(sql, siteId, 'status_changed', { status: body.status });
                 return send(res, 200, { ok: true });
             }
 
@@ -113,6 +115,7 @@ module.exports = async function handler(req, res) {
                 }
                 const share = site.commission_rate_override !== null ? Number(site.commission_rate_override) : S.PLAN_SHARE.custom;
                 await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${siteId}, 'custom', ${share})`;
+                await logEvent(sql, siteId, 'custom_domain_approved', { domain: site.custom_domain_requested });
                 await audit(sql, me.id, 'approve_custom', siteId, { from: site.domain, to: site.custom_domain_requested, platform_share: share });
                 return send(res, 200, { ok: true });
             }

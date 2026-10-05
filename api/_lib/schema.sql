@@ -71,3 +71,13 @@ CREATE TABLE IF NOT EXISTS site_rate_history (
     effective_from TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS site_rate_history_site_idx ON site_rate_history (site_id, effective_from);
+
+-- ===== Step 3: site history (shown on the operator's Deployments page) =====
+CREATE TABLE IF NOT EXISTS site_events (
+    id         SERIAL PRIMARY KEY,
+    site_id    INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    event      TEXT NOT NULL,
+    detail     JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS site_events_site_idx ON site_events (site_id, id DESC);
