@@ -289,6 +289,15 @@ const EpmAnalysisTool = observer(() => {
         }
     }, [contractType, underBarrier, overBarrier, matchDigit]);
 
+    // Rows for the results table: real SideResult data once a scan has run,
+    // otherwise a placeholder row per current side so the table has its
+    // normal shape (and reads "Not scanned yet") from the moment the page
+    // loads, instead of not existing at all until Scan is clicked.
+    type DisplayRow = { label: string; failPct: number | null; failCount: number | null; sampleSize: number | null; flagged: boolean };
+    const displayRows: DisplayRow[] = results
+        ? results.map(r => ({ label: r.label, failPct: r.failPct, failCount: r.failCount, sampleSize: r.sampleSize, flagged: r.flagged }))
+        : sideLabels.map(label => ({ label, failPct: null, failCount: null, sampleSize: null, flagged: false }));
+
     // Digits shown with the blue "selected" circle in the live digit stats
     const highlightDigits =
         contractType === 'over_under' ? [underBarrier, overBarrier] : contractType === 'match_differ' ? [matchDigit] : [];
@@ -589,7 +598,7 @@ const EpmAnalysisTool = observer(() => {
                                     row structure for the current sides straight away (with a
                                     placeholder reading), rather than an empty page until Scan
                                     is clicked. */}
-                                {(results ?? sideLabels.map(label => ({ label, failPct: null, failCount: null, sampleSize: null, flagged: false }))).map(
+                                {displayRows.map(
                                     row => (
                                         <tr key={row.label}>
                                             <td>{row.label}</td>
