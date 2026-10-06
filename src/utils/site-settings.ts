@@ -95,12 +95,49 @@ const isPlatformHostHere = (): boolean => {
 
 const FETCH_TIMEOUT_MS = 3000;
 
+// Site settings rarely change mid-session, but the app mounts nothing at all
+// (not even its own loading spinner -- see src/main.tsx) until this lookup
+// resolves, so previously every refresh paid a full network round trip
+// before the page could even start rendering. sessionStorage makes every
+// refresh after the first one in a tab resolve instantly instead, without
+// changing what gets fetched or how the result is used -- a fresh browser
+// session (new tab) still asks the server, exactly as before. Only a
+// successful 'platform' or 'site' result is cached; 'unconfigured'/'error'
+// are left uncached so a transient failure doesn't stick for the rest of
+// the session.
+const SESSION_CACHE_KEY = 'epm_site_settings_cache_v1';
+
+const readSessionCache = (): TSiteSettings | null => {
+    try {
+        const raw = window.sessionStorage.getItem(SESSION_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as TSiteSettings;
+        if (parsed && (parsed.kind === 'platform' || parsed.kind === 'site')) return parsed;
+        return null;
+    } catch {
+        return null;
+    }
+};
+
+const writeSessionCache = (settings: TSiteSettings) => {
+    try {
+        window.sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(settings));
+    } catch {
+        // Storage unavailable/full/private mode -- fine, just means no caching this session.
+    }
+};
+
 /**
  * Loads the settings for this domain. Never throws. If the lookup fails we only
  * fall back to the platform's branding on your own domains; on anyone else's
  * domain we show the "temporarily unavailable" page instead of your branding.
  */
 export const loadSiteSettings = async (): Promise<TSiteSettings> => {
+    const cached = readSessionCache();
+    if (cached) {
+        current = cached;
+        return cached;
+    }
     try {
         const controller = new AbortController();
         const timer = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -110,6 +147,7 @@ export const loadSiteSettings = async (): Promise<TSiteSettings> => {
         const data = (await res.json()) as TSiteSettings;
         if (data && (data.kind === 'platform' || data.kind === 'site' || data.kind === 'unconfigured')) {
             current = data;
+            if (data.kind === 'platform' || data.kind === 'site') writeSessionCache(data);
             return data;
         }
         throw new Error('bad site-settings payload');
