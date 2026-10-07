@@ -1,6 +1,17 @@
 <!doctype html>
 <html lang="en" dir="auto" class="light">
     <head>
+        <!--
+          TradingView's tab content is a cross-origin iframe to this host.
+          It's already preloaded hidden, as early as the app can start it
+          (see src/pages/main/main.tsx) -- this just gets the DNS lookup +
+          TLS handshake for that connection out of the way even sooner, in
+          parallel with everything else, before any of our own JS has even
+          downloaded. Pure network head-start; doesn't change what loads,
+          when the preload mounts, or anything about how tabs work.
+        -->
+        <link rel="preconnect" href="https://charts.deriv.com" crossorigin />
+        <link rel="dns-prefetch" href="https://charts.deriv.com" />
         <!-- Google Tag Manager -->
         <script>
             (function (w, d, s, l, i) {
