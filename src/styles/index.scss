@@ -35,6 +35,21 @@ body {
  * SmartCharts' own stylesheet has equal-or-higher specificity selectors (theme +
  * mobile + enabled-state combinations) and loads independently of this file.
  */
+/* The title sits inside SmartCharts' own absolutely-positioned container
+   (.cq-top-ui-widgets) which has NO top/left of its own, so the browser places
+   it wherever it would fall in normal flow -- below anything above it and
+   inside the chart's 8px side padding on phones. That, not the title box
+   itself, is what left it hanging ~10px in and ~25px down. Pin the container
+   to the chart's real top-left corner (the Charts page already does this for
+   `top` in chart.scss; this makes every chart behave the same). */
+.smartcharts .cq-top-ui-widgets,
+.smartcharts-mobile .cq-top-ui-widgets {
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 /* Pinned flush into the top-left corner of the chart: no outer margin and no
    top offset (SmartCharts floats it 1em down and .8em in, which made it look
    like it was hanging). The corner that touches the chart edge is squared off. */
