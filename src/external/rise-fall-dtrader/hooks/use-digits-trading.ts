@@ -15,6 +15,7 @@ import type {
 import { useBaseTrading } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import type { UseBaseTradingParams } from '@/external/rise-fall-dtrader/hooks/use-base-trading';
 import { computeDigitStats, getLastDigit } from '@/external/rise-fall-dtrader/lib/digit-stats';
+import { liveDigitStore } from '@/external/rise-fall-dtrader/lib/live-digit-store';
 import type { ContractMode, TradeType, DigitStats } from '@/external/rise-fall-dtrader/lib/digit-types';
 import type { OpenPosition, ClosedPosition } from '../lib/types';
 
@@ -113,10 +114,18 @@ export function useDigitsTrading({ ws, isConnected, isExhausted, isAuthenticated
   const [ownCurrentTick, setOwnCurrentTick] = useState<Tick | null>(null);
   const historySeededRef = useRef(false);
 
+  // Live digit circles: keep the per-tick store's decimal places in sync. This
+  // effect is declared BEFORE the history-seeding one below so the very first
+  // batch of history is counted with the right pip size.
+  useEffect(() => {
+    liveDigitStore.setPipSize(pipSize);
+  }, [pipSize]);
+
   useEffect(() => {
     if (!historySeededRef.current && basePrices.length > 0) {
       historySeededRef.current = true;
       setOwnPrices(basePrices.slice(-MAX_PRICES));
+      liveDigitStore.reset(basePrices);
     }
   }, [basePrices]);
 
@@ -125,6 +134,7 @@ export function useDigitsTrading({ ws, isConnected, isExhausted, isAuthenticated
     historySeededRef.current = false;
     setOwnPrices([]);
     setOwnCurrentTick(null);
+    liveDigitStore.clear();
   }, [activeSymbolKey]);
 
   // ── Throttled tick buffer ────────────────────────────────────────────────
@@ -177,6 +187,10 @@ export function useDigitsTrading({ ws, isConnected, isExhausted, isAuthenticated
 
       const quote: number = raw.quote;
       const newTick: Tick = { quote, epoch: raw.epoch as number } as unknown as Tick;
+
+      // LIVE: feed the digit circles on EVERY tick, right here, with no
+      // batching and no React state -- only the circles subscribe to this.
+      liveDigitStore.push(quote);
 
       lastTickRef.current = newTick;
       tickBufferRef.current.push(quote);

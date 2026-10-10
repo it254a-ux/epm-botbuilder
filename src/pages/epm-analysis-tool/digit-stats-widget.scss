@@ -139,6 +139,63 @@
         border-bottom: 2.2cqw solid var(--brand-danger, #f56052);
     }
 
+    /*
+     * Tappable circles (used by Dtrader, where tapping a digit picks it as the
+     * trade barrier). The Analysis Tool's own widget never sets this.
+     */
+    &__cell--tap {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &:focus-visible {
+            outline: 2px solid var(--button-primary-default);
+            outline-offset: 2px;
+            border-radius: 50%;
+        }
+    }
+
+    /*
+     * ONE row of ten (Dtrader chart) instead of two rows of five. Same look,
+     * same colours, same arcs and pointer -- only the layout and the cqw sizes
+     * change so ten circles fit across the width. 10 circles + 9 gaps + side
+     * padding = 100cqw, so the enlarged "current" circle still has room.
+     */
+    &--row {
+        width: 100%;
+        max-width: 520px;
+        flex: 1 1 auto;
+        margin-right: 0;
+        margin-inline: auto;
+
+        .digit-stats__grid {
+            grid-template-columns: repeat(10, minmax(0, 1fr));
+            row-gap: 0;
+            column-gap: 1cqw;
+            padding: 1cqw 2cqw 3.8cqw;
+        }
+
+        .digit-stats__circle {
+            width: 8.4cqw;
+        }
+
+        /* Digits/percentages scaled up relative to the smaller circle so they
+           stay readable on a phone. */
+        .digit-stats__digit {
+            font-size: 3.5cqw;
+        }
+
+        .digit-stats__pct {
+            font-size: 1.9cqw;
+        }
+
+        .digit-stats__pointer {
+            margin-top: 0.5cqw;
+            border-left-width: 1.2cqw;
+            border-right-width: 1.2cqw;
+            border-bottom-width: 1.7cqw;
+        }
+    }
+
     @media (prefers-reduced-motion: reduce) {
         &__circle,
         &__arc {

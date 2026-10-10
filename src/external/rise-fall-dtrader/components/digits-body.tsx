@@ -471,12 +471,7 @@ export function DigitsBody({
   const chartWithOverlay = (
     <div className="relative h-full w-full max-lg:flex max-lg:flex-col">
       <div className="h-full w-full max-lg:h-auto max-lg:min-h-0 max-lg:flex-1">{chart}</div>
-      <DigitStatsBar
-        digitStats={digitStats}
-        selectedDigit={selectedDigit}
-        onDigitSelect={setSelectedDigit}
-        lastDigit={lastDigit}
-      />
+      <DigitStatsBar selectedDigit={selectedDigit} onDigitSelect={setSelectedDigit} />
     </div>
   );
 
