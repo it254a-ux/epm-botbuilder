@@ -464,9 +464,13 @@ export function DigitsBody({
      before <TradeBody> — it was causing a duplicate bar to appear on
      every digit tab (Matches/Differs, Over/Under, Even/Odd). Now only
      one bar exists, inside the chart wrapper. */
+  /* MOBILE FIX: below lg this container becomes a column — the chart takes
+     the remaining height and the tick-count bar sits in its own row under
+     it, so it can never be hidden behind the chart canvas. From lg up the
+     chart fills the container and the bar floats over it exactly as before. */
   const chartWithOverlay = (
-    <div className="relative h-full w-full">
-      {chart}
+    <div className="relative h-full w-full max-lg:flex max-lg:flex-col">
+      <div className="h-full w-full max-lg:h-auto max-lg:min-h-0 max-lg:flex-1">{chart}</div>
       <DigitStatsBar
         digitStats={digitStats}
         selectedDigit={selectedDigit}
@@ -485,13 +489,13 @@ export function DigitsBody({
       onValueChange={(value) => {
         if (value) handleMatchDiffBotTypeChange(value as MatchDiffBotType);
       }}
-      className="w-full gap-0 rounded-full bg-muted p-0.5 lg:max-w-[320px]"
+      className="grid w-full grid-cols-3 gap-1.5 rounded-xl bg-muted p-1.5"
     >
       {MATCH_DIFF_BOT_OPTIONS.map((opt) => (
         <ToggleGroupItem
           key={opt.value}
           value={opt.value}
-          className="flex-1 h-6 rounded-full text-[8px] font-medium text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:font-bold data-[state=on]:shadow-sm hover:text-foreground"
+          className="h-8 min-w-0 justify-self-stretch whitespace-nowrap rounded-lg px-1 text-[11px] font-medium text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:font-bold data-[state=on]:shadow-sm hover:text-foreground"
         >
           {opt.label}
         </ToggleGroupItem>

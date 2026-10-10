@@ -266,19 +266,17 @@ export function DigitStatsBar({
   const hasData = digitStats.totalTicks > 0;
 
   return (
+    /* MOBILE FIX: on desktop (lg and up) the bar still floats over the bottom
+       of the chart exactly as before (absolute, centred, z-50). Below lg it
+       is switched to a normal in-flow row that sits directly UNDER the chart
+       inside the same container. In-flow content cannot be covered by the
+       chart's own layers (SmartCharts' Flutter canvas / glass pane), which
+       is what was hiding the floating version on phones. */
     <div
       ref={rootRef}
       data-digit-stats-bar-root
-      style={{
-        position: 'absolute',
-        bottom: '24px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 50,
-        width: 'min(96%, 520px)',
-        /* No background, no border, no shadow — circles float directly on the chart */
-        padding: '4px',
-      }}
+      /* No background, no border, no shadow — circles float directly on the chart */
+      className="absolute bottom-6 left-1/2 z-50 w-[min(96%,520px)] -translate-x-1/2 p-1 max-lg:static max-lg:w-full max-lg:shrink-0 max-lg:translate-x-0 max-lg:px-2 max-lg:pb-1 max-lg:pt-1.5"
     >
       <ScanStyles />
       <div
