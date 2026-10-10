@@ -21,3 +21,122 @@ body {
         }
     }
 }
+
+/*
+ * Compact symbol box ("Volatility 100 (1s) Index" + live price) on EVERY
+ * SmartCharts chart in the app -- the Charts page, Dtrader (all trade types),
+ * Accumulators, Rise/Fall -- on phone and desktop alike. SmartCharts draws this
+ * box itself (.cq-chart-title) with large padding, a 32px icon scaled up 1.3x, a
+ * 1.6em name and a 15rem / 4.2rem minimum size. Everything below roughly halves
+ * it: height, width, icon, font sizes and inner spacing, keeping the same
+ * proportions.
+ *
+ * Deliberately NOT scoped to any one page. `!important` is used because
+ * SmartCharts' own stylesheet has equal-or-higher specificity selectors (theme +
+ * mobile + enabled-state combinations) and loads independently of this file.
+ */
+/* Pinned flush into the top-left corner of the chart: no outer margin and no
+   top offset (SmartCharts floats it 1em down and .8em in, which made it look
+   like it was hanging). The corner that touches the chart edge is squared off. */
+.cq-chart-title {
+    margin: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    inset-inline-start: 0 !important;
+}
+
+.cq-chart-title .cq-menu-btn {
+    padding: 4px !important;
+    border-radius: 0 0 4px 0 !important;
+}
+
+.cq-chart-title .cq-symbol-select-btn {
+    padding: 0.3em 0.5em !important;
+    margin: 0 !important;
+    border-radius: 0 0 3px 0 !important;
+}
+
+/* Market icon: 32px (scaled 1.3x) -> 16px (scaled 1.25x) */
+.cq-chart-title .cq-symbol-select-btn > .ic-frx,
+.cq-chart-title .cq-symbol-select-btn > .ic-icon:not(.cq-symbol-dropdown),
+.cq-chart-title .cq-symbol-select-btn > .ic-otc,
+.cq-chart-title .cq-symbol-select-btn > .ic-wld {
+    width: 16px !important;
+    height: 16px !important;
+    transform: scale(1.25) !important;
+}
+
+.cq-chart-title .cq-symbol-select-btn > .ic-frx > svg,
+.cq-chart-title .cq-symbol-select-btn > .ic-icon:not(.cq-symbol-dropdown) > svg,
+.cq-chart-title .cq-symbol-select-btn > .ic-otc > svg,
+.cq-chart-title .cq-symbol-select-btn > .ic-wld > svg {
+    height: 16px !important;
+}
+
+/* Market icon in the real markup: a <span class="ic-icon"> holding an <svg>,
+   placed inside the title's flex row (.cq-symbol-select-btn__container). */
+.cq-chart-title .cq-symbol-select-btn__container > .ic-icon {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    flex-shrink: 0;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.cq-chart-title .cq-symbol-select-btn__container > .ic-icon > svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.cq-chart-title .cq-symbol-select-btn__container {
+    align-items: center;
+}
+
+/* Name + price block: half the minimum size, tighter gap to the icon */
+.cq-chart-title .cq-symbol-select-btn .cq-symbol-info {
+    margin: 0 0 0 10px !important;
+    min-height: 2.1rem !important;
+    min-width: 7.5rem !important;
+    justify-content: center;
+}
+
+/* Symbol name: 1.6em -> 0.9em */
+.cq-chart-title .cq-symbol-select-btn .cq-symbol {
+    font-size: 0.9em !important;
+    line-height: 1.3 !important;
+    padding-right: 0.5rem !important;
+    white-space: nowrap;
+}
+
+/* Price / change line: 1.2em -> 0.7em */
+.cq-chart-title .cq-symbol-select-btn .cq-chart-price {
+    font-size: 0.7em !important;
+    line-height: 1.3 !important;
+}
+
+.cq-chart-title .cq-symbol-select-btn .cq-chart-price > div {
+    line-height: 1.3 !important;
+}
+
+/* Dropdown chevron: 12px -> 8px, smaller gap */
+.cq-chart-title.ciq-menu.ciq-enabled .cq-menu-btn > .cq-symbol-select-btn > .ic-icon.cq-symbol-dropdown {
+    width: 8px !important;
+    margin-left: 6px !important;
+}
+
+.cq-chart-title.ciq-menu.ciq-enabled .cq-menu-btn > .cq-symbol-select-btn > .ic-icon.cq-symbol-dropdown svg {
+    width: 8px !important;
+}
+
+/* Phones: SmartCharts stretches the box across the full chart width.
+   Shrink it to fit its (now smaller) content instead, about half the width. */
+.smartcharts-mobile .cq-chart-title {
+    width: max-content !important;
+    max-width: 100% !important;
+}
+
+.smartcharts-mobile .cq-chart-title .cq-symbol-select-btn {
+    margin: 0 !important;
+}
