@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useDerivWS } from '@deriv/core';
 import { useStore } from '@/hooks/useStore';
@@ -92,6 +92,37 @@ const FLOATING_DIGITS = [
 const EpmAnalysisTool = observer(() => {
     const { run_panel, chart_store } = useStore();
     const { isDesktop } = useDevice();
+
+    // PHONE / TABLET: size this page to the space that is REALLY visible below
+    // its own top edge. A CSS height (100vh minus a guessed header height)
+    // always ends up too tall, so the bottom of the scroll area sat behind the
+    // browser bar and the fixed Run bar and the last section couldn't be
+    // reached. Measuring the actual top edge fixes that for every phone.
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [fitHeight, setFitHeight] = useState<number | null>(null);
+    useEffect(() => {
+        const measure = () => {
+            const el = rootRef.current;
+            if (!el || window.innerWidth > 900) {
+                setFitHeight(null);
+                return;
+            }
+            const vh = window.visualViewport?.height ?? window.innerHeight;
+            const top = el.getBoundingClientRect().top;
+            setFitHeight(Math.max(240, Math.floor(vh - top)));
+        };
+        measure();
+        const t = window.setTimeout(measure, 300);
+        window.addEventListener('resize', measure);
+        window.addEventListener('orientationchange', measure);
+        window.visualViewport?.addEventListener('resize', measure);
+        return () => {
+            window.clearTimeout(t);
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('orientationchange', measure);
+            window.visualViewport?.removeEventListener('resize', measure);
+        };
+    }, []);
     const reservedWidth = isDesktop
         ? run_panel.is_drawer_open
             ? DESKTOP_DRAWER_OPEN_WIDTH
@@ -304,8 +335,13 @@ const EpmAnalysisTool = observer(() => {
 
     return (
         <div
+            ref={rootRef}
             className='epm-analysis-tool'
-            style={{ width: `calc(100% - ${reservedWidth}px)`, transition: 'width 0.3s ease' }}
+            style={{
+                width: `calc(100% - ${reservedWidth}px)`,
+                transition: 'width 0.3s ease',
+                ...(fitHeight !== null ? { height: `${fitHeight}px` } : {}),
+            }}
         >
             <div className='epm-analysis-tool__bg' aria-hidden='true'>
                 {FLOATING_DIGITS.map((d, i) => (
