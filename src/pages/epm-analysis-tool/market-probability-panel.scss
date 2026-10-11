@@ -3,7 +3,10 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-    flex: 1 1 240px;
+    flex: none;
+    width: 280px;
+    max-width: 100%;
+    min-height: 150px;
     padding: 2px 0;
 
     &__price {
@@ -192,7 +195,7 @@
        table vanished until the panel was closed. It now stays visible at those
        widths (the parent wraps it under the scan button if it's really tight)
        and is only dropped on a truly tiny container, i.e. a phone. */
-    @container (max-width: 340px) {
+    @container (max-width: 300px) {
         display: none;
     }
 }

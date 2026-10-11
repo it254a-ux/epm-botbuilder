@@ -325,25 +325,28 @@
     }
 
     &__panel-bottom-left {
-        display: flex;
-        /* If the scan button and the price/probability section can't sit side by
-           side (e.g. the Run panel is open and this area is only ~470px wide),
-           the section drops underneath instead of being hidden. */
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 14px 22px;
+        /* Two FIXED columns: scan controls on the left, the price/probability
+           section on the right. Neither column depends on the other's content,
+           so the probability section never moves, wraps or resizes while the
+           scan progress / "N ticks buffered" text changes or the Run panel
+           opens and closes. */
+        display: grid;
+        grid-template-columns: 160px minmax(0, 280px);
+        align-items: start;
+        gap: 14px;
         min-width: 0;
         container-type: inline-size;
 
         @media (max-width: 700px) {
-            flex-direction: column;
-            flex-wrap: nowrap;
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 
     &__scan-status {
-        flex: 0 0 auto;
         min-width: 0;
+        width: 100%;
+        overflow: hidden;
+        overflow-wrap: anywhere;
     }
 
     &__scan-row {
