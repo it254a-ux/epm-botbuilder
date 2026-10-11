@@ -179,7 +179,9 @@
            couple of characters or a 1-2 digit number -- half the old width */
         > div:nth-child(n + 3) {
             flex: 0.5 1 0;
-            min-width: 70px;
+            /* 85px (was 70px): at 70px a value like "Under 2" plus the dropdown
+               arrow was cut to "Und..." whenever the Run panel narrowed the row */
+            min-width: 85px;
             max-width: 85px;
         }
 
@@ -324,13 +326,18 @@
 
     &__panel-bottom-left {
         display: flex;
+        /* If the scan button and the price/probability section can't sit side by
+           side (e.g. the Run panel is open and this area is only ~470px wide),
+           the section drops underneath instead of being hidden. */
+        flex-wrap: wrap;
         align-items: flex-start;
-        gap: 22px;
+        gap: 14px 22px;
         min-width: 0;
         container-type: inline-size;
 
         @media (max-width: 700px) {
             flex-direction: column;
+            flex-wrap: nowrap;
         }
     }
 
