@@ -7,12 +7,35 @@ import './risk-disclaimer.scss';
 let dismissed = false;
 
 /**
- * Risk disclaimer shown on every page load/refresh, as the first thing on landing.
+ * Risk disclaimer shown on every page load/refresh, 2s after the dashboard is fully loaded and stable.
  * Not shown on the OAuth callback page, and not again after "Okay"
  * until the page is refreshed.
  */
 const RiskDisclaimer = () => {
-    const [open, setOpen] = useState(() => window.location.pathname !== '/callback' && !dismissed);
+    const [open, setOpen] = useState(false);
+
+    // Wait until the app has fully loaded and the page has been visible and
+    // stable (no loading screen anywhere) for 2 seconds, then show the popup.
+    useEffect(() => {
+        if (dismissed || window.location.pathname === '/callback') return;
+        const STABLE_MS = 2000;
+        const TICK_MS = 200;
+        const MAX_WAIT_MS = 25000;
+        const isLoading = () =>
+            document.readyState !== 'complete' ||
+            !!document.querySelector('.load-message, .chunk-loader, .epm-splash, .epm-splash-root');
+        let stable = 0;
+        let waited = 0;
+        const id = window.setInterval(() => {
+            waited += TICK_MS;
+            stable = isLoading() ? 0 : stable + TICK_MS;
+            if (stable >= STABLE_MS || waited >= MAX_WAIT_MS) {
+                window.clearInterval(id);
+                if (!dismissed) setOpen(true);
+            }
+        }, TICK_MS);
+        return () => window.clearInterval(id);
+    }, []);
 
     useEffect(() => {
         if (!open) return;
