@@ -269,3 +269,36 @@
         }
     }
 }
+
+/* Compact layout used inside the TradingView tab's right-hand panel */
+.forex-trader--panel {
+    height: 100%;
+    padding: 8px;
+    gap: 6px;
+    font-size: 12px;
+
+    @media (max-width: 900px) {
+        height: 100%;
+    }
+
+    .forex-trader__controls {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+
+        label:nth-child(1),
+        label:nth-child(4),
+        .forex-trader__analyse-btn {
+            grid-column: 1 / -1;
+        }
+    }
+
+    .forex-trader__chart-wrap {
+        flex: none;
+        height: 250px;
+        min-height: 250px;
+    }
+
+    .forex-trader__grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

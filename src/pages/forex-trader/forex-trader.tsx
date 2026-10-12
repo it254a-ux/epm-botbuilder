@@ -67,7 +67,7 @@ const fmtTime = (t: number) => {
     return `${d.toUTCString().slice(5, 11)} ${d.toISOString().slice(11, 16)} GMT`;
 };
 
-const ForexTrader = () => {
+const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     const [symbol, setSymbol] = useState('R_25');
@@ -90,7 +90,7 @@ const ForexTrader = () => {
     useEffect(() => {
         const measure = () => {
             const el = rootRef.current;
-            if (!el || window.innerWidth > 900) return setFitHeight(null);
+            if (variant === 'panel' || !el || window.innerWidth > 900) return setFitHeight(null);
             const vh = window.visualViewport?.height ?? window.innerHeight;
             setFitHeight(Math.max(320, Math.floor(vh - el.getBoundingClientRect().top)));
         };
@@ -105,7 +105,7 @@ const ForexTrader = () => {
             window.removeEventListener('orientationchange', measure);
             window.visualViewport?.removeEventListener('resize', measure);
         };
-    }, []);
+    }, [variant]);
 
     // ---- markets list
     useEffect(() => {
@@ -305,7 +305,7 @@ const ForexTrader = () => {
     return (
         <div
             ref={rootRef}
-            className='forex-trader'
+            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             <div className='forex-trader__controls'>
@@ -383,7 +383,7 @@ const ForexTrader = () => {
                         Market closed — no live analysis. Pick an open market (Derived indices run all week).
                     </div>
                 )}
-                {pos && (
+                {pos && variant !== 'panel' && (
                     <button
                         type='button'
                         className={`forex-trader__float${canAnalyse ? '' : ' is-disabled'}`}

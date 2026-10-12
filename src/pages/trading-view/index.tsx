@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useStore } from '@/hooks/useStore';
 import TradingViewComponent from '@/components/trading-view-chart/trading-view';
 import { useDevice } from '@deriv-com/ui';
 import './trading-view-page.scss';
@@ -38,16 +37,14 @@ const CROP_TOP = 72;
 // bottom sheet on mobile/tablet, not a side panel, so there's nothing to
 // share width with there.
 const DESKTOP_DRAWER_OPEN_WIDTH = 366;
-const DESKTOP_DRAWER_CLOSED_WIDTH = 16; // the toggler sliver, always present
 
 function TradingViewPageComponent() {
     const page_ref = useRef<HTMLDivElement | null>(null);
     const [height, setHeight] = useState<number | undefined>(undefined);
-    const { run_panel } = useStore();
     const { isDesktop } = useDevice();
-    const { is_drawer_open } = run_panel;
 
-    const reserved_width = isDesktop ? (is_drawer_open ? DESKTOP_DRAWER_OPEN_WIDTH : DESKTOP_DRAWER_CLOSED_WIDTH) : 0;
+    // The right-hand panel on this tab is the Forex Trader tool (always open on desktop).
+    const reserved_width = isDesktop ? DESKTOP_DRAWER_OPEN_WIDTH : 0;
 
     const update = () => {
         const el = page_ref.current;

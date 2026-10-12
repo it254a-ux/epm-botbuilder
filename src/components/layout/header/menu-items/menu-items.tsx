@@ -79,11 +79,6 @@ const PINNED_OVERFLOW_ITEMS = [
         label: <Localize i18n_default_text='TradingView' />,
     },
     {
-        tab: DBOT_TABS.FOREX_TRADER,
-        icon: <span className='app-header__menu-item-emoji'>⚡</span>,
-        label: <Localize i18n_default_text='Forex Trader' />,
-    },
-    {
         tab: DBOT_TABS.TUTORIAL,
         icon: <LegacyGuide1pxIcon height='12px' width='12px' fill='currentColor' />,
         label: <Localize i18n_default_text='Tutorials' />,
