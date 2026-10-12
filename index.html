@@ -12,6 +12,17 @@
         -->
         <link rel="preconnect" href="https://charts.deriv.com" crossorigin />
         <link rel="dns-prefetch" href="https://charts.deriv.com" />
+        <!-- Start the site-settings lookup while the HTML/JS is still downloading
+             (the app can't draw anything until it answers). Skipped when this
+             tab already has a cached answer, so there is no wasted request. -->
+        <script>
+            (function () {
+                try { if (sessionStorage.getItem('epm_site_settings_cache_v1')) return; } catch (e) {}
+                var l = document.createElement('link');
+                l.rel = 'preload'; l.as = 'fetch'; l.href = '/api/site-settings'; l.crossOrigin = 'anonymous';
+                document.head.appendChild(l);
+            })();
+        </script>
         <!-- Google Tag Manager -->
         <script>
             (function (w, d, s, l, i) {
@@ -98,7 +109,16 @@
                     var v = document.createElement('video');
                     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto';
                     v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-                    v.src = '/splash/' + set + '-' + n + '.mp4';
+                    v.preload = 'none';
+                    var startVideo = function () {
+                        v.preload = 'auto';
+                        v.src = '/splash/' + set + '-' + n + '.mp4';
+                        var pr2 = v.play(); if (pr2 && pr2.catch) pr2.catch(function () {});
+                    };
+                    // Poster shows instantly; the video only starts downloading once the
+                    // page's scripts have loaded, so it never slows the app down.
+                    if (document.readyState === 'complete') startVideo();
+                    else window.addEventListener('load', startVideo);
                     v.addEventListener('playing', function () { v.className = 'on'; });
                     bg.appendChild(v);
                     bg.appendChild(document.createElement('i'));
@@ -106,7 +126,6 @@
                     var msgEl = bg.querySelector('.epm-splash__msg');
                     document.body.insertBefore(bg, document.body.firstChild);
                     document.body.classList.add('epm-has-video');
-                    var pr = v.play(); if (pr && pr.catch) pr.catch(function () {});
 
                     // Remove the layer once no loading screen is on the page any more.
                     var gone = null, started = false, done = false;
