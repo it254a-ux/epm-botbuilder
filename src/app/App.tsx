@@ -5,6 +5,7 @@ import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } 
 import { cleanupUrl, handleOAuthCallback } from '@/external/deriv-core';
 import ChunkLoader from '@/components/loader/chunk-loader';
 import LocalStorageSyncWrapper from '@/components/localStorage-sync-wrapper';
+import RiskDisclaimer from '@/components/risk-disclaimer';
 import RoutePromptDialog from '@/components/route-prompt-dialog';
 import { useAccountSwitching } from '@/hooks/useAccountSwitching';
 import { useLanguageFromURL } from '@/hooks/useLanguageFromURL';
@@ -50,6 +51,7 @@ const router = createBrowserRouter(
                         <LanguageHandler>
                             <StoreProvider>
                                 <LocalStorageSyncWrapper>
+                                    <RiskDisclaimer />
                                     <RoutePromptDialog />
                                     <CoreStoreProvider>
                                         <Layout />
