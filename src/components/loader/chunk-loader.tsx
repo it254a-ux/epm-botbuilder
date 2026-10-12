@@ -1,11 +1,9 @@
-import SplashVideo from './splash-video';
 import './epm-splash.scss';
 
 export default function ChunkLoader({ message }: { message: string }) {
     return (
         <div className='app-root app-root--splash'>
             <div className='epm-splash' role='status' aria-live='polite'>
-                <SplashVideo />
                 <div className='epm-splash__mark' aria-hidden='true'>
                     <span className='epm-splash__glow' />
                     <span className='epm-splash__ring' />
