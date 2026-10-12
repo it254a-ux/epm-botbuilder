@@ -14,9 +14,9 @@
     &__card {
         position: relative;
         width: 100%;
-        max-width: 500px;
-        padding: 36px 28px 28px;
-        border-radius: 22px;
+        max-width: 380px;
+        padding: 24px 20px 20px;
+        border-radius: 18px;
         overflow: hidden;
         text-align: center;
         color: #e8f1f6;
@@ -55,9 +55,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 68px;
-        height: 68px;
-        margin: 0 auto 14px;
+        width: 50px;
+        height: 50px;
+        margin: 0 auto 10px;
         border-radius: 50%;
         color: #ffd27a;
         background: radial-gradient(circle at 30% 25%, rgba(255, 210, 122, 0.3), rgba(26, 155, 184, 0.15));
@@ -69,7 +69,7 @@
     &__title {
         position: relative;
         margin: 0;
-        font-size: 22px;
+        font-size: 17px;
         font-weight: 800;
         letter-spacing: 0.4px;
         background: linear-gradient(90deg, #ffffff, #8fe3f5);
@@ -79,29 +79,29 @@
     }
 
     &__rule {
-        width: 56px;
-        height: 3px;
-        margin: 12px auto 16px;
+        width: 44px;
+        height: 2px;
+        margin: 8px auto 12px;
         border-radius: 3px;
         background: linear-gradient(90deg, #1a9bb8, #f5b93c);
     }
 
     &__text {
         position: relative;
-        margin: 0 0 26px;
-        font-size: 14.5px;
-        line-height: 1.7;
+        margin: 0 0 18px;
+        font-size: 12.5px;
+        line-height: 1.55;
         color: #c3d3dd;
     }
 
     &__btn {
         position: relative;
         width: 100%;
-        height: 48px;
+        height: 40px;
         border: 0;
         border-radius: 999px;
         color: #fff;
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 700;
         letter-spacing: 0.4px;
         cursor: pointer;
@@ -121,10 +121,10 @@
 
     @media (max-width: 480px) {
         &__card {
-            padding: 30px 20px 22px;
+            padding: 20px 16px 16px;
         }
         &__text {
-            font-size: 13.5px;
+            font-size: 12px;
         }
     }
 }
