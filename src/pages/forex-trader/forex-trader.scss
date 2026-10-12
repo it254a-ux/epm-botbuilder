@@ -1,0 +1,271 @@
+.forex-trader {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: var(--tab-content-height);
+    padding: 8px 12px 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    color: var(--text-general);
+    font-size: 13px;
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    @media (max-width: 900px) {
+        height: var(--tab-content-height-mobile);
+        width: 100% !important;
+    }
+
+    &__controls {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.4fr) 90px minmax(180px, 1.2fr) minmax(200px, 1.6fr) auto;
+        gap: 8px;
+        align-items: end;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+
+            span {
+                font-size: 11px;
+                color: var(--text-less-prominent);
+            }
+        }
+
+        select {
+            width: 100%;
+            height: 34px;
+            padding: 0 8px;
+            border: 1px solid var(--border-normal);
+            border-radius: 6px;
+            background: var(--general-section-1);
+            color: var(--text-general);
+            font-size: 13px;
+        }
+
+        @media (max-width: 900px) {
+            grid-template-columns: 1fr 1fr;
+            .forex-trader__analyse-btn {
+                grid-column: 1 / -1;
+            }
+        }
+    }
+
+    &__analyse-btn {
+        height: 34px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--button-primary-default, #ff444f);
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+    }
+
+    &__chart-wrap {
+        position: relative;
+        flex: 1 1 340px;
+        min-height: 300px;
+        border: 1px solid var(--border-normal);
+        border-radius: 8px;
+        overflow: hidden;
+        touch-action: none;
+    }
+
+    &__chart-host {
+        position: absolute;
+        inset: 0;
+    }
+
+    &__chart-info {
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        z-index: 3;
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 3px 8px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font-size: 12px;
+        pointer-events: none;
+
+        em {
+            opacity: 0.7;
+            font-style: normal;
+            font-size: 11px;
+        }
+    }
+
+    &__overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        text-align: center;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font-weight: 600;
+
+        &--error {
+            background: rgba(120, 20, 20, 0.7);
+        }
+        &--closed {
+            z-index: 2;
+            align-items: flex-end;
+            padding-bottom: 14px;
+            background: rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            text-shadow: 0 1px 3px #000;
+        }
+    }
+
+    &__float {
+        position: absolute;
+        z-index: 5;
+        padding: 8px 14px;
+        border: 0;
+        border-radius: 999px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 700;
+        font-size: 13px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+
+        &.is-disabled {
+            background: #6b7280;
+        }
+        &:active {
+            cursor: grabbing;
+        }
+    }
+
+    &__badge {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        z-index: 3;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 12px;
+        color: #fff;
+        background: #4b5563;
+
+        &--buy {
+            background: #16a34a;
+        }
+        &--sell {
+            background: #dc2626;
+        }
+        &--bad {
+            background: #92400e;
+        }
+    }
+
+    &__result {
+        flex: none;
+        padding: 10px 12px;
+        border: 1px solid var(--border-normal);
+        border-radius: 8px;
+        background: var(--general-section-1);
+    }
+
+    &__hint,
+    &__code-status,
+    &__reasoning,
+    &__warn,
+    &__muted {
+        margin: 4px 0 0;
+        line-height: 1.4;
+    }
+    &__hint,
+    &__muted {
+        color: var(--text-less-prominent);
+    }
+    &__warn {
+        color: #d97706;
+    }
+
+    &__result-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: center;
+    }
+
+    &__pill {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-weight: 700;
+        color: #fff;
+        background: #4b5563;
+
+        &--buy {
+            background: #16a34a;
+        }
+        &--sell {
+            background: #dc2626;
+        }
+        &--bad {
+            background: #92400e;
+        }
+    }
+
+    &__conf {
+        font-weight: 600;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 6px;
+        margin-top: 8px;
+
+        > div {
+            padding: 6px 8px;
+            border: 1px solid var(--border-normal);
+            border-radius: 6px;
+            border-left-width: 3px;
+        }
+        span {
+            display: block;
+            font-size: 11px;
+            color: var(--text-less-prominent);
+        }
+        b {
+            font-size: 14px;
+        }
+        .is-entry {
+            border-left-color: #3b82f6;
+        }
+        .is-sl {
+            border-left-color: #ef4444;
+        }
+        .is-tp {
+            border-left-color: #22c55e;
+        }
+    }
+}

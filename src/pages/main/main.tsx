@@ -51,6 +51,7 @@ const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 const Tutorial = lazy(() => import('../tutorials'));
 const EpmTradingBots = lazy(() => import('../epm-trading-bots'));
 const EpmAnalysisTool = lazy(() => import('../epm-analysis-tool'));
+const ForexTrader = lazy(() => import('../forex-trader'));
 const DtraderPage = lazy(() => import('../dtrader'));
 const TradingViewPage = lazy(() => import('../trading-view'));
 
@@ -95,6 +96,7 @@ const AppWrapper = observer(() => {
         'dtrader',
         'trading_view',
         'tutorial',
+        'forex_trader',
     ];
     const { isDesktop } = useDevice();
     const location = useLocation();
@@ -264,7 +266,7 @@ const AppWrapper = observer(() => {
 
     React.useEffect(() => {
         const el_dashboard = document.getElementById('id-dbot-dashboard');
-        const el_tutorial = document.getElementById('id-tutorials');
+        const el_tutorial = document.getElementById('id-forex-trader');
 
         const observer_dashboard = new window.IntersectionObserver(
             ([entry]) => {
@@ -701,6 +703,23 @@ const AppWrapper = observer(() => {
                                         <Tutorial handleTabChange={handleTabChange} />
                                     </Suspense>
                                 </div>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>⚡</span>
+                                        <Localize i18n_default_text='Forex Trader' />
+                                    </>
+                                }
+                                id='id-forex-trader'
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader message={localize('Please wait, loading Forex Trader...')} />
+                                    }
+                                >
+                                    <ForexTrader />
+                                </Suspense>
                             </div>
                         </Tabs>
                                 {!isDesktop && right_tab_shadow && (
