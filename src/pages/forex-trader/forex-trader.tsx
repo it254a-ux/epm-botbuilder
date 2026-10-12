@@ -62,6 +62,38 @@ function codeStatus(a: Analysis): AiResult['status'] {
     }
 }
 
+interface CheckItem {
+    label: string;
+    state: 'yes' | 'no' | 'wait';
+}
+
+function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
+    const swept = !!a.sweep;
+    const live = a.state === 'ready';
+    const items: CheckItem[] = [
+        { label: 'Market is open', state: marketClosed ? 'no' : 'yes' },
+        { label: 'Reference range found', state: a.range ? 'yes' : 'no' },
+        {
+            label: 'Range edge swept (price pushed through it)',
+            state: swept || a.state === 'sweep_in_progress' ? 'yes' : 'wait',
+        },
+        { label: 'A candle closed back inside the range', state: swept ? 'yes' : 'wait' },
+    ];
+    if (a.plan) {
+        items.push({
+            label: `Reward at least equal to risk (1 : ${a.plan.rr.toFixed(2)})`,
+            state: a.plan.rr >= 1 ? 'yes' : 'no',
+        });
+        items.push({
+            label: 'Setup still fresh (stop and target not hit, not expired)',
+            state: live ? 'yes' : 'no',
+        });
+    } else {
+        items.push({ label: 'Entry, stop loss and take profit confirmed', state: 'wait' });
+    }
+    return items;
+}
+
 const fmtTime = (t: number) => {
     const d = new Date(t * 1000);
     return `${d.toUTCString().slice(5, 11)} ${d.toISOString().slice(11, 16)} GMT`;
@@ -253,6 +285,8 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                             lastPrice: analysis.lastPrice,
                             atr: analysis.atr,
                             warnings: analysis.warnings,
+                            plannedTrades: analysis.watch,
+                            session: analysis.sessionNow,
                         },
                     }),
                 });
@@ -417,48 +451,145 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                 {status && STATUS_TEXT[status]}
                             </span>
                             {outcome.ai && <span className='forex-trader__conf'>Confidence {outcome.ai.confidence}%</span>}
-                            <span className='forex-trader__muted'>
-                                {outcome.analysis.strategyName} · {fmtTime(Math.floor(outcome.at / 1000))}
-                            </span>
                         </div>
                         {status && STATUS_TEXT[status] !== outcome.analysis.statusText && (
                             <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
                         )}
-                        {outcome.analysis.range && (
-                            <div className='forex-trader__grid'>
-                                <div>
-                                    <span>Range high</span>
-                                    <b>{fmt(outcome.analysis.range.high)}</b>
+
+                        <h4 className='forex-trader__h'>Setup details</h4>
+                        <dl className='forex-trader__facts'>
+                            <dt>Strategy</dt>
+                            <dd>{outcome.analysis.strategyName}</dd>
+                            <dt>Market</dt>
+                            <dd>{info?.underlying_symbol_name ?? symbol}</dd>
+                            <dt>Trade timeframe</dt>
+                            <dd>
+                                {TIMEFRAMES.find(t => t.sec === tf)?.label} candles (enter on a candle close)
+                            </dd>
+                            <dt>Session now</dt>
+                            <dd>
+                                {outcome.analysis.sessionNow}
+                                {outcome.analysis.lastCandleTime ? ` · ${fmtTime(outcome.analysis.lastCandleTime)}` : ''}
+                            </dd>
+                            {outcome.analysis.lastPrice !== null && (
+                                <>
+                                    <dt>Price now</dt>
+                                    <dd>{fmt(outcome.analysis.lastPrice)}</dd>
+                                </>
+                            )}
+                            {outcome.analysis.range && (
+                                <>
+                                    <dt>Reference range</dt>
+                                    <dd>
+                                        {outcome.analysis.range.label} High {fmt(outcome.analysis.range.high)} · Low{' '}
+                                        {fmt(outcome.analysis.range.low)}
+                                    </dd>
+                                    <dt>Range measured</dt>
+                                    <dd>
+                                        {fmtTime(outcome.analysis.range.startTime)} →{' '}
+                                        {fmtTime(outcome.analysis.range.endTime)}
+                                        {outcome.analysis.range.note ? ` (${outcome.analysis.range.note})` : ''}
+                                    </dd>
+                                </>
+                            )}
+                            {outcome.analysis.sweep && (
+                                <>
+                                    <dt>Sweep</dt>
+                                    <dd>
+                                        {outcome.analysis.sweep.side === 'high' ? 'High' : 'Low'} swept to{' '}
+                                        {fmt(outcome.analysis.sweep.extreme)}, closed back inside{' '}
+                                        {fmtTime(outcome.analysis.sweep.confirmTime)}
+                                    </dd>
+                                </>
+                            )}
+                            {outcome.analysis.candlesLeft !== null && outcome.analysis.state === 'ready' && (
+                                <>
+                                    <dt>Valid for</dt>
+                                    <dd>
+                                        about {outcome.analysis.candlesLeft} more candles (
+                                        {Math.round((outcome.analysis.candlesLeft * tf) / 60)} min)
+                                    </dd>
+                                </>
+                            )}
+                        </dl>
+
+                        {plan && (
+                            <>
+                                <h4 className='forex-trader__h'>Trade plan ({plan.side})</h4>
+                                <div className='forex-trader__grid'>
+                                    <div className='is-entry'>
+                                        <span>Entry</span>
+                                        <b>{fmt(plan.entry)}</b>
+                                    </div>
+                                    <div className='is-sl'>
+                                        <span>Stop loss</span>
+                                        <b>{fmt(plan.stopLoss)}</b>
+                                    </div>
+                                    <div className='is-tp'>
+                                        <span>Take profit</span>
+                                        <b>{fmt(plan.takeProfit)}</b>
+                                    </div>
+                                    <div>
+                                        <span>Risk : Reward</span>
+                                        <b>1 : {plan.rr.toFixed(2)}</b>
+                                    </div>
+                                    <div>
+                                        <span>Risk (price)</span>
+                                        <b>{fmt(plan.risk)}</b>
+                                    </div>
+                                    <div>
+                                        <span>Midpoint</span>
+                                        <b>{fmt(plan.midpoint)}</b>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span>Range low</span>
-                                    <b>{fmt(outcome.analysis.range.low)}</b>
-                                </div>
-                                {plan && (
-                                    <>
-                                        <div className='is-entry'>
-                                            <span>Entry ({plan.side})</span>
-                                            <b>{fmt(plan.entry)}</b>
-                                        </div>
-                                        <div className='is-sl'>
-                                            <span>Stop loss</span>
-                                            <b>{fmt(plan.stopLoss)}</b>
-                                        </div>
-                                        <div className='is-tp'>
-                                            <span>Take profit</span>
-                                            <b>{fmt(plan.takeProfit)}</b>
-                                        </div>
-                                        <div>
-                                            <span>Risk : Reward</span>
-                                            <b>1 : {plan.rr.toFixed(2)}</b>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                            </>
                         )}
-                        {outcome.analysis.range?.note && (
-                            <p className='forex-trader__muted'>{outcome.analysis.range.note}</p>
+
+                        {outcome.analysis.watch && outcome.analysis.range && (
+                            <>
+                                <h4 className='forex-trader__h'>Planned trades (dashed lines, not active yet)</h4>
+                                <p className='forex-trader__muted'>
+                                    Price is closer to the {outcome.analysis.watch.nearest === 'sell' ? 'HIGH' : 'LOW'}, so
+                                    that side is the one to watch first.
+                                </p>
+                                {([outcome.analysis.watch.sell, outcome.analysis.watch.buy] as const).map(sc => (
+                                    <div
+                                        key={sc.side}
+                                        className={`forex-trader__scenario forex-trader__scenario--${sc.side === 'SELL' ? 'sell' : 'buy'}${
+                                            (sc.side === 'SELL') === (outcome.analysis.watch!.nearest === 'sell') ? ' is-near' : ''
+                                        }`}
+                                    >
+                                        <b>
+                                            If the {sc.side === 'SELL' ? 'HIGH' : 'LOW'} is swept → {sc.side}
+                                        </b>
+                                        <ol>
+                                            <li>
+                                                Price pushes {sc.side === 'SELL' ? 'above' : 'below'} {fmt(sc.trigger)}
+                                            </li>
+                                            <li>A {TIMEFRAMES.find(t => t.sec === tf)?.label} candle closes back inside the range</li>
+                                            <li>
+                                                Enter {sc.side} near {fmt(sc.entry)}, stop loss {fmt(sc.stopLoss)} (beyond the
+                                                sweep), take profit {fmt(sc.takeProfit)}
+                                            </li>
+                                        </ol>
+                                        <span className='forex-trader__muted'>
+                                            RR about 1 : {sc.rr.toFixed(2)} · price is {fmt(sc.distance)} away
+                                            {sc.distanceAtr !== null ? ` (${sc.distanceAtr.toFixed(1)}× average candle size)` : ''}
+                                        </span>
+                                    </div>
+                                ))}
+                            </>
                         )}
+
+                        <h4 className='forex-trader__h'>Before you enter</h4>
+                        <ul className='forex-trader__check'>
+                            {checklist(outcome.analysis, closed).map(c => (
+                                <li key={c.label} className={`is-${c.state}`}>
+                                    <span>{c.state === 'yes' ? '✔' : c.state === 'no' ? '✖' : '○'}</span> {c.label}
+                                </li>
+                            ))}
+                        </ul>
+
                         {outcome.ai?.reasoning && <p className='forex-trader__reasoning'>{outcome.ai.reasoning}</p>}
                         {[...(outcome.analysis.warnings ?? []), ...(outcome.ai?.warnings ?? [])].map((w, i) => (
                             <p key={i} className='forex-trader__warn'>
@@ -470,6 +601,9 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                 AI review unavailable: {outcome.aiError} Showing the code-calculated result only.
                             </p>
                         )}
+                        <p className='forex-trader__muted'>
+                            Analysed {fmtTime(Math.floor(outcome.at / 1000))}. Signals only: no strategy wins every time.
+                        </p>
                     </>
                 )}
             </div>

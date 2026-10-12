@@ -302,3 +302,80 @@
         grid-template-columns: 1fr 1fr;
     }
 }
+
+.forex-trader__h {
+    margin: 12px 0 4px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-less-prominent);
+}
+
+.forex-trader__facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 3px 10px;
+    margin: 0;
+
+    dt {
+        color: var(--text-less-prominent);
+    }
+    dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+.forex-trader__scenario {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-normal);
+    border-left-width: 4px;
+    border-radius: 6px;
+    opacity: 0.85;
+
+    &--sell {
+        border-left-color: #dc2626;
+    }
+    &--buy {
+        border-left-color: #16a34a;
+    }
+    &.is-near {
+        opacity: 1;
+        background: rgba(37, 99, 235, 0.08);
+    }
+    ol {
+        margin: 4px 0 4px 18px;
+        padding: 0;
+        line-height: 1.45;
+    }
+}
+
+.forex-trader__check {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+        display: flex;
+        gap: 8px;
+        padding: 2px 0;
+        line-height: 1.4;
+    }
+    .is-yes span {
+        color: #16a34a;
+    }
+    .is-no span {
+        color: #dc2626;
+    }
+    .is-wait span {
+        color: var(--text-less-prominent);
+    }
+}
+
+.forex-trader--panel .forex-trader__chart-wrap {
+    height: 290px;
+    min-height: 290px;
+}

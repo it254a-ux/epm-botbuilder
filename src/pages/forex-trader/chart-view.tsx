@@ -57,6 +57,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const linesRef = useRef<IPriceLine[]>([]);
     const extraRef = useRef<ISeriesApi<'Line'>[]>([]);
+    const levelsRef = useRef<{ min: number; max: number } | null>(null);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -86,6 +87,21 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             wickUpColor: '#22c55e',
             wickDownColor: '#ef4444',
         });
+        // Keep every drawn level (SL/TP, planned lines) inside the visible price range.
+        series.applyOptions({
+            autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null; margins?: unknown } | null) => {
+                const res = original();
+                const lv = levelsRef.current;
+                if (!res || !res.priceRange || !lv) return res;
+                return {
+                    ...res,
+                    priceRange: {
+                        minValue: Math.min(res.priceRange.minValue, lv.min),
+                        maxValue: Math.max(res.priceRange.maxValue, lv.max),
+                    },
+                };
+            },
+        } as never);
         chartRef.current = chart;
         seriesRef.current = series;
 
@@ -118,6 +134,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         if (chart) extraRef.current.forEach(s => chart.removeSeries(s));
         extraRef.current = [];
         series?.setMarkers([]);
+        levelsRef.current = null;
     };
 
     useImperativeHandle(ref, () => ({
@@ -172,8 +189,17 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                         extraRef.current.push(s);
                     }
                 }
-                addLine(r.high, `${label} High`, COLORS.range, true, 1);
-                addLine(r.low, `${label} Low`, COLORS.range, true, 1);
+                if (analysis.watch) {
+                    // Nothing has triggered yet: each range edge doubles as an entry for one
+                    // direction and the target for the other, so the labels say both.
+                    addLine(r.high, `${label} High · Sell entry / Buy TP`, COLORS.range, true, 1);
+                    addLine(r.low, `${label} Low · Buy entry / Sell TP`, COLORS.range, true, 1);
+                    addLine(analysis.watch.sell.stopLoss, 'Sell SL (if High swept)', COLORS.sl, true, 1);
+                    addLine(analysis.watch.buy.stopLoss, 'Buy SL (if Low swept)', COLORS.sl, true, 1);
+                } else {
+                    addLine(r.high, `${label} High`, COLORS.range, true, 1);
+                    addLine(r.low, `${label} Low`, COLORS.range, true, 1);
+                }
             }
             if (analysis.sweep) {
                 const sw = analysis.sweep;
@@ -193,6 +219,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 addLine(p.stopLoss, 'SL', COLORS.sl);
                 addLine(p.takeProfit, 'TP', COLORS.tp);
                 addLine(p.midpoint, 'Mid', COLORS.mid, true, 1);
+            }
+
+            // make autoscale include all levels
+            const lv: number[] = [];
+            if (analysis.range) lv.push(analysis.range.high, analysis.range.low);
+            if (analysis.plan) lv.push(analysis.plan.entry, analysis.plan.stopLoss, analysis.plan.takeProfit);
+            if (analysis.watch) lv.push(analysis.watch.sell.stopLoss, analysis.watch.buy.stopLoss);
+            if (lv.length) {
+                const span = Math.max(...lv) - Math.min(...lv);
+                levelsRef.current = { min: Math.min(...lv) - span * 0.04, max: Math.max(...lv) + span * 0.04 };
             }
 
             // Frame the range and the move after it.

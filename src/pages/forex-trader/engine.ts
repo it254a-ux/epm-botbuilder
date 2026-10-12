@@ -59,6 +59,29 @@ export interface TradePlan {
     rr: number;
 }
 
+/** A trade that does not exist yet: what the plan would be IF that side of the range gets swept. */
+export interface Scenario {
+    side: Side;
+    /** The range edge price has to push through and then close back inside. */
+    trigger: number;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+    rr: number;
+    /** Distance from the last price to the trigger edge. */
+    distance: number;
+    distanceAtr: number | null;
+}
+
+export interface WatchPlan {
+    /** If the HIGH is swept -> SELL. */
+    sell: Scenario;
+    /** If the LOW is swept -> BUY. */
+    buy: Scenario;
+    /** Which edge price is closer to right now. */
+    nearest: 'sell' | 'buy';
+}
+
 export interface Analysis {
     strategyId: SweepStrategyId;
     strategyName: string;
@@ -72,6 +95,15 @@ export interface Analysis {
     atr: number | null;
     warnings: string[];
     candlesAnalysed: number;
+    /** Planned (not active) trades, filled while waiting for or during a sweep. */
+    watch: WatchPlan | null;
+    /** Candles since the sweep closed back inside (confirmed setups only). */
+    candlesSince: number | null;
+    /** Candles left before a confirmed setup is treated as expired. */
+    candlesLeft: number | null;
+    /** UTC session names covering the last candle, e.g. "Asian". */
+    sessionNow: string;
+    lastCandleTime: number | null;
 }
 
 const DAY = 86400;
@@ -123,6 +155,44 @@ export function atr(candles: Candle[], period = 14): number | null {
         sum += Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
     }
     return sum / period;
+}
+
+export function sessionAt(t: number): string {
+    const h = new Date(t * 1000).getUTCHours();
+    if (h >= 0 && h < 7) return 'Asian';
+    if (h >= 7 && h < 12) return 'London';
+    if (h >= 12 && h < 16) return 'London / New York overlap';
+    if (h >= 16 && h < 21) return 'New York';
+    return 'Late New York / rollover';
+}
+
+function buildWatch(range: RefRange, lastPrice: number, atrValue: number | null, highExtreme?: number, lowExtreme?: number): WatchPlan {
+    const size = range.high - range.low;
+    const pad = (atrValue ?? size * 0.1) * 0.25;
+    const stretch = Math.max(atrValue ?? 0, size * 0.1) * 0.6; // typical sweep depth when nothing has swept yet
+    const sellStop = (highExtreme ?? range.high + stretch) + pad;
+    const buyStop = (lowExtreme ?? range.low - stretch) - pad;
+    const mk = (side: Side): Scenario => {
+        const sell = side === 'SELL';
+        const entry = sell ? range.high : range.low;
+        const stopLoss = sell ? sellStop : buyStop;
+        const takeProfit = sell ? range.low : range.high;
+        const risk = Math.abs(stopLoss - entry);
+        const distance = Math.abs(lastPrice - entry);
+        return {
+            side,
+            trigger: entry,
+            entry,
+            stopLoss,
+            takeProfit,
+            rr: risk > 0 ? Math.abs(entry - takeProfit) / risk : 0,
+            distance,
+            distanceAtr: atrValue ? distance / atrValue : null,
+        };
+    };
+    const sell = mk('SELL');
+    const buy = mk('BUY');
+    return { sell, buy, nearest: sell.distance <= buy.distance ? 'sell' : 'buy' };
 }
 
 function rangeFromWindow(
@@ -282,6 +352,11 @@ export function analyse(
         atr: atr(candles),
         warnings: [],
         candlesAnalysed: candles.length,
+        watch: null,
+        candlesSince: null,
+        candlesLeft: null,
+        sessionNow: candles.length ? sessionAt(candles[candles.length - 1].time) : '',
+        lastCandleTime: candles.length ? candles[candles.length - 1].time : null,
     };
     if (candles.length < 20) {
         base.warnings.push('Fewer than 20 candles loaded: not enough to analyse.');
@@ -302,6 +377,13 @@ export function analyse(
     const lastC = candles[candles.length - 1];
 
     if (!confirmed) {
+        out.watch = buildWatch(
+            range,
+            lastC.close,
+            base.atr,
+            inProgress?.side === 'high' ? inProgress.extreme : undefined,
+            inProgress?.side === 'low' ? inProgress.extreme : undefined
+        );
         if (inProgress) {
             out.state = 'sweep_in_progress';
             out.statusText = `${inProgress.side === 'high' ? range.label + ' High' : range.label + ' Low'} is being swept: waiting for a candle to close back inside`;
@@ -351,6 +433,8 @@ export function analyse(
         if (hitSL || hitTP) break;
     }
 
+    out.candlesSince = candlesSince;
+    out.candlesLeft = Math.max(0, SETUP_LIFETIME_CANDLES - candlesSince);
     if (hitSL) {
         out.state = 'invalidated';
         out.statusText = 'Setup invalidated: price went through the stop loss';
