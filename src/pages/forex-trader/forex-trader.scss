@@ -379,3 +379,22 @@
     height: 290px;
     min-height: 290px;
 }
+
+.forex-trader__live {
+    position: absolute;
+    right: 64px;
+    top: 8px;
+    z-index: 6;
+    padding: 3px 9px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+
+    &.is-on {
+        color: #22c55e;
+    }
+}

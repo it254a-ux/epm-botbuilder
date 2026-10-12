@@ -27,6 +27,10 @@ interface Outcome {
     analysis: Analysis;
     ai: AiResult | null;
     aiError: string | null;
+    /** The analysis state the AI answer belongs to; a different key means the AI answer is out of date. */
+    aiKey: string | null;
+    /** The state key of the analysis currently shown. */
+    key: string;
     at: number;
 }
 
@@ -108,9 +112,10 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
     const [strategyId, setStrategyId] = useState(1);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [busy, setBusy] = useState(false);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
     const [lastPrice, setLastPrice] = useState<number | null>(null);
+    const [live, setLive] = useState(true);
+    const [aiBusy, setAiBusy] = useState(false);
 
     const chartRef = useRef<ChartViewHandle>(null);
     const candlesRef = useRef<Candle[]>([]);
@@ -207,6 +212,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     }));
                     candlesRef.current = list;
                     chartRef.current?.setCandles(list);
+                    drawKey.current = '';
                     setLastPrice(list.length ? list[list.length - 1].close : null);
                     setLoading(false);
                 } else if (d.ohlc) {
@@ -223,6 +229,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     else if (!last || c.time > last.time) arr.push(c);
                     chartRef.current?.updateCandle(c);
                     setLastPrice(c.close);
+                    liveTick.current();
                 }
             }
         )
@@ -245,21 +252,64 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
 
     const categoryStrategies = STRATEGIES.filter(s => s.category === category);
     const strategy = STRATEGIES.find(s => s.id === strategyId);
-    const canAnalyse = !!strategy?.ready && !loading && !loadError && !closed && !busy && isConnected;
+    const canAnalyse = !!strategy?.ready && !loading && !loadError && !closed && !aiBusy && isConnected;
 
-    const runAnalysis = useCallback(async () => {
-        if (!strategy?.ready) return;
-        setBusy(true);
-        try {
-            // Only finished candles count: a candle still forming could change the result.
-            const now = Math.floor(Date.now() / 1000);
-            const closedCandles = candlesRef.current.filter(c => c.time + tf <= now);
-            const analysis = analyse(strategy.id as SweepStrategyId, closedCandles, kind);
+    // ---- live analysis -------------------------------------------------------
+    // The latest values, readable from the candle stream callback below without
+    // re-subscribing every time something changes.
+    const ctx = useRef({ strategy, tf, kind, info, symbol, live, closed });
+    ctx.current = { strategy, tf, kind, info, symbol, live, closed };
+    const outcomeRef = useRef<Outcome | null>(null);
+    outcomeRef.current = outcome;
+    const drawKey = useRef('');
+    const aiRun = useRef<{ lastCall: number; timer: number | null; lastKey: string }>({ lastCall: 0, timer: null, lastKey: '' });
+    const liveTick = useRef<() => void>(() => {});
+
+    const compute = () => {
+        const c = ctx.current;
+        if (!c.strategy?.ready) return null;
+        const now = Math.floor(Date.now() / 1000);
+        const all = candlesRef.current;
+        const closedCandles = all.filter(x => x.time + c.tf <= now);
+        const forming = all.find(x => x.time + c.tf > now) ?? null;
+        const analysis = analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming);
+        const lastClosed = closedCandles.length ? closedCandles[closedCandles.length - 1].time : 0;
+        // changes when the situation really changes: new closed candle, new state, new sweep
+        const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;
+        return { analysis, closedCandles, key };
+    };
+
+    const drawIfChanged = (analysis: Analysis, closedCandles: Candle[]) => {
+        const n = (v: number | undefined) => (v === undefined ? '' : v.toFixed(8));
+        const sig = [
+            analysis.state,
+            n(analysis.range?.high),
+            n(analysis.range?.low),
+            analysis.sweep?.confirmTime,
+            n(analysis.sweep?.extreme),
+            n(analysis.plan?.stopLoss),
+            n(analysis.watch?.sell.stopLoss),
+            n(analysis.watch?.buy.stopLoss),
+            closedCandles.length,
+        ].join('|');
+        if (sig !== drawKey.current) {
+            drawKey.current = sig;
             chartRef.current?.drawAnalysis(analysis, closedCandles);
-            // wait a frame so the lines are painted before the screenshot
-            await new Promise(r => requestAnimationFrame(() => r(null)));
-            const image = chartRef.current?.screenshot() ?? null;
+        }
+    };
 
+    const runAi = async () => {
+        const r = compute();
+        if (!r) return;
+        const { analysis, closedCandles, key } = r;
+        aiRun.current.lastKey = key;
+        aiRun.current.lastCall = Date.now();
+        setAiBusy(true);
+        try {
+            drawIfChanged(analysis, closedCandles);
+            await new Promise(res => requestAnimationFrame(() => res(null)));
+            const image = chartRef.current?.screenshot() ?? null;
+            const c = ctx.current;
             let ai: AiResult | null = null;
             let aiError: string | null = null;
             try {
@@ -269,10 +319,10 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     body: JSON.stringify({
                         image,
                         meta: {
-                            market: info?.underlying_symbol_name ?? symbol,
-                            symbol,
-                            timeframe: TIMEFRAMES.find(t => t.sec === tf)?.label,
-                            marketType: kind,
+                            market: c.info?.underlying_symbol_name ?? c.symbol,
+                            symbol: c.symbol,
+                            timeframe: TIMEFRAMES.find(t => t.sec === c.tf)?.label,
+                            marketType: c.kind,
                             utcNow: new Date().toISOString(),
                         },
                         analysis: {
@@ -296,11 +346,83 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
             } catch {
                 aiError = 'AI review unavailable (no connection to the server).';
             }
-            setOutcome({ analysis, ai, aiError, at: Date.now() });
+            setOutcome(o => (o ? { ...o, ai, aiError, aiKey: key } : o));
         } finally {
-            setBusy(false);
+            setAiBusy(false);
         }
-    }, [strategy, tf, kind, info, symbol]);
+    };
+
+    const scheduleAi = (force: boolean) => {
+        const st = aiRun.current;
+        const wait = Math.max(0, (force ? 3000 : 15000) - (Date.now() - st.lastCall));
+        if (st.timer) window.clearTimeout(st.timer);
+        st.timer = window.setTimeout(() => {
+            st.timer = null;
+            runAi();
+        }, wait);
+    };
+
+    /** Recalculate everything from the live candles; ask the AI again only when the situation changed. */
+    const refresh = (force: boolean) => {
+        const r = compute();
+        if (!r) return;
+        const { analysis, closedCandles, key } = r;
+        drawIfChanged(analysis, closedCandles);
+        setOutcome(o => ({
+            analysis,
+            ai: o?.ai ?? null,
+            aiError: o?.aiError ?? null,
+            aiKey: o?.aiKey ?? null,
+            key,
+            at: Date.now(),
+        }));
+        if (force || key !== aiRun.current.lastKey) {
+            aiRun.current.lastKey = key;
+            scheduleAi(force);
+        }
+    };
+
+    // every price update from the feed (at most once a second)
+    const lastTickAt = useRef(0);
+    const tickTimer = useRef<number | null>(null);
+    liveTick.current = () => {
+        const c = ctx.current;
+        if (!c.live || !c.strategy?.ready || c.closed) return;
+        const wait = 1000 - (Date.now() - lastTickAt.current);
+        if (wait <= 0) {
+            lastTickAt.current = Date.now();
+            refresh(false);
+        } else if (!tickTimer.current) {
+            tickTimer.current = window.setTimeout(() => {
+                tickTimer.current = null;
+                lastTickAt.current = Date.now();
+                refresh(false);
+            }, wait);
+        }
+    };
+
+    // First analysis happens by itself as soon as candles are loaded, and again when the
+    // person changes market, timeframe or strategy; no button press needed.
+    useEffect(() => {
+        if (loading || loadError || closed || !strategy?.ready || !isConnected) return;
+        aiRun.current.lastKey = '';
+        drawKey.current = '';
+        refresh(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, loadError, closed, strategyId, kind, symbol, tf, isConnected]);
+
+    useEffect(
+        () => () => {
+            if (aiRun.current.timer) window.clearTimeout(aiRun.current.timer);
+            if (tickTimer.current) window.clearTimeout(tickTimer.current);
+        },
+        []
+    );
+
+    const runAnalysis = useCallback(() => {
+        refresh(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ---- draggable floating Analyse button
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -331,7 +453,8 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
         if (d && !d.moved && canAnalyse) runAnalysis();
     };
 
-    const status: AiResult['status'] | null = outcome ? (outcome.ai?.status ?? codeStatus(outcome.analysis)) : null;
+    const aiCurrent = !!outcome?.ai && outcome.aiKey === outcome.key;
+    const status: AiResult['status'] | null = outcome ? (aiCurrent ? outcome.ai!.status : codeStatus(outcome.analysis)) : null;
     const plan = outcome?.analysis.plan;
     const fmt = (n: number) => n.toFixed(pipSize);
     const tone = status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
@@ -398,7 +521,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     </select>
                 </label>
                 <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
-                    {busy ? 'Analysing…' : 'Analyse'}
+                    {aiBusy ? 'Reviewing…' : 'Re-analyse'}
                 </button>
             </div>
 
@@ -410,6 +533,14 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     {lastPrice !== null && <span>{fmt(lastPrice)}</span>}
                     <em>times in GMT</em>
                 </div>
+                <button
+                    type='button'
+                    className={`forex-trader__live${live ? ' is-on' : ''}`}
+                    onClick={() => setLive(l => !l)}
+                    title={live ? 'Updating on every price change. Tap to pause.' : 'Paused. Tap to resume.'}
+                >
+                    {live ? '● LIVE' : '❚❚ PAUSED'}
+                </button>
                 {loading && !loadError && <div className='forex-trader__overlay'>Loading chart…</div>}
                 {loadError && <div className='forex-trader__overlay forex-trader__overlay--error'>{loadError}</div>}
                 {closed && !loadError && (
@@ -428,7 +559,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                         title='Drag to move, tap to analyse'
                         aria-label='Analyse'
                     >
-                        {busy ? '…' : '⚡ Analyse'}
+                        {aiBusy ? '…' : '⚡ Re-analyse'}
                     </button>
                 )}
                 {status && (
@@ -450,7 +581,10 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                             <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
                                 {status && STATUS_TEXT[status]}
                             </span>
-                            {outcome.ai && <span className='forex-trader__conf'>Confidence {outcome.ai.confidence}%</span>}
+                            {aiCurrent && <span className='forex-trader__conf'>Confidence {outcome.ai!.confidence}%</span>}
+                            {!aiCurrent && !outcome.aiError && (
+                                <span className='forex-trader__muted'>AI review {aiBusy ? 'refreshing…' : 'queued…'}</span>
+                            )}
                         </div>
                         {status && STATUS_TEXT[status] !== outcome.analysis.statusText && (
                             <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
@@ -568,13 +702,16 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                             </li>
                                             <li>A {TIMEFRAMES.find(t => t.sec === tf)?.label} candle closes back inside the range</li>
                                             <li>
-                                                Enter {sc.side} near {fmt(sc.entry)}, stop loss {fmt(sc.stopLoss)} (beyond the
-                                                sweep), take profit {fmt(sc.takeProfit)}
+                                                Enter {sc.side} at {fmt(sc.entry)}, stop loss {fmt(sc.stopLoss)}
+                                                {sc.slBasis === 'sweep'
+                                                    ? ' (real sweep extreme + room)'
+                                                    : ` (rule: ${sc.side === 'SELL' ? 'high' : 'low'} ${sc.side === 'SELL' ? '+' : '−'} 1 × ATR + ¼ ATR; moves to the real sweep extreme once price sweeps)`}
+                                                , take profit {fmt(sc.takeProfit)}
                                             </li>
                                         </ol>
                                         <span className='forex-trader__muted'>
-                                            RR about 1 : {sc.rr.toFixed(2)} · price is {fmt(sc.distance)} away
-                                            {sc.distanceAtr !== null ? ` (${sc.distanceAtr.toFixed(1)}× average candle size)` : ''}
+                                            RR 1 : {sc.rr.toFixed(2)} · price is {fmt(sc.distance)} away
+                                            {sc.distanceAtr !== null ? ` (${sc.distanceAtr.toFixed(1)} × ATR)` : ''}
                                         </span>
                                     </div>
                                 ))}
@@ -590,8 +727,8 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                             ))}
                         </ul>
 
-                        {outcome.ai?.reasoning && <p className='forex-trader__reasoning'>{outcome.ai.reasoning}</p>}
-                        {[...(outcome.analysis.warnings ?? []), ...(outcome.ai?.warnings ?? [])].map((w, i) => (
+                        {aiCurrent && outcome.ai?.reasoning && <p className='forex-trader__reasoning'>{outcome.ai.reasoning}</p>}
+                        {[...(outcome.analysis.warnings ?? []), ...(aiCurrent ? outcome.ai?.warnings ?? [] : [])].map((w, i) => (
                             <p key={i} className='forex-trader__warn'>
                                 ⚠ {w}
                             </p>
@@ -602,7 +739,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                             </p>
                         )}
                         <p className='forex-trader__muted'>
-                            Analysed {fmtTime(Math.floor(outcome.at / 1000))}. Signals only: no strategy wins every time.
+                            Live: recalculated {new Date(outcome.at).toISOString().slice(11, 19)} GMT from the real candles. Signals only: no strategy wins every time.
                         </p>
                     </>
                 )}

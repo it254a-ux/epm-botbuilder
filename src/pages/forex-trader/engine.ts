@@ -68,6 +68,8 @@ export interface Scenario {
     stopLoss: number;
     takeProfit: number;
     rr: number;
+    /** 'rule' = fixed rule (edge +/- 1 x ATR + small pad); 'sweep' = real sweep extreme + pad. */
+    slBasis: 'rule' | 'sweep';
     /** Distance from the last price to the trigger edge. */
     distance: number;
     distanceAtr: number | null;
@@ -166,12 +168,19 @@ export function sessionAt(t: number): string {
     return 'Late New York / rollover';
 }
 
-function buildWatch(range: RefRange, lastPrice: number, atrValue: number | null, highExtreme?: number, lowExtreme?: number): WatchPlan {
-    const size = range.high - range.low;
-    const pad = (atrValue ?? size * 0.1) * 0.25;
-    const stretch = Math.max(atrValue ?? 0, size * 0.1) * 0.6; // typical sweep depth when nothing has swept yet
-    const sellStop = (highExtreme ?? range.high + stretch) + pad;
-    const buyStop = (lowExtreme ?? range.low - stretch) - pad;
+function buildWatch(
+    range: RefRange,
+    lastPrice: number,
+    atrValue: number,
+    highExtreme?: number,
+    lowExtreme?: number
+): WatchPlan {
+    // No guessing: until a side really sweeps, the stop loss follows one fixed rule
+    // (edge +/- 1 x ATR(14) + a quarter ATR of room). The moment price does sweep,
+    // it is replaced by the real sweep extreme + the same room.
+    const pad = atrValue * 0.25;
+    const sellStop = (highExtreme ?? range.high + atrValue) + pad;
+    const buyStop = (lowExtreme ?? range.low - atrValue) - pad;
     const mk = (side: Side): Scenario => {
         const sell = side === 'SELL';
         const entry = sell ? range.high : range.low;
@@ -179,6 +188,7 @@ function buildWatch(range: RefRange, lastPrice: number, atrValue: number | null,
         const takeProfit = sell ? range.low : range.high;
         const risk = Math.abs(stopLoss - entry);
         const distance = Math.abs(lastPrice - entry);
+        const real = sell ? highExtreme !== undefined : lowExtreme !== undefined;
         return {
             side,
             trigger: entry,
@@ -186,8 +196,9 @@ function buildWatch(range: RefRange, lastPrice: number, atrValue: number | null,
             stopLoss,
             takeProfit,
             rr: risk > 0 ? Math.abs(entry - takeProfit) / risk : 0,
+            slBasis: real ? 'sweep' : 'rule',
             distance,
-            distanceAtr: atrValue ? distance / atrValue : null,
+            distanceAtr: distance / atrValue,
         };
     };
     const sell = mk('SELL');
@@ -338,7 +349,10 @@ export function scanSweeps(candles: Candle[], range: RefRange): SweepScan {
 export function analyse(
     strategyId: SweepStrategyId,
     candles: Candle[],
-    kind: MarketKind
+    kind: MarketKind,
+    /** The candle still forming right now (not closed yet). Used only for live price and to
+     *  show a break in progress; a sweep is never confirmed until a candle has closed. */
+    forming?: Candle | null
 ): Analysis {
     const base: Analysis = {
         strategyId,
@@ -348,7 +362,7 @@ export function analyse(
         range: null,
         sweep: null,
         plan: null,
-        lastPrice: candles.length ? candles[candles.length - 1].close : null,
+        lastPrice: forming ? forming.close : candles.length ? candles[candles.length - 1].close : null,
         atr: atr(candles),
         warnings: [],
         candlesAnalysed: candles.length,
@@ -373,14 +387,27 @@ export function analyse(
         out.warnings.push('The reference range is very narrow compared with normal movement, so signals from it are less reliable.');
     }
 
-    const { confirmed, inProgress } = scanSweeps(candles, range);
+    const scan = scanSweeps(candles, range);
+    const confirmed = scan.confirmed;
+    let inProgress = scan.inProgress;
+    if (!inProgress && forming && forming.time >= range.endTime) {
+        // Live: the forming candle is already beyond one edge of the range.
+        const hi = forming.high > range.high;
+        const lo = forming.low < range.low;
+        if (hi !== lo) {
+            inProgress = hi
+                ? { side: 'high', extreme: forming.high }
+                : { side: 'low', extreme: forming.low };
+        }
+    }
     const lastC = candles[candles.length - 1];
+    const priceNow = forming ? forming.close : lastC.close;
 
     if (!confirmed) {
         out.watch = buildWatch(
             range,
-            lastC.close,
-            base.atr,
+            priceNow,
+            base.atr as number,
             inProgress?.side === 'high' ? inProgress.extreme : undefined,
             inProgress?.side === 'low' ? inProgress.extreme : undefined
         );
@@ -396,7 +423,7 @@ export function analyse(
 
     out.sweep = confirmed;
     const confirmCandle = candles.find(c => c.time === confirmed.confirmTime)!;
-    const pad = (base.atr ?? rangeSize * 0.1) * 0.25;
+    const pad = (base.atr as number) * 0.25;
     const side: Side = confirmed.side === 'high' ? 'SELL' : 'BUY';
     const entry = confirmCandle.close;
     const stopLoss = side === 'SELL' ? confirmed.extreme + pad : confirmed.extreme - pad;
@@ -433,6 +460,16 @@ export function analyse(
         if (hitSL || hitTP) break;
     }
 
+    if (!hitSL && !hitTP && forming && forming.time > confirmed.confirmTime) {
+        // live: the candle still forming can already have touched the stop or target
+        if (side === 'SELL') {
+            if (forming.high >= plan.stopLoss) hitSL = true;
+            if (forming.low <= plan.takeProfit) hitTP = true;
+        } else {
+            if (forming.low <= plan.stopLoss) hitSL = true;
+            if (forming.high >= plan.takeProfit) hitTP = true;
+        }
+    }
     out.candlesSince = candlesSince;
     out.candlesLeft = Math.max(0, SETUP_LIFETIME_CANDLES - candlesSince);
     if (hitSL) {
@@ -451,7 +488,7 @@ export function analyse(
         return out;
     }
     // Price already ran more than half-way to the target: the entry is stale.
-    const progress = side === 'SELL' ? (plan.entry - lastC.close) / (reward || 1) : (lastC.close - plan.entry) / (reward || 1);
+    const progress = side === 'SELL' ? (plan.entry - priceNow) / (reward || 1) : (priceNow - plan.entry) / (reward || 1);
     if (progress > 0.5) out.warnings.push('Price has already moved over half-way to the target since the entry candle, so entering now is late.');
     out.state = 'ready';
     out.statusText = `${side} setup ready`;
