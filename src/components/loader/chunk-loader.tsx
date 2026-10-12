@@ -7,10 +7,7 @@ export default function ChunkLoader({ message }: { message: string }) {
                 <div className='epm-splash__mark' aria-hidden='true'>
                     <span className='epm-splash__glow' />
                     <span className='epm-splash__ring' />
-                    <span className='epm-splash__bar' />
-                    <span className='epm-splash__bar' />
-                    <span className='epm-splash__bar' />
-                    <span className='epm-splash__bar' />
+                    <span className='epm-splash__bars'><span className='epm-splash__bar' /><span className='epm-splash__bar' /><span className='epm-splash__bar' /><span className='epm-splash__bar' /><span className='epm-splash__bar' /></span>
                 </div>
                 <div className='epm-splash__brand'>Executive Prime Markets</div>
                 <div className='epm-splash__msg'>{message}</div>

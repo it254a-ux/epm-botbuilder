@@ -34,12 +34,16 @@
         position: relative;
         width: 112px;
         height: 112px;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 7px;
-        padding-bottom: 30px;
         animation: epm-splash-in 0.6s ease-out both;
+    }
+
+    &__bars {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
     }
 
     &__ring {
@@ -63,17 +67,18 @@
 
     &__bar {
         position: relative;
-        width: 9px;
-        border-radius: 3px;
+        width: 8px;
+        border-radius: 4px;
         background: linear-gradient(180deg, #fff2c2 0%, #e8c46a 55%, #b8892f 100%);
         box-shadow: 0 0 10px rgba(232, 196, 106, 0.45);
-        transform-origin: bottom;
-        animation: epm-splash-bar 1.3s ease-in-out infinite;
+        transform-origin: center;
+        animation: epm-splash-bar 1.2s ease-in-out infinite;
 
-        &:nth-of-type(1) { height: 22px; animation-delay: 0s; }
-        &:nth-of-type(2) { height: 34px; animation-delay: 0.12s; }
-        &:nth-of-type(3) { height: 28px; animation-delay: 0.24s; }
-        &:nth-of-type(4) { height: 46px; animation-delay: 0.36s; }
+        &:nth-child(1) { height: 26px; animation-delay: 0s; }
+        &:nth-child(2) { height: 38px; animation-delay: 0.1s; }
+        &:nth-child(3) { height: 50px; animation-delay: 0.2s; }
+        &:nth-child(4) { height: 38px; animation-delay: 0.3s; }
+        &:nth-child(5) { height: 26px; animation-delay: 0.4s; }
     }
 
     &__brand {
