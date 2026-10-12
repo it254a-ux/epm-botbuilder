@@ -84,37 +84,29 @@
         -->
         <div id="root">
             <style>
-                #root__boot {
-                    position: fixed;
-                    inset: 0;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 14px;
-                    background: #0e0e0e;
-                    color: #9c9c9c;
-                    font-family:
-                        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                    font-size: 13px;
-                }
-                #root__boot-spinner {
-                    width: 28px;
-                    height: 28px;
-                    border-radius: 50%;
-                    border: 3px solid #333;
-                    border-top-color: #2563eb;
-                    animation: root__boot-spin 0.8s linear infinite;
-                }
-                @keyframes root__boot-spin {
-                    to {
-                        transform: rotate(360deg);
-                    }
-                }
+                #root__boot { position: fixed; inset: 0; }
+                #root__boot .epm-splash { height: 100%; }
+                .epm-splash{position:relative;width:100%;height:100%;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;overflow:hidden;color:#cfc7b0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:radial-gradient(ellipse at 50% 38%, rgba(232, 196, 106, 0.16) 0%, rgba(232, 196, 106, 0) 55%),radial-gradient(ellipse at 50% 120%, rgba(31, 182, 214, 0.12) 0%, rgba(31, 182, 214, 0) 60%),linear-gradient(180deg, #0d0d10 0%, #08080a 100%)}.epm-splash::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at center, #000 0%, transparent 70%);-webkit-mask-image:radial-gradient(ellipse at center, #000 0%, transparent 70%);animation:epm-splash-drift 14s linear infinite}.epm-splash__mark{position:relative;width:112px;height:112px;display:flex;align-items:flex-end;justify-content:center;gap:7px;padding-bottom:30px;animation:epm-splash-in .6s ease-out both}.epm-splash__ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg, rgba(232, 196, 106, 0) 0deg, #e8c46a 200deg, #fff2c2 340deg, rgba(232, 196, 106, 0) 360deg);-webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));animation:epm-splash-spin 1.4s linear infinite;filter:drop-shadow(0 0 8px rgba(232, 196, 106, 0.55))}.epm-splash__glow{position:absolute;inset:14px;border-radius:50%;background:radial-gradient(circle, rgba(232, 196, 106, 0.18), rgba(232, 196, 106, 0) 70%);animation:epm-splash-pulse 2.2s ease-in-out infinite}.epm-splash__bar{position:relative;width:9px;border-radius:3px;background:linear-gradient(180deg, #fff2c2 0%, #e8c46a 55%, #b8892f 100%);box-shadow:0 0 10px rgba(232,196,106,.45);transform-origin:bottom;animation:epm-splash-bar 1.3s ease-in-out infinite}.epm-splash__bar:nth-of-type(1){height:22px;animation-delay:0s}.epm-splash__bar:nth-of-type(2){height:34px;animation-delay:.12s}.epm-splash__bar:nth-of-type(3){height:28px;animation-delay:.24s}.epm-splash__bar:nth-of-type(4){height:46px;animation-delay:.36s}.epm-splash__brand{position:relative;text-align:center;font-size:15px;font-weight:700;letter-spacing:.32em;text-transform:uppercase;background:linear-gradient(100deg, #8c6a22 0%, #e8c46a 30%, #fff6d6 50%, #e8c46a 70%, #8c6a22 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:rgba(0,0,0,0);-webkit-text-fill-color:rgba(0,0,0,0);animation:epm-splash-in .7s .1s ease-out both,epm-splash-shine 2.8s linear infinite}.epm-splash__msg{position:relative;margin-top:-12px;font-size:12.5px;letter-spacing:.08em;color:#8d8774;animation:epm-splash-in .7s .2s ease-out both}.epm-splash__track{position:relative;width:168px;height:3px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.08);animation:epm-splash-in .7s .3s ease-out both}.epm-splash__track::after{content:"";position:absolute;top:0;bottom:0;width:45%;border-radius:3px;background:linear-gradient(90deg, transparent, #e8c46a, #fff2c2, transparent);animation:epm-splash-slide 1.5s ease-in-out infinite}@media(prefers-reduced-motion: reduce){.epm-splash *,.epm-splash::before{animation-duration:.01ms !important;animation-iteration-count:1 !important}}@keyframes epm-splash-spin{to{transform:rotate(360deg)}}@keyframes epm-splash-bar{0%,100%{transform:scaleY(0.55);opacity:.7}50%{transform:scaleY(1);opacity:1}}@keyframes epm-splash-pulse{0%,100%{opacity:.5;transform:scale(0.92)}50%{opacity:1;transform:scale(1.08)}}@keyframes epm-splash-shine{to{background-position:-220% 0}}@keyframes epm-splash-slide{0%{left:-45%}100%{left:100%}}@keyframes epm-splash-drift{to{background-position:44px 44px}}@keyframes epm-splash-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+            .epm-splash__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}.epm-splash__scrim{position:absolute;inset:0;z-index:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.35) 0%,rgba(0,0,0,.7) 100%)}.epm-splash>:not(.epm-splash__video):not(.epm-splash__scrim){position:relative;z-index:1}
             </style>
             <div id="root__boot">
-                <div id="root__boot-spinner"></div>
-                <div>Loading…</div>
+                <div class="epm-splash" role="status">
+                    <script>
+                        (function () {
+                            if (!window.matchMedia("(min-width: 901px)").matches) return;
+                            var n = (window.__epmSplashIdx = 1 + Math.floor(Math.random() * 4));
+                            document.write('<video class="epm-splash__video" src="/splash/desktop-' + n + '.mp4" poster="/splash/desktop-' + n + '.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video><div class="epm-splash__scrim" aria-hidden="true"></div>');
+                        })();
+                    </script>
+                    <div class="epm-splash__mark" aria-hidden="true">
+                        <span class="epm-splash__glow"></span><span class="epm-splash__ring"></span>
+                        <span class="epm-splash__bar"></span><span class="epm-splash__bar"></span>
+                        <span class="epm-splash__bar"></span><span class="epm-splash__bar"></span>
+                    </div>
+                    <div class="epm-splash__brand">Executive Prime Markets</div>
+                    <div class="epm-splash__msg">Loading…</div>
+                    <div class="epm-splash__track" aria-hidden="true"></div>
+                </div>
             </div>
         </div>
         <!-- LiveChat script -->
