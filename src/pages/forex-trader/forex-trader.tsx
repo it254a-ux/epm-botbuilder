@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import ChartView, { type ChartViewHandle } from './chart-view';
-import { analyse, marketKind, type Analysis, type Candle, type SweepStrategyId } from './engine';
+import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
 import './forex-trader.scss';
 
@@ -49,6 +49,14 @@ const STATUS_TEXT: Record<AiResult['status'], string> = {
     invalidated: 'Setup invalidated',
 };
 
+/** The words shown on the pill/badge: the five agreed statuses, with exact wording for finished or stale setups. */
+function statusLabel(status: AiResult['status'], a: Analysis): string {
+    if (a.state === 'target_reached') return 'Target reached: setup finished';
+    if (a.state === 'expired') return 'Setup expired';
+    if (a.state === 'stale') return 'Waiting for fresh data';
+    return STATUS_TEXT[status];
+}
+
 /** Status shown when the AI is unavailable: based on the code's own result. */
 function codeStatus(a: Analysis): AiResult['status'] {
     switch (a.state) {
@@ -73,7 +81,7 @@ interface CheckItem {
 
 function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
     const swept = !!a.sweep;
-    const live = a.state === 'ready';
+    const live = a.state === 'ready' || a.state === 'poor_market';
     const items: CheckItem[] = [
         { label: 'Market is open', state: marketClosed ? 'no' : 'yes' },
         { label: 'Reference range found', state: a.range ? 'yes' : 'no' },
@@ -85,11 +93,11 @@ function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
     ];
     if (a.plan) {
         items.push({
-            label: `Reward at least equal to risk (1 : ${a.plan.rr.toFixed(2)})`,
-            state: a.plan.rr >= 1 ? 'yes' : 'no',
+            label: `Reward at least 1 : ${MIN_RR} (now 1 : ${a.plan.rr.toFixed(2)})`,
+            state: a.plan.rr >= MIN_RR ? 'yes' : 'no',
         });
         items.push({
-            label: 'Setup still fresh (stop and target not hit, not expired)',
+            label: 'Setup still valid (sweep point not broken, target not reached, not expired)',
             state: live ? 'yes' : 'no',
         });
     } else {
@@ -272,7 +280,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
         const all = candlesRef.current;
         const closedCandles = all.filter(x => x.time + c.tf <= now);
         const forming = all.find(x => x.time + c.tf > now) ?? null;
-        const analysis = analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming);
+        const analysis = analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
         const lastClosed = closedCandles.length ? closedCandles[closedCandles.length - 1].time : 0;
         // changes when the situation really changes: new closed candle, new state, new sweep
         const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;
@@ -563,7 +571,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     </button>
                 )}
                 {status && (
-                    <div className={`forex-trader__badge forex-trader__badge--${tone}`}>{STATUS_TEXT[status]}</div>
+                    <div className={`forex-trader__badge forex-trader__badge--${tone}`}>{outcome && statusLabel(status, outcome.analysis)}</div>
                 )}
             </div>
 
@@ -579,14 +587,14 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                     <>
                         <div className='forex-trader__result-head'>
                             <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
-                                {status && STATUS_TEXT[status]}
+                                {status && outcome && statusLabel(status, outcome.analysis)}
                             </span>
                             {aiCurrent && <span className='forex-trader__conf'>Confidence {outcome.ai!.confidence}%</span>}
                             {!aiCurrent && !outcome.aiError && (
                                 <span className='forex-trader__muted'>AI review {aiBusy ? 'refreshing…' : 'queued…'}</span>
                             )}
                         </div>
-                        {status && STATUS_TEXT[status] !== outcome.analysis.statusText && (
+                        {status && statusLabel(status, outcome.analysis) !== outcome.analysis.statusText && (
                             <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
                         )}
 

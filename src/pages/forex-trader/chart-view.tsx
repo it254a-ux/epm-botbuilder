@@ -214,7 +214,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 ]);
             }
             const p = analysis.plan;
-            if (p && (analysis.state === 'ready' || analysis.state === 'invalidated' || analysis.state === 'target_reached' || analysis.state === 'expired')) {
+            if (p && (analysis.state === 'ready' || analysis.state === 'poor_market' || analysis.state === 'invalidated' || analysis.state === 'target_reached' || analysis.state === 'expired')) {
                 addLine(p.entry, 'Entry', COLORS.entry);
                 addLine(p.stopLoss, 'SL', COLORS.sl);
                 addLine(p.takeProfit, 'TP', COLORS.tp);

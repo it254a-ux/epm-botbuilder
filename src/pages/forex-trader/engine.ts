@@ -23,6 +23,8 @@ export type Side = 'BUY' | 'SELL';
 
 export type SetupState =
     | 'no_data'
+    | 'stale'
+    | 'poor_market'
     | 'no_range'
     | 'waiting_for_sweep'
     | 'sweep_in_progress'
@@ -112,6 +114,12 @@ const DAY = 86400;
 const WEEK = 7 * DAY;
 /** After the first break, how many candles price may take to close back inside. */
 const MAX_CANDLES_TO_CLOSE_BACK = 6;
+/** Minimum reward:risk for a setup to count as ready (owner's rule: 1 : 2). */
+export const MIN_RR = 2;
+/** Candle data older than this many candle-lengths is treated as stale. */
+const STALE_AFTER_CANDLES = 3;
+/** Efficiency ratio (net move / total path) over the last 20 candles below this = choppy. */
+const CHOPPY_BELOW = 0.1;
 /** A confirmed setup older than this many candles is treated as expired. */
 const SETUP_LIFETIME_CANDLES = 24;
 
@@ -283,14 +291,15 @@ export function buildRange(
 }
 
 interface SweepScan {
-    confirmed: Sweep | null;
+    /** Every confirmed sweep after the range, oldest first. */
+    all: Sweep[];
     /** A side is currently broken but price has not yet closed back inside. */
     inProgress: { side: 'high' | 'low'; extreme: number } | null;
 }
 
-/** Scan candles after the range for the most recent sweep (break + close back inside). */
+/** Scan candles after the range for sweeps (break + close back inside). */
 export function scanSweeps(candles: Candle[], range: RefRange): SweepScan {
-    let confirmed: Sweep | null = null;
+    const all: Sweep[] = [];
     let open: { side: 'high' | 'low'; firstBreakTime: number; extreme: number; extremeTime: number; count: number } | null = null;
 
     for (const c of candles) {
@@ -312,13 +321,13 @@ export function scanSweeps(candles: Candle[], range: RefRange): SweepScan {
             open.count++;
             const closedInside = c.close <= range.high && c.close >= range.low;
             if (closedInside) {
-                confirmed = {
+                all.push({
                     side: open.side,
                     firstBreakTime: open.firstBreakTime,
                     confirmTime: c.time,
                     extreme: open.extreme,
                     extremeTime: open.extremeTime,
-                };
+                });
                 open = null;
             } else if (open.count > MAX_CANDLES_TO_CLOSE_BACK) {
                 // Price kept going: that was a real breakout, not a sweep.
@@ -334,16 +343,97 @@ export function scanSweeps(candles: Candle[], range: RefRange): SweepScan {
             const closedInside = c.close <= range.high && c.close >= range.low;
             if (closedInside) {
                 // wick-only sweep inside a single candle
-                confirmed = { side, firstBreakTime: c.time, confirmTime: c.time, extreme, extremeTime: c.time };
+                all.push({ side, firstBreakTime: c.time, confirmTime: c.time, extreme, extremeTime: c.time });
             } else {
                 open = { side, firstBreakTime: c.time, extreme, extremeTime: c.time, count: 1 };
             }
         }
     }
-    return {
-        confirmed,
-        inProgress: open ? { side: open.side, extreme: open.extreme } : null,
+    return { all, inProgress: open ? { side: open.side, extreme: open.extreme } : null };
+}
+
+/** Kaufman efficiency ratio of the last `n` closes: 1 = straight line, 0 = pure chop. */
+export function efficiencyRatio(candles: Candle[], n = 20): number | null {
+    if (candles.length < n + 1) return null;
+    const seg = candles.slice(-(n + 1));
+    let path = 0;
+    for (let i = 1; i < seg.length; i++) path += Math.abs(seg[i].close - seg[i - 1].close);
+    if (path === 0) return 0;
+    return Math.abs(seg[seg.length - 1].close - seg[0].close) / path;
+}
+
+function candleLength(candles: Candle[]): number | null {
+    if (candles.length < 2) return null;
+    let best = Infinity;
+    for (let i = candles.length - 1; i > 0 && i > candles.length - 10; i--) {
+        const d = candles[i].time - candles[i - 1].time;
+        if (d > 0 && d < best) best = d;
+    }
+    return isFinite(best) ? best : null;
+}
+
+type Outcome = 'live' | 'invalidated' | 'target_reached' | 'expired';
+
+interface Evaluated {
+    sweep: Sweep;
+    plan: TradePlan;
+    outcome: Outcome;
+    candlesSince: number;
+    /** What ended it, for the message. */
+    why: string;
+}
+
+/** Build the trade for one sweep and say what price has done since. */
+function evaluateSweep(
+    range: RefRange,
+    sweep: Sweep,
+    candles: Candle[],
+    atrValue: number,
+    forming?: Candle | null
+): Evaluated {
+    const confirmCandle = candles.find(c => c.time === sweep.confirmTime)!;
+    const pad = atrValue * 0.25;
+    const side: Side = sweep.side === 'high' ? 'SELL' : 'BUY';
+    const entry = confirmCandle.close;
+    const stopLoss = side === 'SELL' ? sweep.extreme + pad : sweep.extreme - pad;
+    const takeProfit = side === 'SELL' ? range.low : range.high;
+    const risk = Math.abs(stopLoss - entry);
+    const reward = Math.abs(entry - takeProfit);
+    const plan: TradePlan = {
+        side,
+        entry,
+        stopLoss,
+        takeProfit,
+        midpoint: (range.high + range.low) / 2,
+        risk,
+        reward,
+        rr: risk > 0 ? reward / risk : 0,
     };
+
+    const after = candles.filter(c => c.time > sweep.confirmTime);
+    if (forming && forming.time > sweep.confirmTime) after.push(forming);
+    let candlesSince = 0;
+    for (const c of after) {
+        if (c !== forming) candlesSince++;
+        // Breaking the sweep point (its high/low) means it was a real breakout, not a sweep.
+        const brokeSweepPoint = side === 'SELL' ? c.high > sweep.extreme : c.low < sweep.extreme;
+        const hitSL = side === 'SELL' ? c.high >= plan.stopLoss : c.low <= plan.stopLoss;
+        const hitTP = side === 'SELL' ? c.low <= plan.takeProfit : c.high >= plan.takeProfit;
+        if (brokeSweepPoint || hitSL) {
+            return {
+                sweep,
+                plan,
+                outcome: 'invalidated',
+                candlesSince,
+                why: `price broke the sweep ${sweep.side} at ${sweep.extreme}: a real breakout, not a sweep`,
+            };
+        }
+        if (hitTP) return { sweep, plan, outcome: 'target_reached', candlesSince, why: 'target reached' };
+    }
+    if (candlesSince > SETUP_LIFETIME_CANDLES) {
+        return { sweep, plan, outcome: 'expired', candlesSince, why: 'the sweep is too old to act on' };
+    }
+    return { sweep, plan, outcome: 'live', candlesSince, why: '' };
 }
 
 export function analyse(
@@ -352,7 +442,9 @@ export function analyse(
     kind: MarketKind,
     /** The candle still forming right now (not closed yet). Used only for live price and to
      *  show a break in progress; a sweep is never confirmed until a candle has closed. */
-    forming?: Candle | null
+    forming?: Candle | null,
+    /** Current time in seconds (for the stale-data check). Omit to skip that check. */
+    now?: number
 ): Analysis {
     const base: Analysis = {
         strategyId,
@@ -377,43 +469,62 @@ export function analyse(
         return base;
     }
 
+    // Stale data: the newest candle should be at most a few candle-lengths old.
+    const len = candleLength(candles);
+    const lastT = candles[candles.length - 1].time;
+    if (now !== undefined && len && now - (lastT + len) > STALE_AFTER_CANDLES * len) {
+        const ageMin = Math.round((now - (lastT + len)) / 60);
+        return {
+            ...base,
+            state: 'stale',
+            statusText: `Waiting for fresh data: the newest candle is ${ageMin} min old`,
+            warnings: ['The market feed is not delivering new candles (market closed or feed problem). Nothing is analysed on old data.'],
+        };
+    }
+
     const { range, reason } = buildRange(strategyId, candles, kind);
     if (!range) {
         return { ...base, state: 'no_range', statusText: 'No reference range yet', warnings: [reason ?? 'No range.'] };
     }
     const out: Analysis = { ...base, range };
+    const atrValue = base.atr as number;
     const rangeSize = range.high - range.low;
-    if (base.atr && rangeSize < base.atr * 0.8) {
-        out.warnings.push('The reference range is very narrow compared with normal movement, so signals from it are less reliable.');
-    }
 
     const scan = scanSweeps(candles, range);
-    const confirmed = scan.confirmed;
     let inProgress = scan.inProgress;
     if (!inProgress && forming && forming.time >= range.endTime) {
         // Live: the forming candle is already beyond one edge of the range.
         const hi = forming.high > range.high;
         const lo = forming.low < range.low;
         if (hi !== lo) {
-            inProgress = hi
-                ? { side: 'high', extreme: forming.high }
-                : { side: 'low', extreme: forming.low };
+            inProgress = hi ? { side: 'high', extreme: forming.high } : { side: 'low', extreme: forming.low };
         }
     }
     const lastC = candles[candles.length - 1];
     const priceNow = forming ? forming.close : lastC.close;
 
-    if (!confirmed) {
+    // Walk the sweeps oldest to newest. A side whose sweep point was later broken is "dead":
+    // price went through it, so a later close back inside is NOT a fresh setup.
+    const dead = new Set<'high' | 'low'>();
+    let current: Evaluated | null = null;
+    for (const sw of scan.all) {
+        if (dead.has(sw.side)) continue;
+        const ev = evaluateSweep(range, sw, candles, atrValue, forming);
+        if (ev.outcome === 'invalidated') dead.add(sw.side);
+        current = ev;
+    }
+
+    if (!current) {
         out.watch = buildWatch(
             range,
             priceNow,
-            base.atr as number,
+            atrValue,
             inProgress?.side === 'high' ? inProgress.extreme : undefined,
             inProgress?.side === 'low' ? inProgress.extreme : undefined
         );
         if (inProgress) {
             out.state = 'sweep_in_progress';
-            out.statusText = `${inProgress.side === 'high' ? range.label + ' High' : range.label + ' Low'} is being swept: waiting for a candle to close back inside`;
+            out.statusText = `${range.label} ${inProgress.side === 'high' ? 'High' : 'Low'} is being swept: waiting for a candle to close back inside`;
             return out;
         }
         out.state = 'waiting_for_sweep';
@@ -421,76 +532,43 @@ export function analyse(
         return out;
     }
 
-    out.sweep = confirmed;
-    const confirmCandle = candles.find(c => c.time === confirmed.confirmTime)!;
-    const pad = (base.atr as number) * 0.25;
-    const side: Side = confirmed.side === 'high' ? 'SELL' : 'BUY';
-    const entry = confirmCandle.close;
-    const stopLoss = side === 'SELL' ? confirmed.extreme + pad : confirmed.extreme - pad;
-    const takeProfit = side === 'SELL' ? range.low : range.high;
-    const risk = Math.abs(stopLoss - entry);
-    const reward = Math.abs(entry - takeProfit);
-    const plan: TradePlan = {
-        side,
-        entry,
-        stopLoss,
-        takeProfit,
-        midpoint: (range.high + range.low) / 2,
-        risk,
-        reward,
-        rr: risk > 0 ? reward / risk : 0,
-    };
-    out.plan = plan;
-    if (plan.rr < 1) out.warnings.push(`Reward is smaller than risk (RR ${plan.rr.toFixed(2)}). Many traders skip setups below 1:1.`);
+    out.sweep = current.sweep;
+    out.plan = current.plan;
+    out.candlesSince = current.candlesSince;
+    out.candlesLeft = Math.max(0, SETUP_LIFETIME_CANDLES - current.candlesSince);
+    const plan = current.plan;
 
-    // What has price done since the confirmation candle?
-    let hitSL = false;
-    let hitTP = false;
-    let candlesSince = 0;
-    for (const c of candles) {
-        if (c.time <= confirmed.confirmTime) continue;
-        candlesSince++;
-        if (side === 'SELL') {
-            if (c.high >= plan.stopLoss) hitSL = true;
-            if (c.low <= plan.takeProfit) hitTP = true;
-        } else {
-            if (c.low <= plan.stopLoss) hitSL = true;
-            if (c.high >= plan.takeProfit) hitTP = true;
-        }
-        if (hitSL || hitTP) break;
-    }
-
-    if (!hitSL && !hitTP && forming && forming.time > confirmed.confirmTime) {
-        // live: the candle still forming can already have touched the stop or target
-        if (side === 'SELL') {
-            if (forming.high >= plan.stopLoss) hitSL = true;
-            if (forming.low <= plan.takeProfit) hitTP = true;
-        } else {
-            if (forming.low <= plan.stopLoss) hitSL = true;
-            if (forming.high >= plan.takeProfit) hitTP = true;
-        }
-    }
-    out.candlesSince = candlesSince;
-    out.candlesLeft = Math.max(0, SETUP_LIFETIME_CANDLES - candlesSince);
-    if (hitSL) {
+    if (current.outcome === 'invalidated') {
         out.state = 'invalidated';
-        out.statusText = 'Setup invalidated: price went through the stop loss';
+        out.statusText = `Setup invalidated: ${current.why}`;
         return out;
     }
-    if (hitTP) {
+    if (current.outcome === 'target_reached') {
         out.state = 'target_reached';
         out.statusText = 'Target already reached: this setup is finished';
         return out;
     }
-    if (candlesSince > SETUP_LIFETIME_CANDLES) {
+    if (current.outcome === 'expired') {
         out.state = 'expired';
         out.statusText = 'Setup expired: the sweep is too old to act on';
         return out;
     }
-    // Price already ran more than half-way to the target: the entry is stale.
-    const progress = side === 'SELL' ? (plan.entry - priceNow) / (reward || 1) : (priceNow - plan.entry) / (reward || 1);
-    if (progress > 0.5) out.warnings.push('Price has already moved over half-way to the target since the entry candle, so entering now is late.');
+
+    // The sweep is live. Before calling it ready it must pass the market-quality rules.
+    const reasons: string[] = [];
+    if (plan.rr < MIN_RR) reasons.push(`reward is only 1 : ${plan.rr.toFixed(2)} (minimum is 1 : ${MIN_RR})`);
+    if (rangeSize < atrValue) reasons.push('the reference range is narrower than one average candle (ATR)');
+    const er = efficiencyRatio(candles);
+    if (er !== null && er < CHOPPY_BELOW) reasons.push(`the market is choppy (efficiency ${er.toFixed(2)}, needs ${CHOPPY_BELOW} or more)`);
+    const progress = plan.side === 'SELL' ? (plan.entry - priceNow) / (plan.reward || 1) : (priceNow - plan.entry) / (plan.reward || 1);
+    if (progress > 0.5) reasons.push('price has already moved over half-way to the target, so entering now is late');
+    if (reasons.length > 0) {
+        out.state = 'poor_market';
+        out.statusText = `Waiting for the market to be good: ${reasons.join('; ')}`;
+        out.warnings.push(...reasons.map(r => r.charAt(0).toUpperCase() + r.slice(1) + '.'));
+        return out;
+    }
     out.state = 'ready';
-    out.statusText = `${side} setup ready`;
+    out.statusText = `${plan.side} setup ready`;
     return out;
 }
