@@ -110,15 +110,40 @@
                     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto';
                     v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
                     v.preload = 'none';
+                    var tries = 0, started2 = false;
+                    var tryPlay = function () {
+                        var pr2 = v.play();
+                        if (pr2 && pr2.catch) pr2.catch(function () {
+                            // Autoplay blocked or not ready yet: retry shortly, then on first touch/click.
+                            if (tries++ < 3) setTimeout(tryPlay, 800);
+                        });
+                    };
                     var startVideo = function () {
+                        if (started2) return; started2 = true;
                         v.preload = 'auto';
                         v.src = '/splash/' + set + '-' + n + '.mp4';
-                        var pr2 = v.play(); if (pr2 && pr2.catch) pr2.catch(function () {});
+                        tryPlay();
                     };
-                    // Poster shows instantly; the video only starts downloading once the
-                    // page's scripts have loaded, so it never slows the app down.
-                    if (document.readyState === 'complete') startVideo();
-                    else window.addEventListener('load', startVideo);
+                    // Poster shows instantly; the video starts shortly after the page
+                    // begins loading (no longer waits for every resource to finish),
+                    // so it still never competes with the app's first scripts.
+                    var kick = function () { setTimeout(startVideo, 400); };
+                    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', kick);
+                    else kick();
+                    window.addEventListener('load', startVideo); // safety net
+                    // If the download errors or stalls, reload the clip once or twice.
+                    var reloads = 0;
+                    var reloadVideo = function () {
+                        if (reloads++ >= 2 || v.className === 'on') return;
+                        v.src = '/splash/' + set + '-' + n + '.mp4';
+                        v.load(); tryPlay();
+                    };
+                    v.addEventListener('error', function () { setTimeout(reloadVideo, 1000); });
+                    v.addEventListener('stalled', function () { setTimeout(reloadVideo, 4000); });
+                    // Some phones (Low Power Mode) only allow playback after a touch.
+                    ['touchstart', 'click'].forEach(function (ev) {
+                        document.addEventListener(ev, function () { if (v.paused && v.src) tryPlay(); }, { once: true, passive: true });
+                    });
                     v.addEventListener('playing', function () { v.className = 'on'; });
                     bg.appendChild(v);
                     bg.appendChild(document.createElement('i'));
