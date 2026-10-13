@@ -29,7 +29,8 @@
         gap: 8px;
         align-items: end;
 
-        label {
+        label,
+        .forex-trader__market {
             display: flex;
             flex-direction: column;
             gap: 3px;
@@ -57,6 +58,154 @@
             .forex-trader__analyse-btn {
                 grid-column: 1 / -1;
             }
+        }
+    }
+
+    &__market {
+        position: relative;
+    }
+
+    .market-picker {
+        &__button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            height: 34px;
+            padding: 0 8px;
+            border: 1px solid var(--border-normal);
+            border-radius: 6px;
+            background: var(--general-section-1);
+            color: var(--text-general);
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        &__current {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 13px;
+            color: var(--text-general);
+        }
+
+        &__arrow {
+            display: inline-block;
+            font-size: 12px;
+            transition: transform 0.15s;
+
+            &.is-open {
+                transform: rotate(90deg);
+            }
+        }
+
+        &__button &__arrow.is-open {
+            transform: rotate(180deg);
+        }
+
+        &__menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            margin-top: 4px;
+            padding: 6px;
+            border: 1px solid var(--border-normal);
+            border-radius: 8px;
+            background: var(--general-section-1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        }
+
+        &__search {
+            width: 100%;
+            height: 30px;
+            margin-bottom: 6px;
+            padding: 0 8px;
+            border: 1px solid var(--border-normal);
+            border-radius: 6px;
+            background: var(--general-section-1);
+            color: var(--text-general);
+            font-size: 13px;
+        }
+
+        &__list {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        &__group-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 8px 6px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-general);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: left;
+
+            &:hover {
+                background: rgba(128, 128, 128, 0.15);
+            }
+        }
+
+        &__group-name {
+            flex: 1;
+        }
+
+        &__count {
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--text-less-prominent);
+        }
+
+        &__sub {
+            padding: 6px 6px 2px 22px;
+            font-size: 10px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-less-prominent);
+        }
+
+        &__item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 7px 8px 7px 22px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-general);
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+
+            &:hover {
+                background: rgba(128, 128, 128, 0.15);
+            }
+
+            &.is-active {
+                background: rgba(255, 68, 79, 0.18);
+                font-weight: 700;
+            }
+        }
+
+        &__closed {
+            font-size: 10px;
+            color: var(--text-less-prominent);
+        }
+
+        &__empty {
+            padding: 10px;
+            font-size: 12px;
+            color: var(--text-less-prominent);
         }
     }
 
@@ -285,7 +434,7 @@
         grid-template-columns: 1fr 1fr;
         gap: 6px;
 
-        label:nth-child(1),
+        > :nth-child(1),
         label:nth-child(4),
         .forex-trader__analyse-btn {
             grid-column: 1 / -1;

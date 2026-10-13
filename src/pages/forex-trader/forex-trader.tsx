@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
+import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle } from './chart-view';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
@@ -10,6 +11,7 @@ interface SymbolInfo {
     underlying_symbol_name: string;
     market: string;
     market_display_name?: string;
+    submarket_display_name?: string;
     pip_size: number;
     exchange_is_open: number;
     is_trading_suspended: number;
@@ -165,17 +167,6 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
             off = true;
         };
     }, [ws, isConnected]);
-
-    const grouped = useMemo(() => {
-        const m = new Map<string, SymbolInfo[]>();
-        for (const s of symbols) {
-            const g = s.market_display_name ?? s.market ?? 'Other';
-            if (!m.has(g)) m.set(g, []);
-            m.get(g)!.push(s);
-        }
-        m.forEach(list => list.sort((a, b) => a.underlying_symbol_name.localeCompare(b.underlying_symbol_name)));
-        return Array.from(m.entries());
-    }, [symbols]);
 
     const info = symbols.find(s => s.underlying_symbol === symbol);
     const pipSize = info ? Math.max(0, Math.round(-Math.log10(info.pip_size || 0.01))) : 2;
@@ -476,22 +467,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             <div className='forex-trader__controls'>
-                <label>
-                    <span>Market</span>
-                    <select value={symbol} onChange={e => setSymbol(e.target.value)}>
-                        {grouped.length === 0 && <option value={symbol}>{symbol}</option>}
-                        {grouped.map(([group, list]) => (
-                            <optgroup key={group} label={group}>
-                                {list.map(s => (
-                                    <option key={s.underlying_symbol} value={s.underlying_symbol}>
-                                        {s.underlying_symbol_name}
-                                        {s.exchange_is_open === 0 ? ' (closed)' : ''}
-                                    </option>
-                                ))}
-                            </optgroup>
-                        ))}
-                    </select>
-                </label>
+                <MarketPicker symbols={symbols} value={symbol} onChange={setSymbol} />
                 <label className='forex-trader__tf'>
                     <span>Timeframe</span>
                     <select value={tf} onChange={e => setTf(Number(e.target.value))}>
