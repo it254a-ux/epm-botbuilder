@@ -8,7 +8,9 @@
 //
 // Plain CommonJS, same as the other api/ files.
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+// gemini-2.0-flash was shut down by Google on 1 June 2026. Set GEMINI_MODEL in Vercel to switch
+// models without a code change (see https://ai.google.dev/gemini-api/docs/deprecations).
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const MAX_IMAGE_CHARS = 2_500_000; // base64 length, roughly 1.8 MB of image
 const MAX_JSON_CHARS = 20_000;
 
@@ -46,7 +48,10 @@ function clean(parsed, analysis) {
     const codeState = analysis && analysis.state;
     // Hard guard: the AI can never upgrade a setup the code did not find.
     if ((status === 'buy_ready' || status === 'sell_ready') && codeState !== 'ready') {
-        status = codeState === 'invalidated' ? 'invalidated' : 'waiting_for_pov';
+        status = codeState === 'invalidated' ? 'invalidated'
+            : codeState === 'poor_market' || codeState === 'stale' || codeState === 'no_data' || codeState === 'no_range'
+                ? 'waiting_for_market'
+                : 'waiting_for_pov';
     }
     // And a ready setup can only be BUY for a low sweep / SELL for a high sweep.
     if (status === 'buy_ready' && !(analysis.plan && analysis.plan.side === 'BUY')) status = 'waiting_for_market';
@@ -107,7 +112,7 @@ module.exports = async function handler(req, res) {
                 body: JSON.stringify({
                     systemInstruction: { parts: [{ text: SYSTEM }] },
                     contents: [{ role: 'user', parts }],
-                    generationConfig: { temperature: 0.2, responseMimeType: 'application/json', maxOutputTokens: 600 },
+                    generationConfig: { temperature: 0.2, responseMimeType: 'application/json', maxOutputTokens: 2048 },
                 }),
             }
         );
