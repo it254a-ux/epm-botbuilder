@@ -455,7 +455,19 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
     };
 
     const aiCurrent = !!outcome?.ai && outcome.aiKey === outcome.key;
-    const status: AiResult['status'] | null = outcome ? (aiCurrent ? outcome.ai!.status : codeStatus(outcome.analysis)) : null;
+    // The code's rules decide whether a trade is ready. The AI may only make the call more careful, never less.
+    const codeSt: AiResult['status'] | null = outcome ? codeStatus(outcome.analysis) : null;
+    const isReady = (st: AiResult['status'] | null) => st === 'buy_ready' || st === 'sell_ready';
+    const aiSt = aiCurrent ? outcome!.ai!.status : null;
+    const status: AiResult['status'] | null = !outcome ? null : aiSt && isReady(codeSt) ? aiSt : codeSt;
+    const conflict =
+        outcome && codeSt && aiSt && aiSt !== codeSt
+            ? isReady(codeSt)
+                ? ('careful' as const)
+                : isReady(aiSt)
+                  ? ('eager' as const)
+                  : ('wait' as const)
+            : null;
     const plan = outcome?.analysis.plan;
     const fmt = (n: number) => n.toFixed(pipSize);
     const tone = status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
@@ -572,8 +584,30 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                 <span className='forex-trader__muted'>AI review {aiBusy ? 'refreshing…' : 'queued…'}</span>
                             )}
                         </div>
-                        {status && statusLabel(status, outcome.analysis) !== outcome.analysis.statusText && (
-                            <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
+                        {conflict && codeSt && aiSt ? (
+                            <div className={`forex-trader__conflict forex-trader__conflict--${conflict}`}>
+                                <b>The code and the AI do not agree</b>
+                                <p>
+                                    <span>Code (exact rules):</span> {outcome.analysis.statusText.startsWith(statusLabel(codeSt, outcome.analysis))
+                                        ? outcome.analysis.statusText
+                                        : `${statusLabel(codeSt, outcome.analysis)} — ${outcome.analysis.statusText}`}
+                                </p>
+                                <p>
+                                    <span>AI (chart review):</span> {STATUS_TEXT[aiSt]}
+                                </p>
+                                <p className='forex-trader__conflict-verdict'>
+                                    {conflict === 'careful'
+                                        ? 'Do not enter yet. The rules are met, but the AI sees a problem (its reasoning is below). Wait until both agree.'
+                                        : conflict === 'eager'
+                                          ? 'The code decides: its rules are not met, so this is not a trade yet. The AI note below is advice only.'
+                                          : 'The code decides the status. The AI sees the market differently (reasoning below).'}
+                                </p>
+                            </div>
+                        ) : (
+                            status &&
+                            statusLabel(status, outcome.analysis) !== outcome.analysis.statusText && (
+                                <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
+                            )
                         )}
 
                         <h4 className='forex-trader__h'>Setup details</h4>

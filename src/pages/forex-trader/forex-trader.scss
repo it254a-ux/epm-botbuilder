@@ -209,6 +209,45 @@
         }
     }
 
+    &__conflict {
+        margin: 8px 0;
+        padding: 8px 10px;
+        border: 1px solid #f59e0b;
+        border-left-width: 4px;
+        border-radius: 6px;
+        background: rgba(245, 158, 11, 0.1);
+        font-size: 12px;
+        color: var(--text-general);
+
+        b {
+            display: block;
+            margin-bottom: 4px;
+            color: #f59e0b;
+        }
+
+        p {
+            margin: 2px 0;
+        }
+
+        span {
+            color: var(--text-less-prominent);
+        }
+
+        &--careful {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+
+            b {
+                color: #ef4444;
+            }
+        }
+    }
+
+    &__conflict-verdict {
+        margin-top: 4px !important;
+        font-weight: 700;
+    }
+
     &__analyse-btn {
         height: 34px;
         padding: 0 18px;
