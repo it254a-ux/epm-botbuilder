@@ -398,3 +398,28 @@
         color: #22c55e;
     }
 }
+
+.forex-trader__stages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+        display: flex;
+        gap: 8px;
+        padding: 2px 0;
+        line-height: 1.4;
+    }
+    .is-done span {
+        color: #16a34a;
+    }
+    .is-now {
+        font-weight: 700;
+    }
+    .is-now span {
+        color: #2563eb;
+    }
+    .is-todo {
+        color: var(--text-less-prominent);
+    }
+}

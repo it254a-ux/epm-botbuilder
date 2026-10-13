@@ -64,6 +64,7 @@ function codeStatus(a: Analysis): AiResult['status'] {
             return a.plan?.side === 'BUY' ? 'buy_ready' : 'sell_ready';
         case 'waiting_for_sweep':
         case 'sweep_in_progress':
+        case 'waiting_bos':
             return 'waiting_for_pov';
         case 'invalidated':
         case 'target_reached':
@@ -80,16 +81,9 @@ interface CheckItem {
 }
 
 function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
-    const swept = !!a.sweep;
-    const live = a.state === 'ready' || a.state === 'poor_market';
     const items: CheckItem[] = [
         { label: 'Market is open', state: marketClosed ? 'no' : 'yes' },
-        { label: 'Reference range found', state: a.range ? 'yes' : 'no' },
-        {
-            label: 'Range edge swept (price pushed through it)',
-            state: swept || a.state === 'sweep_in_progress' ? 'yes' : 'wait',
-        },
-        { label: 'A candle closed back inside the range', state: swept ? 'yes' : 'wait' },
+        { label: 'Data is fresh (new candles are arriving)', state: a.state === 'stale' ? 'no' : 'yes' },
     ];
     if (a.plan) {
         items.push({
@@ -97,11 +91,15 @@ function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
             state: a.plan.rr >= MIN_RR ? 'yes' : 'no',
         });
         items.push({
+            label: 'Market is not choppy and the range is wide enough',
+            state: a.state === 'poor_market' ? 'no' : 'yes',
+        });
+        items.push({
             label: 'Setup still valid (sweep point not broken, target not reached, not expired)',
-            state: live ? 'yes' : 'no',
+            state: ['invalidated', 'target_reached', 'expired'].includes(a.state) ? 'no' : 'yes',
         });
     } else {
-        items.push({ label: 'Entry, stop loss and take profit confirmed', state: 'wait' });
+        items.push({ label: 'Entry, stop loss and take profit (they appear after the sweep and the BOS)', state: 'wait' });
     }
     return items;
 }
@@ -344,6 +342,10 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                             atr: analysis.atr,
                             warnings: analysis.warnings,
                             plannedTrades: analysis.watch,
+                            bos: analysis.bos,
+                            fairValueGap: analysis.fvg,
+                            entryTime: analysis.entryTime,
+                            stages: analysis.stages,
                             session: analysis.sessionNow,
                         },
                     }),
@@ -644,6 +646,31 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                     </dd>
                                 </>
                             )}
+                            {outcome.analysis.bos && (
+                                <>
+                                    <dt>Break of structure</dt>
+                                    <dd>
+                                        level {fmt(outcome.analysis.bos.level)}
+                                        {outcome.analysis.bos.bosTime
+                                            ? `, confirmed ${fmtTime(outcome.analysis.bos.bosTime)}`
+                                            : ', not confirmed yet'}
+                                    </dd>
+                                </>
+                            )}
+                            {outcome.analysis.fvg && (
+                                <>
+                                    <dt>Fair value gap</dt>
+                                    <dd>
+                                        {fmt(outcome.analysis.fvg.bottom)} to {fmt(outcome.analysis.fvg.top)}
+                                    </dd>
+                                </>
+                            )}
+                            {outcome.analysis.entryTime && (
+                                <>
+                                    <dt>Entry reached</dt>
+                                    <dd>{fmtTime(outcome.analysis.entryTime)}</dd>
+                                </>
+                            )}
                             {outcome.analysis.candlesLeft !== null && outcome.analysis.state === 'ready' && (
                                 <>
                                     <dt>Valid for</dt>
@@ -657,10 +684,12 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
 
                         {plan && (
                             <>
-                                <h4 className='forex-trader__h'>Trade plan ({plan.side})</h4>
+                                <h4 className='forex-trader__h'>{plan.planned ? 'Planned trade' : 'Trade plan'} ({plan.side})</h4>
                                 <div className='forex-trader__grid'>
                                     <div className='is-entry'>
-                                        <span>Entry</span>
+                                        <span>
+                                            Entry {outcome.analysis.entryTime ? '(reached)' : '(pullback to BOS level)'}
+                                        </span>
                                         <b>{fmt(plan.entry)}</b>
                                     </div>
                                     <div className='is-sl'>
@@ -723,6 +752,19 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                                         </span>
                                     </div>
                                 ))}
+                            </>
+                        )}
+
+                        {outcome.analysis.stages.length > 0 && (
+                            <>
+                                <h4 className='forex-trader__h'>Setup stages</h4>
+                                <ol className='forex-trader__stages'>
+                                    {outcome.analysis.stages.map(st => (
+                                        <li key={st.label} className={`is-${st.state}`}>
+                                            <span>{st.state === 'done' ? '✔' : st.state === 'now' ? '●' : '○'}</span> {st.label}
+                                        </li>
+                                    ))}
+                                </ol>
                             </>
                         )}
 

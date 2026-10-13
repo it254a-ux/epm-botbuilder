@@ -26,6 +26,7 @@ export type SetupState =
     | 'stale'
     | 'poor_market'
     | 'no_range'
+    | 'waiting_bos'
     | 'waiting_for_sweep'
     | 'sweep_in_progress'
     | 'ready'
@@ -50,7 +51,32 @@ export interface Sweep {
     extremeTime: number;
 }
 
+/** Break of structure: the swing before the sweep that price must close through to confirm the reversal. */
+export interface Bos {
+    side: Side;
+    level: number;
+    swingTime: number;
+    /** Candle that closed through the level; null while still waiting. */
+    bosTime: number | null;
+}
+
+/** Fair value gap left by the move away from the sweep. */
+export interface Fvg {
+    top: number;
+    bottom: number;
+    startTime: number;
+    endTime: number;
+}
+
+export interface Stage {
+    label: string;
+    state: 'done' | 'now' | 'todo';
+    note?: string;
+}
+
 export interface TradePlan {
+    /** true = the trade is only planned: BOS has not happened yet. */
+    planned?: boolean;
     side: Side;
     entry: number;
     stopLoss: number;
@@ -108,6 +134,12 @@ export interface Analysis {
     /** UTC session names covering the last candle, e.g. "Asian". */
     sessionNow: string;
     lastCandleTime: number | null;
+    bos: Bos | null;
+    fvg: Fvg | null;
+    /** Candle where price pulled back to the entry; null if not yet. */
+    entryTime: number | null;
+    /** The six stages of the setup, for the checklist. */
+    stages: Stage[];
 }
 
 const DAY = 86400;
@@ -381,9 +413,46 @@ interface Evaluated {
     candlesSince: number;
     /** What ended it, for the message. */
     why: string;
+    bos: Bos;
+    fvg: Fvg | null;
+    entryTime: number | null;
 }
 
-/** Build the trade for one sweep and say what price has done since. */
+/** Price without floating-point noise, for messages. */
+export const px = (n: number) => String(Number(n.toPrecision(8)));
+
+/** The most recent swing low (for a SELL) / swing high (for a BUY) before the sweep candle. */
+function findSwing(candles: Candle[], idx: number, side: Side): { level: number; time: number } | null {
+    const lo = Math.max(2, idx - 40);
+    for (let i = idx - 3; i >= lo; i--) {
+        const c = candles[i];
+        const n = [candles[i - 1], candles[i - 2], candles[i + 1], candles[i + 2]];
+        if (side === 'SELL' ? n.every(x => c.low < x.low) : n.every(x => c.high > x.high)) {
+            return { level: side === 'SELL' ? c.low : c.high, time: c.time };
+        }
+    }
+    const seg = candles.slice(Math.max(0, idx - 10), idx);
+    if (seg.length === 0) return null;
+    const pick = seg.reduce((a, b) => (side === 'SELL' ? (b.low < a.low ? b : a) : b.high > a.high ? b : a));
+    return { level: side === 'SELL' ? pick.low : pick.high, time: pick.time };
+}
+
+/** First three-candle gap in the direction of the trade, from the sweep onwards. */
+function findFvg(candles: Candle[], idx: number, side: Side): Fvg | null {
+    for (let k = Math.max(1, idx); k < candles.length - 1; k++) {
+        const a = candles[k - 1];
+        const c = candles[k + 1];
+        if (side === 'SELL' && a.low > c.high) return { top: a.low, bottom: c.high, startTime: a.time, endTime: c.time };
+        if (side === 'BUY' && a.high < c.low) return { top: c.low, bottom: a.high, startTime: a.time, endTime: c.time };
+    }
+    return null;
+}
+
+/**
+ * Build the trade for one sweep and say what price has done since.
+ * Entry is NOT the sweep candle's close: the trade waits for confirmation (a close through the
+ * swing before the sweep = break of structure) and enters on the pullback to that level.
+ */
 function evaluateSweep(
     range: RefRange,
     sweep: Sweep,
@@ -391,17 +460,20 @@ function evaluateSweep(
     atrValue: number,
     forming?: Candle | null
 ): Evaluated {
-    const confirmCandle = candles.find(c => c.time === sweep.confirmTime)!;
     const pad = atrValue * 0.25;
     const side: Side = sweep.side === 'high' ? 'SELL' : 'BUY';
-    const entry = confirmCandle.close;
-    const stopLoss = side === 'SELL' ? sweep.extreme + pad : sweep.extreme - pad;
-    const takeProfit = side === 'SELL' ? range.low : range.high;
-    const risk = Math.abs(stopLoss - entry);
-    const reward = Math.abs(entry - takeProfit);
+    const sell = side === 'SELL';
+    const idxExt = candles.findIndex(c => c.time === sweep.extremeTime);
+    const confirmCandle = candles.find(c => c.time === sweep.confirmTime)!;
+    const swing = idxExt >= 3 ? findSwing(candles, idxExt, side) : null;
+    const level = swing ? swing.level : confirmCandle.close;
+    const stopLoss = sell ? sweep.extreme + pad : sweep.extreme - pad;
+    const takeProfit = sell ? range.low : range.high;
+    const risk = Math.abs(stopLoss - level);
+    const reward = Math.abs(level - takeProfit);
     const plan: TradePlan = {
         side,
-        entry,
+        entry: level,
         stopLoss,
         takeProfit,
         midpoint: (range.high + range.low) / 2,
@@ -409,31 +481,85 @@ function evaluateSweep(
         reward,
         rr: risk > 0 ? reward / risk : 0,
     };
+    const bos: Bos = { side, level, swingTime: swing ? swing.time : confirmCandle.time, bosTime: swing ? null : confirmCandle.time };
 
-    const after = candles.filter(c => c.time > sweep.confirmTime);
-    if (forming && forming.time > sweep.confirmTime) after.push(forming);
+    const seq = candles.filter(c => c.time >= sweep.extremeTime);
+    if (forming && forming.time > sweep.extremeTime) seq.push(forming);
+
+    let entryTime: number | null = null;
     let candlesSince = 0;
-    for (const c of after) {
-        if (c !== forming) candlesSince++;
-        // Breaking the sweep point (its high/low) means it was a real breakout, not a sweep.
-        const brokeSweepPoint = side === 'SELL' ? c.high > sweep.extreme : c.low < sweep.extreme;
-        const hitSL = side === 'SELL' ? c.high >= plan.stopLoss : c.low <= plan.stopLoss;
-        const hitTP = side === 'SELL' ? c.low <= plan.takeProfit : c.high >= plan.takeProfit;
-        if (brokeSweepPoint || hitSL) {
-            return {
-                sweep,
-                plan,
-                outcome: 'invalidated',
-                candlesSince,
-                why: `price broke the sweep ${sweep.side} at ${sweep.extreme}: a real breakout, not a sweep`,
-            };
+    const done = (outcome: Outcome, why: string): Evaluated => ({
+        sweep,
+        plan: { ...plan, planned: bos.bosTime === null },
+        outcome,
+        candlesSince,
+        why,
+        bos,
+        fvg: findFvg(candles, idxExt, side),
+        entryTime,
+    });
+
+    for (const c of seq) {
+        const isForming = c === forming;
+        if (c.time <= sweep.confirmTime) {
+            // candles inside the sweep itself: a close through the swing here already confirms the BOS
+            if (!isForming && bos.bosTime === null && (sell ? c.close < level : c.close > level) && c.time === sweep.confirmTime) {
+                bos.bosTime = c.time;
+            }
+            continue;
         }
-        if (hitTP) return { sweep, plan, outcome: 'target_reached', candlesSince, why: 'target reached' };
+        if (!isForming) candlesSince++;
+        // Breaking the sweep point (its high/low) means it was a real breakout, not a sweep.
+        const brokeSweepPoint = sell ? c.high > sweep.extreme : c.low < sweep.extreme;
+        const hitSL = sell ? c.high >= plan.stopLoss : c.low <= plan.stopLoss;
+        if (brokeSweepPoint || hitSL) {
+            return done('invalidated', `price broke the sweep ${sweep.side} at ${px(sweep.extreme)}: a real breakout, not a sweep`);
+        }
+        const hitTP = sell ? c.low <= plan.takeProfit : c.high >= plan.takeProfit;
+        if (bos.bosTime === null) {
+            if (!isForming && (sell ? c.close < level : c.close > level)) bos.bosTime = c.time;
+            else if (hitTP) return done('target_reached', 'price reached the target without a break of structure');
+            continue;
+        }
+        if (entryTime === null && c.time > bos.bosTime) {
+            if (sell ? c.high >= level : c.low <= level) entryTime = c.time;
+            else if (hitTP) return done('target_reached', 'price went straight to the target without a pullback: the entry was missed');
+        }
+        if (entryTime !== null && hitTP) return done('target_reached', 'target reached');
     }
     if (candlesSince > SETUP_LIFETIME_CANDLES) {
-        return { sweep, plan, outcome: 'expired', candlesSince, why: 'the sweep is too old to act on' };
+        return done('expired', bos.bosTime === null ? 'no break of structure came in time' : 'the sweep is too old to act on');
     }
-    return { sweep, plan, outcome: 'live', candlesSince, why: '' };
+    return done('live', '');
+}
+
+function buildStages(out: Analysis, inProgressNow: boolean): Stage[] {
+    const r = out.range;
+    const sw = out.sweep;
+    const bos = out.bos;
+    const dir = sw ? (sw.side === 'high' ? 'below' : 'above') : '';
+    const st = (done: boolean, now: boolean): Stage['state'] => (done ? 'done' : now ? 'now' : 'todo');
+    const swept = !!sw;
+    const bosDone = !!bos && bos.bosTime !== null;
+    const entered = out.entryTime !== null;
+    const finished = ['invalidated', 'target_reached', 'expired'].includes(out.state);
+    return [
+        { label: r ? `Range marked (${r.label}: ${px(r.low)} to ${px(r.high)})` : 'Range marked', state: st(!!r, !r) },
+        { label: 'Liquidity sweep wick (high or low taken)', state: st(swept, !swept && inProgressNow) },
+        { label: 'A candle closes back inside the range', state: st(swept, false) },
+        {
+            label: bos ? `Break of structure (a close ${dir} ${px(bos.level)})` : 'Break of structure (BOS)',
+            state: st(bosDone, swept && !bosDone && !finished),
+        },
+        {
+            label: out.plan ? `Pullback to the entry (${px(out.plan.entry)})` : 'Pullback to the entry',
+            state: st(entered, bosDone && !entered && !finished),
+        },
+        {
+            label: finished ? `Result: ${out.statusText}` : 'Stop loss and target in play',
+            state: finished ? 'done' : entered ? 'now' : 'todo',
+        },
+    ];
 }
 
 export function analyse(
@@ -463,6 +589,10 @@ export function analyse(
         candlesLeft: null,
         sessionNow: candles.length ? sessionAt(candles[candles.length - 1].time) : '',
         lastCandleTime: candles.length ? candles[candles.length - 1].time : null,
+        bos: null,
+        fvg: null,
+        entryTime: null,
+        stages: [],
     };
     if (candles.length < 20) {
         base.warnings.push('Fewer than 20 candles loaded: not enough to analyse.');
@@ -525,50 +655,62 @@ export function analyse(
         if (inProgress) {
             out.state = 'sweep_in_progress';
             out.statusText = `${range.label} ${inProgress.side === 'high' ? 'High' : 'Low'} is being swept: waiting for a candle to close back inside`;
+            out.stages = buildStages(out, true);
             return out;
         }
         out.state = 'waiting_for_sweep';
         out.statusText = 'Waiting for the point of view: no sweep of the range yet';
+        out.stages = buildStages(out, false);
         return out;
     }
 
     out.sweep = current.sweep;
     out.plan = current.plan;
+    out.bos = current.bos;
+    out.fvg = current.fvg;
+    out.entryTime = current.entryTime;
     out.candlesSince = current.candlesSince;
     out.candlesLeft = Math.max(0, SETUP_LIFETIME_CANDLES - current.candlesSince);
     const plan = current.plan;
+    const sell = plan.side === 'SELL';
 
-    if (current.outcome === 'invalidated') {
-        out.state = 'invalidated';
-        out.statusText = `Setup invalidated: ${current.why}`;
+    const finish = (state: SetupState, text: string): Analysis => {
+        out.state = state;
+        out.statusText = text;
+        out.stages = buildStages(out, false);
         return out;
-    }
-    if (current.outcome === 'target_reached') {
-        out.state = 'target_reached';
-        out.statusText = 'Target already reached: this setup is finished';
-        return out;
-    }
-    if (current.outcome === 'expired') {
-        out.state = 'expired';
-        out.statusText = 'Setup expired: the sweep is too old to act on';
-        return out;
+    };
+
+    if (current.outcome === 'invalidated') return finish('invalidated', `Setup invalidated: ${current.why}`);
+    if (current.outcome === 'target_reached') return finish('target_reached', `Setup finished: ${current.why}`);
+    if (current.outcome === 'expired') return finish('expired', `Setup expired: ${current.why}`);
+
+    if (current.bos.bosTime === null) {
+        out.warnings.push('Not a trade yet: wait for a candle to close through the BOS level before placing anything.');
+        return finish(
+            'waiting_bos',
+            `${range.label} ${current.sweep.side === 'high' ? 'High' : 'Low'} swept and price closed back inside: waiting for a break of structure (a candle closing ${sell ? 'below' : 'above'} ${px(current.bos.level)})`
+        );
     }
 
-    // The sweep is live. Before calling it ready it must pass the market-quality rules.
+    // BOS confirmed. Before calling it ready it must pass the market-quality rules.
     const reasons: string[] = [];
     if (plan.rr < MIN_RR) reasons.push(`reward is only 1 : ${plan.rr.toFixed(2)} (minimum is 1 : ${MIN_RR})`);
     if (rangeSize < atrValue) reasons.push('the reference range is narrower than one average candle (ATR)');
     const er = efficiencyRatio(candles);
     if (er !== null && er < CHOPPY_BELOW) reasons.push(`the market is choppy (efficiency ${er.toFixed(2)}, needs ${CHOPPY_BELOW} or more)`);
-    const progress = plan.side === 'SELL' ? (plan.entry - priceNow) / (plan.reward || 1) : (priceNow - plan.entry) / (plan.reward || 1);
-    if (progress > 0.5) reasons.push('price has already moved over half-way to the target, so entering now is late');
-    if (reasons.length > 0) {
-        out.state = 'poor_market';
-        out.statusText = `Waiting for the market to be good: ${reasons.join('; ')}`;
-        out.warnings.push(...reasons.map(r => r.charAt(0).toUpperCase() + r.slice(1) + '.'));
-        return out;
+    if (current.entryTime === null) {
+        const ran = sell ? (plan.entry - priceNow) / (plan.reward || 1) : (priceNow - plan.entry) / (plan.reward || 1);
+        if (ran > 0.5) reasons.push('price already ran over half-way to the target without pulling back, so the entry is late');
     }
-    out.state = 'ready';
-    out.statusText = `${plan.side} setup ready`;
-    return out;
+    if (reasons.length > 0) {
+        out.warnings.push(...reasons.map(r => r.charAt(0).toUpperCase() + r.slice(1) + '.'));
+        return finish('poor_market', `Waiting for the market to be good: ${reasons.join('; ')}`);
+    }
+    return finish(
+        'ready',
+        current.entryTime !== null
+            ? `${plan.side} entry reached at ${px(plan.entry)}: the trade is live`
+            : `${plan.side} setup ready: enter ${plan.side} when price pulls back to ${px(plan.entry)} (the BOS level)`
+    );
 }
