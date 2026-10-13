@@ -111,7 +111,7 @@ const fmtTime = (t: number) => {
     return `${d.toUTCString().slice(5, 11)} ${d.toISOString().slice(11, 16)} GMT`;
 };
 
-const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
+const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'panel'; panelWidth?: number }) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     const [symbol, setSymbol] = useState('R_25');
@@ -475,7 +475,7 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}`}
+            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             <div className='forex-trader__controls'>
@@ -523,7 +523,19 @@ const ForexTrader = ({ variant = 'page' }: { variant?: 'page' | 'panel' }) => {
                 </button>
             </div>
 
-            <div className='forex-trader__chart-wrap' ref={wrapRef}>
+            <div
+                className='forex-trader__chart-wrap'
+                ref={wrapRef}
+                style={
+                    panelWidth && panelWidth > 380
+                        ? (() => {
+                              // a wider panel gets a taller chart too (never taller than 62% of the screen)
+                              const h = Math.max(290, Math.min(Math.round(panelWidth * 0.62), Math.round(window.innerHeight * 0.62)));
+                              return { height: `${h}px`, minHeight: `${h}px` };
+                          })()
+                        : undefined
+                }
+            >
                 <ChartView ref={chartRef} pipSize={pipSize} />
                 <div className='forex-trader__chart-info'>
                     <b>{info?.underlying_symbol_name ?? symbol}</b>

@@ -611,3 +611,14 @@
         color: var(--text-less-prominent);
     }
 }
+
+// Wider panel: use the extra room for the controls and the facts.
+.forex-trader--wide .forex-trader__controls {
+    grid-template-columns: minmax(0, 1.4fr) 90px minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+
+    > :nth-child(1),
+    label:nth-child(4),
+    .forex-trader__analyse-btn {
+        grid-column: auto;
+    }
+}

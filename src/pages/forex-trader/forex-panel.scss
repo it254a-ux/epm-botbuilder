@@ -7,11 +7,70 @@
         position: fixed;
         top: 10.4rem;
         right: 0;
-        width: 36.6rem;
+        width: 36.6rem; // normal width; the real width comes from the drag state
         height: var(--bot-content-height);
         z-index: 3;
+        padding-top: 34px; // thin header row that holds the enlarge button
         border-left: 1px solid var(--border-normal);
         overflow: hidden;
+    }
+
+    &--desktop.is-dragging {
+        user-select: none;
+    }
+
+    &__edge {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 5;
+        width: 10px;
+        cursor: ew-resize;
+        touch-action: none;
+
+        &::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 3px;
+            width: 4px;
+            height: 44px;
+            margin-top: -22px;
+            border-radius: 2px;
+            background: var(--border-normal);
+        }
+
+        &:hover::after,
+        .is-dragging &::after {
+            background: #2563eb;
+        }
+    }
+
+    &__hint {
+        position: absolute;
+        top: 0;
+        left: 14px;
+        z-index: 6;
+        line-height: 34px;
+        font-size: 11px;
+        color: var(--text-less-prominent);
+    }
+
+    &__enlarge {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        z-index: 6;
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--border-normal);
+        border-radius: 6px;
+        background: var(--general-section-1);
+        color: var(--text-general);
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
     }
 
     &--sheet {

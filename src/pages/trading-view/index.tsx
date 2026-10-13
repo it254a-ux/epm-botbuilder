@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import TradingViewComponent from '@/components/trading-view-chart/trading-view';
 import { useDevice } from '@deriv-com/ui';
+import { usePanelWidth } from '../forex-trader/panel-size';
 import './trading-view-page.scss';
 
 // Full-page version of the same TradingView iframe already used by Bot
@@ -36,7 +37,7 @@ const CROP_TOP = 72;
 // `--expanded` toggle is also gated on isDesktop; the drawer is a full-width
 // bottom sheet on mobile/tablet, not a side panel, so there's nothing to
 // share width with there.
-const DESKTOP_DRAWER_OPEN_WIDTH = 366;
+
 
 function TradingViewPageComponent() {
     const page_ref = useRef<HTMLDivElement | null>(null);
@@ -44,7 +45,8 @@ function TradingViewPageComponent() {
     const { isDesktop } = useDevice();
 
     // The right-hand panel on this tab is the Forex Trader tool (always open on desktop).
-    const reserved_width = isDesktop ? DESKTOP_DRAWER_OPEN_WIDTH : 0;
+    const panel_width = usePanelWidth();
+    const reserved_width = isDesktop ? panel_width : 0;
 
     const update = () => {
         const el = page_ref.current;
