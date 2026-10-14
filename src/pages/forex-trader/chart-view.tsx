@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
     createChart,
     type CandlestickData,
@@ -13,6 +13,7 @@ import {
 } from 'lightweight-charts';
 import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
+import ChartDrawings from './chart-drawings';
 
 export interface ChartViewHandle {
     /** Replace all candles (initial load / market or timeframe change). */
@@ -108,6 +109,10 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const linesRef = useRef<IPriceLine[]>([]);
     const extraRef = useRef<ISeriesApi<SeriesType>[]>([]);
     const levelsRef = useRef<{ min: number; max: number } | null>(null);
+    // candles kept here so the drawing tools' magnet can snap to them
+    const candlesRef = useRef<Candle[]>([]);
+    const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null);
+    const [resetKey, setResetKey] = useState(0);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -155,6 +160,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         } as never);
         chartRef.current = chart;
         seriesRef.current = series;
+        setApis({ chart, series });
 
         const ro = new ResizeObserver(() => {
             if (host.clientWidth > 0 && host.clientHeight > 0) {
@@ -168,6 +174,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             chart.remove();
             chartRef.current = null;
             seriesRef.current = null;
+            setApis(null);
             linesRef.current = [];
             extraRef.current = [];
         };
@@ -192,10 +199,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     useImperativeHandle(ref, () => ({
         setCandles(candles) {
             clearDrawing();
+            candlesRef.current = candles.slice();
+            setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             chartRef.current?.timeScale().fitContent();
         },
         updateCandle(candle) {
+            const list = candlesRef.current;
+            const last = list[list.length - 1];
+            if (last && last.time === candle.time) list[list.length - 1] = candle;
+            else if (!last || candle.time > last.time) list.push(candle);
             seriesRef.current?.update(toBar(candle));
         },
         drawAnalysis(analysis, candles) {
@@ -477,7 +490,14 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         },
     }));
 
-    return <div ref={hostRef} className='forex-trader__chart-host' />;
+    return (
+        <>
+            <div ref={hostRef} className='forex-trader__chart-host' />
+            {apis && (
+                <ChartDrawings chart={apis.chart} series={apis.series} getCandles={() => candlesRef.current} pipSize={pipSize} resetKey={resetKey} />
+            )}
+        </>
+    );
 });
 
 export default ChartView;
