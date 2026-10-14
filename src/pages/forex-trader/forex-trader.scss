@@ -632,7 +632,7 @@
 @media (min-width: 1100px) {
     .forex-trader:not(.forex-trader--panel) {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 460px;
+        grid-template-columns: minmax(0, 1fr) 340px;
         grid-template-rows: auto minmax(0, 1fr);
         overflow: hidden;
 

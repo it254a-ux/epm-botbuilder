@@ -427,35 +427,6 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ---- draggable floating Analyse button
-    const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-    const drag = useRef<{ dx: number; dy: number; sx: number; sy: number; moved: boolean } | null>(null);
-    useEffect(() => {
-        const w = wrapRef.current;
-        if (w && !pos) setPos({ x: Math.max(8, w.clientWidth - 210), y: 44 });
-    }, [pos, loading]);
-
-    const onDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (!pos) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, sx: e.clientX, sy: e.clientY, moved: false };
-    };
-    const onMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-        const d = drag.current;
-        const w = wrapRef.current;
-        if (!d || !w) return;
-        if (Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 6) d.moved = true;
-        if (!d.moved) return;
-        const x = Math.min(Math.max(0, e.clientX - d.dx), w.clientWidth - 110);
-        const y = Math.min(Math.max(0, e.clientY - d.dy), w.clientHeight - 40);
-        setPos({ x, y });
-    };
-    const onUp = () => {
-        const d = drag.current;
-        drag.current = null;
-        if (d && !d.moved && canAnalyse) runAnalysis();
-    };
-
     const aiCurrent = !!outcome?.ai && outcome.aiKey === outcome.key;
     // The code's rules decide whether a trade is ready. The AI may only make the call more careful, never less.
     const codeSt: AiResult['status'] | null = outcome ? codeStatus(outcome.analysis) : null;
@@ -559,20 +530,6 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                     <div className='forex-trader__overlay forex-trader__overlay--closed'>
                         Market closed — no live analysis. Pick an open market (Derived indices run all week).
                     </div>
-                )}
-                {pos && variant !== 'panel' && (
-                    <button
-                        type='button'
-                        className={`forex-trader__float${canAnalyse ? '' : ' is-disabled'}`}
-                        style={{ left: pos.x, top: pos.y }}
-                        onPointerDown={onDown}
-                        onPointerMove={onMove}
-                        onPointerUp={onUp}
-                        title='Drag to move, tap to analyse'
-                        aria-label='Analyse'
-                    >
-                        {aiBusy ? '…' : '⚡ Re-analyse'}
-                    </button>
                 )}
                 {status && (
                     <div className={`forex-trader__badge forex-trader__badge--${tone}`}>{outcome && statusLabel(status, outcome.analysis)}</div>
