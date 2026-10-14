@@ -182,6 +182,8 @@ module.exports = async function handler(req, res) {
                     const age = bosTime ? Math.round((lastClosed - bosTime) / cfg.timeframe) : 0;
                     r.candlesSinceBos = age;
                     if (age > cfg.maxAgeCandles) { r.skipped = `Setup is ${age} candles old (limit ${cfg.maxAgeCandles})`; continue; }
+                    const bad = core.levelsProblem(a.plan);
+                    if (bad) { r.skipped = `Impossible trade levels: ${bad}`; continue; }
                     if (a.plan.rr < cfg.minRr) { r.skipped = `RR ${a.plan.rr.toFixed(2)} below minimum ${cfg.minRr}`; continue; }
 
                     const sig = {

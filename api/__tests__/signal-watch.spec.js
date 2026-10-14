@@ -154,6 +154,29 @@ describe('sending signals', () => {
         expect(sendTelegram).toHaveBeenCalledTimes(2);
     });
 
+    test('a trade with impossible levels is never sent (BUY with stop loss above the entry)', async () => {
+        const a = readyAnalysis();
+        a.plan = { side: 'BUY', entry: 1.0856, stopLoss: 1.0877, takeProfit: 1.0985, rr: 6.1 };
+        engine.analyse.mockReturnValue(a);
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].skipped).toMatch(/impossible trade levels.*stop loss is not below/i);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
+        expect(await global.__sql`SELECT id FROM signals`).toHaveLength(0);
+    });
+
+    test('level checks for every case', () => {
+        const ok = { entry: 100, stopLoss: 98, takeProfit: 105 };
+        expect(core.levelsProblem({ side: 'BUY', ...ok })).toBeNull();
+        expect(core.levelsProblem({ side: 'SELL', entry: 100, stopLoss: 102, takeProfit: 95 })).toBeNull();
+        expect(core.levelsProblem({ side: 'BUY', entry: 100, stopLoss: 102, takeProfit: 105 })).toMatch(/stop loss/);
+        expect(core.levelsProblem({ side: 'BUY', entry: 100, stopLoss: 98, takeProfit: 99 })).toMatch(/take profit/);
+        expect(core.levelsProblem({ side: 'SELL', entry: 100, stopLoss: 98, takeProfit: 95 })).toMatch(/stop loss/);
+        expect(core.levelsProblem({ side: 'SELL', entry: 100, stopLoss: 102, takeProfit: 101 })).toMatch(/take profit/);
+        expect(core.levelsProblem({ side: 'BUY', entry: 100, stopLoss: 100, takeProfit: 105 })).toMatch(/stop loss/);
+        expect(core.levelsProblem({ side: 'BUY', entry: NaN, stopLoss: 98, takeProfit: 105 })).toMatch(/missing/);
+    });
+
     test('RR below the minimum is not sent', async () => {
         process.env.MIN_RR = '3';
         const r = await call(handler);

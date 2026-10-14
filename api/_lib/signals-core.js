@@ -70,7 +70,25 @@ function resolveWatchSymbols(rows, envSymbols) {
     return Array.from(new Set(list));
 }
 
+/**
+ * A trade only makes sense if its levels are on the right sides of the entry:
+ * BUY needs stop loss < entry < take profit, SELL needs take profit < entry < stop loss.
+ * Returns null when the levels are fine, or a short reason when they are not.
+ */
+function levelsProblem(plan) {
+    const { side, entry, stopLoss, takeProfit } = plan;
+    if (![entry, stopLoss, takeProfit].every(Number.isFinite)) return 'a price level is missing';
+    if (side === 'BUY') {
+        if (!(stopLoss < entry)) return 'stop loss is not below the entry for a BUY';
+        if (!(takeProfit > entry)) return 'take profit is not above the entry for a BUY';
+    } else if (side === 'SELL') {
+        if (!(stopLoss > entry)) return 'stop loss is not above the entry for a SELL';
+        if (!(takeProfit < entry)) return 'take profit is not below the entry for a SELL';
+    } else return 'unknown side';
+    return null;
+}
+
 /** Open time of the candle that closed most recently, by the clock. */
 const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem };
