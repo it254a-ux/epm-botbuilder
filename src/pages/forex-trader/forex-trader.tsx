@@ -345,7 +345,7 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                 });
                 const json = await resp.json().catch(() => ({}));
                 if (resp.ok) ai = json as AiResult;
-                else aiError = json?.error ?? `AI review unavailable (${resp.status})`;
+                else aiError = `${json?.error ?? 'AI review unavailable.'} (code ${json?.code ?? resp.status})`;
             } catch {
                 aiError = 'AI review unavailable (no connection to the server).';
             }

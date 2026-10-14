@@ -11,6 +11,7 @@
 // gemini-2.0-flash was shut down by Google on 1 June 2026. Set GEMINI_MODEL in Vercel to switch
 // models without a code change (see https://ai.google.dev/gemini-api/docs/deprecations).
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const FALLBACK_MODEL = 'gemini-3.5-flash-lite';
 const MAX_IMAGE_CHARS = 2_500_000; // base64 length, roughly 1.8 MB of image
 const MAX_JSON_CHARS = 20_000;
 const MAX_CANDLES = 120;
@@ -126,11 +127,8 @@ module.exports = async function handler(req, res) {
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-        let r;
-        try {
-            r = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
-            {
+        const ask = model =>
+            fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
                 method: 'POST',
                 signal: controller.signal,
                 headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -139,8 +137,17 @@ module.exports = async function handler(req, res) {
                     contents: [{ role: 'user', parts }],
                     generationConfig: { temperature: 0.2, responseMimeType: 'application/json', maxOutputTokens: 2048 },
                 }),
+            });
+        let r;
+        let usedModel = MODEL;
+        try {
+            r = await ask(usedModel);
+            // If Google says this model name does not exist (404), try the cheaper fallback model once.
+            if (r.status === 404 && usedModel !== FALLBACK_MODEL) {
+                console.error('gemini model not found, trying fallback:', usedModel);
+                usedModel = FALLBACK_MODEL;
+                r = await ask(usedModel);
             }
-            );
         } catch (err) {
             if (err && err.name === 'AbortError') {
                 res.status(504).json({ error: 'The AI took too long to answer. Please try again.' });
@@ -152,8 +159,14 @@ module.exports = async function handler(req, res) {
         }
         if (!r.ok) {
             const detail = await r.text().catch(() => '');
-            console.error('gemini error', r.status, detail.slice(0, 300));
-            res.status(502).json({ error: 'The AI review is unavailable right now. Please try again shortly.' });
+            console.error('gemini error', r.status, usedModel, detail.slice(0, 300));
+            // Only the status number is shown to the visitor, never Google's detail text.
+            res.status(502).json({
+                error: r.status === 429
+                    ? 'The AI service is busy right now. Please try again in a minute.'
+                    : 'The AI review is unavailable right now. Please try again shortly.',
+                code: r.status,
+            });
             return;
         }
         const data = await r.json();
@@ -165,7 +178,7 @@ module.exports = async function handler(req, res) {
             res.status(502).json({ error: 'The AI gave an unreadable answer. Try again.' });
             return;
         }
-        res.status(200).json({ ...clean(parsed, analysis), model: MODEL });
+        res.status(200).json({ ...clean(parsed, analysis), model: usedModel });
     } catch (err) {
         console.error('forex-analyse error:', err);
         res.status(500).json({ error: 'Analysis failed. Please try again.' });

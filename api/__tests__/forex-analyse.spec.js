@@ -148,11 +148,30 @@ describe('the endpoint', () => {
         expect(r.body.error).toMatch(/too long/);
     });
 
-    test('a Gemini error shows a generic message, not the status code or details', async () => {
+    test('a Gemini error shows a generic message and only the status number, not Google\'s details', async () => {
         global.fetch.mockResolvedValue({ ok: false, status: 403, text: async () => 'API key not valid' });
         const r = await call({ analysis });
         expect(r.status).toBe(502);
-        expect(JSON.stringify(r.body)).not.toMatch(/403|API key|valid/i);
+        expect(r.body.code).toBe(403);
+        expect(r.body.error).not.toMatch(/API key|valid|403/i);
+    });
+
+    test('a busy Gemini (429) gets its own friendly message', async () => {
+        global.fetch.mockResolvedValue({ ok: false, status: 429, text: async () => 'quota' });
+        const r = await call({ analysis });
+        expect(r.body.error).toMatch(/busy/);
+        expect(r.body.code).toBe(429);
+    });
+
+    test('an unknown model name (404) retries once with the fallback model', async () => {
+        global.fetch
+            .mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'model not found' })
+            .mockResolvedValueOnce(geminiAnswer({ status: 'waiting_for_pov', confidence: 40, reasoning: '', warnings: [] }));
+        const r = await call({ analysis });
+        expect(r.status).toBe(200);
+        expect(r.body.model).toBe('gemini-3.5-flash-lite');
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(global.fetch.mock.calls[1][0]).toMatch(/gemini-3\.5-flash-lite/);
     });
 
     describe('candles sent along with the screenshot', () => {
