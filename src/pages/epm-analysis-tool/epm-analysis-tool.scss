@@ -1,4 +1,7 @@
+@use 'components/shared/styles/wallpaper' as *;
+
 .epm-analysis-tool {
+    @include page-wallpaper;
     box-sizing: border-box;
     position: relative;
     max-width: 100%;

@@ -1,4 +1,5 @@
 @use 'components/shared/styles/mixins' as *;
+@use 'components/shared/styles/wallpaper' as *;
 
 .bot-dashboard {
     --translate-panel-rtl: -367px;
@@ -116,23 +117,7 @@
         display: flex;
         width: 100%;
         min-height: 100%;
-        /* Wallpaper: pre-blurred picture (so it never hurts readability) with a
-           theme-aware tint on top. Desktop and phones get their own picture. */
-        --dash-tint: rgba(8, 8, 10, 0.72);
-        background: linear-gradient(var(--dash-tint), var(--dash-tint)),
-            url('/wallpapers/dashboard-desktop.jpg') center / cover no-repeat;
-        background-color: #08080a;
-
-        @media (max-width: 900px) {
-            background: linear-gradient(var(--dash-tint), var(--dash-tint)),
-                url('/wallpapers/dashboard-mobile.jpg') center / cover no-repeat;
-            background-color: #08080a;
-        }
-
-        .theme--light & {
-            --dash-tint: rgba(255, 255, 255, 0.8);
-            background-color: #ffffff;
-        }
+        @include page-wallpaper;
 
         &--tour-active {
             width: calc(100% - 36rem);

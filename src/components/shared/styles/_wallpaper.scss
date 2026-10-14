@@ -1,0 +1,20 @@
+/* Shared page wallpaper: a pre-blurred picture (public/wallpapers) with a
+   theme-aware tint on top, so text stays readable in dark and light mode.
+   Portrait picture on phones, landscape picture on desktop. */
+@mixin page-wallpaper {
+    --wall-tint: rgba(8, 8, 10, 0.72);
+    background: linear-gradient(var(--wall-tint), var(--wall-tint)),
+        url('/wallpapers/dashboard-desktop.jpg') center / cover no-repeat;
+    background-color: #08080a;
+
+    @media (max-width: 900px) {
+        background: linear-gradient(var(--wall-tint), var(--wall-tint)),
+            url('/wallpapers/dashboard-mobile.jpg') center / cover no-repeat;
+        background-color: #08080a;
+    }
+
+    .theme--light & {
+        --wall-tint: rgba(255, 255, 255, 0.8);
+        background-color: #ffffff;
+    }
+}

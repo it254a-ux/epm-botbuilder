@@ -1,4 +1,7 @@
+@use 'components/shared/styles/wallpaper' as *;
+
 .epm-trading-bots {
+    @include page-wallpaper;
     height: 100%;
     display: flex;
     flex-direction: column;

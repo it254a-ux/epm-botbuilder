@@ -1,8 +1,10 @@
+@use 'components/shared/styles/wallpaper' as *;
+
 .forex-trader {
     box-sizing: border-box;
     width: 100%; // fill the whole tab; without this a flex parent shrinks it to its content
     min-width: 0;
-    background: var(--general-main-1); // same page colour as the rest of the website
+    @include page-wallpaper;
     font-family: var(--brand-font-primary), sans-serif; // same font as the rest of the website
     display: flex;
     flex-direction: column;
