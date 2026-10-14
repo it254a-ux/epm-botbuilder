@@ -42,6 +42,7 @@ function signalsPageUrl(env = process.env) {
 
 /** Reads the watcher settings from environment variables (Phase 1: simple and explicit). */
 function readConfig(env = process.env) {
+    const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
     const list = (v, fallback) => String(v || fallback).split(',').map(s => s.trim()).filter(Boolean);
     const tf = Number(env.WATCH_TIMEFRAME || 900);
     const minRr = Number(env.MIN_RR || 2);
@@ -53,7 +54,23 @@ function readConfig(env = process.env) {
         minRr: Number.isFinite(minRr) && minRr > 0 ? minRr : 2,
         // Only send setups whose break of structure happened at most this many candles ago.
         maxAgeCandles: Number.isFinite(maxAge) && maxAge >= 0 ? maxAge : 3,
+        // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.
+        concurrency: Math.min(10, Math.max(1, num(env.WATCH_CONCURRENCY, 3))),
+        batchGapMs: Math.max(0, num(env.WATCH_BATCH_GAP_MS, 1000)),
+        // Stop starting new markets after this long; the rest are done first on the next run.
+        budgetMs: Math.max(1000, num(env.WATCH_BUDGET_MS, 45000)),
+        // Pause between Telegram messages (Telegram allows about 20 per minute to one channel).
+        telegramGapMs: Math.max(0, num(env.TELEGRAM_GAP_MS, 1100)),
     };
 }
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig };
+/** The markets to watch: the database watchlist if it has any rows, otherwise WATCH_SYMBOLS from the environment. */
+function resolveWatchSymbols(rows, envSymbols) {
+    const list = rows && rows.length ? rows.filter(r => r.enabled).map(r => r.symbol) : envSymbols;
+    return Array.from(new Set(list));
+}
+
+/** Open time of the candle that closed most recently, by the clock. */
+const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
+
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed };

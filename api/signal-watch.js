@@ -1,10 +1,18 @@
-// Signal machine, server side. Called on a schedule (every 15 minutes) by a cron service.
+// Signal machine, server side. Called on a schedule (cron-job.org) a few times an hour.
 //
-// For every market in WATCH_SYMBOLS: skip it if closed/suspended, load candles from Deriv,
-// and, only if a NEW candle has closed since the last check, run the SAME analysis the chart
-// uses (api/_lib/engine.js is generated from src/pages/forex-trader/engine.ts). Every READY
-// setup that is fresh and meets the minimum RR is saved once (duplicates are blocked by the
-// database) and sent to Telegram. The website feed (/api/signals) reads the same table.
+// For every market on the watchlist: skip it if closed/suspended or if no new candle has
+// closed since its last check, otherwise load candles from Deriv and run the SAME analysis
+// the chart uses (api/_lib/engine.js is generated from src/pages/forex-trader/engine.ts).
+// Every READY setup that is fresh and meets the minimum RR is saved once (duplicates are
+// blocked by the database) and sent to Telegram. The website feed (/api/signals) reads the
+// same table.
+//
+// WATCHLIST: set in the admin page (/signals-admin.html) and stored in the database. If nothing
+// has been saved there yet, WATCH_SYMBOLS from the environment is used.
+//
+// PACING: Deriv allows 220 market-data requests per minute. Markets are checked 3 at a time,
+// 1 second apart (about 180 per minute), least recently checked first. If a run reaches its
+// time budget the remaining markets are done first on the next run.
 //
 // Protected by SIGNALS_SECRET. Call it with the header   Authorization: Bearer <SIGNALS_SECRET>
 // or (easier to set up) with   ?key=<SIGNALS_SECRET>
@@ -13,7 +21,6 @@
 //   ?test=1   sends a test message to Telegram and does nothing else
 //   ?dry=1    analyses and reports what it WOULD send; sends and saves nothing
 //   ?force=1  re-analyses even if no new candle has closed (duplicates are still blocked)
-const crypto = require('crypto');
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
 const { sendTelegram, sendTelegramPhoto } = require('./_lib/telegram');
@@ -21,13 +28,14 @@ const chart = require('./_lib/signal-chart');
 const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
 const store = require('./_lib/signals-store');
+const { authorised } = require('./_lib/signals-auth');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /**
  * Sends one signal to Telegram: as a chart picture with the signal text as its caption.
  * If the picture cannot be drawn or Telegram refuses it, the plain text message is sent instead,
- * so a signal is never lost because of the picture. Returns { messageId, picture: true|false|'failed: why' }.
+ * so a signal is never lost because of the picture. Returns { messageId, picture: true|'failed: why' }.
  */
 async function deliver(sig, chartInput) {
     const text = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
@@ -44,14 +52,19 @@ async function deliver(sig, chartInput) {
     return { messageId: sent.messageId, picture: `failed: ${why}` };
 }
 
-function authorised(req) {
-    const secret = process.env.SIGNALS_SECRET;
-    if (!secret) return false; // never open by accident
-    const header = String(req.headers.authorization || '');
-    const given = header.startsWith('Bearer ') ? header.slice(7) : String((req.query && req.query.key) || '');
-    const a = Buffer.from(given);
-    const b = Buffer.from(secret);
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
+/** Runs Telegram sends one at a time with a pause between them (Telegram limits bursts). */
+function makeSender(gapMs) {
+    let chain = Promise.resolve();
+    let first = true;
+    return task => {
+        const run = chain.then(async () => {
+            if (!first && gapMs) await sleep(gapMs);
+            first = false;
+            return task();
+        });
+        chain = run.catch(() => {});
+        return run;
+    };
 }
 
 module.exports = async function handler(req, res) {
@@ -78,8 +91,10 @@ module.exports = async function handler(req, res) {
         return;
     }
 
+    const started = Date.now();
     const cfg = core.readConfig();
-    const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, markets: [] };
+    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, errors: 0, deferred: 0 };
+    const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, summary, markets: [] };
 
     let client;
     try {
@@ -91,13 +106,22 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        const sql = dry ? null : getDb();
-        if (sql) {
+        let sql = null;
+        try {
+            sql = getDb();
             await store.ensureTables(sql);
+        } catch (err) {
+            if (!dry) throw err; // a dry run can still show the analysis without a database
+            sql = null;
+        }
+        const write = !dry;
+        const send = makeSender(cfg.telegramGapMs);
+
+        if (write) {
             // Retry anything saved earlier that Telegram did not accept.
             for (const s of await store.getUnsent(sql)) {
                 try {
-                    const sent = await sendTelegram(core.formatTelegram(s, { siteUrl: core.signalsPageUrl() }));
+                    const sent = await send(() => sendTelegram(core.formatTelegram(s, { siteUrl: core.signalsPageUrl() })));
                     await store.markTelegramSent(sql, s.id, sent.messageId);
                 } catch (err) {
                     console.error('signal-watch: Telegram retry failed:', err.message);
@@ -105,32 +129,46 @@ module.exports = async function handler(req, res) {
             }
         }
 
+        const rows = sql ? await store.getWatchlist(sql) : [];
+        report.watchlistSource = rows.length ? 'database' : 'environment (WATCH_SYMBOLS)';
+        const states = sql ? await store.getStates(sql, cfg.timeframe) : new Map();
+        // Least recently checked first, so a run that runs out of time never starves the same markets.
+        const symbols = core
+            .resolveWatchSymbols(rows, cfg.symbols)
+            .sort((a, b) => ((states.get(a) && states.get(a).updatedAt) || 0) - ((states.get(b) && states.get(b).updatedAt) || 0));
+        summary.watching = symbols.length;
+
         const active = await deriv.getActiveSymbols(client);
         const bySymbol = new Map(active.map(s => [s.underlying_symbol, s]));
+        const expected = core.expectedLastClosed(Math.floor(Date.now() / 1000), cfg.timeframe);
 
-        for (const symbol of cfg.symbols) {
+        const processSymbol = async symbol => {
             const entry = { symbol, results: [] };
             report.markets.push(entry);
             try {
                 const info = bySymbol.get(symbol);
-                if (!info) { entry.skipped = 'Not in the Deriv market list'; continue; }
+                if (!info) { entry.skipped = 'Not in the Deriv market list'; return; }
                 if (info.exchange_is_open === 0 || info.is_trading_suspended === 1) {
                     entry.skipped = 'Market closed or suspended';
-                    continue;
+                    summary.closedOrSuspended++;
+                    return;
+                }
+                // Already analysed the newest closed candle? Then do not even download candles.
+                const seen = states.get(symbol);
+                if (!force && seen && seen.lastCandle >= expected) {
+                    entry.skipped = 'No new closed candle since the last check';
+                    summary.noNewCandle++;
+                    return;
                 }
 
                 const candles = await deriv.getCandles(client, symbol, cfg.timeframe);
                 const now = Math.floor(Date.now() / 1000);
                 const closed = candles.filter(c => c.time + cfg.timeframe <= now);
                 const forming = candles.find(c => c.time + cfg.timeframe > now) || null;
-                if (!closed.length) { entry.skipped = 'No closed candles yet'; continue; }
+                if (!closed.length) { entry.skipped = 'No closed candles yet'; return; }
                 const lastClosed = closed[closed.length - 1].time;
                 entry.lastClosedCandle = core.gmtStamp(lastClosed);
-
-                if (sql && !force) {
-                    const seen = await store.getLastCandle(sql, symbol, cfg.timeframe);
-                    if (seen === lastClosed) { entry.skipped = 'No new closed candle since the last check'; continue; }
-                }
+                summary.analysed++;
 
                 const kind = engine.marketKind(info.market);
                 for (const strategyId of cfg.strategies) {
@@ -161,7 +199,7 @@ module.exports = async function handler(req, res) {
                         rr: a.plan.rr,
                         time: lastClosed,
                     };
-                    if (dry) {
+                    if (!write) {
                         r.wouldSend = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
                         try { r.picture = `ok (${chart.renderChartPng({ candles: closed, analysis: a, signal: sig }).length} bytes)`; } catch (err) { r.picture = `would fail: ${err.message}`; }
                         continue;
@@ -170,24 +208,36 @@ module.exports = async function handler(req, res) {
                     const id = await store.insertSignal(sql, sig);
                     if (id === null) { r.skipped = 'Already sent before (duplicate)'; continue; }
                     r.saved = true;
+                    summary.signalsSaved++;
                     try {
-                        const sent = await deliver(sig, { candles: closed, analysis: a, signal: sig });
+                        const sent = await send(() => deliver(sig, { candles: closed, analysis: a, signal: sig }));
                         await store.markTelegramSent(sql, id, sent.messageId);
                         r.telegram = 'sent';
                         r.picture = sent.picture;
+                        summary.telegramSent++;
                     } catch (err) {
                         // Saved on the website feed; Telegram is retried on the next run.
                         r.telegram = `failed: ${err.message}`;
                         console.error('signal-watch: Telegram failed:', err.message);
                     }
                 }
-                if (sql) await store.setLastCandle(sql, symbol, cfg.timeframe, lastClosed);
+                if (write) await store.setLastCandle(sql, symbol, cfg.timeframe, lastClosed);
             } catch (err) {
                 entry.error = err.message;
                 report.ok = false;
+                summary.errors++;
                 console.error(`signal-watch: ${symbol} failed:`, err.message);
             }
-            await sleep(250); // be gentle with Deriv between markets
+        };
+
+        for (let i = 0; i < symbols.length; i += cfg.concurrency) {
+            if (Date.now() - started > cfg.budgetMs) {
+                summary.deferred = symbols.length - i;
+                report.deferredFirst = symbols.slice(i, i + 10);
+                break;
+            }
+            await Promise.all(symbols.slice(i, i + cfg.concurrency).map(processSymbol));
+            if (i + cfg.concurrency < symbols.length) await sleep(cfg.batchGapMs);
         }
     } catch (err) {
         report.ok = false;
@@ -197,5 +247,6 @@ module.exports = async function handler(req, res) {
         client.close();
     }
 
+    report.elapsedMs = Date.now() - started;
     res.status(report.ok ? 200 : 500).json(report);
 };

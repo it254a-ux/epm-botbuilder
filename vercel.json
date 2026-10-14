@@ -2,7 +2,11 @@
     "installCommand": "npm install --legacy-peer-deps",
     "functions": {
         "api/signal-watch.js": {
-            "includeFiles": "api/_lib/fonts/**"
+            "includeFiles": "api/_lib/fonts/**",
+            "maxDuration": 60
+        },
+        "api/signal-admin.js": {
+            "maxDuration": 30
         }
     },
     "rewrites": [

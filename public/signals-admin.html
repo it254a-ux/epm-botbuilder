@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Signal watchlist</title>
+<style>
+  :root { --bg:#0b0e14; --card:#141a24; --line:#232c3b; --text:#e8ecf3; --muted:#8b96a8; --gold:#d4af37; --ok:#1fbf75; --bad:#ef5350; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f6fa; --card:#fff; --line:#dde3ee; --text:#161b26; --muted:#5d6879; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; padding:20px 16px 90px; }
+  h1 { margin:0 0 4px; font-size:22px; color:var(--gold); }
+  p.sub { margin:0 0 16px; color:var(--muted); font-size:13px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input[type=password], input[type=search] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:15px; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:10px 14px; font-size:14px; font-weight:600; background:var(--gold); color:#1a1405; }
+  button.ghost { background:var(--line); color:var(--text); font-weight:500; padding:6px 10px; font-size:12.5px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .grow { flex:1; min-width:180px; }
+  details { background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:10px; }
+  summary { cursor:pointer; padding:12px 14px; font-weight:700; display:flex; justify-content:space-between; gap:8px; }
+  summary small { color:var(--muted); font-weight:400; }
+  .tools { padding:0 14px 8px; display:flex; gap:8px; }
+  .item { display:flex; align-items:center; gap:10px; padding:9px 14px; border-top:1px solid var(--line); }
+  .item input { width:20px; height:20px; accent-color:var(--gold); }
+  .item .nm { flex:1; } .item .sym { color:var(--muted); font-size:12px; }
+  .tag { font-size:11px; padding:2px 7px; border-radius:99px; background:var(--line); color:var(--muted); }
+  .tag.open { background:rgba(31,191,117,.18); color:var(--ok); }
+  .bar { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--line); padding:10px 16px; }
+  .bar .in { max-width:760px; margin:0 auto; display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  #msg { font-size:13px; color:var(--muted); } #msg.ok { color:var(--ok); } #msg.bad { color:var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Signal watchlist</h1>
+  <p class="sub">Tick the markets you want the signal machine to watch, then press Save. Closed markets are skipped automatically.</p>
+
+  <div class="box">
+    <label for="key">Your SIGNALS_SECRET (kept only in this browser tab)</label>
+    <div class="row">
+      <input id="key" type="password" class="grow" autocomplete="off" placeholder="Paste your secret">
+      <button id="load">Load markets</button>
+    </div>
+  </div>
+
+  <div id="tools" class="box" hidden>
+    <div class="row">
+      <input id="search" type="search" class="grow" placeholder="Search markets, e.g. EUR or Bitcoin">
+      <button class="ghost" id="all">Tick all</button>
+      <button class="ghost" id="none">Untick all</button>
+    </div>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div class="bar" id="bar" hidden>
+  <div class="in"><span id="msg"></span><button id="save">Save watchlist</button></div>
+</div>
+
+<script>
+(function () {
+  var keyEl = document.getElementById('key');
+  var listEl = document.getElementById('list');
+  var msg = document.getElementById('msg');
+  var markets = [];
+  var checks = {}; // symbol -> checkbox
+
+  keyEl.value = sessionStorage.getItem('signalsKey') || '';
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function say(text, kind) { msg.textContent = text; msg.className = kind || ''; }
+  function api(method, body) {
+    return fetch('/api/signal-admin', {
+      method: method,
+      headers: { 'x-signals-key': keyEl.value.trim(), 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(r.status === 401 ? 'Wrong secret' : (j.error || 'Request failed')); return j; });
+    });
+  }
+  function count() { var n = 0; Object.keys(checks).forEach(function (s) { if (checks[s].checked) n++; }); return n; }
+  function updateCount() { say(count() + ' of ' + markets.length + ' markets ticked'); }
+
+  function render() {
+    listEl.textContent = '';
+    checks = {};
+    var groups = {};
+    markets.forEach(function (m) { (groups[m.marketName] = groups[m.marketName] || []).push(m); });
+    Object.keys(groups).sort().forEach(function (g) {
+      var d = el('details');
+      var sum = el('summary');
+      sum.appendChild(el('span', '', g));
+      var small = el('small', '', groups[g].length + ' markets');
+      sum.appendChild(small);
+      d.appendChild(sum);
+      var tools = el('div', 'tools');
+      var a = el('button', 'ghost', 'Tick this group'); var n = el('button', 'ghost', 'Untick this group');
+      a.onclick = function () { groups[g].forEach(function (m) { if (checks[m.symbol].parentNode.style.display !== 'none') checks[m.symbol].checked = true; }); updateCount(); };
+      n.onclick = function () { groups[g].forEach(function (m) { checks[m.symbol].checked = false; }); updateCount(); };
+      tools.appendChild(a); tools.appendChild(n); d.appendChild(tools);
+      groups[g].sort(function (x, y) { return x.name.localeCompare(y.name); }).forEach(function (m) {
+        var row = el('label', 'item');
+        row.style.margin = '0';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = m.enabled; cb.onchange = updateCount;
+        checks[m.symbol] = cb;
+        var name = el('span', 'nm', m.name); name.appendChild(document.createElement('br')); name.appendChild(el('span', 'sym', m.symbol));
+        row.appendChild(cb); row.appendChild(name); row.appendChild(el('span', 'tag' + (m.open ? ' open' : ''), m.open ? 'open' : 'closed'));
+        row.dataset.text = (m.name + ' ' + m.symbol + ' ' + g).toLowerCase();
+        d.appendChild(row);
+      });
+      listEl.appendChild(d);
+    });
+    document.getElementById('tools').hidden = false;
+    document.getElementById('bar').hidden = false;
+    updateCount();
+  }
+
+  document.getElementById('load').onclick = function () {
+    sessionStorage.setItem('signalsKey', keyEl.value.trim());
+    listEl.textContent = 'Loading…';
+    api('GET').then(function (d) {
+      markets = d.markets || [];
+      if (!markets.length) { listEl.textContent = d.derivError ? 'Could not reach Deriv: ' + d.derivError : 'No markets returned.'; return; }
+      render();
+      if (d.source === 'environment') say('Nothing saved yet: the ticks shown come from WATCH_SYMBOLS. Press Save to store them.');
+    }).catch(function (e) { listEl.textContent = ''; document.getElementById('bar').hidden = false; say(e.message, 'bad'); });
+  };
+
+  document.getElementById('save').onclick = function () {
+    var map = {};
+    markets.forEach(function (m) { map[m.symbol] = checks[m.symbol].checked; });
+    say('Saving…');
+    api('POST', { symbols: map }).then(function (d) { say('Saved. Now watching ' + d.enabled + ' markets.', 'ok'); })
+      .catch(function (e) { say(e.message, 'bad'); });
+  };
+  document.getElementById('all').onclick = function () { Object.keys(checks).forEach(function (s) { if (checks[s].parentNode.style.display !== 'none') checks[s].checked = true; }); updateCount(); };
+  document.getElementById('none').onclick = function () { Object.keys(checks).forEach(function (s) { checks[s].checked = false; }); updateCount(); };
+  document.getElementById('search').oninput = function (e) {
+    var t = e.target.value.trim().toLowerCase();
+    Array.prototype.forEach.call(listEl.querySelectorAll('label.item'), function (row) { row.style.display = !t || row.dataset.text.indexOf(t) !== -1 ? '' : 'none'; });
+    if (t) Array.prototype.forEach.call(listEl.querySelectorAll('details'), function (d) { d.open = true; });
+  };
+})();
+</script>
+</body>
+</html>

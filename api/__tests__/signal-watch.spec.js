@@ -25,6 +25,7 @@ const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
 const handler = require('../signal-watch');
 const feed = require('../signals');
+const admin = require('../signal-admin');
 
 jest.setTimeout(60000);
 let sharedDb;
@@ -70,13 +71,15 @@ const ENV = { ...process.env };
 let client;
 beforeEach(async () => {
     global.__sql = makeSql();
-    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF) };
+    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist');
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0' };
     client = { close: jest.fn() };
     deriv.connect.mockReset().mockResolvedValue(client);
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
         { underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex', exchange_is_open: 1, is_trading_suspended: 0 },
         { underlying_symbol: 'frxUSDJPY', underlying_symbol_name: 'USD/JPY', market: 'forex', exchange_is_open: 0, is_trading_suspended: 0 },
+        { underlying_symbol: 'frxGBPUSD', underlying_symbol_name: 'GBP/USD', market: 'forex', exchange_is_open: 1, is_trading_suspended: 0 },
+        { underlying_symbol: 'R_100', underlying_symbol_name: 'Volatility 100 Index', market: 'synthetic_index', exchange_is_open: 1, is_trading_suspended: 0 },
     ]);
     deriv.getCandles.mockReset().mockImplementation(async () => candlesUpToNow());
     sendTelegram.mockReset().mockResolvedValue({ messageId: 99 });
@@ -134,9 +137,12 @@ describe('sending signals', () => {
     test('nothing is analysed again until a NEW candle has closed', async () => {
         await call(handler);
         engine.analyse.mockClear();
+        deriv.getCandles.mockClear();
         const second = await call(handler);
         expect(second.body.markets[0].skipped).toMatch(/no new closed candle/i);
         expect(engine.analyse).not.toHaveBeenCalled();
+        expect(deriv.getCandles).not.toHaveBeenCalled(); // not even downloaded
+        expect(second.body.summary.noNewCandle).toBe(1);
     });
 
     test('a different entry price counts as a new signal', async () => {
@@ -256,7 +262,7 @@ describe('markets', () => {
         expect(r.body.markets[0].skipped).toMatch(/not in the deriv/i);
     });
     test('one market failing does not stop the others', async () => {
-        process.env.WATCH_SYMBOLS = 'frxEURUSD,frxEURUSD';
+        process.env.WATCH_SYMBOLS = 'frxEURUSD,frxGBPUSD';
         deriv.getCandles.mockRejectedValueOnce(new Error('boom'));
         const r = await call(handler);
         expect(r.status).toBe(500);
@@ -335,8 +341,141 @@ describe('helpers', () => {
         expect(t).toContain('2025-10-14 09:15 GMT');
     });
     test('config defaults and clean-up', () => {
-        expect(core.readConfig({})).toEqual({ symbols: ['frxEURUSD'], timeframe: 900, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3 });
+        expect(core.readConfig({})).toEqual({
+            symbols: ['frxEURUSD'], timeframe: 900, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
+            concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100,
+        });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
             .toMatchObject({ symbols: ['a', 'b'], timeframe: 900, strategies: [1, 3], maxAgeCandles: 0 });
+    });
+});
+
+describe('watchlist (Phase 2)', () => {
+    const saveList = async obj => {
+        const r = await call(admin, { method: 'POST', headers: { 'x-signals-key': 's3cret' }, body: { symbols: obj } });
+        expect(r.status).toBe(200);
+        return r;
+    };
+    const call2 = (h, opts) => new Promise(resolve => {
+        const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ status: this.code, body: b }); } };
+        h({ method: 'GET', query: {}, headers: { authorization: 'Bearer s3cret' }, ...opts }, res);
+    });
+    // `call` ignores a body, so admin POSTs use call2
+    const post = body => call2(admin, { method: 'POST', body });
+
+    test('with nothing saved, the environment list is used', async () => {
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.watchlistSource).toMatch(/environment/);
+        expect(r.body.markets.map(m => m.symbol)).toEqual(['frxEURUSD']);
+    });
+
+    test('a saved watchlist replaces the environment list, and only ticked markets are watched', async () => {
+        const saved = await post({ symbols: { frxGBPUSD: true, R_100: true, frxEURUSD: false } });
+        expect(saved.status).toBe(200);
+        expect(saved.body).toMatchObject({ ok: true, saved: 3, enabled: 2 });
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.watchlistSource).toBe('database');
+        expect(r.body.markets.map(m => m.symbol).sort()).toEqual(['R_100', 'frxGBPUSD']);
+        expect(r.body.summary.watching).toBe(2);
+    });
+
+    test('everything switched off means nothing is watched (not a fallback to the environment)', async () => {
+        await post({ symbols: { frxEURUSD: false } });
+        const r = await call(handler);
+        expect(r.body.markets).toEqual([]);
+        expect(deriv.getCandles).not.toHaveBeenCalled();
+    });
+
+    test('synthetic markets are analysed as synthetic', async () => {
+        await post({ symbols: { R_100: true } });
+        await call(handler);
+        expect(engine.analyse.mock.calls[0][2]).toBe('synthetic');
+    });
+
+    test('the run summary counts what happened', async () => {
+        await post({ symbols: { frxEURUSD: true, frxUSDJPY: true, frxGBPUSD: true } });
+        const r = await call(handler);
+        expect(r.body.summary).toMatchObject({ watching: 3, analysed: 2, closedOrSuspended: 1, signalsSaved: 2, telegramSent: 2, errors: 0, deferred: 0 });
+    });
+
+    test('markets checked longest ago go first, and a run that runs out of time defers the rest', async () => {
+        await post({ symbols: { frxEURUSD: true, frxGBPUSD: true, R_100: true } });
+        // checked 2 days ago, 1 hour ago, and just now
+        await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('frxGBPUSD', ${TF}, 1, now() - interval '2 days')`;
+        await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('frxEURUSD', ${TF}, 1, now() - interval '1 hour')`;
+        await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('R_100', ${TF}, 1, now())`;
+        process.env.WATCH_CONCURRENCY = '1';
+        let fake = Date.now();
+        const spy = jest.spyOn(Date, 'now').mockImplementation(() => fake);
+        deriv.getCandles.mockImplementation(async () => { const c = candlesUpToNow(); fake += 30000; return c; });
+        const r = await call(handler, { query: { dry: '1' } });
+        spy.mockRestore();
+        // 30 s per market, 45 s budget: the two least recently checked are done, the most recent waits
+        expect(r.body.markets.map(m => m.symbol)).toEqual(['frxGBPUSD', 'frxEURUSD']);
+        expect(r.body.summary.deferred).toBe(1);
+        expect(r.body.deferredFirst).toEqual(['R_100']);
+    });
+
+    test('markets are fetched in small batches, not all at once', async () => {
+        await post({ symbols: { frxEURUSD: true, frxGBPUSD: true, R_100: true, frxAUDUSD: true } });
+        let running = 0; let peak = 0;
+        deriv.getCandles.mockImplementation(async () => { running++; peak = Math.max(peak, running); await new Promise(r => setTimeout(r, 15)); running--; return candlesUpToNow(); });
+        process.env.WATCH_CONCURRENCY = '2';
+        await call(handler, { query: { dry: '1' } });
+        expect(peak).toBe(2);
+    });
+});
+
+describe('admin API', () => {
+    const run = (method, { headers = { 'x-signals-key': 's3cret' }, body, query = {} } = {}) => new Promise(resolve => {
+        const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ status: this.code, body: b }); } };
+        admin({ method, headers, body, query }, res);
+    });
+
+    test('needs the secret', async () => {
+        expect((await run('GET', { headers: {} })).status).toBe(401);
+        expect((await run('POST', { headers: { 'x-signals-key': 'nope' }, body: { symbols: { a: true } } })).status).toBe(401);
+    });
+
+    test('GET lists every Deriv market with open/closed and which are ticked', async () => {
+        const r = await run('GET');
+        expect(r.status).toBe(200);
+        expect(r.body.source).toBe('environment');
+        const eur = r.body.markets.find(m => m.symbol === 'frxEURUSD');
+        const jpy = r.body.markets.find(m => m.symbol === 'frxUSDJPY');
+        expect(eur).toMatchObject({ name: 'EUR/USD', open: true, enabled: true });
+        expect(jpy).toMatchObject({ open: false, enabled: false });
+    });
+
+    test('POST saves, GET shows it, and a later POST changes only what it sends', async () => {
+        await run('POST', { body: { symbols: { frxGBPUSD: true, frxEURUSD: false } } });
+        let r = await run('GET');
+        expect(r.body.source).toBe('database');
+        expect(r.body.markets.find(m => m.symbol === 'frxGBPUSD').enabled).toBe(true);
+        expect(r.body.markets.find(m => m.symbol === 'frxEURUSD').enabled).toBe(false);
+        await run('POST', { body: { symbols: { frxEURUSD: true } } });
+        r = await run('GET');
+        expect(r.body.markets.find(m => m.symbol === 'frxEURUSD').enabled).toBe(true);
+        expect(r.body.markets.find(m => m.symbol === 'frxGBPUSD').enabled).toBe(true);
+    });
+
+    test('rejects bad input', async () => {
+        for (const body of [undefined, {}, { symbols: [] }, { symbols: {} }, { symbols: { 'bad symbol!': true } }, { symbols: { frxEURUSD: 'yes' } }]) {
+            expect((await run('POST', { body })).status).toBe(400);
+        }
+        const tooMany = {}; for (let i = 0; i < 501; i++) tooMany['S' + i] = true;
+        expect((await run('POST', { body: { symbols: tooMany } })).status).toBe(400);
+    });
+
+    test('if Deriv is unreachable the page still gets an answer with the reason', async () => {
+        deriv.connect.mockRejectedValue(new Error('Could not connect to Deriv'));
+        const r = await run('GET');
+        expect(r.status).toBe(200);
+        expect(r.body.derivError).toMatch(/connect/);
+        expect(r.body.markets).toEqual([]);
+    });
+
+    test('only GET and POST', async () => {
+        expect((await run('DELETE')).status).toBe(405);
     });
 });

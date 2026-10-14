@@ -40,6 +40,13 @@ async function ensureTables(sql) {
             PRIMARY KEY (symbol, timeframe)
         )
     `;
+    await sql`
+        CREATE TABLE IF NOT EXISTS signal_watchlist (
+            symbol     TEXT PRIMARY KEY,
+            enabled    BOOLEAN NOT NULL DEFAULT true,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    `;
     prepared.add(sql);
 }
 
@@ -95,6 +102,30 @@ async function setLastCandle(sql, symbol, timeframe, lastCandle) {
     `;
 }
 
+/** Every market that has been switched on or off in the admin page. */
+async function getWatchlist(sql) {
+    const rows = await sql`SELECT symbol, enabled FROM signal_watchlist ORDER BY symbol`;
+    return rows.map(r => ({ symbol: r.symbol, enabled: !!r.enabled }));
+}
+
+/** Saves on/off switches. `entries` is [[symbol, true|false], ...]. */
+async function setWatchlist(sql, entries) {
+    if (!entries.length) return;
+    const symbols = entries.map(e => e[0]);
+    const flags = entries.map(e => !!e[1]);
+    await sql`
+        INSERT INTO signal_watchlist (symbol, enabled)
+        SELECT * FROM unnest(${symbols}::text[], ${flags}::boolean[])
+        ON CONFLICT (symbol) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()
+    `;
+}
+
+/** When each market was last checked: Map(symbol -> { lastCandle, updatedAt in ms }). */
+async function getStates(sql, timeframe) {
+    const rows = await sql`SELECT symbol, last_candle, updated_at FROM signal_watch_state WHERE timeframe = ${timeframe}`;
+    return new Map(rows.map(r => [r.symbol, { lastCandle: Number(r.last_candle), updatedAt: new Date(r.updated_at).getTime() }]));
+}
+
 async function listSignals(sql, limit) {
     const rows = await sql`
         SELECT id, symbol, symbol_name, market, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr,
@@ -119,4 +150,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { ensureTables, insertSignal, markTelegramSent, getUnsent, getLastCandle, setLastCandle, listSignals };
+module.exports = { getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getLastCandle, setLastCandle, listSignals };
