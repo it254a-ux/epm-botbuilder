@@ -48,6 +48,42 @@ const COLORS = {
     ny: 'rgba(249,115,22,0.09)',
 };
 
+/** Turns any CSS colour (hex, rgb, a variable's value) into [r, g, b], or null. */
+function toRgb(host: HTMLElement, css: string): [number, number, number] | null {
+    if (!css) return null;
+    const probe = document.createElement('span');
+    probe.style.color = css.trim();
+    host.appendChild(probe);
+    const m = getComputedStyle(probe).color.match(/[\d.]+/g);
+    host.removeChild(probe);
+    return m && m.length >= 3 ? [Number(m[0]), Number(m[1]), Number(m[2])] : null;
+}
+
+interface Theme {
+    bg: string;
+    text: string;
+    grid: string;
+    border: string;
+    font: string;
+}
+
+/** Reads the website's own colours and font, so the chart always matches the page (dark or light). */
+function readTheme(host: HTMLElement): Theme {
+    const cs = getComputedStyle(host);
+    const dark = isDarkTheme(host);
+    const bgRgb = toRgb(host, cs.getPropertyValue('--general-main-1'));
+    const textRgb = toRgb(host, cs.getPropertyValue('--text-general'));
+    const borderRgb = toRgb(host, cs.getPropertyValue('--border-normal'));
+    const rgb = (c: [number, number, number], a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+    return {
+        bg: bgRgb ? rgb(bgRgb) : dark ? '#0e1116' : '#ffffff',
+        text: textRgb ? rgb(textRgb) : dark ? '#c7cdd6' : '#374151',
+        grid: borderRgb ? rgb(borderRgb, 0.45) : dark ? '#1b2029' : '#eef0f3',
+        border: borderRgb ? rgb(borderRgb) : dark ? '#2a303b' : '#d9dde3',
+        font: cs.fontFamily || 'sans-serif',
+    };
+}
+
 function isDarkTheme(el: HTMLElement): boolean {
     const m = getComputedStyle(el).color.match(/\d+/g);
     if (!m) return true;
@@ -75,23 +111,24 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     useEffect(() => {
         const host = hostRef.current;
         if (!host) return;
-        const dark = isDarkTheme(host);
+        const th = readTheme(host);
+        const themeOptions = (t: Theme) => ({
+            layout: { background: { color: t.bg }, textColor: t.text, fontSize: 11, fontFamily: t.font },
+            grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
+            rightPriceScale: { borderColor: t.border },
+            timeScale: { borderColor: t.border },
+        });
         const chart = createChart(host, {
             width: host.clientWidth,
             height: host.clientHeight,
-            layout: {
-                background: { color: dark ? '#0e1116' : '#ffffff' },
-                textColor: dark ? '#c7cdd6' : '#374151',
-                fontSize: 11,
-            },
-            grid: {
-                vertLines: { color: dark ? '#1b2029' : '#eef0f3' },
-                horzLines: { color: dark ? '#1b2029' : '#eef0f3' },
-            },
-            rightPriceScale: { borderColor: dark ? '#2a303b' : '#d9dde3' },
-            timeScale: { borderColor: dark ? '#2a303b' : '#d9dde3', timeVisible: true, secondsVisible: false },
+            ...themeOptions(th),
+            timeScale: { borderColor: th.border, timeVisible: true, secondsVisible: false },
             crosshair: { mode: 0 },
         });
+        // Follow the website when its theme (dark / light) is switched.
+        const themeWatch = new MutationObserver(() => chart.applyOptions(themeOptions(readTheme(host))));
+        themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+        themeWatch.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
         const series = chart.addCandlestickSeries({
             upColor: '#22c55e',
             downColor: '#ef4444',
@@ -125,6 +162,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         });
         ro.observe(host);
         return () => {
+            themeWatch.disconnect();
             ro.disconnect();
             chart.remove();
             chartRef.current = null;
@@ -218,24 +256,34 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 extraRef.current.push(z);
             };
 
-            // ---- session bands (Asian / London / New York), faint, behind everything
-            const bands = chart.addHistogramSeries({
-                priceScaleId: 'sess',
-                priceFormat: { type: 'volume' },
-                lastValueVisible: false,
-                priceLineVisible: false,
-            });
+            // ---- session bands (Asian / London / New York): one continuous soft shade per session
             chart.priceScale('sess').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
-            const bandData = candles
-                .filter(c => c.time > lastT - 3 * 86400)
-                .map(c => {
-                    const h = new Date(c.time * 1000).getUTCHours();
-                    const color = h < 7 ? COLORS.asian : h < 13 ? COLORS.london : h < 21 ? COLORS.ny : null;
-                    return color ? { time: c.time as UTCTimestamp, value: 1, color } : null;
-                })
-                .filter((x): x is { time: UTCTimestamp; value: number; color: string } => x !== null);
-            bands.setData(bandData);
-            extraRef.current.push(bands);
+            const sessionOf = (t: number) => {
+                const h = new Date(t * 1000).getUTCHours();
+                return h < 7 ? 'asian' : h < 13 ? 'london' : h < 21 ? 'ny' : null;
+            };
+            const recent = candles.filter(c => c.time > lastT - 3 * 86400);
+            (['asian', 'london', 'ny'] as const).forEach(name => {
+                const shade = COLORS[name];
+                const area = chart.addAreaSeries({
+                    priceScaleId: 'sess',
+                    lineVisible: false,
+                    topColor: shade,
+                    bottomColor: shade,
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                    crosshairMarkerVisible: false,
+                });
+                // a fixed 0..1 scale, so the shade always fills the full height of the chart
+                area.applyOptions({
+                    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }),
+                } as never);
+                // candles outside this session are blank points, so the shade stops there
+                area.setData(
+                    recent.map(c => (sessionOf(c.time) === name ? { time: c.time as UTCTimestamp, value: 1 } : { time: c.time as UTCTimestamp }))
+                );
+                extraRef.current.push(area);
+            });
 
             const markers: SeriesMarker<Time>[] = [];
             const plan = analysis.plan;
@@ -272,7 +320,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                     position: sw.side === 'high' ? 'aboveBar' : 'belowBar',
                     shape: sw.side === 'high' ? 'arrowDown' : 'arrowUp',
                     color: COLORS.sweep,
-                    text: 'Liquidity sweep wick',
+                    text: 'Sweep',
                 });
             }
 
@@ -331,13 +379,26 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                               position: 'inBar',
                               shape: 'circle',
                               color: COLORS.entry,
-                              text: planned ? 'Entry (planned)' : 'Entry zone',
+                              text: planned ? 'Entry' : 'Entry zone',
                           }
                 );
             }
 
-            markers.sort((a, b) => (a.time as number) - (b.time as number));
-            series.setMarkers(markers);
+            // Labels on neighbouring candles would overlap, so keep the text of the most important
+            // marker (entry > sweep > BOS > FVG) and show only the arrow/shape for the others.
+            const rank = (m: SeriesMarker<Time>) => {
+                const t = m.text ?? '';
+                return t.startsWith('ENTRY') || t.startsWith('Entry') ? 0 : t === 'Sweep' ? 1 : t === 'BOS' ? 2 : 3;
+            };
+            const keep: SeriesMarker<Time>[] = [];
+            [...markers]
+                .sort((a, b) => rank(a) - rank(b))
+                .forEach(m => {
+                    const clash = keep.some(k => k.text && Math.abs((k.time as number) - (m.time as number)) < 7 * len);
+                    keep.push(clash ? { ...m, text: '' } : m);
+                });
+            keep.sort((a, b) => (a.time as number) - (b.time as number));
+            series.setMarkers(keep);
 
             // make autoscale include all levels
             const lv: number[] = [];

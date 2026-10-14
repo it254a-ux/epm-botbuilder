@@ -2,6 +2,8 @@
     box-sizing: border-box;
     width: 100%; // fill the whole tab; without this a flex parent shrinks it to its content
     min-width: 0;
+    background: var(--general-main-1); // same page colour as the rest of the website
+    font-family: var(--brand-font-primary), sans-serif; // same font as the rest of the website
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -335,7 +337,7 @@
         padding: 8px 14px;
         border: 0;
         border-radius: 999px;
-        background: #2563eb;
+        background: var(--button-primary-default, #2563eb);
         color: #fff;
         font-weight: 700;
         font-size: 13px;
@@ -607,7 +609,7 @@
         font-weight: 700;
     }
     .is-now span {
-        color: #2563eb;
+        color: var(--button-primary-default, #2563eb);
     }
     .is-todo {
         color: var(--text-less-prominent);
@@ -649,5 +651,15 @@
             min-height: 0;
             overflow-y: auto;
         }
+    }
+}
+
+// Form controls do not inherit the page font by themselves.
+.forex-trader,
+.forex-panel {
+    select,
+    input,
+    button {
+        font-family: inherit;
     }
 }

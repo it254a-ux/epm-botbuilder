@@ -1,5 +1,6 @@
 .forex-panel {
     box-sizing: border-box;
+    font-family: var(--brand-font-primary), sans-serif;
     background: var(--general-main-1);
     color: var(--text-general);
 
@@ -43,7 +44,7 @@
 
         &:hover::after,
         .is-dragging &::after {
-            background: #2563eb;
+            background: var(--button-primary-default, #2563eb);
         }
     }
 
@@ -92,7 +93,7 @@
         height: 44px;
         padding: 0 16px;
         border: 0;
-        background: #2563eb;
+        background: var(--button-primary-default, #2563eb);
         color: #fff;
         font-size: 14px;
         font-weight: 700;
