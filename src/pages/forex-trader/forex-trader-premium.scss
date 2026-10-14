@@ -29,7 +29,7 @@ $line: rgba(148, 163, 184, 0.22);
         select {
             min-height: 0;
             padding: 0 22px 0 10px;
-            line-height: normal;
+            line-height: 34px; // = height - borders, so the text sits in the vertical middle
             appearance: none;
             -webkit-appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239ca3af' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -436,6 +436,7 @@ $line: rgba(148, 163, 184, 0.22);
                 font-size: calc(13px * var(--fx));
             }
             select {
+                line-height: calc(36px * var(--fx) - 2px);
                 padding-right: calc(22px * var(--fx));
                 background-position: right calc(8px * var(--fx)) center;
                 background-size: calc(10px * var(--fx)) calc(6px * var(--fx));
