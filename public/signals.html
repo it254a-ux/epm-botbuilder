@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Trading Signals</title>
+<style>
+  :root { --bg:#0b0e14; --card:#141a24; --line:#232c3b; --text:#e8ecf3; --muted:#8b96a8; --buy:#1fbf75; --sell:#ef5350; --gold:#d4af37; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f6fa; --card:#fff; --line:#dde3ee; --text:#161b26; --muted:#5d6879; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:24px 16px 8px; max-width:760px; margin:0 auto; }
+  h1 { margin:0; font-size:22px; color:var(--gold); }
+  .sub { color:var(--muted); font-size:13px; margin-top:4px; }
+  main { max-width:760px; margin:0 auto; padding:8px 16px 40px; display:grid; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--muted); border-radius:10px; padding:14px 16px; }
+  .card.BUY { border-left-color:var(--buy); } .card.SELL { border-left-color:var(--sell); }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .market { font-weight:700; font-size:16px; }
+  .side { font-weight:700; font-size:12px; padding:3px 9px; border-radius:99px; color:#fff; }
+  .BUY .side { background:var(--buy); } .SELL .side { background:var(--sell); }
+  .meta { color:var(--muted); font-size:12.5px; margin:4px 0 10px; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .cell small { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .cell b { font-variant-numeric:tabular-nums; }
+  .status { display:inline-block; margin-top:10px; font-size:12px; padding:2px 8px; border-radius:6px; background:var(--line); }
+  .status.active { background:rgba(212,175,55,.18); color:var(--gold); }
+  .status.hit_tp { background:rgba(31,191,117,.18); color:var(--buy); }
+  .status.hit_sl, .status.invalidated { background:rgba(239,83,80,.18); color:var(--sell); }
+  .empty, .err { text-align:center; color:var(--muted); padding:40px 10px; }
+  footer { max-width:760px; margin:0 auto; padding:0 16px 30px; color:var(--muted); font-size:12px; text-align:center; }
+  @media (max-width:520px) { .grid { grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Live Trading Signals</h1>
+  <div class="sub" id="updated">Loading…</div>
+</header>
+<main id="feed"></main>
+<footer>Signals only, not financial advice. Trading carries risk; you can lose money. All times are GMT.</footer>
+<script>
+(function () {
+  var TF = { 60:'1m',120:'2m',180:'3m',300:'5m',600:'10m',900:'15m',1800:'30m',3600:'1h',7200:'2h',14400:'4h',28800:'8h',86400:'1d' };
+  var STATUS = { active:'Active', hit_tp:'Hit take profit', hit_sl:'Hit stop loss', invalidated:'Invalidated' };
+  var feed = document.getElementById('feed');
+  var updated = document.getElementById('updated');
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function px(n) { return String(Number(Number(n).toPrecision(8))); }
+  function gmt(sec) { return new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' GMT'; }
+  function cell(label, value) { var c = el('div', 'cell'); c.appendChild(el('small', '', label)); c.appendChild(el('b', '', value)); return c; }
+
+  function card(s) {
+    var c = el('div', 'card ' + (s.side === 'BUY' ? 'BUY' : 'SELL'));
+    var top = el('div', 'top');
+    top.appendChild(el('span', 'market', s.symbolName || s.symbol));
+    top.appendChild(el('span', 'side', s.side));
+    c.appendChild(top);
+    c.appendChild(el('div', 'meta', s.strategyName + ' · ' + (TF[s.timeframe] || s.timeframe + 's') + ' · ' + gmt(s.time + s.timeframe)));
+    var g = el('div', 'grid');
+    g.appendChild(cell('Entry', px(s.entry)));
+    g.appendChild(cell('Stop loss', px(s.stopLoss)));
+    g.appendChild(cell('Take profit', px(s.takeProfit)));
+    g.appendChild(cell('Risk : Reward', '1 : ' + Number(s.rr).toFixed(2)));
+    c.appendChild(g);
+    c.appendChild(el('span', 'status ' + s.status, STATUS[s.status] || s.status));
+    return c;
+  }
+
+  function load() {
+    fetch('/api/signals?limit=50', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
+      .then(function (d) {
+        feed.textContent = '';
+        if (!d.signals || !d.signals.length) { feed.appendChild(el('div', 'empty', 'No signals yet. New ones appear here automatically.')); }
+        else d.signals.forEach(function (s) { feed.appendChild(card(s)); });
+        updated.textContent = 'Updated ' + new Date().toISOString().slice(11, 16) + ' GMT · refreshes every 30 seconds';
+      })
+      .catch(function () {
+        if (!feed.children.length) feed.appendChild(el('div', 'err', 'Could not load signals right now. Trying again shortly.'));
+        updated.textContent = 'Connection problem, retrying…';
+      });
+  }
+  load();
+  setInterval(load, 30000);
+})();
+</script>
+</body>
+</html>

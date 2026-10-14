@@ -91,3 +91,37 @@ CREATE TABLE IF NOT EXISTS forex_ai_usage (
 );
 CREATE INDEX IF NOT EXISTS forex_ai_usage_time_idx ON forex_ai_usage (created_at);
 CREATE INDEX IF NOT EXISTS forex_ai_usage_visitor_idx ON forex_ai_usage (visitor, created_at);
+
+-- ===== Signal machine (Telegram + website feed) =====
+-- These are created automatically by the app the first time they are needed, so running this
+-- by hand is optional. Safe to re-run.
+CREATE TABLE IF NOT EXISTS signals (
+    id                  SERIAL PRIMARY KEY,
+    dedupe_key          TEXT NOT NULL UNIQUE,            -- market|strategy|timeframe|side|entry: blocks duplicates
+    symbol              TEXT NOT NULL,
+    symbol_name         TEXT,
+    market              TEXT,
+    strategy_id         INTEGER NOT NULL,
+    strategy_name       TEXT NOT NULL,
+    timeframe           INTEGER NOT NULL,                -- seconds
+    side                TEXT NOT NULL,                   -- 'BUY' | 'SELL'
+    entry               DOUBLE PRECISION NOT NULL,
+    stop_loss           DOUBLE PRECISION NOT NULL,
+    take_profit         DOUBLE PRECISION NOT NULL,
+    rr                  DOUBLE PRECISION NOT NULL,
+    status              TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'hit_tp' | 'hit_sl' | 'invalidated'
+    candle_time         BIGINT NOT NULL,                 -- open time of the candle whose close produced the signal
+    telegram_sent       BOOLEAN NOT NULL DEFAULT false,
+    telegram_message_id BIGINT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS signals_created_idx ON signals (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS signal_watch_state (
+    symbol      TEXT NOT NULL,
+    timeframe   INTEGER NOT NULL,
+    last_candle BIGINT NOT NULL,                         -- last candle already analysed
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (symbol, timeframe)
+);

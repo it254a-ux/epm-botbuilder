@@ -12,7 +12,7 @@
     "test:api": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.api.config.js",
     "type-check": "tsc --noEmit",
     "generate:brand-css": "node scripts/generate-brand-css.js",
-    "prebuild": "node scripts/generate-brand-css.js"
+    "prebuild": "node scripts/generate-brand-css.js && node scripts/build-signal-engine.js"
   },
   "dependencies": {
     "@deriv-com/quill-ui": "^1.24.9",
