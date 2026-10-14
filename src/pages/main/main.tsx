@@ -54,6 +54,7 @@ const EpmAnalysisTool = lazy(() => import('../epm-analysis-tool'));
 const ForexPanel = lazy(() => import('../forex-trader/forex-panel'));
 const DtraderPage = lazy(() => import('../dtrader'));
 const TradingViewPage = lazy(() => import('../trading-view'));
+const ForexTraderPage = lazy(() => import('../forex-trader'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -702,6 +703,21 @@ const AppWrapper = observer(() => {
                                         <Tutorial handleTabChange={handleTabChange} />
                                     </Suspense>
                                 </div>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>⚡</span>
+                                        <Localize i18n_default_text='Forex Trader' />
+                                    </>
+                                }
+                                id='id-forex-trader'
+                            >
+                                <Suspense
+                                    fallback={<ChunkLoader message={localize('Please wait, loading Forex Trader...')} />}
+                                >
+                                    <ForexTraderPage />
+                                </Suspense>
                             </div>
                         </Tabs>
                                 {!isDesktop && right_tab_shadow && (
