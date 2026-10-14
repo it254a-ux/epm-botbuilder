@@ -17,4 +17,24 @@ async function sendTelegram(text, { token = process.env.TELEGRAM_BOT_TOKEN, chat
     return { messageId: data.result && data.result.message_id };
 }
 
-module.exports = { sendTelegram };
+/**
+ * Sends a picture (PNG bytes) with a caption. Telegram limits captions to 1024 characters.
+ * The caller falls back to sendTelegram (text only) if this throws.
+ */
+async function sendTelegramPhoto(png, caption, { token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID } = {}) {
+    if (!token || !chatId) throw new Error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set');
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('caption', String(caption).slice(0, 1024));
+    form.append('parse_mode', 'HTML');
+    form.append('photo', new Blob([png], { type: 'image/png' }), 'signal.png');
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* ignore */ }
+    if (!res.ok || !data || !data.ok) {
+        throw new Error(`Telegram refused the picture (${res.status}): ${(data && data.description) || 'no details'}`);
+    }
+    return { messageId: data.result && data.result.message_id };
+}
+
+module.exports = { sendTelegram, sendTelegramPhoto };

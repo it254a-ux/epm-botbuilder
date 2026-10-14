@@ -10,14 +10,16 @@ jest.mock('../_lib/deriv', () => ({
     getActiveSymbols: jest.fn(),
     getCandles: jest.fn(),
 }));
-jest.mock('../_lib/telegram', () => ({ sendTelegram: jest.fn() }));
+jest.mock('../_lib/telegram', () => ({ sendTelegram: jest.fn(), sendTelegramPhoto: jest.fn() }));
+jest.mock('../_lib/signal-chart', () => ({ renderChartPng: jest.fn() }));
 jest.mock('../_lib/engine', () => ({
     ...jest.requireActual('../_lib/engine'),
     analyse: jest.fn(),
 }));
 
 const deriv = require('../_lib/deriv');
-const { sendTelegram } = require('../_lib/telegram');
+const { sendTelegram, sendTelegramPhoto } = require('../_lib/telegram');
+const chart = require('../_lib/signal-chart');
 const engine = require('../_lib/engine');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
@@ -78,6 +80,9 @@ beforeEach(async () => {
     ]);
     deriv.getCandles.mockReset().mockImplementation(async () => candlesUpToNow());
     sendTelegram.mockReset().mockResolvedValue({ messageId: 99 });
+    sendTelegramPhoto.mockReset().mockResolvedValue({ messageId: 100 });
+    // By default the picture cannot be drawn, so the older tests below keep checking the plain-text path.
+    chart.renderChartPng.mockReset().mockImplementation(() => { throw new Error('no chart in this test'); });
     engine.analyse.mockReset().mockReturnValue(readyAnalysis());
 });
 afterEach(() => { process.env = ENV; });
@@ -160,6 +165,79 @@ describe('sending signals', () => {
     test('states that are not ready send nothing', async () => {
         engine.analyse.mockReturnValue({ state: 'waiting_bos', plan: null });
         await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+    });
+});
+
+describe('chart picture', () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    beforeEach(() => { chart.renderChartPng.mockReset().mockReturnValue(PNG); });
+
+    test('the signal is sent as a picture with the text as caption and a link to the Signals page', async () => {
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+        expect(r.body.markets[0].results[0].picture).toBe(true);
+        expect(sendTelegramPhoto).toHaveBeenCalledTimes(1);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        const [png, caption] = sendTelegramPhoto.mock.calls[0];
+        expect(png).toBe(PNG);
+        expect(caption).toContain('BUY SIGNAL');
+        expect(caption).toContain('https://www.executiveprimemarkets.site/signals.html');
+        expect(caption.length).toBeLessThan(1024);
+        const rows = await global.__sql`SELECT telegram_sent, telegram_message_id FROM signals`;
+        expect(rows[0].telegram_sent).toBe(true);
+        expect(Number(rows[0].telegram_message_id)).toBe(100);
+    });
+
+    test('the picture is drawn from the closed candles and the analysis of this signal', async () => {
+        await call(handler);
+        const input = chart.renderChartPng.mock.calls[0][0];
+        expect(input.signal.side).toBe('BUY');
+        expect(input.analysis.state).toBe('ready');
+        const now = nowSec();
+        expect(input.candles.length).toBeGreaterThan(10);
+        expect(input.candles.every(c => c.time + TF <= now)).toBe(true);
+    });
+
+    test('SITE_URL changes the link', async () => {
+        process.env.SITE_URL = 'https://example.org/';
+        await call(handler);
+        expect(sendTelegramPhoto.mock.calls[0][1]).toContain('https://example.org/signals.html');
+    });
+
+    test('if Telegram refuses the picture, the text message is sent instead', async () => {
+        sendTelegramPhoto.mockRejectedValueOnce(new Error('Telegram refused the picture (400): bad'));
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+        expect(r.body.markets[0].results[0].picture).toMatch(/failed/);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+        expect(sendTelegram.mock.calls[0][0]).toContain('BUY SIGNAL');
+        expect(sendTelegram.mock.calls[0][0]).toContain('signals.html');
+    });
+
+    test('if the picture cannot be drawn, the text message is sent instead', async () => {
+        chart.renderChartPng.mockImplementation(() => { throw new Error('renderer missing'); });
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].picture).toMatch(/renderer missing/);
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+    });
+
+    test('if both fail, the signal stays on the website and is retried as text next run', async () => {
+        sendTelegramPhoto.mockRejectedValueOnce(new Error('down'));
+        sendTelegram.mockRejectedValueOnce(new Error('down'));
+        const first = await call(handler);
+        expect(first.body.markets[0].results[0].telegram).toMatch(/failed/);
+        await call(handler, { query: { force: '1' } });
+        const rows = await global.__sql`SELECT telegram_sent FROM signals`;
+        expect(rows[0].telegram_sent).toBe(true);
+        expect(sendTelegram).toHaveBeenCalledTimes(2);
+    });
+
+    test('?dry=1 reports whether the picture could be drawn, and sends nothing', async () => {
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.markets[0].results[0].picture).toMatch(/^ok/);
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
         expect(sendTelegram).not.toHaveBeenCalled();
     });
 });

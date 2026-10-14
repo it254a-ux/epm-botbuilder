@@ -16,12 +16,33 @@
 const crypto = require('crypto');
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
-const { sendTelegram } = require('./_lib/telegram');
+const { sendTelegram, sendTelegramPhoto } = require('./_lib/telegram');
+const chart = require('./_lib/signal-chart');
 const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
 const store = require('./_lib/signals-store');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Sends one signal to Telegram: as a chart picture with the signal text as its caption.
+ * If the picture cannot be drawn or Telegram refuses it, the plain text message is sent instead,
+ * so a signal is never lost because of the picture. Returns { messageId, picture: true|false|'failed: why' }.
+ */
+async function deliver(sig, chartInput) {
+    const text = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
+    let why = null;
+    try {
+        const png = chart.renderChartPng(chartInput);
+        const sent = await sendTelegramPhoto(png, text);
+        return { messageId: sent.messageId, picture: true };
+    } catch (err) {
+        why = err.message;
+        console.error('signal-watch: chart picture failed, sending text only:', why);
+    }
+    const sent = await sendTelegram(text);
+    return { messageId: sent.messageId, picture: `failed: ${why}` };
+}
 
 function authorised(req) {
     const secret = process.env.SIGNALS_SECRET;
@@ -76,7 +97,7 @@ module.exports = async function handler(req, res) {
             // Retry anything saved earlier that Telegram did not accept.
             for (const s of await store.getUnsent(sql)) {
                 try {
-                    const sent = await sendTelegram(core.formatTelegram(s));
+                    const sent = await sendTelegram(core.formatTelegram(s, { siteUrl: core.signalsPageUrl() }));
                     await store.markTelegramSent(sql, s.id, sent.messageId);
                 } catch (err) {
                     console.error('signal-watch: Telegram retry failed:', err.message);
@@ -140,15 +161,20 @@ module.exports = async function handler(req, res) {
                         rr: a.plan.rr,
                         time: lastClosed,
                     };
-                    if (dry) { r.wouldSend = core.formatTelegram(sig); continue; }
+                    if (dry) {
+                        r.wouldSend = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
+                        try { r.picture = `ok (${chart.renderChartPng({ candles: closed, analysis: a, signal: sig }).length} bytes)`; } catch (err) { r.picture = `would fail: ${err.message}`; }
+                        continue;
+                    }
 
                     const id = await store.insertSignal(sql, sig);
                     if (id === null) { r.skipped = 'Already sent before (duplicate)'; continue; }
                     r.saved = true;
                     try {
-                        const sent = await sendTelegram(core.formatTelegram(sig));
+                        const sent = await deliver(sig, { candles: closed, analysis: a, signal: sig });
                         await store.markTelegramSent(sql, id, sent.messageId);
                         r.telegram = 'sent';
+                        r.picture = sent.picture;
                     } catch (err) {
                         // Saved on the website feed; Telegram is retried on the next run.
                         r.telegram = `failed: ${err.message}`;

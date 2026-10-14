@@ -15,7 +15,7 @@ function gmtStamp(epochSeconds) {
 }
 
 /** The Telegram text for one signal. Uses Telegram HTML formatting. */
-function formatTelegram(sig) {
+function formatTelegram(sig, { siteUrl } = {}) {
     const buy = sig.side === 'BUY';
     return [
         `${buy ? '🟢' : '🔴'} <b>${sig.side} SIGNAL</b>: ${escapeHtml(sig.symbolName || sig.symbol)}`,
@@ -28,9 +28,16 @@ function formatTelegram(sig) {
         `⚖️ Risk : Reward = 1 : ${sig.rr.toFixed(2)}`,
         // sig.time is the OPEN time of the last closed candle; the signal exists from the moment that candle closed.
         `🕒 ${gmtStamp(sig.time + sig.timeframe)}`,
+        ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
         '',
         '⚠️ Signals only, not financial advice.',
     ].join('\n');
+}
+
+/** Address of the public Signals page, used as the link under every Telegram message. */
+function signalsPageUrl(env = process.env) {
+    const base = String(env.SITE_URL || 'https://www.executiveprimemarkets.site').replace(/\/+$/, '');
+    return `${base}/signals.html`;
 }
 
 /** Reads the watcher settings from environment variables (Phase 1: simple and explicit). */
@@ -49,4 +56,4 @@ function readConfig(env = process.env) {
     };
 }
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, readConfig };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig };
