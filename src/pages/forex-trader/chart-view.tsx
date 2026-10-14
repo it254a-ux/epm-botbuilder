@@ -35,6 +35,7 @@ const COLORS = {
     entry: '#3b82f6',
     sl: '#ef4444',
     tp: '#22c55e',
+    path: '#eab308',
     sweep: '#a855f7',
     bos: '#06b6d4',
     fvg: '#a855f7',
@@ -363,6 +364,44 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 addLine(plan.stopLoss, 'SL', COLORS.sl);
                 addLine(plan.takeProfit, `TP · RR 1:${plan.rr.toFixed(1)}`, COLORS.tp);
                 addLine(plan.midpoint, 'Mid', COLORS.mid, true, 1);
+
+                // ---- projected market path: W shape for a BUY, M shape for a SELL, ending at the TP
+                const dir = sell ? -1 : 1;
+                const lastClose = candles[candles.length - 1].close;
+                const startPrice = analysis.entryTime !== null ? lastClose : plan.entry;
+                const reach = Math.abs(plan.takeProfit - startPrice);
+                const risk = Math.abs(plan.entry - plan.stopLoss);
+                if (reach > 0) {
+                    // first dip / spike is kept small and never goes past half-way to the stop loss
+                    const dip = Math.min(reach * 0.2, risk * 0.5);
+                    // [candles ahead, price]
+                    const steps: Array<[number, number]> = [
+                        [0, startPrice],
+                        [2, startPrice - dir * dip],
+                        [4, startPrice + dir * reach * 0.4],
+                        [6, startPrice + dir * reach * 0.1],
+                        [8, plan.takeProfit],
+                    ];
+                    const pathSeries = chart.addLineSeries({
+                        color: COLORS.path,
+                        lineWidth: 2,
+                        lineStyle: 2,
+                        lastValueVisible: false,
+                        priceLineVisible: false,
+                        crosshairMarkerVisible: false,
+                    });
+                    pathSeries.setData(steps.map(([k, value]) => ({ time: (lastT + len * k) as UTCTimestamp, value })));
+                    pathSeries.setMarkers([
+                        {
+                            time: (lastT + len * 8) as UTCTimestamp,
+                            position: sell ? 'belowBar' : 'aboveBar',
+                            shape: sell ? 'arrowDown' : 'arrowUp',
+                            color: COLORS.path,
+                            text: sell ? 'Expected (M)' : 'Expected (W)',
+                        },
+                    ]);
+                    extraRef.current.push(pathSeries);
+                }
 
                 // the point of entry itself
                 markers.push(
