@@ -97,6 +97,7 @@ const AppWrapper = observer(() => {
         'dtrader',
         'trading_view',
         'tutorial',
+        'forex_trader',
     ];
     const { isDesktop } = useDevice();
     const location = useLocation();

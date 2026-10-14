@@ -1,5 +1,7 @@
 .forex-trader {
     box-sizing: border-box;
+    width: 100%; // fill the whole tab; without this a flex parent shrinks it to its content
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
