@@ -154,4 +154,41 @@ describe('the endpoint', () => {
         expect(r.status).toBe(502);
         expect(JSON.stringify(r.body)).not.toMatch(/403|API key|valid/i);
     });
+
+    describe('candles sent along with the screenshot', () => {
+        const candles = [
+            [1760400000, 100, 101, 99, 100.5],
+            [1760400900, 100.5, 102, 100, 101],
+        ];
+
+        test('are passed to Gemini as plain text lines', async () => {
+            global.fetch.mockResolvedValue(geminiAnswer({ status: 'waiting_for_pov', confidence: 50, reasoning: '', warnings: [] }));
+            const r = await call({ analysis, candles });
+            expect(r.status).toBe(200);
+            const sent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts.map(p => p.text || '').join('\n');
+            expect(sent).toMatch(/Last 2 closed candles/);
+            expect(sent).toMatch(/2025-10-14T00:00Z 100 101 99 100.5/);
+        });
+
+        test('are optional', async () => {
+            global.fetch.mockResolvedValue(geminiAnswer({ status: 'waiting_for_pov', confidence: 50, reasoning: '', warnings: [] }));
+            expect((await call({ analysis })).status).toBe(200);
+        });
+
+        test('bad shapes are refused before reaching Gemini', async () => {
+            const bad = [
+                'text',
+                [[1, 2, 3]],
+                [[1760400000, 100, 99, 101, 100]], // high below low
+                [[1760400000, 'a', 1, 1, 1]],
+                Array.from({ length: 121 }, (_, i) => [1760400000 + i * 900, 1, 2, 0.5, 1.5]),
+            ];
+            for (const c of bad) {
+                limit._reset();
+                const r = await call({ analysis, candles: c });
+                expect(r.status).toBe(400);
+            }
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+    });
 });

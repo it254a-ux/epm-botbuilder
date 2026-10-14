@@ -315,6 +315,8 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         image,
+                        // the last 100 closed candles as [time, open, high, low, close]
+                        candles: closedCandles.slice(-100).map(k => [k.time, k.open, k.high, k.low, k.close]),
                         meta: {
                             market: c.info?.underlying_symbol_name ?? c.symbol,
                             symbol: c.symbol,

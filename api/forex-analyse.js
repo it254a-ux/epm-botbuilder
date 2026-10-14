@@ -13,6 +13,7 @@
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const MAX_IMAGE_CHARS = 2_500_000; // base64 length, roughly 1.8 MB of image
 const MAX_JSON_CHARS = 20_000;
+const MAX_CANDLES = 120;
 const { takeSlot } = require('./_lib/forex-limit');
 
 // How long we wait for Gemini before giving up (Vercel would otherwise cut the request off).
@@ -21,9 +22,10 @@ const GEMINI_TIMEOUT_MS = 20_000;
 const STATUS = ['waiting_for_market', 'waiting_for_pov', 'buy_ready', 'sell_ready', 'invalidated'];
 
 const SYSTEM = `You are a careful trading-chart reviewer for a signals tool. You never place trades and you never promise profit.
-You receive: a chart screenshot, and a JSON object of exact numbers already calculated by code (reference range, sweep, entry, stop loss, take profit, risk:reward, plannedTrades = what the trade would be if each side gets swept, session, warnings, status).
+You receive: a chart screenshot, the last closed candles as plain numbers (oldest first: time, open, high, low, close), and a JSON object of exact numbers already calculated by code (reference range, sweep, entry, stop loss, take profit, risk:reward, plannedTrades = what the trade would be if each side gets swept, session, warnings, status).
 Rules:
 - The numbers are correct. Never change, recalculate or invent price levels. Refer to them by name (Entry, SL, TP, range high, range low).
+- Use the candle numbers to check what the screenshot shows (clean rejection, momentum, choppiness, room to the target). They never change the exact levels in the JSON.
 - Judge only whether the setup named in the JSON looks clean on the chart (clear sweep, clean rejection, room to the target, no obvious opposing structure, volatility that is neither dead nor chaotic).
 - Pick exactly one status:
   "waiting_for_market" = conditions are poor right now (choppy, dead, news-like spikes, range too small, price stuck in the middle).
@@ -33,6 +35,20 @@ Rules:
 - If the code says the setup is not ready, you may not answer buy_ready or sell_ready.
 - Be honest about uncertainty. No strategy wins every time.
 Answer ONLY with a JSON object: {"status": string, "confidence": integer 0-100, "reasoning": string (max 70 words), "warnings": array of short strings (max 4)}`;
+
+/** Validates the candles from the browser and turns them into compact text lines, or null if they are not valid. */
+function candlesToText(candles) {
+    if (candles === undefined || candles === null) return '';
+    if (!Array.isArray(candles) || candles.length > MAX_CANDLES) return null;
+    const lines = [];
+    for (const c of candles) {
+        if (!Array.isArray(c) || c.length !== 5 || !c.every(v => typeof v === 'number' && Number.isFinite(v))) return null;
+        const [t, o, h, l, cl] = c;
+        if (h < Math.max(o, cl, l) || l > Math.min(o, cl, h)) return null; // high/low must contain the candle
+        lines.push(`${new Date(t * 1000).toISOString().slice(0, 16)}Z ${o} ${h} ${l} ${cl}`);
+    }
+    return lines.join('\n');
+}
 
 function clean(parsed, analysis) {
     let status = STATUS.includes(parsed && parsed.status) ? parsed.status : 'waiting_for_market';
@@ -99,7 +115,13 @@ module.exports = async function handler(req, res) {
             return;
         }
 
+        const candleText = candlesToText(body.candles);
+        if (candleText === null) {
+            res.status(400).json({ error: 'Bad candle data' });
+            return;
+        }
         const parts = [{ text: `Exact numbers calculated by code (JSON):\n${json}` }];
+        if (candleText) parts.push({ text: `Last ${body.candles.length} closed candles (UTC time, open, high, low, close), oldest first:\n${candleText}` });
         if (image) parts.push({ inline_data: { mime_type: 'image/jpeg', data: image } });
 
         const controller = new AbortController();
@@ -150,3 +172,4 @@ module.exports = async function handler(req, res) {
     }
 };
 module.exports._clean = clean;
+module.exports._candlesToText = candlesToText;
