@@ -71,6 +71,8 @@
     &-sidebar {
         position: relative;
         background-color: var(--general-main-1);
+        // slightly see-through so the wallpaper shows (solid colour above is the fallback)
+        background-color: color-mix(in srgb, var(--general-main-1) 78%, transparent);
         padding: 2.4rem;
         height: 100%;
         display: none;
@@ -178,7 +180,7 @@
             align-items: flex-start;
             height: var(--tab-content-height);
             flex-grow: 1;
-            background: var(--general-main-1);
+            background: transparent; // let the page wallpaper show through
             overflow: hidden;
             position: relative;
 
