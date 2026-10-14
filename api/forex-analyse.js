@@ -13,19 +13,10 @@
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const MAX_IMAGE_CHARS = 2_500_000; // base64 length, roughly 1.8 MB of image
 const MAX_JSON_CHARS = 20_000;
+const { takeSlot } = require('./_lib/forex-limit');
 
-// Per-instance, in-memory limiter. It slows down abuse; it is not a hard quota.
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 8;
-const hits = new Map();
-function limited(ip) {
-    const now = Date.now();
-    const list = (hits.get(ip) || []).filter(t => now - t < WINDOW_MS);
-    list.push(now);
-    hits.set(ip, list);
-    if (hits.size > 5000) hits.clear();
-    return list.length > MAX_PER_WINDOW;
-}
+// How long we wait for Gemini before giving up (Vercel would otherwise cut the request off).
+const GEMINI_TIMEOUT_MS = 20_000;
 
 const STATUS = ['waiting_for_market', 'waiting_for_pov', 'buy_ready', 'sell_ready', 'invalidated'];
 
@@ -73,12 +64,19 @@ module.exports = async function handler(req, res) {
     }
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        res.status(503).json({ error: 'The AI is not set up yet: GEMINI_API_KEY is missing in Vercel.' });
+        // Visitors get a plain message; the real reason goes to the server log only.
+        console.error('forex-analyse: GEMINI_API_KEY is not set');
+        res.status(503).json({ error: 'The AI review is not available right now.' });
         return;
     }
     const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
-    if (limited(ip)) {
-        res.status(429).json({ error: 'Too many requests. Please wait a minute and try again.' });
+    const refused = await takeSlot(ip);
+    if (refused) {
+        res.status(429).json({
+            error: refused === 'minute'
+                ? 'Too many requests. Please wait a minute and try again.'
+                : 'The AI review has reached its limit for today. The chart and levels still work; please try again later.',
+        });
         return;
     }
 
@@ -104,10 +102,15 @@ module.exports = async function handler(req, res) {
         const parts = [{ text: `Exact numbers calculated by code (JSON):\n${json}` }];
         if (image) parts.push({ inline_data: { mime_type: 'image/jpeg', data: image } });
 
-        const r = await fetch(
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+        let r;
+        try {
+            r = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
             {
                 method: 'POST',
+                signal: controller.signal,
                 headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                 body: JSON.stringify({
                     systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -115,11 +118,20 @@ module.exports = async function handler(req, res) {
                     generationConfig: { temperature: 0.2, responseMimeType: 'application/json', maxOutputTokens: 2048 },
                 }),
             }
-        );
+            );
+        } catch (err) {
+            if (err && err.name === 'AbortError') {
+                res.status(504).json({ error: 'The AI took too long to answer. Please try again.' });
+                return;
+            }
+            throw err;
+        } finally {
+            clearTimeout(timer);
+        }
         if (!r.ok) {
             const detail = await r.text().catch(() => '');
             console.error('gemini error', r.status, detail.slice(0, 300));
-            res.status(502).json({ error: `The AI service returned an error (${r.status}).` });
+            res.status(502).json({ error: 'The AI review is unavailable right now. Please try again shortly.' });
             return;
         }
         const data = await r.json();

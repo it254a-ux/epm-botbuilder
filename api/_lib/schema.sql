@@ -81,3 +81,13 @@ CREATE TABLE IF NOT EXISTS site_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS site_events_site_idx ON site_events (site_id, id DESC);
+
+-- ===== Forex Trader AI usage (limits per visitor and per day) =====
+-- Created automatically by api/_lib/forex-limit.js the first time it is needed; listed here for reference.
+CREATE TABLE IF NOT EXISTS forex_ai_usage (
+    id         BIGSERIAL PRIMARY KEY,
+    visitor    TEXT NOT NULL,                 -- hashed visitor address, never the readable IP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS forex_ai_usage_time_idx ON forex_ai_usage (created_at);
+CREATE INDEX IF NOT EXISTS forex_ai_usage_visitor_idx ON forex_ai_usage (visitor, created_at);
