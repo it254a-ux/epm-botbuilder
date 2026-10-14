@@ -376,13 +376,15 @@ $line: rgba(148, 163, 184, 0.22);
                 -webkit-text-fill-color: transparent;
             }
 
-            > :nth-child(1),
-            > :nth-child(4),
-            .forex-trader__analyse-btn {
+            // Market takes the full width; the rest are two cards per row:
+            // Timeframe | Category, then Strategy | Re-analyse
+            > :nth-child(1) {
                 grid-column: 1 / -1;
             }
             > :nth-child(2),
-            > :nth-child(3) {
+            > :nth-child(3),
+            > :nth-child(4),
+            .forex-trader__analyse-btn {
                 grid-column: auto;
             }
         }
