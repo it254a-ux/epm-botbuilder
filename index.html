@@ -172,7 +172,23 @@
                         var present = !!live;
                         if (live) { var m = live.querySelector('.epm-splash__msg'); if (m && m.textContent && msgEl.textContent !== m.textContent) msgEl.textContent = m.textContent; }
                         if (present) { started = true; if (gone) { clearTimeout(gone); gone = null; } if (bg.style.opacity === '0') bg.style.opacity = '1'; }
-                        else if (started && !gone) { gone = setTimeout(function () { gone = null; if (!document.querySelector('#root .epm-splash')) finish(); }, 150); }
+                        else if (started && !gone) {
+                            // Only treat loading as finished when real page content is on screen.
+                            // Short gaps between loading screens (slow connections, code still
+                            // downloading) used to remove the video for good; if no content shows
+                            // up at all, give up after 8s so the layer can never stay forever.
+                            var content = function () { return !!document.querySelector('.main, .info-page, .bot-dashboard, .dtrader, .epm-trading-bots'); };
+                            var waited = 0;
+                            var poll = function () {
+                                gone = null;
+                                if (done) return;
+                                if (document.querySelector('#root .epm-splash')) return; // a loader is back: keep the video
+                                waited += 300;
+                                if (content() ? waited >= 300 : waited >= 8000) finish();
+                                else gone = setTimeout(poll, 300);
+                            };
+                            gone = setTimeout(poll, 300);
+                        }
                     }
                     var mo = new MutationObserver(check);
                     mo.observe(document.documentElement, { childList: true, subtree: true });

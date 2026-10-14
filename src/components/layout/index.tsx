@@ -4,7 +4,9 @@ import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
 import { Outlet, useLocation } from 'react-router-dom';
 import { api_base } from '@/external/bot-skeleton';
+import ChunkLoader from '@/components/loader/chunk-loader';
 import { useStore } from '@/hooks/useStore';
+import { localize } from '@deriv-com/translations';
 import { useDevice } from '@deriv-com/ui';
 import { crypto_currencies_display_order, fiat_currencies_display_order } from '../shared';
 import AppHeader from './header';
@@ -194,7 +196,10 @@ const Layout = observer(() => {
                         aria-hidden={main_app_hidden ? true : undefined}
                         inert={main_app_hidden ? '' : undefined}
                     >
-                        <Suspense fallback={null}>
+                        {/* Keep a loading screen on show while the app's code downloads:
+                            an empty fallback left a gap with no loader on the page, which
+                            made the background video layer think loading had finished. */}
+                        <Suspense fallback={<ChunkLoader message={localize('Loading...')} />}>
                             <AppRoot />
                         </Suspense>
                     </div>
