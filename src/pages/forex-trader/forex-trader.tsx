@@ -5,6 +5,7 @@ import ChartView, { type ChartViewHandle } from './chart-view';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
 import './forex-trader.scss';
+import './forex-trader-premium.scss';
 
 interface SymbolInfo {
     underlying_symbol: string;
