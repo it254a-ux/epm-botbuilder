@@ -37,6 +37,13 @@ type TTabsProps = {
     should_update_hash?: boolean;
     single_tab_has_no_label?: boolean;
     top: boolean;
+    /** Keep a tab's content running (hidden) after it has been opened, instead of
+     *  closing it when another tab is selected. A tab opts out with
+     *  `data-no-keep-alive` on its child element. */
+    keep_alive?: boolean;
+    /** When true, also open every other keep-alive tab once, one after another in
+     *  the background (used after the Charts page has finished loading). */
+    preload_ready?: boolean;
 };
 
 const Tabs = ({
@@ -63,8 +70,12 @@ const Tabs = ({
     should_update_hash = false,
     single_tab_has_no_label = false,
     top,
+    keep_alive = false,
+    preload_ready = false,
 }: TTabsProps) => {
     const [active_line_style, updateActiveLineStyle] = React.useState({});
+    // Tabs that have been opened (or background-preloaded) and are kept alive.
+    const [opened_tabs, setOpenedTabs] = React.useState<number[]>([]);
     const active_tab_ref = React.useRef<HTMLLIElement>(null);
     const tabs_wrapper_ref = React.useRef<HTMLUListElement>(null);
     const pushHash = (hash: string) => {
@@ -112,6 +123,36 @@ const Tabs = ({
     });
 
     const [active_tab_index, setActiveTabIndex] = React.useState(initial_index_to_show);
+
+    React.useEffect(() => {
+        if (!keep_alive) return;
+        setOpenedTabs(prev => (prev.includes(active_tab_index) ? prev : [...prev, active_tab_index]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keep_alive, active_tab_index]);
+
+    // After the Charts page is ready, open the remaining tabs once, one by one and
+    // only when the browser is idle, so nothing competes with what the person sees.
+    React.useEffect(() => {
+        if (!keep_alive || !preload_ready) return undefined;
+        const eligible: number[] = [];
+        React.Children.forEach(children, (child, index) => {
+            if (child && !child['props']['data-no-keep-alive'] && child['props'].children) eligible.push(index);
+        });
+        const timers: number[] = [];
+        eligible.forEach((index, order) => {
+            const open = () =>
+                setOpenedTabs(prev => (prev.includes(index) ? prev : [...prev, index]));
+            timers.push(
+                window.setTimeout(() => {
+                    if ('requestIdleCallback' in window) window.requestIdleCallback(open);
+                    else open();
+                }, 1500 * (order + 1))
+            );
+        });
+        return () => timers.forEach(t => window.clearTimeout(t));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keep_alive, preload_ready]);
+
 
     React.useEffect(() => {
         if (active_tab_index >= 0 && active_index !== active_tab_index) {
@@ -228,10 +269,24 @@ const Tabs = ({
             >
                 {React.Children.map(children, (child, index) => {
                     if (!child) return null;
-                    if (index !== active_tab_index) {
-                        return undefined;
+                    const is_active = index === active_tab_index;
+                    if (!keep_alive || child.props['data-no-keep-alive']) {
+                        if (!is_active) return undefined;
+                        return child.props.children;
                     }
-                    return child.props.children;
+                    if (!is_active && !opened_tabs.includes(index)) return undefined;
+                    // display:contents keeps the active tab laid out exactly as before
+                    // (no extra box); inactive tabs stay alive but hidden.
+                    return (
+                        <div
+                            key={child.props.id ?? index}
+                            className='dc-tabs__pane'
+                            style={{ display: is_active ? 'contents' : 'none' }}
+                            aria-hidden={is_active ? undefined : true}
+                        >
+                            {child.props.children}
+                        </div>
+                    );
                 })}
             </div>
         </div>

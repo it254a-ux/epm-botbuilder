@@ -539,6 +539,12 @@ const AppWrapper = observer(() => {
                             // affordances already built for this tab bar.
                             is_scrollable={!isDesktop}
                             top
+                            // Keep pages running (hidden) once opened, and after Charts is
+                            // ready open the rest once in the background, so switching
+                            // pages never restarts them. Charts, Dtrader and TradingView
+                            // opt out (they have their own loading rules, see below).
+                            keep_alive
+                            preload_ready={!!(chart_store.is_chart_loading || charts_preload_timed_out)}
                         >
                             <div
                                 label={
@@ -617,6 +623,7 @@ const AppWrapper = observer(() => {
                                         <Localize i18n_default_text='Charts' />
                                     </>
                                 }
+                                data-no-keep-alive
                                 id={
                                     is_chart_modal_visible || is_trading_view_modal_visible
                                         ? 'id-charts--disabled'
@@ -636,6 +643,7 @@ const AppWrapper = observer(() => {
                                         <Localize i18n_default_text='Dtrader' />
                                     </>
                                 }
+                                data-no-keep-alive
                                 id='id-dtrader'
                                 // .dtrader-app (dtrader/index.tsx) is 'h-full',
                                 // meant to fill this panel, but a plain block
@@ -665,6 +673,7 @@ const AppWrapper = observer(() => {
                                         <Localize i18n_default_text='TradingView' />
                                     </>
                                 }
+                                data-no-keep-alive
                                 id='id-trading-view'
                                 // No style/height prop here on purpose: Tabs.tsx's
                                 // React.Children.map renders `child.props.children`

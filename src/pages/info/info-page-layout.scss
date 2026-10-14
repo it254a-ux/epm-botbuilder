@@ -1,3 +1,5 @@
+@use 'components/shared/styles/wallpaper' as *;
+
 // Rendered inside Layout's <Body> (.main-body: flex-grow: 1; overflow:
 // hidden -- see components/layout/main-body/main-body.scss), not a bare
 // full-viewport page, so this needs its own height + scroll rather than
@@ -20,7 +22,7 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    background: var(--general-main-1);
+    @include page-wallpaper;
     color: var(--text-general);
 
     // A wrapping row of equal-height cards, not a single centered column: on

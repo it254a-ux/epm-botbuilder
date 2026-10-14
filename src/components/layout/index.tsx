@@ -1,8 +1,8 @@
 // @ts-nocheck — vendored bot code with known upstream type gaps; see AGENTS.md
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { api_base } from '@/external/bot-skeleton';
 import { useStore } from '@/hooks/useStore';
 import { useDevice } from '@deriv-com/ui';
@@ -11,11 +11,37 @@ import AppHeader from './header';
 import Body from './main-body';
 import './layout.scss';
 
+// The main app (all tabs, charts, bot builder). Same chunk App.tsx already loads.
+const AppRoot = lazy(() => import('../../app/app-root'));
+const MAIN_APP_PATHS = ['/', '/preview'];
+// Opening these must not close the main app (it used to be torn down and rebuilt,
+// which looked like a full refresh when coming back).
+const INFO_PATHS = ['/about', '/contact', '/legal/risk-disclosure', '/legal/terms', '/legal/privacy-policy'];
+
 const Layout = observer(() => {
     const { isDesktop } = useDevice();
     const store = useStore();
     const is_quick_strategy_active = store?.quick_strategy?.is_open;
     const isCallbackPage = window.location.pathname === '/callback';
+    const { pathname } = useLocation();
+    const is_main_app_route = MAIN_APP_PATHS.includes(pathname);
+    const is_info_route = INFO_PATHS.includes(pathname);
+    // Becomes true the first time the main app is shown; from then on it stays
+    // running (hidden) while an info page is open.
+    const main_app_was_shown = useRef(false);
+    if (is_main_app_route) main_app_was_shown.current = true;
+    if (!is_main_app_route && !is_info_route) main_app_was_shown.current = false; // e.g. /dtrader: same as before
+    const keep_main_app = is_main_app_route || (is_info_route && main_app_was_shown.current);
+    const main_app_hidden = keep_main_app && !is_main_app_route;
+
+    // Coming back from an info page: let charts / the bot workspace re-measure.
+    const was_hidden = useRef(false);
+    useEffect(() => {
+        if (was_hidden.current && !main_app_hidden) {
+            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        }
+        was_hidden.current = main_app_hidden;
+    }, [main_app_hidden]);
 
     const checkClientAccount = JSON.parse(localStorage.getItem('clientAccounts') ?? '{}');
     const getQueryParams = new URLSearchParams(window.location.search);
@@ -150,7 +176,30 @@ const Layout = observer(() => {
         >
             {!isCallbackPage && <AppHeader isAuthenticating={isAuthenticating || !isInitialAuthCheckComplete} />}
             <Body>
-                <Outlet />
+                {keep_main_app && (
+                    <div
+                        style={
+                            main_app_hidden
+                                ? {
+                                      position: 'fixed',
+                                      top: 0,
+                                      left: '-200vw',
+                                      width: '100vw',
+                                      height: '100vh',
+                                      visibility: 'hidden',
+                                      pointerEvents: 'none',
+                                  }
+                                : { display: 'contents' }
+                        }
+                        aria-hidden={main_app_hidden ? true : undefined}
+                        inert={main_app_hidden ? '' : undefined}
+                    >
+                        <Suspense fallback={null}>
+                            <AppRoot />
+                        </Suspense>
+                    </div>
+                )}
+                {!is_main_app_route && <Outlet />}
             </Body>
             {/* Footer removed — its icons (fullscreen, logout, server time,
                 network status) now render inline in the header row via

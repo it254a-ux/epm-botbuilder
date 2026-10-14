@@ -17,7 +17,6 @@ import i18nInstance from './i18n';
 import './app-root.scss';
 
 const Layout = lazy(() => import('../components/layout'));
-const AppRoot = lazy(() => import('./app-root'));
 const DtraderPage = lazy(() => import('../pages/dtrader'));
 const AboutPage = lazy(() => import('../pages/info/about'));
 const ContactPage = lazy(() => import('../pages/info/contact'));
@@ -64,9 +63,9 @@ const router = createBrowserRouter(
             }
         >
             {/* All child routes will be passed as children to Layout */}
-            <Route index element={<AppRoot />} />
+            <Route index element={null} />
             {/* App Builder embeds the template at /preview — render the same app shell */}
-            <Route path='preview' element={<AppRoot />} />
+            <Route path='preview' element={null} />
             {/* Ported Rise/Fall trading page (formerly its own repo) */}
             <Route path='dtrader' element={<DtraderPage />} />
             {/* Standalone info/legal pages — see src/pages/info/. Nested
