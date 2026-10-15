@@ -98,6 +98,9 @@ const rrBucket = rr => (rr < 3 ? RR_BUCKETS[0] : rr < 4 ? RR_BUCKETS[1] : rr < 6
 const STOP_BUCKETS = ['stop < 0.5 ATR', 'stop 0.5-1 ATR', 'stop 1-1.5 ATR', 'stop 1.5-2.5 ATR', 'stop > 2.5 ATR'];
 const stopBucket = x => (x === null ? null : x < 0.5 ? STOP_BUCKETS[0] : x < 1 ? STOP_BUCKETS[1] : x < 1.5 ? STOP_BUCKETS[2] : x < 2.5 ? STOP_BUCKETS[3] : STOP_BUCKETS[4]);
 
+/** "2026 Q3" for a candle time: lets you see whether a pattern holds in every stretch of time or only in one. */
+const quarterOf = t => { const d = new Date(t * 1000); return `${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`; };
+
 /** Everything the report shows, from a list of trades. */
 function buildReport(trades) {
     const overall = summarise(trades);
@@ -113,9 +116,10 @@ function buildReport(trades) {
         byReward: group(trades, t => rrBucket(t.rr), RR_BUCKETS),
         byStopSize: group(trades, t => stopBucket(t.stopAtr), STOP_BUCKETS),
         byFreshness: group(trades, t => `${t.age} candle${t.age === 1 ? '' : 's'} after the break`),
+        byPeriod: group(trades, t => quarterOf(t.time)).sort((a, b) => a.name.localeCompare(b.name)),
         bySymbol: group(trades, t => `${t.symbolName} (${t.symbol})`),
         notes,
     };
 }
 
-module.exports = { runBacktest, summarise, group, buildReport, historyCandles, sessionOf, rrBucket, stopBucket };
+module.exports = { runBacktest, summarise, group, buildReport, quarterOf, historyCandles, sessionOf, rrBucket, stopBucket };

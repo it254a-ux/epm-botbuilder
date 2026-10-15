@@ -143,6 +143,12 @@ describe('the numbers', () => {
         expect(r.byStrategy.map(x => x.name)).toEqual(['1. S', '2. Two']);
         expect(r.notes[0]).toMatch(/too few/i);
     });
+    test('results are also split by calendar quarter, oldest first', () => {
+        expect(bt.quarterOf(Date.UTC(2026, 9, 15) / 1000)).toBe('2026 Q4');
+        expect(bt.quarterOf(Date.UTC(2026, 0, 1) / 1000)).toBe('2026 Q1');
+        const r = bt.buildReport([T('hit_tp', 2, { time: Date.UTC(2026, 9, 1) / 1000 }), T('hit_sl', 2, { time: Date.UTC(2026, 0, 5) / 1000 }), T('hit_sl', 2, { time: Date.UTC(2025, 10, 5) / 1000 })]);
+        expect(r.byPeriod.map(x => x.name)).toEqual(['2025 Q4', '2026 Q1', '2026 Q4']);
+    });
     test('the real engine replays months of data without errors', () => {
         engine.analyse.mockImplementation(jest.requireActual('../_lib/engine').analyse);
         let p = 1.1; const cs = [];
