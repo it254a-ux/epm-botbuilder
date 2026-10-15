@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { LegacyChevronRight1pxIcon } from '@deriv/quill-icons/Legacy';
 import { MenuItem, Text, useDevice } from '@deriv-com/ui';
@@ -10,10 +11,12 @@ type TMenuContentProps = {
     onNavigateToTutorials?: () => void;
     onOpenSubmenu?: (submenu: string) => void;
     onLogout?: () => void;
+    onCloseMenu?: () => void;
 };
 
 const MenuContent = observer(
-    ({ enableThemeToggle = true, onNavigateToTutorials, onOpenSubmenu, onLogout }: TMenuContentProps) => {
+    ({ enableThemeToggle = true, onNavigateToTutorials, onOpenSubmenu, onLogout, onCloseMenu }: TMenuContentProps) => {
+    const navigate = useNavigate();
     const { isDesktop } = useDevice();
     const { client } = useStore();
     const textSize = isDesktop ? 'sm' : 'md';
@@ -70,6 +73,17 @@ const MenuContent = observer(
                                                 })}
                                                 disableHover
                                                 href={href}
+                                                // Pages inside the app (About, Contact, Legal) open without a
+                                                // full reload, so the running pages stay alive.
+                                                onClick={
+                                                    href?.startsWith('/') && !target
+                                                        ? (e: React.MouseEvent) => {
+                                                              e.preventDefault();
+                                                              navigate(href);
+                                                              onCloseMenu?.();
+                                                          }
+                                                        : undefined
+                                                }
                                                 key={`${index}-${itemIndex}-${label}`}
                                                 leftComponent={
                                                     <LeftComponent

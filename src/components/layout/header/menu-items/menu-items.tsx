@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { observer } from 'mobx-react-lite';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { DBOT_TABS } from '@/constants/bot-contents';
@@ -346,32 +346,36 @@ export const MenuItems = observer(() => {
                             <Localize i18n_default_text='Company' />
                         </div>
                         {COMPANY_LINKS.map(link => (
-                            <a
+                            // Link (not a plain <a href>): opens the page inside the app without
+                            // reloading the whole site, so the pages already running stay alive.
+                            <Link
                                 key={link.key}
                                 role='menuitem'
                                 className='app-header__menu-more-item'
-                                href={link.href}
+                                to={link.href}
                                 onClick={() => setIsMoreOpen(false)}
                             >
                                 <span className='app-header__menu-item-icon'>{link.icon}</span>
                                 <span className='app-header__menu-item-label'>{link.label}</span>
-                            </a>
+                            </Link>
                         ))}
                         <div className='app-header__menu-more-divider' role='separator' />
                         <div className='app-header__menu-more-heading'>
                             <Localize i18n_default_text='Legal' />
                         </div>
                         {LEGAL_LINKS.map(link => (
-                            <a
+                            // Link (not a plain <a href>): opens the page inside the app without
+                            // reloading the whole site, so the pages already running stay alive.
+                            <Link
                                 key={link.key}
                                 role='menuitem'
                                 className='app-header__menu-more-item'
-                                href={link.href}
+                                to={link.href}
                                 onClick={() => setIsMoreOpen(false)}
                             >
                                 <span className='app-header__menu-item-icon'>{link.icon}</span>
                                 <span className='app-header__menu-item-label'>{link.label}</span>
-                            </a>
+                            </Link>
                         ))}
                     </div>
                 )}
