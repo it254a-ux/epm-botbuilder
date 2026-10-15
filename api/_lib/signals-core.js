@@ -57,6 +57,8 @@ function readConfig(env = process.env) {
         // Only send setups whose break of structure happened at most this many candles ago.
         maxAgeCandles: Number.isFinite(maxAge) && maxAge >= 0 ? maxAge : 3,
         // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.
+        // Checked first in every run (gold first). Override with WATCH_PRIORITY=frxXAUUSD,frxEURUSD,...
+        priority: list(env.WATCH_PRIORITY, MAIN_MARKETS.join(',')),
         concurrency: Math.min(10, Math.max(1, num(env.WATCH_CONCURRENCY, 3))),
         batchGapMs: Math.max(0, num(env.WATCH_BATCH_GAP_MS, 1000)),
         // Stop starting new markets after this long; the rest are done first on the next run.
@@ -64,6 +66,23 @@ function readConfig(env = process.env) {
         // Pause between Telegram messages (Telegram allows about 20 per minute to one channel).
         telegramGapMs: Math.max(0, num(env.TELEGRAM_GAP_MS, 1100)),
     };
+}
+
+/** The main markets, in priority order (gold first). They are always checked first in every run. */
+const MAIN_MARKETS = ['frxXAUUSD', 'frxEURUSD', 'frxGBPUSD', 'frxUSDJPY', 'frxAUDUSD', 'frxUSDCAD', 'frxUSDCHF', 'frxNZDUSD', 'cryBTCUSD', 'cryETHUSD', 'OTC_NDX', 'OTC_DJI', 'OTC_SPC'];
+
+/**
+ * The order markets are checked in: priority markets first (in the priority order given), then the
+ * rest, least recently checked first. A run that runs out of time therefore only ever skips the least important ones.
+ */
+function orderForRun(symbols, priority, states) {
+    const set = new Set(symbols);
+    const first = priority.filter(s => set.has(s));
+    const firstSet = new Set(first);
+    const rest = symbols
+        .filter(s => !firstSet.has(s))
+        .sort((a, b) => ((states.get(a) && states.get(a).updatedAt) || 0) - ((states.get(b) && states.get(b).updatedAt) || 0));
+    return [...first, ...rest];
 }
 
 /** The markets to watch: the database watchlist if it has any rows, otherwise WATCH_SYMBOLS from the environment. */
@@ -108,4 +127,4 @@ function setupCheck(analysis, lastClosed, cfg) {
 /** Open time of the candle that closed most recently, by the clock. */
 const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck, orderForRun, MAIN_MARKETS };

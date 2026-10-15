@@ -533,7 +533,7 @@ describe('helpers', () => {
     test('config defaults and clean-up', () => {
         expect(core.readConfig({})).toEqual({
             symbols: ['frxEURUSD'], timeframe: 3600, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
-            concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100,
+            concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100, priority: core.MAIN_MARKETS,
         });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
             .toMatchObject({ symbols: ['a', 'b'], timeframe: 3600, strategies: [1, 3], maxAgeCandles: 0 });
@@ -595,6 +595,7 @@ describe('watchlist (Phase 2)', () => {
         await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('frxEURUSD', ${TF}, 1, now() - interval '1 hour')`;
         await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('R_100', ${TF}, 1, now())`;
         process.env.WATCH_CONCURRENCY = '1';
+        process.env.WATCH_PRIORITY = 'none'; // this test is about the "least recently checked" order alone
         let fake = Date.now();
         const spy = jest.spyOn(Date, 'now').mockImplementation(() => fake);
         deriv.getCandles.mockImplementation(async () => { const c = candlesUpToNow(); fake += 30000; return c; });
@@ -829,5 +830,56 @@ describe('news helpers', () => {
         expect(news.readNewsConfig({})).toMatchObject({ enabled: true, impacts: ['high'], beforeMin: 120, afterMin: 30, warnHours: 24, refreshHours: 6 });
         expect(news.readNewsConfig({ NEWS_FILTER: 'OFF', NEWS_IMPACT: 'High, Medium', NEWS_BLACKOUT_BEFORE_MIN: '60' }))
             .toMatchObject({ enabled: false, impacts: ['high', 'medium'], beforeMin: 60 });
+    });
+});
+
+
+describe('main markets first', () => {
+    const post = body => new Promise(resolve => {
+        const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ status: this.code, body: b }); } };
+        admin({ method: 'POST', query: {}, headers: { authorization: 'Bearer s3cret' }, body }, res);
+    });
+
+    test('gold leads the default list', () => {
+        expect(core.MAIN_MARKETS[0]).toBe('frxXAUUSD');
+        expect(core.readConfig({}).priority[0]).toBe('frxXAUUSD');
+        expect(core.readConfig({ WATCH_PRIORITY: 'a, b' }).priority).toEqual(['a', 'b']);
+    });
+
+    test('priority markets come first in priority order, the rest by least recently checked', () => {
+        const states = new Map([['x', { updatedAt: 300 }], ['y', { updatedAt: 100 }], ['z', { updatedAt: 200 }]]);
+        expect(core.orderForRun(['x', 'y', 'z', 'g', 'e'], ['g', 'e', 'nothere'], states)).toEqual(['g', 'e', 'y', 'z', 'x']);
+        expect(core.orderForRun(['x'], [], new Map())).toEqual(['x']);
+    });
+
+    test('in a run, a priority market is checked first even if it was checked most recently', async () => {
+        await post({ symbols: { frxEURUSD: true, frxGBPUSD: true, R_100: true } });
+        await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('R_100', ${TF}, 1, now())`;
+        await global.__sql`INSERT INTO signal_watch_state (symbol, timeframe, last_candle, updated_at) VALUES ('frxGBPUSD', ${TF}, 1, now() - interval '3 days')`;
+        process.env.WATCH_PRIORITY = 'R_100';
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.markets.map(m => m.symbol)).toEqual(['R_100', 'frxEURUSD', 'frxGBPUSD']); // then never-checked before checked-3-days-ago
+    });
+
+    test('a run that runs out of time never skips a priority market', async () => {
+        await post({ symbols: { frxEURUSD: true, frxGBPUSD: true, R_100: true } });
+        process.env.WATCH_PRIORITY = 'R_100';
+        process.env.WATCH_CONCURRENCY = '1';
+        let fake = Date.now();
+        const spy = jest.spyOn(Date, 'now').mockImplementation(() => fake);
+        deriv.getCandles.mockImplementation(async () => { const c = candlesUpToNow(); fake += 50000; return c; });
+        const r = await call(handler, { query: { dry: '1' } });
+        spy.mockRestore();
+        expect(r.body.markets.map(m => m.symbol)).toEqual(['R_100']);
+        expect(r.body.summary.deferred).toBe(2);
+    });
+
+    test('the admin page is told which markets are the main ones', async () => {
+        const r = await new Promise(resolve => {
+            const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ status: this.code, body: b }); } };
+            admin({ method: 'GET', query: {}, headers: { authorization: 'Bearer s3cret' } }, res);
+        });
+        expect(r.body.main[0]).toBe('frxXAUUSD');
+        expect(r.body.main).toEqual(core.MAIN_MARKETS);
     });
 });

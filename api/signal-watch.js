@@ -209,10 +209,8 @@ module.exports = async function handler(req, res) {
         const rows = sql ? await store.getWatchlist(sql) : [];
         report.watchlistSource = rows.length ? 'database' : 'environment (WATCH_SYMBOLS)';
         const states = sql ? await store.getStates(sql, cfg.timeframe) : new Map();
-        // Least recently checked first, so a run that runs out of time never starves the same markets.
-        const symbols = core
-            .resolveWatchSymbols(rows, cfg.symbols)
-            .sort((a, b) => ((states.get(a) && states.get(a).updatedAt) || 0) - ((states.get(b) && states.get(b).updatedAt) || 0));
+        // Main markets (gold first) are always checked first; the rest by least recently checked.
+        const symbols = core.orderForRun(core.resolveWatchSymbols(rows, cfg.symbols), cfg.priority, states);
         summary.watching = symbols.length;
 
         if (write) {

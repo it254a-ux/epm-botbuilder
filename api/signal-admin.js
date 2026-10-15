@@ -73,7 +73,7 @@ module.exports = async function handler(req, res) {
             open: s.exchange_is_open !== 0 && s.is_trading_suspended !== 1,
             enabled: on.has(s.underlying_symbol),
         }));
-        res.status(200).json({ source: fromEnv ? 'environment' : 'database', enabled: on.size, markets, derivError });
+        res.status(200).json({ source: fromEnv ? 'environment' : 'database', enabled: on.size, main: core.readConfig().priority, markets, derivError });
     } catch (err) {
         console.error('signal-admin error:', err.message);
         res.status(500).json({ error: 'Could not complete the request' });
