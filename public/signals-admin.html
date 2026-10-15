@@ -15,7 +15,7 @@
   p.sub { margin:0 0 16px; color:var(--muted); font-size:13px; }
   .box { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; }
   label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
-  input[type=password], input[type=search] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:15px; }
+  input[type=password], input[type=text], input[type=search] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:15px; }
   button { cursor:pointer; border:0; border-radius:8px; padding:10px 14px; font-size:14px; font-weight:600; background:var(--gold); color:#1a1405; }
   button.ghost { background:var(--line); color:var(--text); font-weight:500; padding:6px 10px; font-size:12.5px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -43,6 +43,8 @@
     <label for="key">Your SIGNALS_SECRET (kept only in this browser tab)</label>
     <div class="row">
       <input id="key" type="password" class="grow" autocomplete="off" placeholder="Paste your secret">
+      <button class="ghost" id="eye" type="button" aria-label="Show the secret" title="Show / hide the secret">👁 Show</button>
+      <button class="ghost" id="copy" type="button" title="Copy the secret">Copy</button>
       <button id="load">Load markets</button>
     </div>
   </div>
@@ -70,6 +72,22 @@
   var checks = {}; // symbol -> checkbox
 
   keyEl.value = sessionStorage.getItem('signalsKey') || '';
+
+  // Eye button: show or hide the secret so it can be read and copied. Copy button: copies it.
+  var eyeEl = document.getElementById('eye');
+  eyeEl.onclick = function () {
+    var show = keyEl.type === 'password';
+    keyEl.type = show ? 'text' : 'password';
+    eyeEl.textContent = show ? '🙈 Hide' : '👁 Show';
+    eyeEl.setAttribute('aria-label', show ? 'Hide the secret' : 'Show the secret');
+  };
+  document.getElementById('copy').onclick = function () {
+    var v = keyEl.value.trim();
+    if (!v) { say('There is nothing to copy yet.', 'bad'); return; }
+    var done = function () { say('Secret copied.', 'ok'); };
+    var fallback = function () { var t = keyEl.type; keyEl.type = 'text'; keyEl.select(); try { document.execCommand('copy'); done(); } catch (e) { say('Could not copy. Press Show and copy it by hand.', 'bad'); } keyEl.type = t; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(done, fallback); else fallback();
+  };
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
   function say(text, kind) { msg.textContent = text; msg.className = kind || ''; }
