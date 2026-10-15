@@ -214,6 +214,13 @@ describe('the endpoint', () => {
         expect(r.body.bySymbol).toHaveLength(2);
         expect(r.body.latestTrades).toBeUndefined();
     });
+    test('the report says how much history each market really had', async () => {
+        deriv.getCandlesBack.mockImplementation(async (c, symbol, tf, days, stats) => { Object.assign(stats, { pages: 2, wanted: 17520, perPage: [1000, 1000] }); return recentCandles; });
+        const r = await call({ symbols: 'frxEURUSD' });
+        expect(r.body.coverage).toHaveLength(1);
+        expect(r.body.coverage[0]).toMatchObject({ symbol: 'frxEURUSD', candles: 700, requested: 17520, pages: 2, candlesPerPage: [1000, 1000], daysReplayed: 14 });
+        expect(r.body.coverage[0].from).toMatch(/GMT$/);
+    });
     test('trades=1 also lists the latest trades', async () => {
         const r = await call({ symbols: 'frxEURUSD', trades: '1' });
         expect(r.body.latestTrades).toHaveLength(1);

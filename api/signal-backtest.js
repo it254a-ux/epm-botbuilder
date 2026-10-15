@@ -49,7 +49,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const out = { ok: true, timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, ...filters }, symbolsTested: 0, skipped: [], unfinished: [] };
+    const out = { ok: true, timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, ...filters }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
     const trades = [];
     try {
         const active = await deriv.getActiveSymbols(client);
@@ -78,8 +78,15 @@ module.exports = async function handler(req, res) {
             const meta = info.get(symbol);
             if (!meta) { out.skipped.push({ symbol, reason: 'Not in the Deriv market list' }); return; }
             const nowSec = Math.floor(Date.now() / 1000);
-            const raw = await deriv.getCandlesBack(client, symbol, timeframe, 15 + days);
+            const stats = {};
+            const raw = await deriv.getCandlesBack(client, symbol, timeframe, 15 + days, stats);
             const candles = raw.filter(c => c.time + timeframe <= nowSec); // closed candles only
+            // What data was really available: lets you see if a market has less history than asked for.
+            out.coverage.push({
+                symbol, candles: candles.length, requested: stats.wanted, pages: stats.pages, candlesPerPage: stats.perPage,
+                from: candles.length ? core.gmtStamp(candles[0].time) : null, to: candles.length ? core.gmtStamp(candles[candles.length - 1].time + timeframe) : null,
+                daysReplayed: Math.max(0, Math.round(((candles.length - window) * timeframe) / 86400)),
+            });
             if (candles.length < window + 1) { out.skipped.push({ symbol, reason: `Only ${candles.length} candles available` }); return; }
             const found = bt.runBacktest({
                 symbol, symbolName: meta.underlying_symbol_name, market: meta.market, candles, timeframe, strategies, cfg, filters, expirySeconds, window,

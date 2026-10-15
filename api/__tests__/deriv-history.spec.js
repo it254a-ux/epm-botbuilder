@@ -4,7 +4,7 @@ const { getCandlesBack } = require('../_lib/deriv');
 
 const TF = 3600;
 /** A fake Deriv that holds `total` hourly candles and answers like ticks_history does. */
-function fakeClient(total, newest = 1_800_000_000) {
+function fakeClient(total, newest = 1_800_000_000, pageCap = 5000) {
     const all = Array.from({ length: total }, (_, i) => ({ epoch: newest - (total - 1 - i) * TF, open: '1', high: '2', low: '0.5', close: '1.5' }));
     const calls = [];
     return {
@@ -13,7 +13,7 @@ function fakeClient(total, newest = 1_800_000_000) {
             calls.push(req);
             const endEpoch = req.end === 'latest' ? Infinity : req.end;
             const upTo = all.filter(c => c.epoch <= endEpoch);
-            return { candles: upTo.slice(-Math.min(req.count, 5000)) };
+            return { candles: upTo.slice(-Math.min(req.count, pageCap)) };
         },
     };
 }
@@ -47,7 +47,23 @@ test('stops when the market has less history than asked for', async () => {
     const c = fakeClient(7000);
     const rows = await getCandlesBack(c, 'x', TF, 730);
     expect(rows).toHaveLength(7000);
-    expect(c.calls).toHaveLength(2); // second page came back short: nothing older exists
+    expect(c.calls).toHaveLength(3); // the third page came back empty: nothing older exists
+});
+
+test('keeps going when Deriv sends fewer candles per request than asked for', async () => {
+    const stats = {};
+    const c = fakeClient(20000, 1_800_000_000, 1000); // this fake never sends more than 1000 at a time
+    const rows = await getCandlesBack(c, 'x', TF, 730, stats);
+    expect(rows).toHaveLength(17520);
+    expect(stats.pages).toBe(18);
+    expect(stats.perPage[0]).toBe(1000);
+    for (let i = 1; i < rows.length; i++) expect(rows[i].time - rows[i - 1].time).toBe(TF);
+});
+
+test('stats tell how many requests were needed', async () => {
+    const stats = {};
+    await getCandlesBack(fakeClient(3000), 'x', TF, 100, stats);
+    expect(stats).toMatchObject({ pages: 1, wanted: 2400, perPage: [2400] });
 });
 
 test('a market with no data returns an empty list, not an error', async () => {

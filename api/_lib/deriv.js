@@ -100,23 +100,30 @@ async function getCandles(client, symbol, granularity, days = 15) {
 }
 
 /**
- * Long history for the backtest. Deriv returns at most 5000 candles per request, so older data is
- * read page by page (each page ends just before the oldest candle of the previous one).
- * Returns candles oldest first, no duplicates.
+ * Long history for the backtest. Deriv returns a limited number of candles per request (at most
+ * 5000, and possibly fewer), so older data is read page by page: each page ends just before the
+ * oldest candle of the previous one, and reading stops only when a page brings nothing new.
+ * Returns candles oldest first, no duplicates. `stats` (optional) is filled with what happened.
  */
-async function getCandlesBack(client, symbol, granularity, days) {
+async function getCandlesBack(client, symbol, granularity, days, stats = {}) {
     const PAGE = 5000;
+    const MAX_PAGES = 30;
     const wanted = Math.ceil((days * 86400) / granularity);
     const byTime = new Map();
+    stats.pages = 0;
+    stats.wanted = wanted;
+    stats.perPage = [];
     let end = 'latest';
-    for (let page = 0; page < 10 && byTime.size < wanted; page++) {
+    for (let page = 0; page < MAX_PAGES && byTime.size < wanted; page++) {
         const count = Math.min(PAGE, wanted - byTime.size);
         const res = await client.send({ ticks_history: symbol, style: 'candles', granularity, end, count });
         const rows = (res.candles || []).map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+        stats.pages++;
+        stats.perPage.push(rows.length);
         if (!rows.length) break;
         const before = byTime.size;
         for (const r of rows) byTime.set(r.time, r);
-        if (rows.length < count || byTime.size === before) break; // no older data left
+        if (byTime.size === before) break; // nothing older came back: that is all the history there is
         end = Math.min(...rows.map(r => r.time)) - 1;
     }
     return [...byTime.values()].sort((a, b) => a.time - b.time);
