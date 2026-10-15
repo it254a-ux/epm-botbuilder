@@ -144,9 +144,10 @@ describe('the numbers', () => {
         expect(r.notes[0]).toMatch(/too few/i);
     });
     test('what-if rows show each extra rule on the same trades', () => {
+        const Q4 = Date.UTC(2026, 9, 1) / 1000;
         const r = bt.buildReport([
-            T('hit_sl', 8, { stopAtr: 0.3 }), T('hit_sl', 7, { stopAtr: 0.4 }), T('hit_tp', 2.5, { stopAtr: 1.2 }), T('hit_sl', 2.5, { stopAtr: 2 }),
-            T('hit_tp', 3, { stopAtr: 1.6, time: Date.UTC(2026, 3, 1) / 1000 }), T('open', 3, { stopAtr: null }),
+            T('hit_sl', 8, { stopAtr: 0.3, time: Q4 }), T('hit_sl', 7, { stopAtr: 0.4, time: Q4 }), T('hit_tp', 2.5, { stopAtr: 1.2, time: Q4 }), T('hit_sl', 2.5, { stopAtr: 2, time: Q4 }),
+            T('hit_tp', 3, { stopAtr: 1.6, time: Date.UTC(2026, 3, 1) / 1000 }), T('open', 3, { stopAtr: null, time: Q4 }),
         ]);
         const row = n => r.whatIf.find(x => x.name === n);
         expect(row('All trades (as sent today)')).toMatchObject({ signals: 6, decided: 5, wins: 2, losses: 3 });
