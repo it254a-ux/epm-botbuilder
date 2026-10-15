@@ -531,11 +531,11 @@ describe('helpers', () => {
     });
     test('config defaults and clean-up', () => {
         expect(core.readConfig({})).toEqual({
-            symbols: ['frxEURUSD'], timeframe: 900, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
+            symbols: ['frxEURUSD'], timeframe: 3600, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
             concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100,
         });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
-            .toMatchObject({ symbols: ['a', 'b'], timeframe: 900, strategies: [1, 3], maxAgeCandles: 0 });
+            .toMatchObject({ symbols: ['a', 'b'], timeframe: 3600, strategies: [1, 3], maxAgeCandles: 0 });
     });
 });
 

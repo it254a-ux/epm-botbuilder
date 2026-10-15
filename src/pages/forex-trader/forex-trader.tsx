@@ -116,7 +116,7 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     const [symbol, setSymbol] = useState('R_25');
-    const [tf, setTf] = useState(900);
+    const [tf, setTf] = useState(3600);
     const [category, setCategory] = useState(STRATEGY_CATEGORIES[0]);
     const [strategyId, setStrategyId] = useState(1);
     const [loading, setLoading] = useState(true);

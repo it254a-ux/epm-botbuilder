@@ -44,12 +44,12 @@ function signalsPageUrl(env = process.env) {
 function readConfig(env = process.env) {
     const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
     const list = (v, fallback) => String(v || fallback).split(',').map(s => s.trim()).filter(Boolean);
-    const tf = Number(env.WATCH_TIMEFRAME || 900);
+    const tf = Number(env.WATCH_TIMEFRAME || 3600);
     const minRr = Number(env.MIN_RR || 2);
     const maxAge = Number(env.SIGNAL_MAX_AGE_CANDLES === undefined || env.SIGNAL_MAX_AGE_CANDLES === '' ? 3 : env.SIGNAL_MAX_AGE_CANDLES);
     return {
         symbols: list(env.WATCH_SYMBOLS, 'frxEURUSD'),
-        timeframe: Number.isFinite(tf) && tf >= 60 ? tf : 900,
+        timeframe: Number.isFinite(tf) && tf >= 60 ? tf : 3600,
         strategies: list(env.WATCH_STRATEGIES, '1,2,3,4,5').map(Number).filter(n => n >= 1 && n <= 5),
         minRr: Number.isFinite(minRr) && minRr > 0 ? minRr : 2,
         // Only send setups whose break of structure happened at most this many candles ago.
