@@ -272,14 +272,10 @@ module.exports = async function handler(req, res) {
                     entry.results.push(r);
                     if (a.state !== 'ready' || !a.plan) continue;
 
-                    // Only fresh setups: skip one whose BOS happened long ago (for example right after first deploy).
-                    const bosTime = a.bos && a.bos.bosTime;
-                    const age = bosTime ? Math.round((lastClosed - bosTime) / cfg.timeframe) : 0;
-                    r.candlesSinceBos = age;
-                    if (age > cfg.maxAgeCandles) { r.skipped = `Setup is ${age} candles old (limit ${cfg.maxAgeCandles})`; continue; }
-                    const bad = core.levelsProblem(a.plan);
-                    if (bad) { r.skipped = `Impossible trade levels: ${bad}`; continue; }
-                    if (a.plan.rr < cfg.minRr) { r.skipped = `RR ${a.plan.rr.toFixed(2)} below minimum ${cfg.minRr}`; continue; }
+                    // Fresh enough, sane levels, enough reward: the same checks the backtest uses.
+                    const chk = core.setupCheck(a, lastClosed, cfg);
+                    r.candlesSinceBos = chk.age;
+                    if (chk.problem) { r.skipped = chk.problem; continue; }
 
                     // News: hold the signal around high-impact events, or add a warning line.
                     const ccys = news.currenciesFor(symbol, info.market);

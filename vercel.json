@@ -7,6 +7,9 @@
         },
         "api/signal-admin.js": {
             "maxDuration": 30
+        },
+        "api/signal-backtest.js": {
+            "maxDuration": 60
         }
     },
     "rewrites": [

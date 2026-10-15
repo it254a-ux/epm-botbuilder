@@ -90,7 +90,22 @@ function levelsProblem(plan) {
     return null;
 }
 
+/**
+ * The checks every setup must pass before it counts as a signal, used by the live watcher AND the
+ * backtest so they can never disagree: fresh enough, sane levels, enough reward.
+ * Returns { age (candles since the break of structure), problem (text, or null when it passes) }.
+ */
+function setupCheck(analysis, lastClosed, cfg) {
+    const bosTime = analysis.bos && analysis.bos.bosTime;
+    const age = bosTime ? Math.round((lastClosed - bosTime) / cfg.timeframe) : 0;
+    if (age > cfg.maxAgeCandles) return { age, problem: `Setup is ${age} candles old (limit ${cfg.maxAgeCandles})` };
+    const bad = levelsProblem(analysis.plan);
+    if (bad) return { age, problem: `Impossible trade levels: ${bad}` };
+    if (analysis.plan.rr < cfg.minRr) return { age, problem: `RR ${analysis.plan.rr.toFixed(2)} below minimum ${cfg.minRr}` };
+    return { age, problem: null };
+}
+
 /** Open time of the candle that closed most recently, by the clock. */
 const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck };
