@@ -102,7 +102,7 @@ const stopBucket = x => (x === null ? null : x < 0.5 ? STOP_BUCKETS[0] : x < 1 ?
 function buildReport(trades) {
     const overall = summarise(trades);
     const notes = [];
-    if (overall.decided < 30) notes.push(`Only ${overall.decided} trades were decided (hit take profit or stop loss). That is too few for reliable conclusions: widen the markets or days before acting on any number below.`);
+    if (overall.decided < 30) notes.push(`Only ${overall.decided} trade${overall.decided === 1 ? ' was' : 's were'} decided (hit take profit or stop loss). That is too few for reliable conclusions: add markets or days (up to &days=730) before acting on any number below.`);
     notes.push('Not replayed: historical news, and the still-forming candle. Results use the same rules as the results messages in Telegram (a candle touching both stop and target counts as a loss).');
     return {
         overall,

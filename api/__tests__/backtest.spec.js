@@ -4,7 +4,7 @@
 const { PGlite } = require('@electric-sql/pglite');
 
 jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
-jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandles: jest.fn() }));
+jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandlesBack: jest.fn() }));
 jest.mock('../_lib/engine', () => ({ ...jest.requireActual('../_lib/engine'), analyse: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
@@ -188,7 +188,7 @@ describe('the endpoint', () => {
             { underlying_symbol: 'cryBTCUSD', underlying_symbol_name: 'Bitcoin', market: 'cryptocurrency' },
         ]);
         recentCandles = recent();
-        deriv.getCandles.mockReset().mockImplementation(async () => recentCandles);
+        deriv.getCandlesBack.mockReset().mockImplementation(async () => recentCandles);
         signalAt400();
     });
     afterEach(() => { process.env = ENV; });
@@ -227,14 +227,14 @@ describe('the endpoint', () => {
         expect(r.body.bySymbol[0].name).toMatch(/Bitcoin/);
     });
     test('unknown markets and short histories are reported, not fatal', async () => {
-        deriv.getCandles.mockImplementation(async (c, symbol) => (symbol === 'frxGBPUSD' ? recentCandles.slice(-50) : recentCandles));
+        deriv.getCandlesBack.mockImplementation(async (c, symbol) => (symbol === 'frxGBPUSD' ? recentCandles.slice(-50) : recentCandles));
         const r = await call({ symbols: 'frxEURUSD,frxGBPUSD,frxNOPE' });
         expect(r.status).toBe(200);
         expect(r.body.symbolsTested).toBe(1);
         expect(r.body.skipped.map(s => s.symbol).sort()).toEqual(['frxGBPUSD', 'frxNOPE']);
     });
     test('a market whose download fails is skipped and the others still run', async () => {
-        deriv.getCandles.mockImplementationOnce(async () => { throw new Error('rate limited'); });
+        deriv.getCandlesBack.mockImplementationOnce(async () => { throw new Error('rate limited'); });
         const r = await call({ symbols: 'frxEURUSD,frxGBPUSD' });
         expect(r.body.symbolsTested).toBe(1);
         expect(r.body.skipped[0].reason).toMatch(/rate limited/);
@@ -253,7 +253,7 @@ describe('the endpoint', () => {
         process.env.WATCH_CONCURRENCY = '1';
         let fake = Date.now();
         const spy = jest.spyOn(Date, 'now').mockImplementation(() => fake);
-        deriv.getCandles.mockImplementation(async () => { fake += 30000; return recentCandles; });
+        deriv.getCandlesBack.mockImplementation(async () => { fake += 30000; return recentCandles; });
         const r = await call({ symbols: 'frxEURUSD,frxGBPUSD,cryBTCUSD' });
         spy.mockRestore();
         expect(r.body.symbolsTested).toBe(2);

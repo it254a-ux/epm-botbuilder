@@ -99,4 +99,27 @@ async function getCandles(client, symbol, granularity, days = 15) {
     }));
 }
 
-module.exports = { connect, getActiveSymbols, getCandles, DEFAULT_URL };
+/**
+ * Long history for the backtest. Deriv returns at most 5000 candles per request, so older data is
+ * read page by page (each page ends just before the oldest candle of the previous one).
+ * Returns candles oldest first, no duplicates.
+ */
+async function getCandlesBack(client, symbol, granularity, days) {
+    const PAGE = 5000;
+    const wanted = Math.ceil((days * 86400) / granularity);
+    const byTime = new Map();
+    let end = 'latest';
+    for (let page = 0; page < 10 && byTime.size < wanted; page++) {
+        const count = Math.min(PAGE, wanted - byTime.size);
+        const res = await client.send({ ticks_history: symbol, style: 'candles', granularity, end, count });
+        const rows = (res.candles || []).map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+        if (!rows.length) break;
+        const before = byTime.size;
+        for (const r of rows) byTime.set(r.time, r);
+        if (rows.length < count || byTime.size === before) break; // no older data left
+        end = Math.min(...rows.map(r => r.time)) - 1;
+    }
+    return [...byTime.values()].sort((a, b) => a.time - b.time);
+}
+
+module.exports = { connect, getActiveSymbols, getCandles, getCandlesBack, DEFAULT_URL };

@@ -6,7 +6,7 @@
 //        &symbols=frxEURUSD,frxGBPUSD   markets to test (default: your saved watchlist)
 //        &markets=forex,indices         only these Deriv market groups (forex, indices, commodities,
 //                                       cryptocurrency, synthetic_index)
-//        &days=120                      how many days to replay (default 120, newest data)
+//        &days=180                      how many days to replay (default 180, up to 730 = 2 years)
 //        &tf=3600                       candle size in seconds (default: the live timeframe)
 //        &strategies=1,2,3              (default: the live strategies)
 //        &minRr=2 &maxAge=3             what-if: override the live minimum reward / freshness
@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
     const q = req.query || {};
     const live = core.readConfig();
     const timeframe = Math.max(60, numOr(q.tf, live.timeframe));
-    const days = Math.min(300, Math.max(5, numOr(q.days, 120)));
+    const days = Math.min(730, Math.max(5, numOr(q.days, 180)));
     const strategies = q.strategies ? String(q.strategies).split(',').map(Number).filter(n => n >= 1 && n <= 5) : live.strategies;
     const cfg = { ...live, timeframe, minRr: numOr(q.minRr, live.minRr), maxAgeCandles: numOr(q.maxAge, live.maxAgeCandles) };
     const filters = { minStopAtr: numOr(q.minStopAtr, 0), maxRr: numOr(q.maxRr, 0) };
@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
             const meta = info.get(symbol);
             if (!meta) { out.skipped.push({ symbol, reason: 'Not in the Deriv market list' }); return; }
             const nowSec = Math.floor(Date.now() / 1000);
-            const raw = await deriv.getCandles(client, symbol, timeframe, 15 + days);
+            const raw = await deriv.getCandlesBack(client, symbol, timeframe, 15 + days);
             const candles = raw.filter(c => c.time + timeframe <= nowSec); // closed candles only
             if (candles.length < window + 1) { out.skipped.push({ symbol, reason: `Only ${candles.length} candles available` }); return; }
             const found = bt.runBacktest({
