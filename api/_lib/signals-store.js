@@ -31,6 +31,11 @@ async function ensureTables(sql) {
         )
     `;
     await sql`CREATE INDEX IF NOT EXISTS signals_created_idx ON signals (created_at DESC)`;
+    // Result tracking (added later: older databases get these columns automatically).
+    await sql`ALTER TABLE signals ADD COLUMN IF NOT EXISTS entered_time BIGINT`;
+    await sql`ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_time BIGINT`;
+    await sql`ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_sent BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_message_id BIGINT`;
     await sql`
         CREATE TABLE IF NOT EXISTS signal_watch_state (
             symbol      TEXT NOT NULL,
@@ -90,6 +95,68 @@ async function getUnsent(sql) {
     }));
 }
 
+const toSignal = r => ({
+    id: r.id,
+    symbol: r.symbol,
+    symbolName: r.symbol_name,
+    strategyName: r.strategy_name,
+    timeframe: Number(r.timeframe),
+    side: r.side,
+    entry: Number(r.entry),
+    stopLoss: Number(r.stop_loss),
+    takeProfit: Number(r.take_profit),
+    rr: Number(r.rr),
+    time: Number(r.candle_time),
+    telegramSent: r.telegram_sent === true,
+    telegramMessageId: r.telegram_message_id === null || r.telegram_message_id === undefined ? null : Number(r.telegram_message_id),
+    enteredTime: r.entered_time === null || r.entered_time === undefined ? null : Number(r.entered_time),
+    closedTime: r.closed_time === null || r.closed_time === undefined ? null : Number(r.closed_time),
+    status: r.status,
+});
+
+/** Signals still waiting for a result (not yet closed). */
+async function getOpenSignals(sql) {
+    const rows = await sql`
+        SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time,
+               telegram_sent, telegram_message_id, entered_time, closed_time, status
+        FROM signals WHERE status = 'active' ORDER BY id ASC LIMIT 40
+    `;
+    return rows.map(toSignal);
+}
+
+/**
+ * Closes a signal with its result. Returns true only for the run that actually closed it
+ * (so two overlapping runs can never both send the result).
+ * If the original message never reached Telegram there is nothing to reply to, so no result message is owed.
+ */
+async function closeSignal(sql, sig, outcome) {
+    const owed = sig.telegramSent === true;
+    const rows = await sql`
+        UPDATE signals
+        SET status = ${outcome.status}, entered_time = ${outcome.enteredTime}, closed_time = ${outcome.closedTime},
+            result_sent = ${!owed}, updated_at = now()
+        WHERE id = ${sig.id} AND status = 'active'
+        RETURNING id
+    `;
+    return rows.length > 0;
+}
+
+async function markResultSent(sql, id, messageId) {
+    await sql`UPDATE signals SET result_sent = true, result_message_id = ${messageId ?? null}, updated_at = now() WHERE id = ${id}`;
+}
+
+/** Results that were decided but not delivered to Telegram yet: retried on the next run. */
+async function getUnsentResults(sql) {
+    const rows = await sql`
+        SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time,
+               telegram_sent, telegram_message_id, entered_time, closed_time, status
+        FROM signals
+        WHERE status <> 'active' AND result_sent = false AND updated_at > now() - interval '6 hours'
+        ORDER BY id ASC LIMIT 10
+    `;
+    return rows.map(toSignal);
+}
+
 async function getLastCandle(sql, symbol, timeframe) {
     const rows = await sql`SELECT last_candle FROM signal_watch_state WHERE symbol = ${symbol} AND timeframe = ${timeframe}`;
     return rows.length ? Number(rows[0].last_candle) : null;
@@ -129,7 +196,7 @@ async function getStates(sql, timeframe) {
 async function listSignals(sql, limit) {
     const rows = await sql`
         SELECT id, symbol, symbol_name, market, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr,
-               status, candle_time, created_at
+               status, candle_time, entered_time, closed_time, created_at
         FROM signals ORDER BY created_at DESC LIMIT ${limit}
     `;
     return rows.map(r => ({
@@ -146,8 +213,10 @@ async function listSignals(sql, limit) {
         rr: Number(r.rr),
         status: r.status,
         time: Number(r.candle_time),
+        enteredTime: r.entered_time === null || r.entered_time === undefined ? null : Number(r.entered_time),
+        closedTime: r.closed_time === null || r.closed_time === undefined ? null : Number(r.closed_time),
         createdAt: r.created_at,
     }));
 }
 
-module.exports = { getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getLastCandle, setLastCandle, listSignals };
+module.exports = { getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };

@@ -271,6 +271,172 @@ describe('chart picture', () => {
     });
 });
 
+describe('results after a signal', () => {
+    // The signal below was "sent" at the last closed candle; later candles are added to decide how it ended.
+    async function openSignal() {
+        const first = await call(handler);
+        expect(first.body.markets[0].results[0].telegram).toBe('sent');
+        sendTelegram.mockClear();
+        engine.analyse.mockReturnValue({ state: 'waiting_bos', plan: null }); // no new signals while testing results
+        return (await global.__sql`SELECT * FROM signals`)[0];
+    }
+    // Moves the signal back in time so that candles after it have already closed.
+    async function ageSignal(row, candlesAgo) {
+        await global.__sql`UPDATE signals SET candle_time = ${Number(row.candle_time) - candlesAgo * TF} WHERE id = ${row.id}`;
+    }
+    const candlesAfter = (row, list) => {
+        // list of [low, high] for the candles that follow the signal candle (oldest first)
+        const base = Number(row.candle_time) + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            ...candlesUpToNow(),
+            ...list.map(([low, high], i) => ({ time: base + i * TF, open: low, high, low, close: high })),
+        ].sort((a, b) => a.time - b.time).filter((c, i, arr) => arr.findIndex(x => x.time === c.time) === i));
+    };
+
+    test('take profit hit -> result is sent as a reply under the original signal, with the dollar amounts', async () => {
+        const row = await openSignal(); // BUY entry 1.085, SL 1.08, TP 1.0975, rr 2.5
+        await ageSignal(row, 6);
+        // candles after the (moved) signal candle: enter at 1.085, then reach the target
+        const moved = { ...row, candle_time: Number(row.candle_time) - 6 * TF };
+        const base = Number(moved.candle_time) + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.09, high: 1.099, low: 1.088, close: 1.098 },
+        ]);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.results).toHaveLength(1);
+        expect(r.body.results[0]).toMatchObject({ status: 'hit_tp', telegram: 'sent' });
+        const [text, opts] = sendTelegram.mock.calls.find(c => String(c[0]).includes('TAKE PROFIT HIT'));
+        expect(text).toContain('$10 → <b>+$25.00</b>');
+        expect(text).toContain('$20 → <b>+$50.00</b>');
+        expect(text).toContain('$50 → <b>+$125.00</b>');
+        expect(opts.replyTo).toBe(99); // the id Telegram gave the original message
+        const rows = await global.__sql`SELECT status, result_sent, closed_time FROM signals`;
+        expect(rows[0].status).toBe('hit_tp');
+        expect(rows[0].result_sent).toBe(true);
+    });
+
+    test('stop loss hit -> loss message', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 6);
+        const base = Number(row.candle_time) - 6 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.085, high: 1.086, low: 1.079, close: 1.08 },
+        ]);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.results[0].status).toBe('hit_sl');
+        expect(sendTelegram.mock.calls.some(c => String(c[0]).includes('$10 → <b>-$10.00</b>'))).toBe(true);
+    });
+
+    test('a result is sent only once, even though the machine runs every 15 minutes', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 6);
+        const base = Number(row.candle_time) - 6 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.09, high: 1.099, low: 1.088, close: 1.098 },
+        ]);
+        await call(handler, { query: { force: '1' } });
+        await call(handler, { query: { force: '1' } });
+        await call(handler, { query: { force: '1' } });
+        expect(sendTelegram.mock.calls.filter(c => String(c[0]).includes('TAKE PROFIT HIT'))).toHaveLength(1);
+    });
+
+    test('no result yet -> nothing is sent and the signal stays active', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 3);
+        const base = Number(row.candle_time) - 3 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [{ time: base, open: 1.09, high: 1.092, low: 1.088, close: 1.09 }]);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.results).toEqual([]);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await global.__sql`SELECT status FROM signals`)[0].status).toBe('active');
+    });
+
+    test('after 24 hours without entry -> "entry not reached", no money shown', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 100); // 25 hours ago
+        const base = Number(row.candle_time) - 100 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [{ time: base, open: 1.09, high: 1.092, low: 1.088, close: 1.09 }]);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.results[0].status).toBe('not_triggered');
+        const text = sendTelegram.mock.calls.map(c => c[0]).find(t => String(t).includes('ENTRY NOT REACHED'));
+        expect(text).toBeDefined();
+        expect(text).not.toContain('If you risked');
+    });
+
+    test('a Telegram failure for the result is retried on the next run', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 6);
+        const base = Number(row.candle_time) - 6 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.09, high: 1.099, low: 1.088, close: 1.098 },
+        ]);
+        sendTelegram.mockRejectedValueOnce(new Error('down'));
+        const first = await call(handler, { query: { force: '1' } });
+        expect(first.body.results[0].telegram).toMatch(/failed/);
+        expect((await global.__sql`SELECT result_sent FROM signals`)[0].result_sent).toBe(false);
+        await call(handler, { query: { force: '1' } });
+        expect((await global.__sql`SELECT result_sent FROM signals`)[0].result_sent).toBe(true);
+        expect(sendTelegram.mock.calls.filter(c => String(c[0]).includes('TAKE PROFIT HIT'))).toHaveLength(2); // 1 failed + 1 retry
+    });
+
+    test('a signal that never reached Telegram is closed on the website but no result message is sent', async () => {
+        sendTelegram.mockRejectedValue(new Error('down'));
+        await call(handler);
+        sendTelegram.mockReset().mockResolvedValue({ messageId: 1 });
+        engine.analyse.mockReturnValue({ state: 'waiting_bos', plan: null });
+        const row = (await global.__sql`SELECT * FROM signals`)[0];
+        await global.__sql`UPDATE signals SET created_at = now() - interval '5 hours' WHERE id = ${row.id}`; // too old for the retry
+        await ageSignal(row, 6);
+        const base = Number(row.candle_time) - 6 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.09, high: 1.099, low: 1.088, close: 1.098 },
+        ]);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.results[0].status).toBe('hit_tp');
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await global.__sql`SELECT status FROM signals`)[0].status).toBe('hit_tp');
+    });
+
+    test('result tracking trouble never stops new signals', async () => {
+        await call(handler); // one open signal
+        sendTelegram.mockClear();
+        deriv.getCandles.mockRejectedValueOnce(new Error('boom')); // used by result tracking first
+        const a = readyAnalysis();
+        a.plan.entry = 1.09;
+        engine.analyse.mockReturnValue(a);
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.status).toBe(200);
+        expect(sendTelegram.mock.calls.some(c => String(c[0]).includes('BUY SIGNAL'))).toBe(true);
+    });
+
+    test('the feed shows the final status of a signal', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 6);
+        const base = Number(row.candle_time) - 6 * TF + TF;
+        deriv.getCandles.mockImplementation(async () => [
+            { time: base, open: 1.09, high: 1.09, low: 1.084, close: 1.09 },
+            { time: base + TF, open: 1.09, high: 1.099, low: 1.088, close: 1.098 },
+        ]);
+        await call(handler, { query: { force: '1' } });
+        const f = await call(feed, { headers: {} });
+        expect(f.body.signals[0].status).toBe('hit_tp');
+        expect(f.body.signals[0].closedTime).toBeGreaterThan(0);
+    });
+
+    test('?dry=1 does not touch results', async () => {
+        const row = await openSignal();
+        await ageSignal(row, 6);
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.results).toBeUndefined();
+        expect((await global.__sql`SELECT status FROM signals`)[0].status).toBe('active');
+    });
+});
+
 describe('markets', () => {
     test('a closed market is skipped without downloading candles', async () => {
         process.env.WATCH_SYMBOLS = 'frxUSDJPY';

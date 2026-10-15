@@ -14,6 +14,11 @@
 // 1 second apart (about 180 per minute), least recently checked first. If a run reaches its
 // time budget the remaining markets are done first on the next run.
 //
+// Every run also checks the signals that are still open: when one hits its take profit or stop loss
+// (or never reaches its entry, or runs out of time) the result is saved and sent to Telegram as a reply
+// under the original signal, with what $10 / $20 / $50 risked would have made or lost.
+// See api/_lib/signal-outcome.js for the exact rules. Settings: RESULT_STAKES, RESULT_EXPIRY_HOURS.
+//
 // Protected by SIGNALS_SECRET. Call it with the header   Authorization: Bearer <SIGNALS_SECRET>
 // or (easier to set up) with   ?key=<SIGNALS_SECRET>
 //
@@ -27,6 +32,7 @@ const { sendTelegram, sendTelegramPhoto } = require('./_lib/telegram');
 const chart = require('./_lib/signal-chart');
 const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
+const outcomeLib = require('./_lib/signal-outcome');
 const store = require('./_lib/signals-store');
 const { authorised } = require('./_lib/signals-auth');
 
@@ -65,6 +71,76 @@ function makeSender(gapMs) {
         chain = run.catch(() => {});
         return run;
     };
+}
+
+/** Sends the result message for one finished signal, as a reply under the original signal. */
+async function sendResult(sql, sig, outcome, resultCfg, send) {
+    const text = outcomeLib.formatResult(sig, outcome, { stakes: resultCfg.stakes, siteUrl: core.signalsPageUrl() });
+    const sent = await send(() => sendTelegram(text, { replyTo: sig.telegramMessageId }));
+    await store.markResultSent(sql, sig.id, sent.messageId);
+}
+
+/**
+ * Looks at every signal that is still open, decides if it has finished (take profit, stop loss,
+ * never entered, or expired) using the candles since it was sent, saves that and sends the result.
+ * A problem with one signal never stops the others.
+ */
+async function trackOpenSignals(sql, client, report, send, skipFetch) {
+    const resultCfg = outcomeLib.readResultConfig();
+    const now = Math.floor(Date.now() / 1000);
+    report.results = [];
+
+    // Results decided earlier that Telegram did not accept are retried first.
+    for (const s of await store.getUnsentResults(sql)) {
+        const outcome = { status: s.status, enteredTime: s.enteredTime, closedTime: s.closedTime };
+        try {
+            await sendResult(sql, s, outcome, resultCfg, send);
+            report.results.push({ id: s.id, status: s.status, telegram: 'sent (retry)' });
+        } catch (err) {
+            console.error('signal-watch: result retry failed:', err.message);
+        }
+    }
+
+    const open = await store.getOpenSignals(sql);
+    const groups = new Map();
+    for (const s of open) {
+        const k = `${s.symbol}|${s.timeframe}`;
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(s);
+    }
+
+    for (const sigs of groups.values()) {
+        // No new candle has closed since the last check: nothing can have changed, so do not download anything.
+        if (skipFetch && skipFetch(sigs[0].symbol, sigs[0].timeframe)) continue;
+        let candles;
+        try {
+            const oldest = Math.min(...sigs.map(x => x.time));
+            const days = Math.min(15, Math.max(2, Math.ceil((now - oldest) / 86400) + 1));
+            candles = await deriv.getCandles(client, sigs[0].symbol, sigs[0].timeframe, days);
+        } catch (err) {
+            console.error(`signal-watch: could not load candles to check ${sigs[0].symbol}:`, err.message);
+            continue;
+        }
+        for (const s of sigs) {
+            try {
+                const outcome = outcomeLib.evaluateSignal(s, candles, now, resultCfg.expirySeconds);
+                if (!outcome) continue;
+                if (!(await store.closeSignal(sql, s, outcome))) continue; // another run closed it first
+                const entry = { id: s.id, symbol: s.symbol, status: outcome.status };
+                report.results.push(entry);
+                if (!s.telegramSent) { entry.telegram = 'not needed (the signal itself never reached Telegram)'; continue; }
+                try {
+                    await sendResult(sql, s, outcome, resultCfg, send);
+                    entry.telegram = 'sent';
+                } catch (err) {
+                    entry.telegram = `failed: ${err.message}`; // retried on the next run
+                    console.error('signal-watch: result Telegram failed:', err.message);
+                }
+            } catch (err) {
+                console.error(`signal-watch: checking signal ${s.id} failed:`, err.message);
+            }
+        }
+    }
 }
 
 module.exports = async function handler(req, res) {
@@ -137,6 +213,18 @@ module.exports = async function handler(req, res) {
             .resolveWatchSymbols(rows, cfg.symbols)
             .sort((a, b) => ((states.get(a) && states.get(a).updatedAt) || 0) - ((states.get(b) && states.get(b).updatedAt) || 0));
         summary.watching = symbols.length;
+
+        if (write) {
+            try {
+                const expectedNow = core.expectedLastClosed(Math.floor(Date.now() / 1000), cfg.timeframe);
+                const skipFetch = (symbol, tf) => !force && tf === cfg.timeframe && states.has(symbol) && states.get(symbol).lastCandle >= expectedNow;
+                await trackOpenSignals(sql, client, report, send, skipFetch);
+            } catch (err) {
+                // Result tracking must never stop new signals from being found.
+                report.resultsError = err.message;
+                console.error('signal-watch: result tracking failed:', err.message);
+            }
+        }
 
         const active = await deriv.getActiveSymbols(client);
         const bySymbol = new Map(active.map(s => [s.underlying_symbol, s]));

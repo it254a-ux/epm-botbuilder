@@ -1,12 +1,19 @@
 // Sends a message to your Telegram channel/group through the Bot API.
 // TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID live only in Vercel environment variables.
 
-async function sendTelegram(text, { token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID } = {}) {
+async function sendTelegram(text, { token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID, replyTo = null } = {}) {
     if (!token || !chatId) throw new Error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set');
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+        body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            // Shown as a reply under the original signal; still sent normally if that message was deleted.
+            ...(replyTo ? { reply_parameters: { message_id: Number(replyTo), allow_sending_without_reply: true } } : {}),
+        }),
     });
     let data = null;
     try { data = await res.json(); } catch (e) { /* ignore */ }

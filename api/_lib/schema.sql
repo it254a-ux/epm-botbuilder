@@ -125,3 +125,9 @@ CREATE TABLE IF NOT EXISTS signal_watch_state (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (symbol, timeframe)
 );
+
+-- Result tracking for signals (created automatically by api/_lib/signals-store.js; listed here for reference).
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS entered_time BIGINT;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_time BIGINT;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_sent BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_message_id BIGINT;

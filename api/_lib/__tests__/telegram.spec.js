@@ -4,6 +4,21 @@ const { sendTelegramPhoto } = require('../telegram');
 
 afterEach(() => { delete global.fetch; });
 
+describe('sendTelegram reply', () => {
+    const { sendTelegram } = require('../telegram');
+    test('replyTo makes it a reply that still sends if the original was deleted', async () => {
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 5 } }) });
+        await sendTelegram('hi', { token: 'T', chatId: '1', replyTo: 42 });
+        const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(body.reply_parameters).toEqual({ message_id: 42, allow_sending_without_reply: true });
+    });
+    test('without replyTo nothing about replies is sent', async () => {
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 5 } }) });
+        await sendTelegram('hi', { token: 'T', chatId: '1' });
+        expect(JSON.parse(global.fetch.mock.calls[0][1].body).reply_parameters).toBeUndefined();
+    });
+});
+
 describe('sendTelegramPhoto', () => {
     test('posts the picture and caption to sendPhoto', async () => {
         global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 7 } }) });
