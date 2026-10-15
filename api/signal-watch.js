@@ -34,6 +34,7 @@ const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
 const outcomeLib = require('./_lib/signal-outcome');
 const store = require('./_lib/signals-store');
+const news = require('./_lib/news');
 const { authorised } = require('./_lib/signals-auth');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -44,7 +45,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * so a signal is never lost because of the picture. Returns { messageId, picture: true|'failed: why' }.
  */
 async function deliver(sig, chartInput) {
-    const text = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
+    const text = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
     let why = null;
     try {
         const png = chart.renderChartPng(chartInput);
@@ -169,7 +170,7 @@ module.exports = async function handler(req, res) {
 
     const started = Date.now();
     const cfg = core.readConfig();
-    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, errors: 0, deferred: 0 };
+    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, summary, markets: [] };
 
     let client;
@@ -226,6 +227,12 @@ module.exports = async function handler(req, res) {
             }
         }
 
+        // Economic news (never blocks the run: if the feed is down, signals go out as normal).
+        const newsCfg = news.readNewsConfig();
+        let newsData = { status: 'off', events: [] };
+        if (newsCfg.enabled) newsData = await news.loadEvents(store, sql, newsCfg, { save: write });
+        report.news = { status: newsData.status, eventsLoaded: newsData.events.length };
+
         const active = await deriv.getActiveSymbols(client);
         const bySymbol = new Map(active.map(s => [s.underlying_symbol, s]));
         const expected = core.expectedLastClosed(Math.floor(Date.now() / 1000), cfg.timeframe);
@@ -274,6 +281,15 @@ module.exports = async function handler(req, res) {
                     if (bad) { r.skipped = `Impossible trade levels: ${bad}`; continue; }
                     if (a.plan.rr < cfg.minRr) { r.skipped = `RR ${a.plan.rr.toFixed(2)} below minimum ${cfg.minRr}`; continue; }
 
+                    // News: hold the signal around high-impact events, or add a warning line.
+                    const ccys = news.currenciesFor(symbol, info.market);
+                    const nw = ccys.length && newsData.events.length ? news.check(ccys, newsData.events, now, newsCfg) : {};
+                    if (nw.blackout) {
+                        r.skipped = `News blackout: ${news.describe(nw.blackout, now)}`;
+                        summary.newsHeld++;
+                        continue;
+                    }
+
                     const sig = {
                         key: core.dedupeKey(symbol, strategyId, cfg.timeframe, a.plan.side, a.plan.entry),
                         symbol,
@@ -288,9 +304,10 @@ module.exports = async function handler(req, res) {
                         takeProfit: a.plan.takeProfit,
                         rr: a.plan.rr,
                         time: lastClosed,
+                        newsNote: nw.upcoming ? news.newsNote(nw.upcoming, now) : null,
                     };
                     if (!write) {
-                        r.wouldSend = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl() });
+                        r.wouldSend = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
                         try { r.picture = `ok (${chart.renderChartPng({ candles: closed, analysis: a, signal: sig }).length} bytes)`; } catch (err) { r.picture = `would fail: ${err.message}`; }
                         continue;
                     }

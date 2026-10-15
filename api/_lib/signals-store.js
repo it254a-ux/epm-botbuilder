@@ -52,6 +52,13 @@ async function ensureTables(sql) {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     `;
+    await sql`
+        CREATE TABLE IF NOT EXISTS signal_news_cache (
+            id         INTEGER PRIMARY KEY,
+            events     JSONB NOT NULL,
+            fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    `;
     prepared.add(sql);
 }
 
@@ -193,6 +200,21 @@ async function getStates(sql, timeframe) {
     return new Map(rows.map(r => [r.symbol, { lastCandle: Number(r.last_candle), updatedAt: new Date(r.updated_at).getTime() }]));
 }
 
+/** The cached economic calendar: { events, fetchedAt in ms } or null. */
+async function getNewsCache(sql) {
+    const rows = await sql`SELECT events, fetched_at FROM signal_news_cache WHERE id = 1`;
+    if (!rows.length) return null;
+    const events = typeof rows[0].events === 'string' ? JSON.parse(rows[0].events) : rows[0].events;
+    return { events: Array.isArray(events) ? events : [], fetchedAt: new Date(rows[0].fetched_at).getTime() };
+}
+
+async function setNewsCache(sql, events) {
+    await sql`
+        INSERT INTO signal_news_cache (id, events, fetched_at) VALUES (1, ${JSON.stringify(events)}::jsonb, now())
+        ON CONFLICT (id) DO UPDATE SET events = EXCLUDED.events, fetched_at = now()
+    `;
+}
+
 async function listSignals(sql, limit) {
     const rows = await sql`
         SELECT id, symbol, symbol_name, market, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr,
@@ -219,4 +241,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };

@@ -26,6 +26,7 @@ const core = require('../_lib/signals-core');
 const handler = require('../signal-watch');
 const feed = require('../signals');
 const admin = require('../signal-admin');
+const news = require('../_lib/news');
 
 jest.setTimeout(60000);
 let sharedDb;
@@ -71,8 +72,8 @@ const ENV = { ...process.env };
 let client;
 beforeEach(async () => {
     global.__sql = makeSql();
-    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0' };
+    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache');
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off' };
     client = { close: jest.fn() };
     deriv.connect.mockReset().mockResolvedValue(client);
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
@@ -666,5 +667,167 @@ describe('admin API', () => {
 
     test('only GET and POST', async () => {
         expect((await run('DELETE')).status).toBe(405);
+    });
+});
+
+
+describe('economic news', () => {
+    // a calendar event `minutes` from now; the feed writes dates with a UTC offset
+    const ev = (minutes, over = {}) => ({
+        title: 'Non-Farm Employment Change', country: 'USD', impact: 'High',
+        date: new Date(Date.now() + minutes * 60000).toISOString().replace('Z', '+00:00'), forecast: '', previous: '', ...over,
+    });
+    const feed = list => jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200, json: async () => list });
+    beforeEach(() => { process.env.NEWS_FILTER = 'on'; });
+    afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
+
+    test('a high-impact event for one of the two currencies holds the signal: not saved, not sent', async () => {
+        feed([ev(45)]); // EUR/USD and USD news in 45 minutes
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].skipped).toMatch(/news blackout: USD Non-Farm Employment Change/i);
+        expect(r.body.summary.newsHeld).toBe(1);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
+        expect(await global.__sql`SELECT id FROM signals`).toHaveLength(0);
+    });
+
+    test('a held signal is sent on a later run once the news has passed, if the setup is still fresh', async () => {
+        const spy = feed([ev(45)]);
+        await call(handler, { query: { force: '1' } });
+        expect(sendTelegram).not.toHaveBeenCalled();
+        spy.mockResolvedValue({ ok: true, status: 200, json: async () => [ev(-200)] }); // event now long past
+        await global.__sql`UPDATE signal_news_cache SET fetched_at = now() - interval '1 day'`;
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('shortly AFTER the news it is still held (default 30 minutes)', async () => {
+        feed([ev(-20)]);
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].skipped).toMatch(/news blackout/i);
+    });
+
+    test('news further away than the blackout only adds a warning line to the message', async () => {
+        feed([ev(600)]); // 10 hours ahead: outside the 2 h blackout, inside the 24 h warning
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+        const text = sendTelegram.mock.calls[0][0];
+        expect(text).toContain('High-impact news ahead');
+        expect(text).toContain('USD Non-Farm Employment Change');
+        expect(text).toMatch(/in 10h 0m/);
+    });
+
+    test('news more than 24 hours away adds nothing', async () => {
+        feed([ev(60 * 30)]);
+        await call(handler);
+        expect(sendTelegram.mock.calls[0][0]).not.toContain('news');
+    });
+
+    test('news for a currency that is not in the pair is ignored', async () => {
+        feed([ev(30, { country: 'JPY' })]); // EUR/USD
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('medium and low impact events are ignored unless NEWS_IMPACT says otherwise', async () => {
+        feed([ev(30, { impact: 'Medium' })]);
+        let r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+        process.env.NEWS_IMPACT = 'high,medium';
+        r = await call(handler, { query: { force: '1' } });
+        // the earlier signal was saved, so this is a duplicate, but the blackout is checked first
+        expect(r.body.markets[0].results[0].skipped).toMatch(/news blackout/i);
+    });
+
+    test('synthetic markets are never held by news', async () => {
+        process.env.WATCH_SYMBOLS = 'R_100';
+        feed([ev(30)]);
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('if the feed is down the signal is still sent, and the report says so', async () => {
+        jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'));
+        const r = await call(handler);
+        expect(r.body.news.status).toMatch(/unavailable: network down/);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('a feed answering with an error status is treated as unavailable', async () => {
+        jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+        const r = await call(handler);
+        expect(r.body.news.status).toMatch(/unavailable: news feed answered 429/);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('the calendar is downloaded once and then served from the database cache', async () => {
+        const spy = feed([ev(600)]);
+        await call(handler, { query: { force: '1' } });
+        const second = await call(handler, { query: { force: '1' } });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(second.body.news.status).toBe('cache');
+    });
+
+    test('if a refresh fails, the old cached calendar is still used', async () => {
+        const spy = feed([ev(45)]);
+        await call(handler, { query: { force: '1' } });
+        await global.__sql`UPDATE signal_news_cache SET fetched_at = now() - interval '1 day'`;
+        spy.mockRejectedValue(new Error('feed down'));
+        const r = await call(handler, { query: { force: '1' } });
+        expect(r.body.news.status).toMatch(/stale cache/);
+        expect(r.body.markets[0].results[0].skipped).toMatch(/news blackout/i); // the cached event still protects
+    });
+
+    test('a dry run reads the calendar but saves nothing to the cache', async () => {
+        feed([ev(600)]);
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.news.status).toBe('fresh');
+        expect(r.body.markets[0].results[0].wouldSend).toContain('High-impact news ahead');
+        expect(await global.__sql`SELECT id FROM signal_news_cache`).toHaveLength(0);
+    });
+
+    test('NEWS_FILTER=off never touches the feed', async () => {
+        process.env.NEWS_FILTER = 'off';
+        const spy = feed([ev(30)]);
+        const r = await call(handler);
+        expect(spy).not.toHaveBeenCalled();
+        expect(r.body.news.status).toBe('off');
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+});
+
+describe('news helpers', () => {
+    test('which currencies matter for each kind of market', () => {
+        expect(news.currenciesFor('frxEURUSD', 'forex')).toEqual(['EUR', 'USD']);
+        expect(news.currenciesFor('frxXAUUSD', 'commodities')).toEqual(['USD']); // gold: only the dollar has news
+        expect(news.currenciesFor('cryBTCUSD', 'cryptocurrency')).toEqual(['USD']);
+        expect(news.currenciesFor('OTC_NDX', 'indices')).toEqual(['USD']);
+        expect(news.currenciesFor('OTC_GDAXI', 'indices')).toEqual(['EUR']);
+        expect(news.currenciesFor('OTC_SOMETHINGNEW', 'indices')).toEqual([]);
+        expect(news.currenciesFor('R_100', 'synthetic_index')).toEqual([]);
+        expect(news.currenciesFor('1HZ100V', 'synthetic_index')).toEqual([]);
+    });
+
+    test('the feed is read defensively', () => {
+        const rows = news.normalizeEvents([
+            { title: 'CPI y/y', country: 'gbp', date: '2026-10-16T08:30:00-04:00', impact: 'High' },
+            { title: 'No date', country: 'USD', impact: 'High' },
+            { title: 'Bad country', country: 'EUROZONE', date: '2026-10-16T08:30:00Z', impact: 'High' },
+            null, 'junk',
+        ]);
+        expect(rows).toEqual([{ title: 'CPI y/y', currency: 'GBP', time: Date.parse('2026-10-16T12:30:00Z') / 1000, impact: 'high' }]);
+        expect(news.normalizeEvents({ not: 'an array' })).toEqual([]);
+    });
+
+    test('event titles are escaped so they cannot break the Telegram message', () => {
+        const t = news.describe({ currency: 'USD', title: 'Fed <b>speech</b> & Q&A', time: 1760000000, impact: 'high' }, 1760000000 - 3600);
+        expect(t).toContain('Fed &lt;b&gt;speech&lt;/b&gt; &amp; Q&amp;A');
+        expect(t).toContain('in 1h 0m');
+    });
+
+    test('settings and their defaults', () => {
+        expect(news.readNewsConfig({})).toMatchObject({ enabled: true, impacts: ['high'], beforeMin: 120, afterMin: 30, warnHours: 24, refreshHours: 6 });
+        expect(news.readNewsConfig({ NEWS_FILTER: 'OFF', NEWS_IMPACT: 'High, Medium', NEWS_BLACKOUT_BEFORE_MIN: '60' }))
+            .toMatchObject({ enabled: false, impacts: ['high', 'medium'], beforeMin: 60 });
     });
 });

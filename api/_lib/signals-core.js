@@ -15,7 +15,7 @@ function gmtStamp(epochSeconds) {
 }
 
 /** The Telegram text for one signal. Uses Telegram HTML formatting. */
-function formatTelegram(sig, { siteUrl } = {}) {
+function formatTelegram(sig, { siteUrl, newsNote } = {}) {
     const buy = sig.side === 'BUY';
     return [
         `${buy ? '🟢' : '🔴'} <b>${sig.side} SIGNAL</b>: ${escapeHtml(sig.symbolName || sig.symbol)}`,
@@ -28,6 +28,8 @@ function formatTelegram(sig, { siteUrl } = {}) {
         `⚖️ Risk : Reward = 1 : ${sig.rr.toFixed(2)}`,
         // sig.time is the OPEN time of the last closed candle; the signal exists from the moment that candle closed.
         `🕒 ${gmtStamp(sig.time + sig.timeframe)}`,
+        // newsNote is already HTML-safe text built by news.js
+        ...(newsNote ? ['', newsNote] : []),
         ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
         '',
         '⚠️ Signals only, not financial advice.',
