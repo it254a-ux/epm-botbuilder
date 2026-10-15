@@ -101,11 +101,27 @@ const stopBucket = x => (x === null ? null : x < 0.5 ? STOP_BUCKETS[0] : x < 1 ?
 /** "2026 Q3" for a candle time: lets you see whether a pattern holds in every stretch of time or only in one. */
 const quarterOf = t => { const d = new Date(t * 1000); return `${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`; };
 
+/**
+ * "What if" rows: the same trades with one rule added, so you can see what each rule would have done.
+ * Careful: a rule picked after looking at the results always looks good on those same results.
+ * Only trust it if it also helps in most periods and in markets that were not used to choose it.
+ */
+const WHAT_IF = [
+    ['All trades (as sent today)', () => true],
+    ['Only stops of at least 0.5 ATR', t => t.stopAtr !== null && t.stopAtr >= 0.5],
+    ['Only stops of at least 1 ATR', t => t.stopAtr !== null && t.stopAtr >= 1],
+    ['Only stops of at least 1.5 ATR', t => t.stopAtr !== null && t.stopAtr >= 1.5],
+    ['Only reward of 6 or less', t => t.rr <= 6],
+    ['Stops of at least 1 ATR AND reward of 6 or less', t => t.stopAtr !== null && t.stopAtr >= 1 && t.rr <= 6],
+];
+
 /** Everything the report shows, from a list of trades. */
 function buildReport(trades) {
     const overall = summarise(trades);
     const notes = [];
     if (overall.decided < 30) notes.push(`Only ${overall.decided} trade${overall.decided === 1 ? ' was' : 's were'} decided (hit take profit or stop loss). That is too few for reliable conclusions: add markets or days (up to &days=730) before acting on any number below.`);
+    notes.push('Spreads, commissions and slippage are NOT included: real results are lower than shown. A result near 0R here is a loss in real trading.');
+    notes.push('The whatIf rows were not planned before seeing the data. Only trust a rule if it also helps in most periods (see stopAtLeast1ByPeriod) and in markets you did not use to choose it.');
     notes.push('Not replayed: historical news, and the still-forming candle. Results use the same rules as the results messages in Telegram (a candle touching both stop and target counts as a loss).');
     return {
         overall,
@@ -116,7 +132,9 @@ function buildReport(trades) {
         byReward: group(trades, t => rrBucket(t.rr), RR_BUCKETS),
         byStopSize: group(trades, t => stopBucket(t.stopAtr), STOP_BUCKETS),
         byFreshness: group(trades, t => `${t.age} candle${t.age === 1 ? '' : 's'} after the break`),
-        byPeriod: group(trades, t => quarterOf(t.time)).sort((a, b) => a.name.localeCompare(b.name)),
+        whatIf: WHAT_IF.map(([name, keep]) => ({ name, ...summarise(trades.filter(keep)) })),
+        stopAtLeast1ByPeriod: group(trades.filter(t => t.stopAtr !== null && t.stopAtr >= 1), t => quarterOf(t.time)).sort((a, b) => a.name.localeCompare(b.name)),
+        byPeriod: group(trades,  t => quarterOf(t.time)).sort((a, b) => a.name.localeCompare(b.name)),
         bySymbol: group(trades, t => `${t.symbolName} (${t.symbol})`),
         notes,
     };

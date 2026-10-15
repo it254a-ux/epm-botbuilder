@@ -143,6 +143,21 @@ describe('the numbers', () => {
         expect(r.byStrategy.map(x => x.name)).toEqual(['1. S', '2. Two']);
         expect(r.notes[0]).toMatch(/too few/i);
     });
+    test('what-if rows show each extra rule on the same trades', () => {
+        const r = bt.buildReport([
+            T('hit_sl', 8, { stopAtr: 0.3 }), T('hit_sl', 7, { stopAtr: 0.4 }), T('hit_tp', 2.5, { stopAtr: 1.2 }), T('hit_sl', 2.5, { stopAtr: 2 }),
+            T('hit_tp', 3, { stopAtr: 1.6, time: Date.UTC(2026, 3, 1) / 1000 }), T('open', 3, { stopAtr: null }),
+        ]);
+        const row = n => r.whatIf.find(x => x.name === n);
+        expect(row('All trades (as sent today)')).toMatchObject({ signals: 6, decided: 5, wins: 2, losses: 3 });
+        expect(row('Only stops of at least 0.5 ATR')).toMatchObject({ signals: 3, decided: 3, wins: 2, losses: 1 });
+        expect(row('Only stops of at least 1 ATR')).toMatchObject({ decided: 3, wins: 2 });
+        expect(row('Only stops of at least 1.5 ATR')).toMatchObject({ decided: 2, wins: 1, losses: 1 });
+        expect(row('Only reward of 6 or less')).toMatchObject({ signals: 4, decided: 3, wins: 2, losses: 1 });
+        expect(row('Stops of at least 1 ATR AND reward of 6 or less').decided).toBe(3);
+        expect(r.stopAtLeast1ByPeriod.map(x => x.name)).toEqual(['2026 Q2', '2026 Q4']);
+        expect(r.notes.join(' ')).toMatch(/Spreads, commissions and slippage are NOT included/);
+    });
     test('results are also split by calendar quarter, oldest first', () => {
         expect(bt.quarterOf(Date.UTC(2026, 9, 15) / 1000)).toBe('2026 Q4');
         expect(bt.quarterOf(Date.UTC(2026, 0, 1) / 1000)).toBe('2026 Q1');
