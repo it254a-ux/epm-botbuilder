@@ -73,7 +73,7 @@ let client;
 beforeEach(async () => {
     global.__sql = makeSql();
     await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off' };
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MIN_STOP_ATR: '0' };
     client = { close: jest.fn() };
     deriv.connect.mockReset().mockResolvedValue(client);
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
@@ -533,7 +533,7 @@ describe('helpers', () => {
     test('config defaults and clean-up', () => {
         expect(core.readConfig({})).toEqual({
             symbols: ['frxEURUSD'], timeframe: 3600, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
-            concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100, priority: core.MAIN_MARKETS,
+            concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100, priority: core.MAIN_MARKETS, minStopAtr: 1, maxRr: 0,
         });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
             .toMatchObject({ symbols: ['a', 'b'], timeframe: 3600, strategies: [1, 3], maxAgeCandles: 0 });
@@ -883,3 +883,56 @@ describe('main markets first', () => {
         expect(r.body.main).toEqual(core.MAIN_MARKETS);
     });
 });
+
+
+describe('stop size and reward cap rules', () => {
+    // candlesUpToNow() candles are about 0.2 wide, so ATR is about 0.2; the default plan risks 0.005 = about 0.025 ATR
+    const planWithRisk = risk => ({ ...readyAnalysis(), plan: { side: 'BUY', entry: 1.085, stopLoss: 1.085 - risk, takeProfit: 1.085 + risk * 3, rr: 3 } });
+
+    test('the default rule is a stop of at least 1 ATR', () => {
+        expect(core.readConfig({}).minStopAtr).toBe(1);
+        expect(core.readConfig({ MIN_STOP_ATR: '0' }).minStopAtr).toBe(0);
+        expect(core.readConfig({ MIN_STOP_ATR: '1.5', MAX_RR: '6' })).toMatchObject({ minStopAtr: 1.5, maxRr: 6 });
+    });
+
+    test('a stop that is too tight is not sent', async () => {
+        process.env.MIN_STOP_ATR = '1';
+        engine.analyse.mockReturnValue(planWithRisk(0.005));
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].skipped).toMatch(/stop loss too tight: 0\.\d\d ATR from the entry \(minimum 1\)/i);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(await global.__sql`SELECT id FROM signals`).toHaveLength(0);
+    });
+
+    test('a stop of at least the minimum is sent', async () => {
+        process.env.MIN_STOP_ATR = '1';
+        engine.analyse.mockReturnValue(planWithRisk(0.4)); // about 2 ATR
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('MIN_STOP_ATR=0 turns the rule off', async () => {
+        process.env.MIN_STOP_ATR = '0';
+        engine.analyse.mockReturnValue(planWithRisk(0.005));
+        const r = await call(handler);
+        expect(r.body.markets[0].results[0].telegram).toBe('sent');
+    });
+
+    test('a reward above the cap is not sent', async () => {
+        process.env.MAX_RR = '2.5';
+        const r = await call(handler); // the default plan has RR 2.5 in readyAnalysis(), so use a bigger one
+        expect(r.body.markets[0].results[0].telegram).toBe('sent'); // 2.5 is not above 2.5
+        sendTelegram.mockClear(); sendTelegramPhoto.mockClear();
+        const a = readyAnalysis(); a.plan = { ...a.plan, entry: 1.09, rr: 8 };
+        engine.analyse.mockReturnValue(a);
+        const r2 = await call(handler, { query: { force: '1' } });
+        expect(r2.body.markets[0].results[0].skipped).toMatch(/reward too high.*cap 2\.5/i);
+    });
+
+    test('without an ATR (too little history) the stop rule cannot judge, so it lets the setup through', () => {
+        const cfg = { timeframe: 3600, maxAgeCandles: 3, minRr: 2, minStopAtr: 1, maxRr: 0 };
+        expect(core.setupCheck(planWithRisk(0.005), BASE_T, cfg, null).problem).toBeNull();
+        expect(core.setupCheck(planWithRisk(0.005), BASE_T, cfg, 0.2).problem).toMatch(/too tight/);
+    });
+});
+const BASE_T = 0;

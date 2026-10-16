@@ -98,9 +98,9 @@ describe('same rules as the live watcher', () => {
         readyAt([8], {}, 5); // break of structure 5 candles ago, limit is 3
         expect(run(series(20))).toHaveLength(0);
     });
-    test('what-if filters: too-tight stops and too-good-to-be-true rewards can be excluded', () => {
+    test('stop-size and reward-cap rules apply in the backtest exactly like live', () => {
         readyAt([25]); // needs 15+ candles of history for the ATR, so a longer window than the other tests
-        const go = filters => run(series(40), { window: 20, filters });
+        const go = over => run(series(40), { window: 20, cfg: { ...CFG, ...over } });
         expect(go({ minStopAtr: 5 })).toHaveLength(0); // the stop is about 1 ATR
         expect(go({ maxRr: 2.5 })).toHaveLength(0);
         expect(go({ minStopAtr: 0.5, maxRr: 5 })).toHaveLength(1);
@@ -150,7 +150,7 @@ describe('the numbers', () => {
             T('hit_tp', 3, { stopAtr: 1.6, time: Date.UTC(2026, 3, 1) / 1000 }), T('open', 3, { stopAtr: null, time: Q4 }),
         ]);
         const row = n => r.whatIf.find(x => x.name === n);
-        expect(row('All trades (as sent today)')).toMatchObject({ signals: 6, decided: 5, wins: 2, losses: 3 });
+        expect(row('All trades in this run')).toMatchObject({ signals: 6, decided: 5, wins: 2, losses: 3 });
         expect(row('Only stops of at least 0.5 ATR')).toMatchObject({ signals: 3, decided: 3, wins: 2, losses: 1 });
         expect(row('Only stops of at least 1 ATR')).toMatchObject({ decided: 3, wins: 2 });
         expect(row('Only stops of at least 1.5 ATR')).toMatchObject({ decided: 2, wins: 1, losses: 1 });
@@ -202,7 +202,7 @@ describe('the endpoint', () => {
     beforeEach(async () => {
         global.__sql = makeSql();
         await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache');
-        process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_TIMEFRAME: String(TF), WATCH_BATCH_GAP_MS: '0', WATCH_STRATEGIES: '1' };
+        process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_TIMEFRAME: String(TF), WATCH_BATCH_GAP_MS: '0', WATCH_STRATEGIES: '1', MIN_STOP_ATR: '0' };
         deriv.connect.mockReset().mockResolvedValue({ close: jest.fn() });
         deriv.getActiveSymbols.mockReset().mockResolvedValue([
             { underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex' },
@@ -271,7 +271,17 @@ describe('the endpoint', () => {
     test('what-if settings change the result', async () => {
         expect((await call({ symbols: 'frxEURUSD', minRr: '4' })).body.overall.signals).toBe(0);
         expect((await call({ symbols: 'frxEURUSD', maxRr: '2' })).body.overall.signals).toBe(0);
+        expect((await call({ symbols: 'frxEURUSD', minStopAtr: '9' })).body.overall.signals).toBe(0);
         expect((await call({ symbols: 'frxEURUSD', strategies: '2' })).body.overall.signals).toBe(0);
+    });
+    test('the live stop-size rule is the default, and ?minStopAtr= overrides it', async () => {
+        process.env.MIN_STOP_ATR = '5'; // the test trade has a stop of about 1 ATR
+        const live = await call({ symbols: 'frxEURUSD' });
+        expect(live.body.overall.signals).toBe(0);
+        expect(live.body.settings.minStopAtr).toBe(5);
+        const off = await call({ symbols: 'frxEURUSD', minStopAtr: '0' });
+        expect(off.body.overall.signals).toBe(1);
+        expect(off.body.settings.minStopAtr).toBe(0);
     });
     test('more than 60 markets are cut with a clear message', async () => {
         const many = Array.from({ length: 70 }, (_, i) => `frxA${i}`).join(',');

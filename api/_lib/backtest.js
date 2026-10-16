@@ -11,7 +11,7 @@ const { evaluateSignal } = require('./signal-outcome');
 /** Candles needed before the first analysis: the same history the live watcher loads (15 days). */
 const historyCandles = tf => Math.ceil((15 * 86400) / tf);
 
-function runBacktest({ symbol, symbolName, market, candles, timeframe, strategies, cfg, filters = {}, expirySeconds = 86400, window = historyCandles(timeframe) }) {
+function runBacktest({ symbol, symbolName, market, candles, timeframe, strategies, cfg, expirySeconds = 86400, window = historyCandles(timeframe) }) {
     const tf = timeframe;
     const kind = engine.marketKind(market);
     const trades = [];
@@ -26,14 +26,12 @@ function runBacktest({ symbol, symbolName, market, candles, timeframe, strategie
         for (const strategyId of strategies) {
             const a = engine.analyse(strategyId, closed, kind, null, now);
             if (a.state !== 'ready' || !a.plan) continue;
-            const chk = core.setupCheck(a, lastClosed, cfg);
+            const atr = engine.atr(closed, 14);
+            const chk = core.setupCheck(a, lastClosed, cfg, atr);
             if (chk.problem) continue;
 
             const risk = Math.abs(a.plan.entry - a.plan.stopLoss);
-            const atr = engine.atr(closed, 14);
             const stopAtr = atr ? risk / atr : null;
-            if (filters.minStopAtr && stopAtr !== null && stopAtr < filters.minStopAtr) continue;
-            if (filters.maxRr && a.plan.rr > filters.maxRr) continue;
 
             const key = core.dedupeKey(symbol, strategyId, tf, a.plan.side, a.plan.entry);
             if (seen.has(key)) continue;
@@ -107,7 +105,7 @@ const quarterOf = t => { const d = new Date(t * 1000); return `${d.getUTCFullYea
  * Only trust it if it also helps in most periods and in markets that were not used to choose it.
  */
 const WHAT_IF = [
-    ['All trades (as sent today)', () => true],
+    ['All trades in this run', () => true],
     ['Only stops of at least 0.5 ATR', t => t.stopAtr !== null && t.stopAtr >= 0.5],
     ['Only stops of at least 1 ATR', t => t.stopAtr !== null && t.stopAtr >= 1],
     ['Only stops of at least 1.5 ATR', t => t.stopAtr !== null && t.stopAtr >= 1.5],

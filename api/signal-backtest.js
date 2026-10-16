@@ -10,7 +10,7 @@
 //        &tf=3600                       candle size in seconds (default: the live timeframe)
 //        &strategies=1,2,3              (default: the live strategies)
 //        &minRr=2 &maxAge=3             what-if: override the live minimum reward / freshness
-//        &minStopAtr=0.5 &maxRr=8       what-if: skip too-tight stops / too-good-to-be-true rewards
+//        &minStopAtr=0 &maxRr=8         what-if: override the live minimum stop size in ATR (0 = off) / reward cap
 //        &trades=1                      also list the latest 100 trades
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
@@ -37,8 +37,10 @@ module.exports = async function handler(req, res) {
     const timeframe = Math.max(60, numOr(q.tf, live.timeframe));
     const days = Math.min(730, Math.max(5, numOr(q.days, 180)));
     const strategies = q.strategies ? String(q.strategies).split(',').map(Number).filter(n => n >= 1 && n <= 5) : live.strategies;
-    const cfg = { ...live, timeframe, minRr: numOr(q.minRr, live.minRr), maxAgeCandles: numOr(q.maxAge, live.maxAgeCandles) };
-    const filters = { minStopAtr: numOr(q.minStopAtr, 0), maxRr: numOr(q.maxRr, 0) };
+    const cfg = {
+        ...live, timeframe, minRr: numOr(q.minRr, live.minRr), maxAgeCandles: numOr(q.maxAge, live.maxAgeCandles),
+        minStopAtr: numOr(q.minStopAtr, live.minStopAtr), maxRr: numOr(q.maxRr, live.maxRr),
+    };
     const { expirySeconds } = readResultConfig();
 
     let client;
@@ -49,7 +51,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const out = { ok: true, timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, ...filters }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
+    const out = { ok: true, timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
     const trades = [];
     try {
         const active = await deriv.getActiveSymbols(client);
@@ -89,7 +91,7 @@ module.exports = async function handler(req, res) {
             });
             if (candles.length < window + 1) { out.skipped.push({ symbol, reason: `Only ${candles.length} candles available` }); return; }
             const found = bt.runBacktest({
-                symbol, symbolName: meta.underlying_symbol_name, market: meta.market, candles, timeframe, strategies, cfg, filters, expirySeconds, window,
+                symbol, symbolName: meta.underlying_symbol_name, market: meta.market, candles, timeframe, strategies, cfg, expirySeconds, window,
             });
             trades.push(...found);
             out.symbolsTested++;

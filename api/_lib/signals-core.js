@@ -56,6 +56,10 @@ function readConfig(env = process.env) {
         minRr: Number.isFinite(minRr) && minRr > 0 ? minRr : 2,
         // Only send setups whose break of structure happened at most this many candles ago.
         maxAgeCandles: Number.isFinite(maxAge) && maxAge >= 0 ? maxAge : 3,
+        // Reject setups whose stop loss is closer than this many ATR (one ATR = a normal hourly price move) to the entry: normal movement stops them out. 0 = off.
+        minStopAtr: Math.max(0, num(env.MIN_STOP_ATR, 1)),
+        // Reject setups whose reward is higher than this (usually a tiny stop). 0 = off.
+        maxRr: Math.max(0, num(env.MAX_RR, 0)),
         // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.
         // Checked first in every run (gold first); also what the page's Focus markets button ticks. Override with WATCH_PRIORITY=frxXAUUSD,frxEURUSD,...
         priority: list(env.WATCH_PRIORITY, MAIN_MARKETS.join(',')),
@@ -111,15 +115,20 @@ function levelsProblem(plan) {
 
 /**
  * The checks every setup must pass before it counts as a signal, used by the live watcher AND the
- * backtest so they can never disagree: fresh enough, sane levels, enough reward.
+ * backtest so they can never disagree: fresh enough, sane levels, a stop that is not too tight, enough reward.
  * Returns { age (candles since the break of structure), problem (text, or null when it passes) }.
  */
-function setupCheck(analysis, lastClosed, cfg) {
+function setupCheck(analysis, lastClosed, cfg, atr = null) {
     const bosTime = analysis.bos && analysis.bos.bosTime;
     const age = bosTime ? Math.round((lastClosed - bosTime) / cfg.timeframe) : 0;
     if (age > cfg.maxAgeCandles) return { age, problem: `Setup is ${age} candles old (limit ${cfg.maxAgeCandles})` };
     const bad = levelsProblem(analysis.plan);
     if (bad) return { age, problem: `Impossible trade levels: ${bad}` };
+    if (cfg.minStopAtr > 0 && atr) {
+        const stopAtr = Math.abs(analysis.plan.entry - analysis.plan.stopLoss) / atr;
+        if (stopAtr < cfg.minStopAtr) return { age, problem: `Stop loss too tight: ${stopAtr.toFixed(2)} ATR from the entry (minimum ${cfg.minStopAtr})` };
+    }
+    if (cfg.maxRr > 0 && analysis.plan.rr > cfg.maxRr) return { age, problem: `Reward too high to be realistic: RR ${analysis.plan.rr.toFixed(2)} (cap ${cfg.maxRr})` };
     if (analysis.plan.rr < cfg.minRr) return { age, problem: `RR ${analysis.plan.rr.toFixed(2)} below minimum ${cfg.minRr}` };
     return { age, problem: null };
 }

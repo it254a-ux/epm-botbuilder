@@ -264,6 +264,7 @@ module.exports = async function handler(req, res) {
                 summary.analysed++;
 
                 const kind = engine.marketKind(info.market);
+                const atr = engine.atr(closed, 14);
                 for (const strategyId of cfg.strategies) {
                     const a = engine.analyse(strategyId, closed, kind, forming, now);
                     const r = { strategy: strategyId, state: a.state };
@@ -271,7 +272,7 @@ module.exports = async function handler(req, res) {
                     if (a.state !== 'ready' || !a.plan) continue;
 
                     // Fresh enough, sane levels, enough reward: the same checks the backtest uses.
-                    const chk = core.setupCheck(a, lastClosed, cfg);
+                    const chk = core.setupCheck(a, lastClosed, cfg, atr);
                     r.candlesSinceBos = chk.age;
                     if (chk.problem) { r.skipped = chk.problem; continue; }
 
