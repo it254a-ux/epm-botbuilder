@@ -14,6 +14,11 @@
 // 1 second apart (about 180 per minute), least recently checked first. If a run reaches its
 // time budget the remaining markets are done first on the next run.
 //
+// ENTRY TOUCH (default on, ENTRY_TOUCH=off to turn off): a ready setup is NOT sent straight away. It goes on a waiting list and
+// every run (run the cron job every minute) looks at the 1-minute candles: the signal is sent only when price actually reaches the
+// entry. If price reaches the take profit or stop loss first, the touch is too old (ENTRY_FRESH_MINUTES) or the setup runs out of
+// time (ENTRY_WAIT_CANDLES), it is dropped quietly and nothing is sent. See api/_lib/signal-entry.js.
+//
 // Every run also checks the signals that are still open: when one hits its take profit or stop loss
 // (or never reaches its entry, or runs out of time) the result is saved and sent to Telegram as a reply
 // under the original signal, with what $10 / $20 / $50 risked would have made or lost.
@@ -33,6 +38,7 @@ const chart = require('./_lib/signal-chart');
 const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
 const outcomeLib = require('./_lib/signal-outcome');
+const entryLib = require('./_lib/signal-entry');
 const store = require('./_lib/signals-store');
 const news = require('./_lib/news');
 const { authorised } = require('./_lib/signals-auth');
@@ -170,8 +176,8 @@ module.exports = async function handler(req, res) {
 
     const started = Date.now();
     const cfg = core.readConfig();
-    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
-    const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, summary, markets: [] };
+    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0, waitingNew: 0, entryHit: 0, droppedWaiting: 0 };
+    const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, entryTouch: cfg.entryTouch, summary, markets: [], waiting: [] };
 
     let client;
     try {
@@ -234,6 +240,93 @@ module.exports = async function handler(req, res) {
         const active = await deriv.getActiveSymbols(client);
         const bySymbol = new Map(active.map(s => [s.underlying_symbol, s]));
         const expected = core.expectedLastClosed(Math.floor(Date.now() / 1000), cfg.timeframe);
+
+        /**
+         * Looks at the setups waiting for their entry. Sends the signal for the ones whose entry has just been touched;
+         * drops (quietly, nothing is sent) the ones price ran away from, the ones that ran out of time and the ones that are no
+         * longer valid. onlyIds = only these (used for setups found in this very run).
+         */
+        const checkWaiting = async onlyIds => {
+            if (!write || !cfg.entryTouch) return;
+            const waiting = (await store.getWaiting(sql)).filter(p => !onlyIds || onlyIds.includes(p.id));
+            if (!waiting.length) return;
+            const bySym = new Map();
+            for (const p of waiting) {
+                if (!bySym.has(p.symbol)) bySym.set(p.symbol, []);
+                bySym.get(p.symbol).push(p);
+            }
+            for (const [symbol, list] of bySym) {
+                const info = bySymbol.get(symbol);
+                const now = Math.floor(Date.now() / 1000);
+                const note = (p, result, reason) => report.waiting.push({ id: p.id, symbol, side: p.side, entry: p.entry, result, ...(reason ? { reason } : {}) });
+                const drop = async (p, status, reason) => {
+                    if (await store.resolvePending(sql, p.id, status, reason)) { summary.droppedWaiting++; note(p, status, reason); }
+                };
+                try {
+                    const live = [];
+                    for (const p of list) {
+                        if (now >= p.expiresAt) await drop(p, 'cancelled', 'Waited too long: the entry was never reached');
+                        else live.push(p);
+                    }
+                    if (!live.length) continue;
+                    if (!info || info.exchange_is_open === 0 || info.is_trading_suspended === 1) { live.forEach(p => note(p, 'waiting', 'Market closed or suspended')); continue; }
+
+                    // 1-minute candles since the oldest waiting setup was formed
+                    const from = Math.min(...live.map(p => p.time + p.timeframe));
+                    const minutes = Math.min(5000, Math.ceil((now - from) / 60) + 3);
+                    const minuteCandles = await deriv.getCandles(client, symbol, 60, (minutes * 60) / 86400);
+
+                    for (const p of live) {
+                        const res = entryLib.checkEntry(p, minuteCandles, p.time + p.timeframe, now, cfg.entryFreshSeconds);
+                        if (res.status === 'waiting') { note(p, 'waiting'); continue; }
+                        if (res.status === 'cancelled') { await drop(p, 'cancelled', res.reason); continue; }
+                        if (res.status === 'missed') { await drop(p, 'missed', `Price touched the entry at ${core.gmtStamp(res.touchTime)}, too long ago to still be useful`); continue; }
+
+                        // Price has just touched the entry. Last checks, then send.
+                        const ccys = news.currenciesFor(symbol, info.market);
+                        const nw = ccys.length && newsData.events.length ? news.check(ccys, newsData.events, now, newsCfg) : {};
+                        if (nw.blackout) { summary.newsHeld++; await drop(p, 'cancelled', `News blackout: ${news.describe(nw.blackout, now)}`); continue; }
+
+                        const candles = await deriv.getCandles(client, symbol, p.timeframe);
+                        const closed = candles.filter(c => c.time + p.timeframe <= now);
+                        const forming = candles.find(c => c.time + p.timeframe > now) || null;
+                        const a = engine.analyse(p.strategyId, closed, engine.marketKind(info.market), forming, now);
+                        if (a.state !== 'ready' || !a.plan || a.plan.side !== p.side) { await drop(p, 'cancelled', `Setup is no longer valid (${a.state})`); continue; }
+
+                        if (!(await store.resolvePending(sql, p.id, 'sent', 'Entry touched'))) continue; // another run took it
+                        const sig = {
+                            key: p.key, symbol, symbolName: p.symbolName || info.underlying_symbol_name, market: p.market, strategyId: p.strategyId, strategyName: p.strategyName,
+                            timeframe: p.timeframe, side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, rr: p.rr, time: p.time,
+                            enteredAt: res.touchTime, newsNote: nw.upcoming ? news.newsNote(nw.upcoming, now) : null,
+                        };
+                        const entry = { id: p.id, symbol, side: p.side, entry: p.entry, result: 'entry touched', touchedAt: core.gmtStamp(res.touchTime) };
+                        report.waiting.push(entry);
+                        const id = await store.insertSignal(sql, sig);
+                        if (id === null) { entry.result = 'already sent before (duplicate)'; continue; }
+                        summary.signalsSaved++;
+                        summary.entryHit++;
+                        try {
+                            const sent = await send(() => deliver(sig, { candles: closed, analysis: a, signal: sig }));
+                            await store.markTelegramSent(sql, id, sent.messageId);
+                            entry.telegram = 'sent';
+                            entry.picture = sent.picture;
+                            summary.telegramSent++;
+                        } catch (err) {
+                            entry.telegram = `failed: ${err.message}`; // saved; retried on the next run
+                            console.error('signal-watch: Telegram failed:', err.message);
+                        }
+                    }
+                } catch (err) {
+                    // A problem with one market never stops the others; its setups simply stay waiting.
+                    console.error(`signal-watch: checking waiting setups for ${symbol} failed:`, err.message);
+                    report.waiting.push({ symbol, result: 'error', reason: err.message });
+                }
+            }
+        };
+        const newWaitingIds = [];
+
+        // The time-critical part first: has price reached the entry of a setup that is already waiting?
+        try { await checkWaiting(null); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
 
         const processSymbol = async symbol => {
             const entry = { symbol, results: [] };
@@ -304,6 +397,17 @@ module.exports = async function handler(req, res) {
                     if (!write) {
                         r.wouldSend = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
                         try { r.picture = `ok (${chart.renderChartPng({ candles: closed, analysis: a, signal: sig }).length} bytes)`; } catch (err) { r.picture = `would fail: ${err.message}`; }
+                        if (cfg.entryTouch) r.wouldWait = `Would wait: nothing is sent until price touches the entry ${engine.px(sig.entry)} (the text above is what goes out at that moment, with the entry-hit line)`;
+                        continue;
+                    }
+
+                    if (cfg.entryTouch) {
+                        // Ready, but price has not been at the entry yet: wait. The signal is sent only when it touches.
+                        const pid = await store.insertPending(sql, { ...sig, expiresAt: lastClosed + cfg.timeframe * (1 + cfg.waitCandles) });
+                        if (pid === null) { r.skipped = 'Already waiting, dropped earlier, or already sent (duplicate)'; continue; }
+                        r.waiting = `Waiting for price to touch ${engine.px(sig.entry)}`;
+                        summary.waitingNew++;
+                        newWaitingIds.push(pid);
                         continue;
                     }
 
@@ -340,6 +444,11 @@ module.exports = async function handler(req, res) {
             }
             await Promise.all(symbols.slice(i, i + cfg.concurrency).map(processSymbol));
             if (i + cfg.concurrency < symbols.length) await sleep(cfg.batchGapMs);
+        }
+
+        // Setups found in this run may already have been touched (price can be at the entry the moment they form).
+        if (newWaitingIds.length) {
+            try { await checkWaiting(newWaitingIds); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
         }
     } catch (err) {
         report.ok = false;

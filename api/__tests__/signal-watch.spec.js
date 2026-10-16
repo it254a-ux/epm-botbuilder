@@ -72,8 +72,8 @@ const ENV = { ...process.env };
 let client;
 beforeEach(async () => {
     global.__sql = makeSql();
-    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MIN_STOP_ATR: '0' };
+    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache, signal_pending');
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MIN_STOP_ATR: '0', ENTRY_TOUCH: 'off' }; // the older tests below check the "send as soon as ready" behaviour; the entry-touch tests turn it on
     client = { close: jest.fn() };
     deriv.connect.mockReset().mockResolvedValue(client);
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
@@ -534,7 +534,9 @@ describe('helpers', () => {
         expect(core.readConfig({})).toEqual({
             symbols: ['frxEURUSD'], timeframe: 3600, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
             concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100, priority: core.MAIN_MARKETS, minStopAtr: 1, maxRr: 0,
+            entryTouch: true, entryFreshSeconds: 300, waitCandles: 24,
         });
+        expect(core.readConfig({ ENTRY_TOUCH: 'off', ENTRY_FRESH_MINUTES: '2', ENTRY_WAIT_CANDLES: '6' })).toMatchObject({ entryTouch: false, entryFreshSeconds: 120, waitCandles: 6 });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
             .toMatchObject({ symbols: ['a', 'b'], timeframe: 3600, strategies: [1, 3], maxAgeCandles: 0 });
     });
@@ -936,3 +938,167 @@ describe('stop size and reward cap rules', () => {
     });
 });
 const BASE_T = 0;
+
+describe('entry touch: the signal is sent only AFTER price reaches the entry', () => {
+    const FROM = () => lastClosedStart() + TF; // the moment the setup candle closed
+    const curMinute = () => Math.floor(nowSec() / 60) * 60;
+    // candles by timeframe: 1-minute candles are whatever the test says, the rest is the normal hourly-style fake
+    let minutes;
+    const minute = (low, high, time = curMinute()) => ({ time, open: (low + high) / 2, high, low, close: (low + high) / 2 });
+    beforeEach(() => {
+        process.env.ENTRY_TOUCH = 'on';
+        minutes = [minute(1.088, 1.092)]; // price is above the BUY entry 1.085: not touched
+        deriv.getCandles.mockReset().mockImplementation(async (c, sym, gran) => (gran === 60 ? minutes : candlesUpToNow()));
+    });
+    afterEach(() => jest.restoreAllMocks());
+    const pendingRows = () => global.__sql`SELECT * FROM signal_pending ORDER BY id`;
+
+    test('a ready setup whose entry is not touched yet is NOT sent: it waits', async () => {
+        const r = await call(handler);
+        expect(r.status).toBe(200);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
+        expect(await global.__sql`SELECT id FROM signals`).toHaveLength(0);
+        const rows = await pendingRows();
+        expect(rows).toHaveLength(1);
+        expect(rows[0].status).toBe('waiting');
+        expect(r.body.markets[0].results[0].waiting).toMatch(/Waiting for price to touch 1\.085/);
+        expect(r.body.summary).toMatchObject({ waitingNew: 1, entryHit: 0, signalsSaved: 0 });
+    });
+
+    test('when price touches the entry on a later run, the signal is sent then (once), with the entry-hit wording', async () => {
+        await call(handler);
+        minutes = [minute(1.0849, 1.092)];
+        const r = await call(handler);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+        const text = sendTelegram.mock.calls[0][0];
+        expect(text).toContain('BUY SIGNAL');
+        expect(text).toContain('Price has just reached the entry. Enter now.');
+        expect(text).toContain('Entry hit:');
+        expect(r.body.summary).toMatchObject({ entryHit: 1, signalsSaved: 1, telegramSent: 1 });
+        const sigs = await global.__sql`SELECT * FROM signals`;
+        expect(sigs).toHaveLength(1);
+        expect(sigs[0].telegram_sent).toBe(true);
+        expect(Number(sigs[0].entered_time)).toBe(curMinute());
+        expect((await pendingRows())[0].status).toBe('sent');
+        // a third run sends nothing more
+        await call(handler);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+    });
+
+    test('the chart picture is sent too, with the entry-hit caption', async () => {
+        chart.renderChartPng.mockReset().mockReturnValue(Buffer.from('png'));
+        await call(handler);
+        minutes = [minute(1.0849, 1.092)];
+        await call(handler);
+        expect(sendTelegramPhoto).toHaveBeenCalledTimes(1);
+        expect(sendTelegramPhoto.mock.calls[0][1]).toContain('Entry hit:');
+    });
+
+    test('a setup found while price is already at the entry is sent in the same run', async () => {
+        minutes = [minute(1.0849, 1.092)];
+        const r = await call(handler);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+        expect(r.body.summary).toMatchObject({ waitingNew: 1, entryHit: 1 });
+    });
+
+    test('price reaches the take profit BEFORE the entry: dropped quietly, nothing sent', async () => {
+        await call(handler);
+        minutes = [minute(1.09, 1.099)]; // went up to 1.099 (> take profit 1.0975), never down to 1.085
+        const r = await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await pendingRows())[0].status).toBe('cancelled');
+        expect((await pendingRows())[0].reason).toMatch(/take profit before the entry/);
+        expect(r.body.summary.droppedWaiting).toBe(1);
+    });
+
+    test('price reaches the stop loss before the entry: dropped quietly', async () => {
+        await call(handler);
+        minutes = [minute(1.079, 1.0845)]; // fell below the stop 1.08 without touching 1.085
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await pendingRows())[0].reason).toMatch(/stop loss before the entry/);
+    });
+
+    test('entry and stop in the same minute: dropped, it would be over before anyone could act', async () => {
+        await call(handler);
+        minutes = [minute(1.079, 1.09)];
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await pendingRows())[0].status).toBe('cancelled');
+    });
+
+    test('a touch that is too old (the cron job was not running) is skipped: late signals are not sent', async () => {
+        await call(handler);
+        const from = FROM();
+        const realNow = Date.now();
+        jest.spyOn(Date, 'now').mockReturnValue(realNow + 20 * 60 * 1000); // 20 minutes later
+        minutes = [minute(1.0849, 1.092, from)];
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        const rows = await pendingRows();
+        expect(rows[0].status).toBe('missed');
+    });
+
+    test('a setup that waits too long is dropped', async () => {
+        process.env.ENTRY_WAIT_CANDLES = '1';
+        await call(handler);
+        jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60 * 60 * 1000);
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        const rows = await pendingRows();
+        expect(rows[0].status).toBe('cancelled');
+        expect(rows[0].reason).toMatch(/Waited too long/);
+    });
+
+    test('if the setup is no longer valid when price touches the entry, nothing is sent', async () => {
+        await call(handler);
+        minutes = [minute(1.0849, 1.092)];
+        engine.analyse.mockReturnValue({ state: 'invalidated', strategyName: 'Asian High/Low sweep', plan: null });
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await pendingRows())[0].reason).toMatch(/no longer valid/);
+    });
+
+    test('a dropped setup is never queued again, and a sent one is never queued again', async () => {
+        await call(handler);
+        minutes = [minute(1.09, 1.099)];
+        await call(handler); // dropped
+        minutes = [minute(1.088, 1.092)];
+        const again = await call(handler, { query: { force: '1' } });
+        expect(again.body.markets[0].results[0].skipped).toMatch(/duplicate/i);
+        expect(await pendingRows()).toHaveLength(1);
+    });
+
+    test('a closed market keeps its setups waiting (nothing is dropped or sent)', async () => {
+        await call(handler);
+        deriv.getActiveSymbols.mockResolvedValue([{ underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex', exchange_is_open: 0, is_trading_suspended: 0 }]);
+        minutes = [minute(1.0849, 1.092)];
+        await call(handler);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect((await pendingRows())[0].status).toBe('waiting');
+    });
+
+    test('a failed minute-candle download leaves the setup waiting and does not stop the run', async () => {
+        await call(handler);
+        deriv.getCandles.mockImplementation(async (c, sym, gran) => { if (gran === 60) throw new Error('Deriv rate limit'); return candlesUpToNow(); });
+        const r = await call(handler);
+        expect(r.status).toBe(200);
+        expect(r.body.waiting.some(w => w.result === 'error')).toBe(true);
+        expect((await pendingRows())[0].status).toBe('waiting');
+    });
+
+    test('dry run: says it would wait, saves nothing', async () => {
+        const r = await call(handler, { query: { dry: '1' } });
+        expect(r.body.markets[0].results[0].wouldWait).toMatch(/Would wait/);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(await pendingRows()).toHaveLength(0);
+    });
+
+    test('ENTRY_TOUCH=off sends as soon as the setup is ready, exactly like before', async () => {
+        process.env.ENTRY_TOUCH = 'off';
+        await call(handler);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+        expect(sendTelegram.mock.calls[0][0]).not.toContain('Entry hit');
+    });
+});

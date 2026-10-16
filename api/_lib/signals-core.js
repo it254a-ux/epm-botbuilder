@@ -27,7 +27,10 @@ function formatTelegram(sig, { siteUrl, newsNote } = {}) {
         `✅ Take profit: <code>${px(sig.takeProfit)}</code>`,
         `⚖️ Risk : Reward = 1 : ${sig.rr.toFixed(2)}`,
         // sig.time is the OPEN time of the last closed candle; the signal exists from the moment that candle closed.
-        `🕒 ${gmtStamp(sig.time + sig.timeframe)}`,
+        // sig.enteredAt (entry-touch mode) is the minute price reached the entry: this message is sent because of it.
+        ...(sig.enteredAt
+            ? [`⚡ <b>Price has just reached the entry. Enter now.</b>`, `🕒 Entry hit: ${gmtStamp(sig.enteredAt)} (setup formed ${gmtStamp(sig.time + sig.timeframe)})`]
+            : [`🕒 ${gmtStamp(sig.time + sig.timeframe)}`]),
         // newsNote is already HTML-safe text built by news.js
         ...(newsNote ? ['', newsNote] : []),
         ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
@@ -60,6 +63,12 @@ function readConfig(env = process.env) {
         minStopAtr: Math.max(0, num(env.MIN_STOP_ATR, 1)),
         // Reject setups whose reward is higher than this (usually a tiny stop). 0 = off.
         maxRr: Math.max(0, num(env.MAX_RR, 0)),
+        // Signals are sent only AFTER price touches the entry (ENTRY_TOUCH=off brings back "send as soon as the setup is ready").
+        entryTouch: String(env.ENTRY_TOUCH || 'on').toLowerCase() !== 'off',
+        // A touch older than this many minutes is "too late": the setup is dropped, nothing is sent.
+        entryFreshSeconds: Math.round(Math.max(1, num(env.ENTRY_FRESH_MINUTES, 5)) * 60),
+        // How many candles a setup may wait for its entry (the engine's own setup lifetime is 24).
+        waitCandles: Math.max(1, Math.floor(num(env.ENTRY_WAIT_CANDLES, 24))),
         // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.
         // Checked first in every run (gold first); also what the page's Focus markets button ticks. Override with WATCH_PRIORITY=frxXAUUSD,frxEURUSD,...
         priority: list(env.WATCH_PRIORITY, MAIN_MARKETS.join(',')),

@@ -59,6 +59,31 @@ async function ensureTables(sql) {
             fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     `;
+    // Setups that are ready but whose entry price has not been touched yet: nothing is sent until it is.
+    await sql`
+        CREATE TABLE IF NOT EXISTS signal_pending (
+            id            SERIAL PRIMARY KEY,
+            dedupe_key    TEXT NOT NULL UNIQUE,
+            symbol        TEXT NOT NULL,
+            symbol_name   TEXT,
+            market        TEXT,
+            strategy_id   INTEGER NOT NULL,
+            strategy_name TEXT NOT NULL,
+            timeframe     INTEGER NOT NULL,
+            side          TEXT NOT NULL,
+            entry         DOUBLE PRECISION NOT NULL,
+            stop_loss     DOUBLE PRECISION NOT NULL,
+            take_profit   DOUBLE PRECISION NOT NULL,
+            rr            DOUBLE PRECISION NOT NULL,
+            setup_time    BIGINT NOT NULL,
+            expires_at    BIGINT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'waiting',
+            reason        TEXT,
+            news_note     TEXT,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    `;
     prepared.add(sql);
 }
 
@@ -66,9 +91,9 @@ async function ensureTables(sql) {
 async function insertSignal(sql, s) {
     const rows = await sql`
         INSERT INTO signals (dedupe_key, symbol, symbol_name, market, strategy_id, strategy_name, timeframe,
-                             side, entry, stop_loss, take_profit, rr, candle_time)
+                             side, entry, stop_loss, take_profit, rr, candle_time, entered_time)
         VALUES (${s.key}, ${s.symbol}, ${s.symbolName}, ${s.market}, ${s.strategyId}, ${s.strategyName}, ${s.timeframe},
-                ${s.side}, ${s.entry}, ${s.stopLoss}, ${s.takeProfit}, ${s.rr}, ${s.time})
+                ${s.side}, ${s.entry}, ${s.stopLoss}, ${s.takeProfit}, ${s.rr}, ${s.time}, ${s.enteredAt ?? null})
         ON CONFLICT (dedupe_key) DO NOTHING
         RETURNING id
     `;
@@ -82,7 +107,7 @@ async function markTelegramSent(sql, id, messageId) {
 /** Signals saved but not delivered to Telegram yet (Telegram was down): retried on the next run. */
 async function getUnsent(sql) {
     const rows = await sql`
-        SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time
+        SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time, entered_time
         FROM signals
         WHERE telegram_sent = false AND status = 'active' AND created_at > now() - interval '3 hours'
         ORDER BY id ASC LIMIT 5
@@ -99,6 +124,7 @@ async function getUnsent(sql) {
         takeProfit: Number(r.take_profit),
         rr: Number(r.rr),
         time: Number(r.candle_time),
+        enteredAt: r.entered_time === null || r.entered_time === undefined ? undefined : Number(r.entered_time),
     }));
 }
 
@@ -162,6 +188,63 @@ async function getUnsentResults(sql) {
         ORDER BY id ASC LIMIT 10
     `;
     return rows.map(toSignal);
+}
+
+const toPending = r => ({
+    id: r.id,
+    key: r.dedupe_key,
+    symbol: r.symbol,
+    symbolName: r.symbol_name,
+    market: r.market,
+    strategyId: Number(r.strategy_id),
+    strategyName: r.strategy_name,
+    timeframe: Number(r.timeframe),
+    side: r.side,
+    entry: Number(r.entry),
+    stopLoss: Number(r.stop_loss),
+    takeProfit: Number(r.take_profit),
+    rr: Number(r.rr),
+    time: Number(r.setup_time), // open time of the candle that completed the setup (same meaning as signals.candle_time)
+    expiresAt: Number(r.expires_at),
+});
+
+/**
+ * Puts a ready setup on the waiting list. Returns its id, or null when this setup is already waiting,
+ * was already dropped earlier, or was already sent as a signal (so it can never be queued twice).
+ */
+async function insertPending(sql, p) {
+    const rows = await sql`
+        INSERT INTO signal_pending (dedupe_key, symbol, symbol_name, market, strategy_id, strategy_name, timeframe,
+                                    side, entry, stop_loss, take_profit, rr, setup_time, expires_at, news_note)
+        SELECT ${p.key}, ${p.symbol}, ${p.symbolName}, ${p.market}, ${p.strategyId}, ${p.strategyName}, ${p.timeframe},
+               ${p.side}, ${p.entry}, ${p.stopLoss}, ${p.takeProfit}, ${p.rr}, ${p.time}, ${p.expiresAt}, ${p.newsNote ?? null}
+        WHERE NOT EXISTS (SELECT 1 FROM signals WHERE dedupe_key = ${p.key})
+        ON CONFLICT (dedupe_key) DO NOTHING
+        RETURNING id
+    `;
+    return rows.length ? rows[0].id : null;
+}
+
+/** Setups still waiting for their entry to be touched. */
+async function getWaiting(sql) {
+    const rows = await sql`
+        SELECT id, dedupe_key, symbol, symbol_name, market, strategy_id, strategy_name, timeframe, side, entry, stop_loss,
+               take_profit, rr, setup_time, expires_at
+        FROM signal_pending WHERE status = 'waiting' ORDER BY id ASC LIMIT 60
+    `;
+    return rows.map(toPending);
+}
+
+/**
+ * Takes a waiting setup out of the waiting list ('sent', 'cancelled' or 'missed'). Returns true only for the run that
+ * really did it, so two overlapping runs can never both act on the same setup.
+ */
+async function resolvePending(sql, id, status, reason) {
+    const rows = await sql`
+        UPDATE signal_pending SET status = ${status}, reason = ${reason ?? null}, updated_at = now()
+        WHERE id = ${id} AND status = 'waiting' RETURNING id
+    `;
+    return rows.length > 0;
 }
 
 async function getLastCandle(sql, symbol, timeframe) {
@@ -241,4 +324,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };

@@ -131,3 +131,27 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS entered_time BIGINT;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_time BIGINT;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_sent BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_message_id BIGINT;
+
+-- Ready setups waiting for price to touch their entry (created automatically by api/_lib/signals-store.js; listed here for reference).
+CREATE TABLE IF NOT EXISTS signal_pending (
+    id            SERIAL PRIMARY KEY,
+    dedupe_key    TEXT NOT NULL UNIQUE,
+    symbol        TEXT NOT NULL,
+    symbol_name   TEXT,
+    market        TEXT,
+    strategy_id   INTEGER NOT NULL,
+    strategy_name TEXT NOT NULL,
+    timeframe     INTEGER NOT NULL,
+    side          TEXT NOT NULL,
+    entry         DOUBLE PRECISION NOT NULL,
+    stop_loss     DOUBLE PRECISION NOT NULL,
+    take_profit   DOUBLE PRECISION NOT NULL,
+    rr            DOUBLE PRECISION NOT NULL,
+    setup_time    BIGINT NOT NULL,
+    expires_at    BIGINT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'waiting',
+    reason        TEXT,
+    news_note     TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
