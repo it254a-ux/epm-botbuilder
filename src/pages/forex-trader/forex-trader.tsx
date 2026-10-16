@@ -4,6 +4,8 @@ import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle } from './chart-view';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
+import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
+import MtfPanel from './mtf-panel';
 import './forex-trader.scss';
 import './forex-trader-premium.scss';
 
@@ -125,6 +127,12 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     const [lastPrice, setLastPrice] = useState<number | null>(null);
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
+    // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
+    const [mode, setMode] = useState<'h1' | 'mtf'>('h1');
+    const [mtf, setMtf] = useState<MtfResult | null>(null);
+    const [m15Ready, setM15Ready] = useState(false);
+    const [m15Error, setM15Error] = useState<string | null>(null);
+    const m15Ref = useRef<Candle[]>([]);
 
     const chartRef = useRef<ChartViewHandle>(null);
     const candlesRef = useRef<Candle[]>([]);
@@ -182,12 +190,15 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
         setLoading(true);
         setLoadError(null);
         setOutcome(null);
+        setMtf(null);
         chartRef.current?.drawAnalysis(null, []);
         candlesRef.current = [];
-        const count = Math.min(5000, Math.ceil((15 * 86400) / tf));
+        // M15 + M5 mode draws the M5 chart (the entry timeframe) with about 2 days of history
+        const effTf = mode === 'mtf' ? M5_SEC : tf;
+        const count = Math.min(5000, Math.ceil(((mode === 'mtf' ? 2 : 15) * 86400) / effTf));
 
         ws.subscribe(
-            { ticks_history: symbol, style: 'candles', granularity: tf, end: 'latest', count, adjust_start_time: 1 },
+            { ticks_history: symbol, style: 'candles', granularity: effTf, end: 'latest', count, adjust_start_time: 1 },
             data => {
                 if (off) return;
                 const d = data as {
@@ -246,7 +257,54 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
             off = true;
             if (unsub) unsub();
         };
-    }, [ws, isConnected, symbol, tf]);
+    }, [ws, isConnected, symbol, tf, mode]);
+
+    // ---- M15 candles (only in the M15 + M5 mode): the direction timeframe, with its own live feed
+    useEffect(() => {
+        if (mode !== 'mtf' || !ws || !isConnected || !symbol) return;
+        let off = false;
+        let unsub: (() => void) | null = null;
+        m15Ref.current = [];
+        setM15Ready(false);
+        setM15Error(null);
+        ws.subscribe(
+            { ticks_history: symbol, style: 'candles', granularity: M15_SEC, end: 'latest', count: 400, adjust_start_time: 1 },
+            data => {
+                if (off) return;
+                const d = data as {
+                    error?: { message?: string };
+                    candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
+                    ohlc?: { open_time: number; open: string | number; high: string | number; low: string | number; close: string | number };
+                };
+                if (d.error) {
+                    setM15Error(d.error.message ?? 'Could not load M15 candles');
+                    return;
+                }
+                if (d.candles) {
+                    m15Ref.current = d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+                    setM15Ready(true);
+                    liveTick.current();
+                } else if (d.ohlc) {
+                    const c: Candle = { time: Number(d.ohlc.open_time), open: Number(d.ohlc.open), high: Number(d.ohlc.high), low: Number(d.ohlc.low), close: Number(d.ohlc.close) };
+                    const arr = m15Ref.current;
+                    const last = arr[arr.length - 1];
+                    if (last && last.time === c.time) arr[arr.length - 1] = c;
+                    else if (!last || c.time > last.time) arr.push(c);
+                }
+            }
+        )
+            .then(sub => {
+                if (off) sub.unsubscribe();
+                else unsub = sub.unsubscribe;
+            })
+            .catch(err => {
+                if (!off) setM15Error(err instanceof Error ? err.message : 'Connection error');
+            });
+        return () => {
+            off = true;
+            if (unsub) unsub();
+        };
+    }, [ws, isConnected, symbol, mode]);
 
     const categoryStrategies = STRATEGIES.filter(s => s.category === category);
     const strategy = STRATEGIES.find(s => s.id === strategyId);
@@ -255,8 +313,8 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     // ---- live analysis -------------------------------------------------------
     // The latest values, readable from the candle stream callback below without
     // re-subscribing every time something changes.
-    const ctx = useRef({ strategy, tf, kind, info, symbol, live, closed });
-    ctx.current = { strategy, tf, kind, info, symbol, live, closed };
+    const ctx = useRef({ strategy, tf, kind, info, symbol, live, closed, mode });
+    ctx.current = { strategy, tf, kind, info, symbol, live, closed, mode };
     const outcomeRef = useRef<Outcome | null>(null);
     outcomeRef.current = outcome;
     const drawKey = useRef('');
@@ -389,8 +447,28 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     // every price update from the feed (at most once a second)
     const lastTickAt = useRef(0);
     const tickTimer = useRef<number | null>(null);
+    const mtfCompute = () => {
+        if (ctx.current.mode !== 'mtf') return;
+        setMtf(analyseMtf(m15Ref.current, candlesRef.current, Math.floor(Date.now() / 1000)));
+    };
     liveTick.current = () => {
         const c = ctx.current;
+        if (c.mode === 'mtf') {
+            // M15 + M5 mode: recalculate from the real closed candles, at most once a second
+            if (!c.live || c.closed) return;
+            const wait = 1000 - (Date.now() - lastTickAt.current);
+            if (wait <= 0) {
+                lastTickAt.current = Date.now();
+                mtfCompute();
+            } else if (!tickTimer.current) {
+                tickTimer.current = window.setTimeout(() => {
+                    tickTimer.current = null;
+                    lastTickAt.current = Date.now();
+                    mtfCompute();
+                }, wait);
+            }
+            return;
+        }
         if (!c.live || !c.strategy?.ready || c.closed) return;
         const wait = 1000 - (Date.now() - lastTickAt.current);
         if (wait <= 0) {
@@ -408,12 +486,20 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     // First analysis happens by itself as soon as candles are loaded, and again when the
     // person changes market, timeframe or strategy; no button press needed.
     useEffect(() => {
+        if (mode !== 'h1') return;
         if (loading || loadError || closed || !strategy?.ready || !isConnected) return;
         aiRun.current.lastKey = '';
         drawKey.current = '';
         refresh(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading, loadError, closed, strategyId, kind, symbol, tf, isConnected]);
+    }, [loading, loadError, closed, strategyId, kind, symbol, tf, isConnected, mode]);
+
+    // M15 + M5 mode: first calculation as soon as both timeframes are loaded
+    useEffect(() => {
+        if (mode !== 'mtf' || loading || loadError || closed || !m15Ready || !isConnected) return;
+        mtfCompute();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, loading, loadError, closed, m15Ready, symbol, isConnected]);
 
     useEffect(
         () => () => {
@@ -454,6 +540,15 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
         >
             <div className='forex-trader__controls'>
                 <MarketPicker symbols={symbols} value={symbol} onChange={setSymbol} />
+                <label>
+                    <span>Mode</span>
+                    <select value={mode} onChange={e => setMode(e.target.value as 'h1' | 'mtf')}>
+                        <option value='h1'>H1 strategies (existing)</option>
+                        <option value='mtf'>M15 analysis + M5 entry</option>
+                    </select>
+                </label>
+                {mode === 'h1' && (
+                <>
                 <label className='forex-trader__tf'>
                     <span>Timeframe</span>
                     <select value={tf} onChange={e => setTf(Number(e.target.value))}>
@@ -495,6 +590,8 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                 <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
                     {aiBusy ? 'Reviewing…' : 'Re-analyse'}
                 </button>
+                </>
+                )}
             </div>
 
             <div
@@ -513,7 +610,7 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                 <ChartView ref={chartRef} pipSize={pipSize} />
                 <div className='forex-trader__chart-info'>
                     <b>{info?.underlying_symbol_name ?? symbol}</b>
-                    <span>{TIMEFRAMES.find(t => t.sec === tf)?.label}</span>
+                    <span>{mode === 'mtf' ? 'M15 + M5' : TIMEFRAMES.find(t => t.sec === tf)?.label}</span>
                     {lastPrice !== null && <span>{fmt(lastPrice)}</span>}
                     <em>times in GMT</em>
                 </div>
@@ -532,20 +629,35 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
                         Market closed — no live analysis. Pick an open market (Derived indices run all week).
                     </div>
                 )}
-                {status && (
+                {mode === 'mtf' && mtf && !closed && !loadError && (
+                    <div className={`forex-trader__badge forex-trader__badge--${mtf.signal === 'BUY' ? 'buy' : mtf.signal === 'SELL' ? 'sell' : 'wait'}`}>
+                        {mtf.signal === 'WAIT' ? 'WAIT / NO SIGNAL' : `${mtf.signal} signal`}
+                    </div>
+                )}
+                {mode === 'h1' && status && (
                     <div className={`forex-trader__badge forex-trader__badge--${tone}`}>{outcome && statusLabel(status, outcome.analysis)}</div>
                 )}
             </div>
 
             <div className='forex-trader__result'>
-                {!outcome && (
+                {mode === 'mtf' && (
+                    <MtfPanel
+                        result={mtf}
+                        market={info?.underlying_symbol_name ?? symbol}
+                        fmt={fmt}
+                        loading={loading || !m15Ready}
+                        error={loadError ?? m15Error}
+                        marketClosed={closed}
+                    />
+                )}
+                {mode === 'h1' && !outcome && (
                     <p className='forex-trader__hint'>
                         Choose a market and a strategy, then tap <b>Analyse</b>. The tool calculates the exact levels with
                         code, draws them on the chart, and asks Gemini whether the setup looks clean. Signals only — it
                         never trades, and no strategy wins every time.
                     </p>
                 )}
-                {outcome && (
+                {mode === 'h1' && outcome && (
                     <>
                         <div className='forex-trader__result-head'>
                             <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
