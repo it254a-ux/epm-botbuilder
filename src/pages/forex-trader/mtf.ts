@@ -89,6 +89,8 @@ export interface MtfResult {
     plan: MtfPlan | null;
     /** Short explanation, one point per line. */
     reasons: string[];
+    /** Identifies one confirmed setup (side + pullback extreme + broken level): stays the same while the same setup is still valid, so it is sent once. */
+    setupId: string | null;
     /** Time of the signal: the close of the confirming M5 candle (WAIT: the last closed M5 candle). Seconds, UTC. */
     signalTime: number | null;
     lastPrice: number | null;
@@ -267,6 +269,7 @@ function result(partial: Partial<MtfResult> & { reasons: string[]; m15Text: stri
         m5Status: 'no_data',
         levels: { support: null, resistance: null, prevDayHigh: null, prevDayLow: null, invalidation: null, equalHighs: null, equalLows: null },
         plan: null,
+        setupId: null,
         signalTime: null,
         lastPrice: null,
         key: '',
@@ -370,6 +373,7 @@ export function analyseMtf(m15Raw: Candle[], m5Raw: Candle[], now: number): MtfR
     return result({
         ...base,
         signal: plan.side,
+        setupId: `${plan.side}|${fmt(extreme)}|${fmt(sgn * (conf.breakLevel as number))}`,
         m5Status: 'confirmed',
         m5Text,
         plan,

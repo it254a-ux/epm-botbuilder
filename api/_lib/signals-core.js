@@ -92,6 +92,10 @@ function readConfig(env = process.env) {
         entryTouch: String(env.ENTRY_TOUCH || 'on').toLowerCase() !== 'off',
         // A touch older than this many minutes is "too late": the setup is dropped, nothing is sent.
         entryFreshSeconds: Math.round(Math.max(1, num(env.ENTRY_FRESH_MINUTES, 5)) * 60),
+        // While setups wait for their entry, one run keeps checking every WATCH_POLL_SECONDS until WATCH_LOOP_SECONDS after it started
+        // (0 = off: one check per run). The function limit is 60 s, so keep the loop under about 50.
+        watchLoopMs: Math.max(0, num(env.WATCH_LOOP_SECONDS, 48)) * 1000,
+        watchPollMs: Math.max(1, num(env.WATCH_POLL_SECONDS, 8)) * 1000,
         // How many candles a setup may wait for its entry (the engine's own setup lifetime is 24).
         waitCandles: Math.max(1, Math.floor(num(env.ENTRY_WAIT_CANDLES, 24))),
         // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.

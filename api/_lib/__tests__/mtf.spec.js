@@ -42,6 +42,11 @@ describe('analyseMtf', () => {
         expect(r.plan.stopLoss).toBeLessThan(124); // beyond the pullback low
         expect(r.signalTime).toBe(E); // the close of the confirming (last) candle
         expect(r.reasons.length).toBeGreaterThanOrEqual(3);
+        expect(r.setupId).toMatch(/^BUY\|[\d.]+\|[\d.]+$/);
+        // one candle later the same setup is still valid and has the SAME id (so the machine sends it only once)
+        const later = analyseMtf(bullM15(), bullM5([...buyM5Closes(), 125.4]), NOW);
+        expect(later.signal).toBe('BUY');
+        expect(later.setupId).toBe(r.setupId);
     });
 
     test('the same picture upside down = SELL, with the same rules and mirrored numbers', () => {

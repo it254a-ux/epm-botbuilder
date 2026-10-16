@@ -198,6 +198,7 @@ function result(partial) {
         m5Status: 'no_data',
         levels: { support: null, resistance: null, prevDayHigh: null, prevDayLow: null, invalidation: null, equalHighs: null, equalLows: null },
         plan: null,
+        setupId: null,
         signalTime: null,
         lastPrice: null,
         key: '',
@@ -296,6 +297,7 @@ function analyseMtf(m15Raw, m5Raw, now) {
     return result({
         ...base,
         signal: plan.side,
+        setupId: `${plan.side}|${fmt(extreme)}|${fmt(sgn * conf.breakLevel)}`,
         m5Status: 'confirmed',
         m5Text,
         plan,

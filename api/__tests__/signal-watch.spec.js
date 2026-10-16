@@ -73,7 +73,7 @@ let client;
 beforeEach(async () => {
     global.__sql = makeSql();
     await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache, signal_pending');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MIN_STOP_ATR: '0', ENTRY_TOUCH: 'off' }; // the older tests below check the "send as soon as ready" behaviour; the entry-touch tests turn it on
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', WATCH_STRATEGIES: '1', WATCH_TIMEFRAME: String(TF), TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MIN_STOP_ATR: '0', ENTRY_TOUCH: 'off', WATCH_LOOP_SECONDS: '0' }; // the older tests below check the "send as soon as ready" behaviour; the entry-touch tests turn it on
     client = { close: jest.fn() };
     deriv.connect.mockReset().mockResolvedValue(client);
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
@@ -534,7 +534,7 @@ describe('helpers', () => {
         expect(core.readConfig({})).toEqual({
             symbols: ['frxEURUSD'], timeframe: 3600, strategies: [1, 2, 3, 4, 5], minRr: 2, maxAgeCandles: 3,
             concurrency: 3, batchGapMs: 1000, budgetMs: 45000, telegramGapMs: 1100, priority: core.MAIN_MARKETS, minStopAtr: 1, maxRr: 0,
-            entryTouch: true, entryFreshSeconds: 300, waitCandles: 24,
+            entryTouch: true, entryFreshSeconds: 300, waitCandles: 24, watchLoopMs: 48000, watchPollMs: 8000,
         });
         expect(core.readConfig({ ENTRY_TOUCH: 'off', ENTRY_FRESH_MINUTES: '2', ENTRY_WAIT_CANDLES: '6' })).toMatchObject({ entryTouch: false, entryFreshSeconds: 120, waitCandles: 6 });
         expect(core.readConfig({ WATCH_SYMBOLS: ' a , b ', WATCH_TIMEFRAME: 'x', WATCH_STRATEGIES: '1,9,3', SIGNAL_MAX_AGE_CANDLES: '0' }))
@@ -1093,6 +1093,42 @@ describe('entry touch: the signal is sent only AFTER price reaches the entry', (
         expect(r.body.markets[0].results[0].wouldWait).toMatch(/Would wait/);
         expect(sendTelegram).not.toHaveBeenCalled();
         expect(await pendingRows()).toHaveLength(0);
+    });
+
+    test('watch loop: while a setup waits, the same run keeps looking and sends the moment price touches the entry', async () => {
+        process.env.WATCH_LOOP_SECONDS = '5';
+        process.env.WATCH_POLL_SECONDS = '1';
+        let calls = 0;
+        deriv.getCandles.mockImplementation(async (c, sym, gran) => {
+            if (gran !== 60) return candlesUpToNow();
+            calls++;
+            return calls >= 3 ? [minute(1.0849, 1.092)] : [minute(1.088, 1.092)]; // price reaches the entry on the 3rd look
+        });
+        const r = await call(handler);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+        expect(sendTelegram.mock.calls[0][0]).toContain('Price has just reached the entry');
+        expect(r.body.summary.watchPolls).toBeGreaterThanOrEqual(1);
+        expect(r.body.summary.entryHit).toBe(1);
+    });
+
+    test('watch loop: nothing waiting = no looping, the run ends at once', async () => {
+        process.env.WATCH_LOOP_SECONDS = '30';
+        deriv.getActiveSymbols.mockResolvedValue([{ underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex', exchange_is_open: 1, is_trading_suspended: 0 }]);
+        engine.analyse.mockReturnValue({ state: 'waiting_for_sweep', strategyName: 'Asian High/Low sweep', plan: null });
+        const t0 = Date.now();
+        const r = await call(handler);
+        expect(Date.now() - t0).toBeLessThan(5000);
+        expect(r.body.summary.watchPolls).toBe(0);
+    });
+
+    test('watch loop: a setup on a closed market does not keep the run waiting', async () => {
+        await call(handler);
+        process.env.WATCH_LOOP_SECONDS = '30';
+        deriv.getActiveSymbols.mockResolvedValue([{ underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex', exchange_is_open: 0, is_trading_suspended: 0 }]);
+        const t0 = Date.now();
+        const r = await call(handler);
+        expect(Date.now() - t0).toBeLessThan(5000);
+        expect(r.body.summary.watchPolls).toBe(0);
     });
 
     test('ENTRY_TOUCH=off sends as soon as the setup is ready, exactly like before', async () => {

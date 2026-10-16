@@ -176,7 +176,7 @@ module.exports = async function handler(req, res) {
 
     const started = Date.now();
     const cfg = core.readConfig();
-    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0, waitingNew: 0, entryHit: 0, droppedWaiting: 0 };
+    const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0, waitingNew: 0, entryHit: 0, droppedWaiting: 0, watchPolls: 0 };
     const report = { ok: true, dry, timeframe: cfg.timeframe, minRr: cfg.minRr, entryTouch: cfg.entryTouch, summary, markets: [], waiting: [] };
 
     let client;
@@ -244,12 +244,14 @@ module.exports = async function handler(req, res) {
         /**
          * Looks at the setups waiting for their entry. Sends the signal for the ones whose entry has just been touched;
          * drops (quietly, nothing is sent) the ones price ran away from, the ones that ran out of time and the ones that are no
-         * longer valid. onlyIds = only these (used for setups found in this very run).
+         * longer valid. quiet = a repeat check inside the same run (waiting notes are not added to the report again).
+         * Returns how many setups are still waiting on an open market (the watch loop below keeps looking while this is above 0).
          */
-        const checkWaiting = async onlyIds => {
-            if (!write || !cfg.entryTouch) return;
-            const waiting = (await store.getWaiting(sql)).filter(p => !onlyIds || onlyIds.includes(p.id));
-            if (!waiting.length) return;
+        const checkWaiting = async quiet => {
+            if (!write || !cfg.entryTouch) return 0;
+            const waiting = await store.getWaiting(sql);
+            if (!waiting.length) return 0;
+            let left = 0;
             const bySym = new Map();
             for (const p of waiting) {
                 if (!bySym.has(p.symbol)) bySym.set(p.symbol, []);
@@ -258,7 +260,7 @@ module.exports = async function handler(req, res) {
             for (const [symbol, list] of bySym) {
                 const info = bySymbol.get(symbol);
                 const now = Math.floor(Date.now() / 1000);
-                const note = (p, result, reason) => report.waiting.push({ id: p.id, symbol, side: p.side, entry: p.entry, result, ...(reason ? { reason } : {}) });
+                const note = (p, result, reason) => !(quiet && result === 'waiting') && report.waiting.push({ id: p.id, symbol, side: p.side, entry: p.entry, result, ...(reason ? { reason } : {}) });
                 const drop = async (p, status, reason) => {
                     if (await store.resolvePending(sql, p.id, status, reason)) { summary.droppedWaiting++; note(p, status, reason); }
                 };
@@ -278,7 +280,7 @@ module.exports = async function handler(req, res) {
 
                     for (const p of live) {
                         const res = entryLib.checkEntry(p, minuteCandles, p.time + p.timeframe, now, cfg.entryFreshSeconds);
-                        if (res.status === 'waiting') { note(p, 'waiting'); continue; }
+                        if (res.status === 'waiting') { left++; note(p, 'waiting'); continue; }
                         if (res.status === 'cancelled') { await drop(p, 'cancelled', res.reason); continue; }
                         if (res.status === 'missed') { await drop(p, 'missed', `Price touched the entry at ${core.gmtStamp(res.touchTime)}, too long ago to still be useful`); continue; }
 
@@ -319,14 +321,17 @@ module.exports = async function handler(req, res) {
                 } catch (err) {
                     // A problem with one market never stops the others; its setups simply stay waiting.
                     console.error(`signal-watch: checking waiting setups for ${symbol} failed:`, err.message);
-                    report.waiting.push({ symbol, result: 'error', reason: err.message });
+                    if (!quiet) report.waiting.push({ symbol, result: 'error', reason: err.message });
+                    left += list.length;
                 }
             }
+            return left;
         };
-        const newWaitingIds = [];
+        let waitingLeft = 0;
+        let newWaiting = false;
 
         // The time-critical part first: has price reached the entry of a setup that is already waiting?
-        try { await checkWaiting(null); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
+        try { waitingLeft = await checkWaiting(false); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
 
         const processSymbol = async symbol => {
             const entry = { symbol, results: [] };
@@ -407,7 +412,7 @@ module.exports = async function handler(req, res) {
                         if (pid === null) { r.skipped = 'Already waiting, dropped earlier, or already sent (duplicate)'; continue; }
                         r.waiting = `Waiting for price to touch ${engine.px(sig.entry)}`;
                         summary.waitingNew++;
-                        newWaitingIds.push(pid);
+                        newWaiting = true;
                         continue;
                     }
 
@@ -447,8 +452,17 @@ module.exports = async function handler(req, res) {
         }
 
         // Setups found in this run may already have been touched (price can be at the entry the moment they form).
-        if (newWaitingIds.length) {
-            try { await checkWaiting(newWaitingIds); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
+        if (newWaiting) {
+            try { waitingLeft = await checkWaiting(false); } catch (err) { report.waitingError = err.message; console.error('signal-watch: waiting list failed:', err.message); }
+        }
+
+        // WATCH LOOP: while setups are waiting for their entry, keep looking every few seconds until this run is nearly out of time
+        // (the cron job starts the next run right after). A run with nothing waiting ends at once, so quiet times cost almost nothing.
+        // Overlapping runs are safe: a setup can only be taken by one of them.
+        const watchUntil = started + cfg.watchLoopMs;
+        while (write && cfg.entryTouch && waitingLeft > 0 && Date.now() + cfg.watchPollMs < watchUntil) {
+            await sleep(cfg.watchPollMs);
+            try { waitingLeft = await checkWaiting(true); summary.watchPolls++; } catch (err) { report.waitingError = err.message; console.error('signal-watch: watch loop failed:', err.message); break; }
         }
     } catch (err) {
         report.ok = false;
