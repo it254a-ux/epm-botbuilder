@@ -7,6 +7,7 @@
 const engine = require('./engine');
 const core = require('./signals-core');
 const { evaluateSignal } = require('./signal-outcome');
+const mtfLib = require('./mtf');
 
 /** Candles needed before the first analysis: the same history the live watcher loads (15 days). */
 const historyCandles = tf => Math.ceil((15 * 86400) / tf);
@@ -49,6 +50,46 @@ function runBacktest({ symbol, symbolName, market, candles, timeframe, strategie
     return trades;
 }
 
+/** The M15 + M5 mode is stored with this strategy number (the H1 strategies are 1-5). Same as the live machine. */
+const MTF_STRATEGY_ID = 100;
+const MTF_STRATEGY_NAME = 'M15 analysis + M5 entry';
+const MTF_TF = 300;
+const MTF_FIRST = 100; // M5 candles needed before the first analysis
+
+/**
+ * Replays M5 + M15 history through the SAME analyseMtf the live machine and the Forex Trader page use, one closed M5 candle at
+ * a time (each step sees only what was closed at that moment). Every confirmed BUY/SELL is scored with the same outcome rules as the
+ * live results (entry = the close of the last closed M5 candle). One signal per setup, like the live machine.
+ */
+function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 86400 }) {
+    const kind = engine.marketKind(market);
+    const trades = [];
+    const seen = new Set();
+    if (m5.length < MTF_FIRST + 1 || m15.length < mtfLib.MIN_M15_CANDLES) return trades;
+    const endNow = m5[m5.length - 1].time + MTF_TF;
+    let j = -1; // newest M15 candle that was closed at "now"
+    for (let i = MTF_FIRST - 1; i < m5.length; i++) {
+        const now = m5[i].time + MTF_TF;
+        while (j + 1 < m15.length && m15[j + 1].time + mtfLib.M15_SEC <= now) j++;
+        if (j + 1 < mtfLib.MIN_M15_CANDLES) continue;
+        const m5w = m5.slice(Math.max(0, i - 299), i + 1);
+        const m15w = m15.slice(Math.max(0, j - 399), j + 1);
+        const r = mtfLib.analyseMtf(m15w, m5w, now);
+        if (r.signal === 'WAIT' || !r.plan || !r.setupId) continue;
+        if (seen.has(r.setupId)) continue;
+        seen.add(r.setupId);
+        const atr = engine.atr(m5w, 14);
+        const sig = { symbol, strategyId: MTF_STRATEGY_ID, timeframe: MTF_TF, side: r.plan.side, entry: r.plan.entry, stopLoss: r.plan.stopLoss, takeProfit: r.plan.takeProfit, rr: r.plan.rr, time: m5[i].time };
+        const outcome = evaluateSignal(sig, m5.slice(i + 1), endNow, expirySeconds);
+        trades.push({
+            symbol, symbolName: symbolName || symbol, kind, strategyId: MTF_STRATEGY_ID, strategyName: MTF_STRATEGY_NAME, side: r.plan.side,
+            rr: r.plan.rr, stopAtr: atr ? r.plan.risk / atr : null, age: 0, time: m5[i].time, hourUtc: new Date(now * 1000).getUTCHours(),
+            status: outcome ? outcome.status : 'open',
+        });
+    }
+    return trades;
+}
+
 const round = (n, d = 2) => (n === null || !Number.isFinite(n) ? null : Math.round(n * 10 ** d) / 10 ** d);
 
 /**
@@ -67,8 +108,15 @@ function summarise(trades) {
         wins: wins.length,
         losses: losses.length,
         notTriggered: trades.filter(t => t.status === 'not_triggered').length,
+        // Setups price actually reached (entered): with entry-touch on (the default) only these are sent to Telegram.
+        touched: decided + trades.filter(t => t.status === 'expired').length,
         expired: trades.filter(t => t.status === 'expired').length,
         open: trades.filter(t => t.status === 'open').length,
+        touchRate: (() => {
+            const touched = decided + trades.filter(t => t.status === 'expired').length;
+            const never = trades.filter(t => t.status === 'not_triggered').length;
+            return touched + never ? round((touched / (touched + never)) * 100, 1) : null;
+        })(),
         winRate: decided ? round((wins.length / decided) * 100, 1) : null,
         avgWinRR: wins.length ? round(winR / wins.length) : null,
         expectancyR: decided ? round((winR - losses.length) / decided, 3) : null,
@@ -120,6 +168,7 @@ function buildReport(trades) {
     if (overall.decided < 30) notes.push(`Only ${overall.decided} trade${overall.decided === 1 ? ' was' : 's were'} decided (hit take profit or stop loss). That is too few for reliable conclusions: add markets or days (up to &days=730) before acting on any number below.`);
     notes.push('Spreads, commissions and slippage are NOT included: real results are lower than shown. A result near 0R here is a loss in real trading.');
     notes.push('The whatIf rows were not planned before seeing the data. Only trust a rule if it also helps in most periods (see stopAtLeast1ByPeriod) and in markets you did not use to choose it.');
+    notes.push('Entry touch: with the default setting a signal is sent only after price reaches the entry. "touched" counts the setups price reached (these would have been sent); "notTriggered" are setups that never reached their entry (these would NOT have been sent); touchRate is touched / (touched + notTriggered). Wins and losses are the same either way.');
     notes.push('Not replayed: historical news, and the still-forming candle. Results use the same rules as the results messages in Telegram (a candle touching both stop and target counts as a loss).');
     return {
         overall,
@@ -138,4 +187,4 @@ function buildReport(trades) {
     };
 }
 
-module.exports = { runBacktest, summarise, group, buildReport, quarterOf, historyCandles, sessionOf, rrBucket, stopBucket };
+module.exports = { runMtfBacktest, runBacktest, summarise, group, buildReport, quarterOf, historyCandles, sessionOf, rrBucket, stopBucket };

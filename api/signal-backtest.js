@@ -12,6 +12,7 @@
 //        &minRr=2 &maxAge=3             what-if: override the live minimum reward / freshness
 //        &minStopAtr=0 &maxRr=8         what-if: override the live minimum stop size in ATR (0 = off) / reward cap
 //        &trades=1                      also list the latest 100 trades
+//        &mode=mtf                      test the M15 analysis + M5 entry mode instead of the H1 strategies (default 30 days, up to 90)
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
 const core = require('./_lib/signals-core');
@@ -34,8 +35,9 @@ module.exports = async function handler(req, res) {
     const started = Date.now();
     const q = req.query || {};
     const live = core.readConfig();
-    const timeframe = Math.max(60, numOr(q.tf, live.timeframe));
-    const days = Math.min(730, Math.max(5, numOr(q.days, 180)));
+    const mtfMode = q.mode === 'mtf';
+    const timeframe = mtfMode ? 300 : Math.max(60, numOr(q.tf, live.timeframe));
+    const days = mtfMode ? Math.min(90, Math.max(5, numOr(q.days, 30))) : Math.min(730, Math.max(5, numOr(q.days, 180)));
     const strategies = q.strategies ? String(q.strategies).split(',').map(Number).filter(n => n >= 1 && n <= 5) : live.strategies;
     const cfg = {
         ...live, timeframe, minRr: numOr(q.minRr, live.minRr), maxAgeCandles: numOr(q.maxAge, live.maxAgeCandles),
@@ -51,7 +53,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const out = { ok: true, timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
+    const out = { ok: true, mode: mtfMode ? 'mtf (M15 analysis + M5 entry)' : 'h1 strategies', timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
     const trades = [];
     try {
         const active = await deriv.getActiveSymbols(client);
@@ -76,9 +78,26 @@ module.exports = async function handler(req, res) {
         }
 
         const window = bt.historyCandles(timeframe);
+        const oneMtf = async (symbol, meta) => {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const stats = {};
+            const rawM5 = await deriv.getCandlesBack(client, symbol, 300, 2 + days, stats);
+            const rawM15 = await deriv.getCandlesBack(client, symbol, 900, 6 + days);
+            const m5 = rawM5.filter(c => c.time + 300 <= nowSec);
+            const m15 = rawM15.filter(c => c.time + 900 <= nowSec);
+            out.coverage.push({
+                symbol, candles: m5.length, requested: stats.wanted, pages: stats.pages, m15Candles: m15.length,
+                from: m5.length ? core.gmtStamp(m5[0].time) : null, to: m5.length ? core.gmtStamp(m5[m5.length - 1].time + 300) : null,
+                daysReplayed: Math.max(0, Math.round(((m5.length - 100) * 300) / 86400)),
+            });
+            if (m5.length < 101 || m15.length < 60) { out.skipped.push({ symbol, reason: `Only ${m5.length} M5 and ${m15.length} M15 candles available` }); return; }
+            trades.push(...bt.runMtfBacktest({ symbol, symbolName: meta.underlying_symbol_name, market: meta.market, m5, m15, expirySeconds }));
+            out.symbolsTested++;
+        };
         const one = async symbol => {
             const meta = info.get(symbol);
             if (!meta) { out.skipped.push({ symbol, reason: 'Not in the Deriv market list' }); return; }
+            if (mtfMode) return oneMtf(symbol, meta);
             const nowSec = Math.floor(Date.now() / 1000);
             const stats = {};
             const raw = await deriv.getCandlesBack(client, symbol, timeframe, 15 + days, stats);

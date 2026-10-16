@@ -4,11 +4,13 @@
 const { PGlite } = require('@electric-sql/pglite');
 
 jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
+jest.mock('../_lib/mtf', () => ({ ...jest.requireActual('../_lib/mtf'), analyseMtf: jest.fn() }));
 jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandlesBack: jest.fn() }));
 jest.mock('../_lib/engine', () => ({ ...jest.requireActual('../_lib/engine'), analyse: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
 const engine = require('../_lib/engine');
+const mtfLib = require('../_lib/mtf');
 const bt = require('../_lib/backtest');
 const handler = require('../signal-backtest');
 
@@ -30,7 +32,7 @@ function readyAt(indexes, planOver, bosAgeCandles = 0) {
 }
 const run = (candles, extra = {}) => bt.runBacktest({ symbol: 'frxEURUSD', symbolName: 'EUR/USD', market: 'forex', candles, timeframe: TF, strategies: [1], cfg: CFG, window: 5, ...extra });
 
-beforeEach(() => engine.analyse.mockReset());
+beforeEach(() => { engine.analyse.mockReset(); mtfLib.analyseMtf.mockReset().mockReturnValue({ signal: 'WAIT', plan: null, setupId: null }); });
 
 describe('scoring trades like the live results', () => {
     test('entered then target reached = hit_tp', () => {
@@ -116,11 +118,59 @@ describe('same rules as the live watcher', () => {
     });
 });
 
+describe('M15 + M5 replay', () => {
+    const M5 = 300;
+    const B5 = Date.UTC(2026, 9, 13, 0, 0) / 1000;
+    const m5s = (n, over = {}) => Array.from({ length: n }, (_, i) => ({ time: B5 + i * M5, open: 101, high: 101.2, low: 100.8, close: 101, ...(over[i] || {}) }));
+    const m15s = Array.from({ length: 140 }, (_, k) => ({ time: B5 - 100 * 900 + k * 900, open: 101, high: 101.5, low: 100.5, close: 101 }));
+    const buyAt = indexes => mtfLib.analyseMtf.mockImplementation((m15, m5w) => {
+        const last = m5w[m5w.length - 1].time;
+        return indexes.some(i => B5 + i * M5 === last)
+            ? { signal: 'BUY', plan: { side: 'BUY', entry: 100, stopLoss: 99, takeProfit: 103, rr: 3, risk: 1 }, setupId: 'BUY|99|100' }
+            : { signal: 'WAIT', plan: null, setupId: null };
+    });
+    const go = (m5, extra = {}) => bt.runMtfBacktest({ symbol: 'frxEURUSD', symbolName: 'EUR/USD', market: 'forex', m5, m15: m15s, ...extra });
+
+    test('a confirmed BUY is scored like a live result: entered, then target = hit_tp', () => {
+        buyAt([110]);
+        const t = go(m5s(140, { 111: { low: 99.8, high: 101 }, 112: { high: 103.5 } }));
+        expect(t).toHaveLength(1);
+        expect(t[0]).toMatchObject({ status: 'hit_tp', side: 'BUY', rr: 3, strategyId: 100, strategyName: 'M15 analysis + M5 entry' });
+    });
+    test('the same setup on the next candles counts once (like the live machine)', () => {
+        buyAt([110, 111, 112]);
+        expect(go(m5s(140, { 111: { low: 99.8, high: 101 }, 112: { high: 103.5 } }))).toHaveLength(1);
+    });
+    test('stop loss after entry = hit_sl', () => {
+        buyAt([110]);
+        expect(go(m5s(140, { 111: { low: 98.5, high: 101 } }))[0].status).toBe('hit_sl');
+    });
+    test('only closed history is shown to the analysis at each step', () => {
+        buyAt([]);
+        go(m5s(120));
+        for (const [m15w, m5w] of mtfLib.analyseMtf.mock.calls) {
+            const now = m5w[m5w.length - 1].time + M5;
+            expect(m15w[m15w.length - 1].time + 900).toBeLessThanOrEqual(now);
+        }
+    });
+    test('WAIT everywhere, or too little data = no trades, no crash', () => {
+        expect(go(m5s(140))).toEqual([]);
+        expect(go(m5s(50))).toEqual([]);
+        expect(bt.runMtfBacktest({ symbol: 'x', market: 'forex', m5: m5s(140), m15: m15s.slice(0, 10) })).toEqual([]);
+    });
+});
+
 describe('the numbers', () => {
     const T = (status, rr = 2, over = {}) => ({ status, rr, strategyId: 1, strategyName: 'S', side: 'BUY', kind: 'forex', symbol: 'A', symbolName: 'A', hourUtc: 9, age: 0, stopAtr: 1, ...over });
     test('win rate, expectancy and profit factor', () => {
         const s = bt.summarise([T('hit_tp'), T('hit_tp'), T('hit_tp'), T('hit_sl'), T('not_triggered'), T('expired'), T('open')]);
         expect(s).toMatchObject({ signals: 7, decided: 4, wins: 3, losses: 1, notTriggered: 1, expired: 1, open: 1, winRate: 75, avgWinRR: 2, expectancyR: 1.25, profitFactor: 6 });
+    });
+    test('how many setups price actually reached (these are the ones sent with entry-touch on)', () => {
+        const s = bt.summarise([T('hit_tp'), T('hit_sl'), T('expired'), T('not_triggered'), T('not_triggered'), T('open')]);
+        expect(s).toMatchObject({ signals: 6, touched: 3, notTriggered: 2, touchRate: 60 });
+        expect(bt.summarise([T('open')]).touchRate).toBeNull();
+        expect(bt.buildReport([T('hit_tp')]).notes.join(' ')).toMatch(/Entry touch/);
     });
     test('a strategy that wins 1 in 3 at 1:2 breaks even (0R)', () => {
         expect(bt.summarise([T('hit_tp', 2), T('hit_sl'), T('hit_sl')]).expectancyR).toBe(0);
@@ -229,6 +279,23 @@ describe('the endpoint', () => {
         expect(r.body.byStrategy[0].name).toBe('1. Test');
         expect(r.body.bySymbol).toHaveLength(2);
         expect(r.body.latestTrades).toBeUndefined();
+    });
+    test('mode=mtf replays the M15 + M5 rules on 5-minute candles', async () => {
+        const end5 = Math.floor(Date.now() / 1000 / 300) * 300 - 600;
+        const m5 = Array.from({ length: 700 }, (_, i) => ({ time: end5 - (699 - i) * 300, open: 101, high: 101.2, low: 100.8, close: 101 })).map((c, i) => (i === 401 ? { ...c, low: 99.8, high: 101 } : i === 402 ? { ...c, high: 103.5 } : c));
+        const end15 = Math.floor(Date.now() / 1000 / 900) * 900 - 1800;
+        const m15 = Array.from({ length: 400 }, (_, i) => ({ time: end15 - (399 - i) * 900, open: 101, high: 101.5, low: 100.5, close: 101 }));
+        deriv.getCandlesBack.mockReset().mockImplementation(async (c, symbol, gran) => (gran === 300 ? m5 : m15));
+        mtfLib.analyseMtf.mockImplementation((a, b) => (b[b.length - 1].time === m5[400].time
+            ? { signal: 'BUY', plan: { side: 'BUY', entry: 100, stopLoss: 99, takeProfit: 103, rr: 3, risk: 1 }, setupId: 'BUY|99|100' }
+            : { signal: 'WAIT', plan: null, setupId: null }));
+        const r = await call({ symbols: 'frxEURUSD', mode: 'mtf' });
+        expect(r.status).toBe(200);
+        expect(r.body.mode).toMatch(/mtf/);
+        expect(r.body.timeframe).toBe(300);
+        expect(r.body.symbolsTested).toBe(1);
+        expect(r.body.overall).toMatchObject({ signals: 1, wins: 1, touched: 1, touchRate: 100 });
+        expect(r.body.byStrategy[0].name).toBe('100. M15 analysis + M5 entry');
     });
     test('the report says how much history each market really had', async () => {
         deriv.getCandlesBack.mockImplementation(async (c, symbol, tf, days, stats) => { Object.assign(stats, { pages: 2, wanted: 17520, perPage: [1000, 1000] }); return recentCandles; });
