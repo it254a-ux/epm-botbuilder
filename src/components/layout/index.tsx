@@ -33,7 +33,26 @@ const Layout = observer(() => {
     const main_app_was_shown = useRef(false);
     if (is_main_app_route) main_app_was_shown.current = true;
     if (!is_main_app_route && !is_info_route) main_app_was_shown.current = false; // e.g. /dtrader: same as before
-    const keep_main_app = is_main_app_route || (is_info_route && main_app_was_shown.current);
+    // Landing straight on an info page: once the loading video is gone, start the main
+    // app quietly in the background so the other pages are ready (and never reload) later.
+    const [warm_app, setWarmApp] = useState(false);
+    useEffect(() => {
+        if (!is_info_route) {
+            if (!is_main_app_route) setWarmApp(false); // e.g. /dtrader: same as before
+            return undefined;
+        }
+        if (warm_app) return undefined;
+        let waited = 0;
+        const timer = window.setInterval(() => {
+            waited += 1000;
+            if (waited >= 3000 && !document.getElementById('epm-bg')) {
+                setWarmApp(true);
+                window.clearInterval(timer);
+            }
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [is_info_route, is_main_app_route, warm_app]);
+    const keep_main_app = is_main_app_route || (is_info_route && (main_app_was_shown.current || warm_app));
     const main_app_hidden = keep_main_app && !is_main_app_route;
 
     // Coming back from an info page: let charts / the bot workspace re-measure.
