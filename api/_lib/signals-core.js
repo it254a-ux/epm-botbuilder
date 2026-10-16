@@ -57,7 +57,7 @@ function readConfig(env = process.env) {
         // Only send setups whose break of structure happened at most this many candles ago.
         maxAgeCandles: Number.isFinite(maxAge) && maxAge >= 0 ? maxAge : 3,
         // Pacing against Deriv's limit (220 "other" requests per minute): 3 markets at a time, 1 second apart.
-        // Checked first in every run (gold first). Override with WATCH_PRIORITY=frxXAUUSD,frxEURUSD,...
+        // Checked first in every run (gold first); also what the page's Focus markets button ticks. Override with WATCH_PRIORITY=frxXAUUSD,frxEURUSD,...
         priority: list(env.WATCH_PRIORITY, MAIN_MARKETS.join(',')),
         concurrency: Math.min(10, Math.max(1, num(env.WATCH_CONCURRENCY, 3))),
         batchGapMs: Math.max(0, num(env.WATCH_BATCH_GAP_MS, 1000)),
@@ -68,8 +68,8 @@ function readConfig(env = process.env) {
     };
 }
 
-/** The main markets, in priority order (gold first). They are always checked first in every run. */
-const MAIN_MARKETS = ['frxXAUUSD', 'frxEURUSD', 'frxGBPUSD', 'frxUSDJPY', 'frxAUDUSD', 'frxUSDCAD', 'frxUSDCHF', 'frxNZDUSD', 'cryBTCUSD', 'cryETHUSD', 'OTC_NDX', 'OTC_DJI', 'OTC_SPC'];
+/** The focus markets, in priority order (gold first): the only ones to watch until the engine is proven. */
+const MAIN_MARKETS = ['frxXAUUSD', 'frxUSDCAD', 'frxGBPUSD', 'frxEURUSD', 'cryBTCUSD'];
 
 /**
  * The order markets are checked in: priority markets first (in the priority order given), then the

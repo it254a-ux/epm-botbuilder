@@ -52,7 +52,7 @@
   <div id="tools" class="box" hidden>
     <div class="row">
       <input id="search" type="search" class="grow" placeholder="Search markets, e.g. EUR or Bitcoin">
-      <button class="ghost" id="main" title="Gold, the major forex pairs, Bitcoin, Ethereum and the US indices">⭐ Main markets only</button>
+      <button class="ghost" id="main" title="Gold, USD/CAD, GBP/USD, EUR/USD and Bitcoin">⭐ Focus markets only</button>
       <button class="ghost" id="all">Tick all</button>
       <button class="ghost" id="none">Untick all</button>
     </div>
@@ -162,7 +162,7 @@
     var n = 0;
     Object.keys(checks).forEach(function (s) { var on = mainList.indexOf(s) !== -1; checks[s].checked = on; if (on) n++; });
     updateCount();
-    say(n + ' main markets ticked (gold first). Press Save to keep them.');
+    say(n + ' focus markets ticked (gold first). Press Save to keep them.');
   };
   document.getElementById('all').onclick = function () { Object.keys(checks).forEach(function (s) { if (checks[s].parentNode.style.display !== 'none') checks[s].checked = true; }); updateCount(); };
   document.getElementById('none').onclick = function () { Object.keys(checks).forEach(function (s) { checks[s].checked = false; }); updateCount(); };
