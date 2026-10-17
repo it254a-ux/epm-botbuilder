@@ -39,10 +39,11 @@
         position: relative;
         min-width: 0;
         min-height: 0;
-        border-radius: 12px;
+        border-radius: 16px;
         overflow: hidden;
         background: var(--general-main-1);
-        border: 1px solid var(--border-normal);
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 11%, transparent);
+        box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.55);
 
         @media (max-width: 900px) {
             flex: none;
@@ -77,15 +78,27 @@
         }
     }
 
+    // =====================================================================================
+    // Side panel: dark-glass cards with a fine gold edge, calm type, compact controls
+    // =====================================================================================
+    --fl-gold: #d4af37;
+    --fl-gold-soft: color-mix(in srgb, #d4af37 22%, transparent);
+    --fl-card: color-mix(in srgb, var(--general-main-1) 88%, transparent);
+    --fl-field: color-mix(in srgb, var(--general-section-1) 92%, transparent);
+    --fl-line: color-mix(in srgb, var(--text-prominent) 11%, transparent);
+    --fl-buy: #10b981;
+    --fl-sell: #ef4444;
+
     &__side {
         min-width: 0;
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
         overflow-y: auto;
         overscroll-behavior-y: contain;
-        padding-right: 2px;
+        padding: 0 2px 2px 0;
+        scrollbar-width: thin;
 
         @media (max-width: 900px) {
             flex: none;
@@ -94,10 +107,26 @@
     }
 
     &__card {
-        background: var(--general-main-1);
-        border: 1px solid var(--border-normal);
-        border-radius: 12px;
-        padding: 10px 12px;
+        position: relative;
+        padding: 12px 14px 14px;
+        border-radius: 16px;
+        background: var(--fl-card);
+        border: 1px solid var(--fl-line);
+        box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.55), inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+
+        // a thin gold line along the top edge
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 18px;
+            right: 18px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--fl-gold), transparent);
+            opacity: 0.7;
+        }
     }
 
     &__card-head {
@@ -105,12 +134,25 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
 
         h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin: 0;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+
+            &::before {
+                content: '';
+                width: 3px;
+                height: 14px;
+                border-radius: 2px;
+                background: linear-gradient(180deg, var(--fl-gold), #f3e2a0);
+            }
         }
     }
 
@@ -118,24 +160,27 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 8px 12px;
-        border-radius: 12px;
-        background: var(--general-main-1);
-        border: 1px solid var(--border-normal);
+        padding: 9px 14px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, color-mix(in srgb, #3b82f6 16%, var(--fl-card)), var(--fl-card));
+        border: 1px solid color-mix(in srgb, #3b82f6 40%, transparent);
 
         b {
             margin-left: auto;
-            font-size: 15px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            font-variant-numeric: tabular-nums;
         }
 
         button {
-            border: 1px solid var(--border-normal);
+            border: 1px solid var(--fl-line);
             background: transparent;
             color: inherit;
-            border-radius: 8px;
-            padding: 5px 9px;
-            font-size: 12px;
-            font-weight: 600;
+            border-radius: 999px;
+            padding: 4px 11px;
+            font-size: 11px;
+            font-weight: 700;
             cursor: pointer;
 
             &:disabled {
@@ -145,33 +190,35 @@
         }
 
         &.is-real {
-            border-color: #ef4444;
-            background: color-mix(in srgb, #ef4444 12%, var(--general-main-1));
+            border-color: var(--fl-sell);
+            background: linear-gradient(135deg, color-mix(in srgb, #ef4444 20%, var(--fl-card)), var(--fl-card));
         }
     }
 
     &__badge {
-        padding: 3px 9px;
+        padding: 3px 10px;
         border-radius: 999px;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 800;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.1em;
         color: #fff;
-        background: #3b82f6;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        box-shadow: 0 4px 12px -4px #3b82f6;
 
         .is-real & {
-            background: #ef4444;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            box-shadow: 0 4px 12px -4px #ef4444;
         }
     }
 
     &__notice {
         margin: 0;
-        padding: 7px 10px;
-        border-radius: 10px;
+        padding: 8px 12px;
+        border-radius: 12px;
         font-size: 12px;
         cursor: pointer;
-        background: color-mix(in srgb, #3b82f6 14%, var(--general-main-1));
-        border: 1px solid #3b82f6;
+        background: color-mix(in srgb, #3b82f6 14%, var(--fl-card));
+        border: 1px solid color-mix(in srgb, #3b82f6 60%, transparent);
     }
 
     // ---- trade controls
@@ -184,7 +231,7 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
 
     &__go {
@@ -192,20 +239,26 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-        min-height: 54px;
+        min-height: 38px;
+        padding: 0 10px;
         border: 0;
         border-radius: 12px;
-        font-size: 18px;
+        font-size: 13px;
         font-weight: 800;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.1em;
         color: #fff;
         cursor: pointer;
         touch-action: manipulation; // no double-tap zoom delay on phones: taps register at once
         user-select: none;
-        transition: transform 0.05s, filter 0.15s;
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
+        transition: transform 0.05s, filter 0.15s, box-shadow 0.15s;
+
+        span {
+            font-size: 10px;
+        }
 
         small {
-            font-size: 12px;
+            font-size: 11px;
             opacity: 0.85;
         }
 
@@ -223,28 +276,33 @@
         }
 
         &--buy {
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: linear-gradient(135deg, #34d399, #059669);
+            box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 8px 18px -10px #10b981;
         }
 
         &--sell {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
+            background: linear-gradient(135deg, #f87171, #dc2626);
+            box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 8px 18px -10px #ef4444;
         }
     }
 
     &__grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: 10px 8px;
 
         label,
         .forex-live__count {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 4px;
             min-width: 0;
 
             span {
-                font-size: 11px;
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
                 color: var(--text-less-prominent);
             }
         }
@@ -256,63 +314,80 @@
         display: block;
         width: 100%;
         min-width: 0;
-        height: 38px;
+        height: 34px;
         margin: 0;
         padding: 0 10px;
-        border-radius: 8px;
+        border-radius: 10px;
         font-size: 13px;
-        line-height: 36px;
+        font-weight: 600;
+        line-height: 32px;
         text-align: left;
         vertical-align: middle;
         color: var(--text-general);
-        background-color: var(--general-section-1);
-        border: 1px solid var(--border-normal);
+        background-color: var(--fl-field);
+        border: 1px solid var(--fl-line);
+        transition: border-color 0.15s, box-shadow 0.15s;
+
+        &:focus {
+            outline: none;
+            border-color: var(--fl-gold);
+            box-shadow: 0 0 0 3px var(--fl-gold-soft);
+        }
     }
 
     &__chips {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 6px;
-        margin-top: 10px;
+        margin-top: 12px;
 
         > button {
-            height: 32px;
+            height: 28px;
             min-width: 0;
             padding: 0;
             border-radius: 999px;
             font-size: 12px;
-            font-weight: 600;
-            line-height: 30px;
+            font-weight: 700;
+            line-height: 26px;
             text-align: center;
             cursor: pointer;
             color: inherit;
             background: transparent;
-            border: 1px solid var(--border-normal);
+            border: 1px solid var(--fl-line);
+            transition: background 0.15s, border-color 0.15s;
+
+            &:hover {
+                border-color: var(--fl-gold);
+            }
 
             &.is-on {
-                color: #fff;
-                background: #3b82f6;
-                border-color: #3b82f6;
+                color: #1a1405;
+                background: linear-gradient(135deg, #f3e2a0, var(--fl-gold));
+                border-color: var(--fl-gold);
             }
         }
     }
 
     &__count {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 110px;
         align-items: center;
         gap: 8px;
         margin-top: 10px;
 
         span {
-            font-size: 11px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
             color: var(--text-less-prominent);
         }
     }
 
     &__hint {
-        margin: 8px 0 0;
+        margin: 10px 0 0;
         font-size: 11px;
+        line-height: 1.45;
         color: var(--text-less-prominent);
     }
 
@@ -330,24 +405,31 @@
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 6px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
 
         > div {
-            padding: 6px 8px;
-            border-radius: 8px;
-            background: var(--general-section-1);
             display: flex;
             flex-direction: column;
+            gap: 1px;
             min-width: 0;
+            padding: 7px 10px;
+            border-radius: 12px;
+            background: var(--fl-field);
+            border: 1px solid var(--fl-line);
         }
 
         small {
             font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
             color: var(--text-less-prominent);
         }
 
         b {
             font-size: 15px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
         }
 
         em {
@@ -371,24 +453,29 @@
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
 
         button {
             flex: 1 1 auto;
-            height: 30px;
+            height: 28px;
             padding: 0 10px;
-            border-radius: 8px;
-            font-size: 12px;
+            border-radius: 999px;
+            font-size: 11px;
             font-weight: 700;
             cursor: pointer;
             color: inherit;
             background: transparent;
-            border: 1px solid var(--border-normal);
+            border: 1px solid var(--fl-line);
+            transition: border-color 0.15s;
+
+            &:hover:not(:disabled) {
+                border-color: var(--fl-gold);
+            }
 
             &.is-main {
                 color: #fff;
-                background: #ef4444;
-                border-color: #ef4444;
+                background: linear-gradient(135deg, #f87171, #dc2626);
+                border-color: transparent;
             }
 
             &:disabled {
@@ -399,7 +486,7 @@
     }
 
     &__empty {
-        margin: 4px 0;
+        margin: 4px 0 0;
         font-size: 12px;
         color: var(--text-less-prominent);
     }
@@ -410,7 +497,7 @@
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 5px;
         max-height: 260px;
         overflow-y: auto;
     }
@@ -420,40 +507,44 @@
         grid-template-columns: 64px minmax(0, 1fr) auto auto;
         align-items: center;
         gap: 8px;
-        padding: 5px 8px;
-        border-radius: 8px;
-        border-left: 3px solid var(--border-normal);
-        background: var(--general-section-1);
+        padding: 6px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--fl-line);
+        border-left: 3px solid var(--fl-line);
+        background: var(--fl-field);
 
         &--buy {
-            border-left-color: #10b981;
+            border-left-color: var(--fl-buy);
         }
 
         &--sell {
-            border-left-color: #ef4444;
+            border-left-color: var(--fl-sell);
         }
 
         button {
             height: 24px;
-            padding: 0 9px;
-            border-radius: 6px;
+            padding: 0 10px;
+            border-radius: 999px;
             font-size: 11px;
             font-weight: 700;
             cursor: pointer;
             color: inherit;
             background: transparent;
-            border: 1px solid var(--border-normal);
+            border: 1px solid var(--fl-line);
 
             &:disabled {
                 opacity: 0.4;
             }
         }
-    }
 
-    &__side {
-        .forex-live__row .forex-live__side {
+        // the BUY / SELL label inside a row (it shares its class name with the side panel)
+        .forex-live__side {
+            display: inline;
+            overflow: visible;
+            padding: 0;
             font-size: 11px;
             font-weight: 800;
+            letter-spacing: 0.06em;
         }
     }
 
@@ -476,7 +567,7 @@
     }
 
     &__toggle {
-        margin-top: 8px;
+        margin-top: 10px;
         padding: 0;
         border: 0;
         background: none;
@@ -498,8 +589,10 @@
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 3px;
+        gap: 4px;
         font-size: 12px;
+        max-height: 150px;
+        overflow-y: auto;
 
         .is-err {
             color: var(--text-loss-danger);
@@ -516,8 +609,11 @@
         overflow: hidden;
 
         > summary {
-            padding: 10px 12px;
+            padding: 12px 14px;
+            font-size: 13px;
             font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
             cursor: pointer;
         }
 
