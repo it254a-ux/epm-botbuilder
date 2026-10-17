@@ -146,17 +146,18 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade 
                         {s}
                     </button>
                 ))}
-                <label className='forex-live__count'>
-                    <span>Trades per click</span>
-                    <select value={prefs.count} onChange={e => set({ count: Number(e.target.value) })}>
-                        {COUNTS.map(c => (
-                            <option key={c} value={c}>
-                                {c}
-                            </option>
-                        ))}
-                    </select>
-                </label>
             </div>
+
+            <label className='forex-live__count'>
+                <span>Trades per click</span>
+                <select value={prefs.count} onChange={e => set({ count: Number(e.target.value) })}>
+                    {COUNTS.map(c => (
+                        <option key={c} value={c}>
+                            {c}
+                        </option>
+                    ))}
+                </select>
+            </label>
 
             <p className='forex-live__hint'>
                 No time limit: a trade stays open until you close it, or until its stop loss / take profit is reached. You can never lose more than the stake.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { useApiBase } from '@/hooks/useApiBase';
@@ -29,6 +29,33 @@ const ForexLive = observer(() => {
     const [chartType, setChartType] = useState('candles');
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
     const [notice, setNotice] = useState('');
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [fitHeight, setFitHeight] = useState<number | null>(null);
+
+    // keep the page exactly as tall as the visible area, so nothing runs past the bottom of the screen
+    useEffect(() => {
+        const measure = () => {
+            const el = rootRef.current;
+            if (!el) return;
+            const vh = window.visualViewport?.height ?? window.innerHeight;
+            const top = el.getBoundingClientRect().top;
+            // the tab may be hidden (kept alive in the background): a hidden page has no position, so leave the CSS height alone
+            setFitHeight(el.offsetParent === null ? null : Math.max(320, Math.floor(vh - top - 4)));
+        };
+        measure();
+        const t = window.setTimeout(measure, 300);
+        const t2 = window.setTimeout(measure, 1200);
+        window.addEventListener('resize', measure);
+        window.addEventListener('orientationchange', measure);
+        window.visualViewport?.addEventListener('resize', measure);
+        return () => {
+            window.clearTimeout(t);
+            window.clearTimeout(t2);
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('orientationchange', measure);
+            window.visualViewport?.removeEventListener('resize', measure);
+        };
+    }, []);
 
     const currency = client?.currency || (authData as any)?.currency || '';
     const balance = client?.balance ?? (authData as any)?.balance;
@@ -78,7 +105,7 @@ const ForexLive = observer(() => {
     const onPlan = useCallback((p: ReportedPlan | null, s: string) => setPlan({ plan: p, symbol: s }), []);
 
     return (
-        <div className='forex-live'>
+        <div className='forex-live' ref={rootRef} style={fitHeight ? { height: `${fitHeight}px` } : undefined}>
             <div className='forex-live__chartcol'>
                 <LiveChart
                     symbol={symbol}
@@ -100,23 +127,19 @@ const ForexLive = observer(() => {
             </div>
 
             <aside className='forex-live__side'>
-                <section className={`forex-live__account${demo ? ' is-demo' : ' is-real'}`}>
-                    {isAuthorized ? (
-                        <>
-                            <span className='forex-live__badge'>{demo ? 'DEMO' : 'REAL MONEY'}</span>
-                            <b>
-                                {balance !== undefined && balance !== null && balance !== '' ? Number(balance).toFixed(2) : '—'} {currency}
-                            </b>
-                            {!demo && demoAccount && (
-                                <button type='button' disabled={botRunning} onClick={switchToDemo} title={botRunning ? 'Stop the running bot first' : ''}>
-                                    Switch to Demo
-                                </button>
-                            )}
-                        </>
-                    ) : (
-                        <span>Log in at the top right to start trading.</span>
-                    )}
-                </section>
+                {isAuthorized && (
+                    <section className={`forex-live__account${demo ? ' is-demo' : ' is-real'}`}>
+                        <span className='forex-live__badge'>{demo ? 'DEMO' : 'REAL MONEY'}</span>
+                        <b>
+                            {balance !== undefined && balance !== null && balance !== '' ? Number(balance).toFixed(2) : '—'} {currency}
+                        </b>
+                        {!demo && demoAccount && (
+                            <button type='button' disabled={botRunning} onClick={switchToDemo} title={botRunning ? 'Stop the running bot first' : ''}>
+                                Switch to Demo
+                            </button>
+                        )}
+                    </section>
+                )}
                 {notice && (
                     <p className='forex-live__notice' role='status' onClick={() => setNotice('')}>
                         {notice}
