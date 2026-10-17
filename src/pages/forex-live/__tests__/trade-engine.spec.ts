@@ -39,7 +39,7 @@ describe('buildBuyRequest', () => {
     it('opens a BUY as MULTUP with no expiry and the stake as the price', () => {
         const r = buildBuyRequest(base);
         expect(r).toEqual({
-            buy: 1,
+            buy: '1',
             price: 10,
             parameters: { contract_type: 'MULTUP', underlying_symbol: 'frxEURUSD', currency: 'USD', basis: 'stake', amount: 10, multiplier: 100 },
         });

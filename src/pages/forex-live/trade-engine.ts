@@ -34,7 +34,7 @@ export interface TradeInput {
 }
 
 export interface BuyRequest {
-    buy: 1;
+    buy: '1';
     price: number;
     parameters: {
         contract_type: MultiplierContract;
@@ -72,7 +72,7 @@ export function buildBuyRequest(t: TradeInput): BuyRequest {
     if (positive(t.stopLoss)) limit.stop_loss = money(t.stopLoss);
     if (positive(t.takeProfit)) limit.take_profit = money(t.takeProfit);
     return {
-        buy: 1,
+        buy: '1', // written exactly like the bots' own buy request
         // For a multiplier the price is the stake: the most we agree to pay.
         price: stake,
         parameters: {
