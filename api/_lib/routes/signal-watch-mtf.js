@@ -17,17 +17,17 @@
 //
 // Protected by SIGNALS_SECRET: header   Authorization: Bearer <SIGNALS_SECRET>   or   ?key=<SIGNALS_SECRET>
 // Testing:  ?dry=1 shows what it would send (nothing is sent or saved)   ?force=1 re-analyses even without a new candle
-const { getDb } = require('./_lib/db');
-const deriv = require('./_lib/deriv');
-const { sendTelegram } = require('./_lib/telegram');
-const chart = require('./_lib/signal-chart');
-const { deliverSignal } = require('./_lib/signal-deliver');
-const mtf = require('./_lib/mtf');
-const ict = require('./_lib/ict');
-const core = require('./_lib/signals-core');
-const store = require('./_lib/signals-store');
-const news = require('./_lib/news');
-const { authorised } = require('./_lib/signals-auth');
+const { getDb } = require('../db');
+const deriv = require('../deriv');
+const { sendTelegram } = require('../telegram');
+const chart = require('../signal-chart');
+const { deliverSignal } = require('../signal-deliver');
+const mtf = require('../mtf');
+const ict = require('../ict');
+const core = require('../signals-core');
+const store = require('../signals-store');
+const news = require('../news');
+const { authorised } = require('../signals-auth');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MTF_TF = 300;

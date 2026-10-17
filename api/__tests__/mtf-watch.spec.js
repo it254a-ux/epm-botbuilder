@@ -17,7 +17,7 @@ const mtf = require('../_lib/mtf');
 const ict = require('../_lib/ict');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
-const handler = require('../signal-watch-mtf');
+const handler = require('../_lib/routes/signal-watch-mtf');
 
 let sharedDb;
 function makeSql() {

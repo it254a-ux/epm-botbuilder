@@ -15,13 +15,13 @@
 //        &mode=mtf                      test the M15 direction + M5 entry mode instead of the H1 strategies (default 30 days, up to 90)
 //        &mode=ict                      test the ICT strategy (sweep + structure shift + fair value gap), same data and rules as mode=mtf
 //        &cooldown=30                   (mode=mtf) minutes before the same market can signal again (default: MTF_COOLDOWN_MIN, 30)
-const { getDb } = require('./_lib/db');
-const deriv = require('./_lib/deriv');
-const core = require('./_lib/signals-core');
-const store = require('./_lib/signals-store');
-const bt = require('./_lib/backtest');
-const { readResultConfig } = require('./_lib/signal-outcome');
-const { authorised } = require('./_lib/signals-auth');
+const { getDb } = require('../db');
+const deriv = require('../deriv');
+const core = require('../signals-core');
+const store = require('../signals-store');
+const bt = require('../backtest');
+const { readResultConfig } = require('../signal-outcome');
+const { authorised } = require('../signals-auth');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MAX_SYMBOLS = 60;

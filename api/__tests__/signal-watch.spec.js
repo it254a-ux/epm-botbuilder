@@ -24,8 +24,8 @@ const engine = require('../_lib/engine');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
 const handler = require('../signal-watch');
-const feed = require('../signals');
-const admin = require('../signal-admin');
+const feed = require('../_lib/routes/signals');
+const admin = require('../_lib/routes/signal-admin');
 const news = require('../_lib/news');
 
 jest.setTimeout(60000);

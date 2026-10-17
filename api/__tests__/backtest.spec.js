@@ -14,7 +14,7 @@ const engine = require('../_lib/engine');
 const mtfLib = require('../_lib/mtf');
 const ictLib = require('../_lib/ict');
 const bt = require('../_lib/backtest');
-const handler = require('../signal-backtest');
+const handler = require('../_lib/routes/signal-backtest');
 
 const TF = 3600;
 const BASE = Date.UTC(2026, 9, 13, 0, 0) / 1000;

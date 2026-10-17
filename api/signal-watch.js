@@ -140,7 +140,7 @@ async function trackOpenSignals(sql, client, report, send, skipFetch) {
     }
 }
 
-module.exports = async function handler(req, res) {
+async function handleH1(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (req.method !== 'GET' && req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -464,4 +464,29 @@ module.exports = async function handler(req, res) {
 
     report.elapsedMs = Date.now() - started;
     res.status(report.ok ? 200 : 500).json(report);
+}
+
+// ONE serverless function for the whole signal machine. Vercel's free (Hobby) plan allows at most 12 functions per
+// deployment and every file directly inside api/ is one, so the other signal endpoints live in api/_lib/routes/ and are
+// reached through this file. vercel.json rewrites keep the old addresses working:
+//   /api/signals -> ?route=feed   /api/signal-admin -> ?route=admin   /api/signal-backtest -> ?route=backtest
+//   /api/signal-watch-mtf -> ?route=watch-mtf   (and /api/signal-watch itself is the hourly watcher, no route)
+// DO NOT add new files directly inside api/ for signal features: add a route here instead (api/__tests__/function-count.spec.js guards this).
+const ROUTES = {
+    feed: () => require('./_lib/routes/signals'),
+    admin: () => require('./_lib/routes/signal-admin'),
+    backtest: () => require('./_lib/routes/signal-backtest'),
+    'watch-mtf': () => require('./_lib/routes/signal-watch-mtf'),
+};
+
+module.exports = async function handler(req, res) {
+    const route = req.query && req.query.route;
+    if (route === undefined || route === '') return handleH1(req, res);
+    const load = Object.prototype.hasOwnProperty.call(ROUTES, route) ? ROUTES[route] : null;
+    if (!load) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(404).json({ error: 'Unknown route' });
+        return undefined;
+    }
+    return load()(req, res);
 };

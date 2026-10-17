@@ -1,8 +1,8 @@
 // GET /api/signals?limit=50
 // Public, read-only feed for the website's Signals page. Signals are written only by
 // api/signal-watch.js (which is protected by SIGNALS_SECRET), never through this endpoint.
-const { getDb } = require('./_lib/db');
-const store = require('./_lib/signals-store');
+const { getDb } = require('../db');
+const store = require('../signals-store');
 
 module.exports = async function handler(req, res) {
     if (req.method !== 'GET') {

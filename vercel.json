@@ -4,15 +4,6 @@
         "api/signal-watch.js": {
             "includeFiles": "api/_lib/fonts/**",
             "maxDuration": 60
-        },
-        "api/signal-admin.js": {
-            "maxDuration": 30
-        },
-        "api/signal-backtest.js": {
-            "maxDuration": 60
-        },
-        "api/signal-watch-mtf.js": {
-            "maxDuration": 60
         }
     },
     "rewrites": [
@@ -23,6 +14,22 @@
         {
             "source": "/admin",
             "destination": "/admin/index.html"
+        },
+        {
+            "source": "/api/signals",
+            "destination": "/api/signal-watch?route=feed"
+        },
+        {
+            "source": "/api/signal-admin",
+            "destination": "/api/signal-watch?route=admin"
+        },
+        {
+            "source": "/api/signal-backtest",
+            "destination": "/api/signal-watch?route=backtest"
+        },
+        {
+            "source": "/api/signal-watch-mtf",
+            "destination": "/api/signal-watch?route=watch-mtf"
         },
         {
             "source": "/api/(.*)",

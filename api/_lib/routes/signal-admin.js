@@ -2,11 +2,11 @@
 //
 //   GET   -> every market Deriv offers, with open/closed and whether it is switched on
 //   POST  -> body { "symbols": { "frxEURUSD": true, "frxGBPUSD": false, ... } } saves the switches
-const { getDb } = require('./_lib/db');
-const deriv = require('./_lib/deriv');
-const core = require('./_lib/signals-core');
-const store = require('./_lib/signals-store');
-const { authorised } = require('./_lib/signals-auth');
+const { getDb } = require('../db');
+const deriv = require('../deriv');
+const core = require('../signals-core');
+const store = require('../signals-store');
+const { authorised } = require('../signals-auth');
 
 const SYMBOL_OK = /^[A-Za-z0-9_]{1,40}$/;
 const MAX_ENTRIES = 500;
