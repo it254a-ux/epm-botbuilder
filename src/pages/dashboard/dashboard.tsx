@@ -8,7 +8,9 @@ import { useDevice } from '@deriv-com/ui';
 import OnboardTourHandler from '../tutorials/dbot-tours/onboarding-tour';
 import Announcements from './announcements';
 import Cards from './cards';
+import DashboardTicker from './dashboard-ticker';
 import InfoPanel from './info-panel';
+import './dashboard-ticker.scss';
 
 type TMobileIconGuide = {
     handleTabChange: (active_number: number) => void;
@@ -34,6 +36,18 @@ const DashboardComponent = observer(({ handleTabChange }: TMobileIconGuide) => {
                         <Announcements is_mobile={!isDesktop} is_tablet={isTablet} handleTabChange={handleTabChange} />
                     )}
                     <div className='quick-panel'>
+                        {!has_dashboard_strategies && (
+                            <DashboardTicker
+                                variant='welcome'
+                                label={localize('Welcome')}
+                                items={[
+                                    localize('Welcome to Executive Prime Markets'),
+                                    localize('Build, load and run your trading bots in one place'),
+                                    localize('Synthetics, derived indices and forex, all on one screen'),
+                                    localize('Start with a quick strategy and trade your way'),
+                                ]}
+                            />
+                        )}
                         <div
                             className={classNames('tab__dashboard__header', {
                                 'tab__dashboard__header--listed': isDesktop && has_dashboard_strategies,
@@ -68,6 +82,21 @@ const DashboardComponent = observer(({ handleTabChange }: TMobileIconGuide) => {
                             </Text>
                         </div>
                         <Cards has_dashboard_strategies={has_dashboard_strategies} is_mobile={!isDesktop} />
+                        {!has_dashboard_strategies && (
+                            <DashboardTicker
+                                variant='markets'
+                                label={localize('Free')}
+                                items={[
+                                    localize('Free bots'),
+                                    localize('Free signals'),
+                                    localize('Volatility indices'),
+                                    localize('Boom and Crash'),
+                                    localize('Jump and Step indices'),
+                                    localize('Forex majors and minors'),
+                                    localize('Ready-made quick strategies'),
+                                ]}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
