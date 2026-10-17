@@ -10,6 +10,9 @@
         },
         "api/signal-backtest.js": {
             "maxDuration": 60
+        },
+        "api/signal-watch-mtf.js": {
+            "maxDuration": 60
         }
     },
     "rewrites": [

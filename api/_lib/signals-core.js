@@ -45,6 +45,31 @@ function signalsPageUrl(env = process.env) {
     return `${base}/signals.html`;
 }
 
+/**
+ * The Telegram text for an M15 direction + M5 entry signal. The entry is the price at the close of the confirming
+ * M5 candle (a market entry, so nothing has to be waited for). sig.time is the OPEN time of that last closed M5 candle.
+ */
+function formatMtfTelegram(sig, { siteUrl, newsNote } = {}) {
+    const buy = sig.side === 'BUY';
+    return [
+        `${buy ? '🟢' : '🔴'} <b>${sig.side} SIGNAL</b>: ${escapeHtml(sig.symbolName || sig.symbol)}`,
+        '',
+        '📊 Mode: M15 direction + M5 entry',
+        `🧭 ${escapeHtml(sig.m15Text)}`,
+        `✅ ${escapeHtml(sig.m5Text)}`,
+        '',
+        `🎯 Entry: <code>${px(sig.entry)}</code> (price at the close of the confirming M5 candle)`,
+        `🛑 Stop loss: <code>${px(sig.stopLoss)}</code>`,
+        `✅ Take profit: <code>${px(sig.takeProfit)}</code>`,
+        `⚖️ Risk : Reward = 1 : ${sig.rr.toFixed(2)}`,
+        `🕒 ${gmtStamp(sig.time + sig.timeframe)}`,
+        ...(newsNote ? ['', newsNote] : []),
+        ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
+        '',
+        '⚠️ Signals only, not financial advice.',
+    ].join('\n');
+}
+
 /** Reads the watcher settings from environment variables (Phase 1: simple and explicit). */
 function readConfig(env = process.env) {
     const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
@@ -145,4 +170,4 @@ function setupCheck(analysis, lastClosed, cfg, atr = null) {
 /** Open time of the candle that closed most recently, by the clock. */
 const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck, orderForRun, MAIN_MARKETS };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, formatMtfTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck, orderForRun, MAIN_MARKETS };

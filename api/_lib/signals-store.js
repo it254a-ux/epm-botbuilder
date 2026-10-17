@@ -109,7 +109,7 @@ async function getUnsent(sql) {
     const rows = await sql`
         SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time, entered_time
         FROM signals
-        WHERE telegram_sent = false AND status = 'active' AND created_at > now() - interval '3 hours'
+        WHERE telegram_sent = false AND status = 'active' AND timeframe >= 900 AND created_at > now() - interval '3 hours'
         ORDER BY id ASC LIMIT 5
     `;
     return rows.map(r => ({
@@ -148,6 +148,39 @@ const toSignal = r => ({
 });
 
 /** Signals still waiting for a result (not yet closed). */
+/** M5 (M15 + M5 mode) signals that were saved but not delivered: only worth retrying for a few minutes. */
+async function getUnsentMtf(sql) {
+    const rows = await sql`
+        SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time, entered_time
+        FROM signals
+        WHERE telegram_sent = false AND status = 'active' AND timeframe < 900 AND created_at > now() - interval '10 minutes'
+        ORDER BY id ASC LIMIT 5
+    `;
+    return rows.map(r => ({
+        id: r.id,
+        symbol: r.symbol,
+        symbolName: r.symbol_name,
+        strategyName: r.strategy_name,
+        timeframe: Number(r.timeframe),
+        side: r.side,
+        entry: Number(r.entry),
+        stopLoss: Number(r.stop_loss),
+        takeProfit: Number(r.take_profit),
+        rr: Number(r.rr),
+        time: Number(r.candle_time),
+    }));
+}
+
+/** Was a signal saved for this market and timeframe in the last `minutes` minutes? */
+async function hasRecentSignal(sql, symbol, timeframe, minutes) {
+    const rows = await sql`
+        SELECT 1 FROM signals
+        WHERE symbol = ${symbol} AND timeframe = ${timeframe} AND created_at > now() - (${minutes} * interval '1 minute')
+        LIMIT 1
+    `;
+    return rows.length > 0;
+}
+
 async function getOpenSignals(sql) {
     const rows = await sql`
         SELECT id, symbol, symbol_name, strategy_name, timeframe, side, entry, stop_loss, take_profit, rr, candle_time,
@@ -324,4 +357,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
