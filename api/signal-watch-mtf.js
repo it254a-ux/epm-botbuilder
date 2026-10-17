@@ -18,6 +18,8 @@
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
 const { sendTelegram } = require('./_lib/telegram');
+const chart = require('./_lib/signal-chart');
+const { deliverSignal } = require('./_lib/signal-deliver');
 const mtf = require('./_lib/mtf');
 const core = require('./_lib/signals-core');
 const store = require('./_lib/signals-store');
@@ -139,6 +141,7 @@ module.exports = async function handler(req, res) {
                 const [c15, c5] = await Promise.all([deriv.getCandles(client, symbol, 900, 5), deriv.getCandles(client, symbol, 300, 2)]);
                 const now = Math.floor(Date.now() / 1000);
                 const a = mtf.analyseMtf(c15, c5, now);
+                const closed5 = c5.filter(c => c.time + MTF_TF <= now);
                 summary.analysed++;
                 entry.signal = a.signal;
                 entry.bias = a.bias;
@@ -162,7 +165,8 @@ module.exports = async function handler(req, res) {
                         entry.skipped = `Cool-down: a signal was already sent for this market in the last ${cooldownMin} minutes`;
                     } else {
                         const sig = {
-                            key: `${symbol}|mtf|${a.plan.side}|${a.signalTime}`,
+                            // one signal per setup: the setup id stays the same while the same setup is still valid (older analysis results without one: per confirming candle)
+                            key: `${symbol}|mtf|${a.setupId || `${a.plan.side}|${a.signalTime}`}`,
                             symbol,
                             symbolName: info.underlying_symbol_name,
                             market: info.market,
@@ -180,8 +184,10 @@ module.exports = async function handler(req, res) {
                             newsNote: nw.upcoming ? news.newsNote(nw.upcoming, now) : null,
                         };
                         const text = () => core.formatMtfTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
+                        const chartInput = { candles: closed5.slice(-120), analysis: {}, signal: sig };
                         if (!write) {
                             entry.wouldSend = text();
+                            try { entry.picture = `ok (${chart.renderChartPng(chartInput).length} bytes)`; } catch (err) { entry.picture = `would fail: ${err.message}`; }
                         } else {
                             const id = await store.insertSignal(sql, sig);
                             if (id === null) {
@@ -191,9 +197,10 @@ module.exports = async function handler(req, res) {
                                 summary.signalsSaved++;
                                 openNow.add(symbol);
                                 try {
-                                    const sent = await send(() => sendTelegram(text()));
+                                    const sent = await send(() => deliverSignal(text(), chartInput));
                                     await store.markTelegramSent(sql, id, sent.messageId);
                                     entry.telegram = 'sent';
+                                    entry.picture = sent.picture;
                                     summary.telegramSent++;
                                 } catch (err) {
                                     entry.telegram = `failed: ${err.message}`;

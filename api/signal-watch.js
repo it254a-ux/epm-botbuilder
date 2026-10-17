@@ -37,6 +37,7 @@ const { sendTelegram, sendTelegramPhoto } = require('./_lib/telegram');
 const chart = require('./_lib/signal-chart');
 const engine = require('./_lib/engine');
 const core = require('./_lib/signals-core');
+const { deliverSignal } = require('./_lib/signal-deliver');
 const outcomeLib = require('./_lib/signal-outcome');
 const entryLib = require('./_lib/signal-entry');
 const store = require('./_lib/signals-store');
@@ -51,18 +52,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * so a signal is never lost because of the picture. Returns { messageId, picture: true|'failed: why' }.
  */
 async function deliver(sig, chartInput) {
-    const text = core.formatTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
-    let why = null;
-    try {
-        const png = chart.renderChartPng(chartInput);
-        const sent = await sendTelegramPhoto(png, text);
-        return { messageId: sent.messageId, picture: true };
-    } catch (err) {
-        why = err.message;
-        console.error('signal-watch: chart picture failed, sending text only:', why);
-    }
-    const sent = await sendTelegram(text);
-    return { messageId: sent.messageId, picture: `failed: ${why}` };
+    return deliverSignal(core.formatTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote }), chartInput);
 }
 
 /** Runs Telegram sends one at a time with a pause between them (Telegram limits bursts). */

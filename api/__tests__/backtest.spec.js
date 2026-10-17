@@ -135,7 +135,7 @@ describe('M15 + M5 replay', () => {
         buyAt([110]);
         const t = go(m5s(140, { 111: { low: 99.8, high: 101 }, 112: { high: 103.5 } }));
         expect(t).toHaveLength(1);
-        expect(t[0]).toMatchObject({ status: 'hit_tp', side: 'BUY', rr: 3, strategyId: 100, strategyName: 'M15 analysis + M5 entry' });
+        expect(t[0]).toMatchObject({ status: 'hit_tp', side: 'BUY', rr: 3, strategyId: 6, strategyName: 'M15 direction + M5 entry' });
     });
     test('the same setup on the next candles counts once (like the live machine)', () => {
         buyAt([110, 111, 112]);
@@ -152,6 +152,30 @@ describe('M15 + M5 replay', () => {
             const now = m5w[m5w.length - 1].time + M5;
             expect(m15w[m15w.length - 1].time + 900).toBeLessThanOrEqual(now);
         }
+    });
+    test('cool-down: after a signal the same market stays quiet for 30 minutes (like live); with 0 it does not', () => {
+        // two different setups 3 candles (15 min) apart, both reaching their target quickly
+        mtfLib.analyseMtf.mockImplementation((m15, m5w) => {
+            const last = m5w[m5w.length - 1].time;
+            const idx = (last - B5) / M5;
+            return idx === 110 || idx === 113
+                ? { signal: 'BUY', plan: { side: 'BUY', entry: 100, stopLoss: 99, takeProfit: 103, rr: 3, risk: 1 }, setupId: `BUY|${idx}|100` }
+                : { signal: 'WAIT', plan: null, setupId: null };
+        });
+        const candles = m5s(140, { 111: { low: 99.8, high: 101 }, 112: { high: 103.5 }, 114: { low: 99.8, high: 101 }, 115: { high: 103.5 } });
+        expect(go(candles)).toHaveLength(1); // 30-minute cool-down by default
+        expect(go(candles, { cooldownMinutes: 0 })).toHaveLength(2);
+    });
+    test('only one open trade per market: a new setup waits while the previous trade is still running', () => {
+        mtfLib.analyseMtf.mockImplementation((m15, m5w) => {
+            const idx = (m5w[m5w.length - 1].time - B5) / M5;
+            return idx === 110 || idx === 113
+                ? { signal: 'BUY', plan: { side: 'BUY', entry: 100, stopLoss: 99, takeProfit: 103, rr: 3, risk: 1 }, setupId: `BUY|${idx}|100` }
+                : { signal: 'WAIT', plan: null, setupId: null };
+        });
+        // the first trade enters but neither target nor stop is reached for a long time, so nothing else is allowed meanwhile
+        const candles = m5s(140, { 111: { low: 99.8, high: 101 }, 130: { high: 103.5 } });
+        expect(go(candles, { cooldownMinutes: 0 })).toHaveLength(1);
     });
     test('WAIT everywhere, or too little data = no trades, no crash', () => {
         expect(go(m5s(140))).toEqual([]);
@@ -295,7 +319,7 @@ describe('the endpoint', () => {
         expect(r.body.timeframe).toBe(300);
         expect(r.body.symbolsTested).toBe(1);
         expect(r.body.overall).toMatchObject({ signals: 1, wins: 1, touched: 1, touchRate: 100 });
-        expect(r.body.byStrategy[0].name).toBe('100. M15 analysis + M5 entry');
+        expect(r.body.byStrategy[0].name).toBe('6. M15 direction + M5 entry');
     });
     test('the report says how much history each market really had', async () => {
         deriv.getCandlesBack.mockImplementation(async (c, symbol, tf, days, stats) => { Object.assign(stats, { pages: 2, wanted: 17520, perPage: [1000, 1000] }); return recentCandles; });

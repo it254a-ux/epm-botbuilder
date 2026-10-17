@@ -7,9 +7,11 @@ jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
 jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandles: jest.fn() }));
 jest.mock('../_lib/telegram', () => ({ sendTelegram: jest.fn(), sendTelegramPhoto: jest.fn() }));
 jest.mock('../_lib/mtf', () => ({ analyseMtf: jest.fn() }));
+jest.mock('../_lib/signal-chart', () => ({ renderChartPng: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
-const { sendTelegram } = require('../_lib/telegram');
+const { sendTelegram, sendTelegramPhoto } = require('../_lib/telegram');
+const chart = require('../_lib/signal-chart');
 const mtf = require('../_lib/mtf');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
@@ -60,6 +62,9 @@ beforeEach(async () => {
     ]);
     deriv.getCandles.mockReset().mockResolvedValue([{ time: 1, open: 1, high: 1, low: 1, close: 1 }]);
     sendTelegram.mockReset().mockResolvedValue({ messageId: 55 });
+    sendTelegramPhoto.mockReset().mockResolvedValue({ messageId: 56 });
+    // By default the picture cannot be drawn, so the tests below keep checking the plain-text message.
+    chart.renderChartPng.mockReset().mockImplementation(() => { throw new Error('no chart in this test'); });
     mtf.analyseMtf.mockReset().mockReturnValue(BUY());
 });
 afterEach(() => { process.env = ENV; if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
@@ -282,5 +287,41 @@ describe('the message text', () => {
         expect(t).toContain('2026-10-16 09:35 GMT');
         expect(t).not.toContain('Open the signals page');
         expect(t.endsWith('⚠️ Signals only, not financial advice.')).toBe(true);
+    });
+});
+
+describe('chart picture and once-per-setup', () => {
+    const c5 = () => { const last = Math.floor(nowSec() / 300) * 300; return Array.from({ length: 30 }, (_, i) => ({ time: last - (30 - i) * 300, open: 1, high: 1.1, low: 0.9, close: 1 })); };
+    beforeEach(() => { deriv.getCandles.mockReset().mockImplementation(async () => c5()); });
+
+    test('the signal goes out as a chart picture with the text as its caption', async () => {
+        chart.renderChartPng.mockReset().mockReturnValue(Buffer.from('png'));
+        const r = await call();
+        expect(r.body.markets[0]).toMatchObject({ telegram: 'sent', picture: true });
+        expect(sendTelegramPhoto).toHaveBeenCalledTimes(1);
+        expect(sendTelegramPhoto.mock.calls[0][1]).toContain('Mode: M15 direction + M5 entry');
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(chart.renderChartPng.mock.calls[0][0].signal).toMatchObject({ timeframe: 300, side: 'BUY', entry: 2350.5 });
+    });
+    test('if the picture fails, the plain text is sent instead (a signal is never lost)', async () => {
+        const r = await call();
+        expect(r.body.markets[0].picture).toMatch(/^failed/);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+    });
+    test('the same setup keeps the same id on the next candle: it is not sent again', async () => {
+        mtf.analyseMtf.mockReturnValue(BUY({ setupId: 'BUY|2345|2350' }));
+        await call();
+        process.env.MTF_COOLDOWN_MIN = '0'; // even without the cool-down the same setup is not repeated
+        mtf.analyseMtf.mockReturnValue(BUY({ setupId: 'BUY|2345|2350', signalTime: closeOfLast() + 300 }));
+        const again = await call({ force: '1' });
+        expect(again.body.markets[0].skipped).toMatch(/Already sent|open|duplicate/i);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+    });
+    test('dry run shows the picture check and sends nothing', async () => {
+        chart.renderChartPng.mockReset().mockReturnValue(Buffer.from('png'));
+        const r = await call({ dry: '1' });
+        expect(r.body.markets[0].picture).toMatch(/^ok/);
+        expect(sendTelegram).not.toHaveBeenCalled();
+        expect(sendTelegramPhoto).not.toHaveBeenCalled();
     });
 });

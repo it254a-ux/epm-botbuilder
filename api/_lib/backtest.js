@@ -50,28 +50,31 @@ function runBacktest({ symbol, symbolName, market, candles, timeframe, strategie
     return trades;
 }
 
-/** The M15 + M5 mode is stored with this strategy number (the H1 strategies are 1-5). Same as the live machine. */
-const MTF_STRATEGY_ID = 100;
-const MTF_STRATEGY_NAME = 'M15 analysis + M5 entry';
+/** The M15 + M5 mode is stored with this strategy number and name (the H1 strategies are 1-5). Same as the live watcher (api/signal-watch-mtf.js). */
+const MTF_STRATEGY_ID = 6;
+const MTF_STRATEGY_NAME = 'M15 direction + M5 entry';
 const MTF_TF = 300;
 const MTF_FIRST = 100; // M5 candles needed before the first analysis
 
 /**
  * Replays M5 + M15 history through the SAME analyseMtf the live machine and the Forex Trader page use, one closed M5 candle at
  * a time (each step sees only what was closed at that moment). Every confirmed BUY/SELL is scored with the same outcome rules as the
- * live results (entry = the close of the last closed M5 candle). One signal per setup, like the live machine.
+ * live results (entry = the close of the last closed M5 candle). Same safety rules as the live watcher: one signal per setup, only one open
+ * trade per market at a time, and a cool-down (default 30 minutes) after each signal before the same market can signal again.
  */
-function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 86400 }) {
+function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 86400, cooldownMinutes = 30 }) {
     const kind = engine.marketKind(market);
     const trades = [];
     const seen = new Set();
     if (m5.length < MTF_FIRST + 1 || m15.length < mtfLib.MIN_M15_CANDLES) return trades;
     const endNow = m5[m5.length - 1].time + MTF_TF;
     let j = -1; // newest M15 candle that was closed at "now"
+    let blockedUntil = 0; // no new signal before this time (cool-down, or the previous trade is still open)
     for (let i = MTF_FIRST - 1; i < m5.length; i++) {
         const now = m5[i].time + MTF_TF;
         while (j + 1 < m15.length && m15[j + 1].time + mtfLib.M15_SEC <= now) j++;
         if (j + 1 < mtfLib.MIN_M15_CANDLES) continue;
+        if (now < blockedUntil) continue;
         const m5w = m5.slice(Math.max(0, i - 299), i + 1);
         const m15w = m15.slice(Math.max(0, j - 399), j + 1);
         const r = mtfLib.analyseMtf(m15w, m5w, now);
@@ -81,6 +84,7 @@ function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 8
         const atr = engine.atr(m5w, 14);
         const sig = { symbol, strategyId: MTF_STRATEGY_ID, timeframe: MTF_TF, side: r.plan.side, entry: r.plan.entry, stopLoss: r.plan.stopLoss, takeProfit: r.plan.takeProfit, rr: r.plan.rr, time: m5[i].time };
         const outcome = evaluateSignal(sig, m5.slice(i + 1), endNow, expirySeconds);
+        blockedUntil = Math.max(now + cooldownMinutes * 60, outcome ? outcome.closedTime + MTF_TF : Infinity);
         trades.push({
             symbol, symbolName: symbolName || symbol, kind, strategyId: MTF_STRATEGY_ID, strategyName: MTF_STRATEGY_NAME, side: r.plan.side,
             rr: r.plan.rr, stopAtr: atr ? r.plan.risk / atr : null, age: 0, time: m5[i].time, hourUtc: new Date(now * 1000).getUTCHours(),

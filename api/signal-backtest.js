@@ -12,7 +12,8 @@
 //        &minRr=2 &maxAge=3             what-if: override the live minimum reward / freshness
 //        &minStopAtr=0 &maxRr=8         what-if: override the live minimum stop size in ATR (0 = off) / reward cap
 //        &trades=1                      also list the latest 100 trades
-//        &mode=mtf                      test the M15 analysis + M5 entry mode instead of the H1 strategies (default 30 days, up to 90)
+//        &mode=mtf                      test the M15 direction + M5 entry mode instead of the H1 strategies (default 30 days, up to 90)
+//        &cooldown=30                   (mode=mtf) minutes before the same market can signal again (default: MTF_COOLDOWN_MIN, 30)
 const { getDb } = require('./_lib/db');
 const deriv = require('./_lib/deriv');
 const core = require('./_lib/signals-core');
@@ -53,7 +54,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const out = { ok: true, mode: mtfMode ? 'mtf (M15 analysis + M5 entry)' : 'h1 strategies', timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
+    const out = { ok: true, mode: mtfMode ? 'mtf (M15 direction + M5 entry)' : 'h1 strategies', timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
     const trades = [];
     try {
         const active = await deriv.getActiveSymbols(client);
@@ -91,7 +92,7 @@ module.exports = async function handler(req, res) {
                 daysReplayed: Math.max(0, Math.round(((m5.length - 100) * 300) / 86400)),
             });
             if (m5.length < 101 || m15.length < 60) { out.skipped.push({ symbol, reason: `Only ${m5.length} M5 and ${m15.length} M15 candles available` }); return; }
-            trades.push(...bt.runMtfBacktest({ symbol, symbolName: meta.underlying_symbol_name, market: meta.market, m5, m15, expirySeconds }));
+            trades.push(...bt.runMtfBacktest({ symbol, symbolName: meta.underlying_symbol_name, market: meta.market, m5, m15, expirySeconds, cooldownMinutes: Math.max(0, numOr(q.cooldown, numOr(process.env.MTF_COOLDOWN_MIN, 30))) }));
             out.symbolsTested++;
         };
         const one = async symbol => {
