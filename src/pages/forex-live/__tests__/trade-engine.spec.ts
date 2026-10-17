@@ -41,7 +41,7 @@ describe('buildBuyRequest', () => {
         expect(r).toEqual({
             buy: 1,
             price: 10,
-            parameters: { contract_type: 'MULTUP', underlying_symbol: 'frxEURUSD', currency: 'USD', amount: 10, multiplier: 100 },
+            parameters: { contract_type: 'MULTUP', underlying_symbol: 'frxEURUSD', currency: 'USD', basis: 'stake', amount: 10, multiplier: 100 },
         });
         // a multiplier has no fixed time: nothing about duration or expiry may be sent
         expect(JSON.stringify(r)).not.toMatch(/duration|expiry/);

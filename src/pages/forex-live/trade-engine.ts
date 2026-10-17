@@ -40,6 +40,8 @@ export interface BuyRequest {
         contract_type: MultiplierContract;
         underlying_symbol: string;
         currency: string;
+        /** Deriv needs to be told what the amount is: here, the stake. */
+        basis: 'stake';
         amount: number;
         multiplier: number;
         limit_order?: { stop_loss?: number; take_profit?: number };
@@ -77,6 +79,7 @@ export function buildBuyRequest(t: TradeInput): BuyRequest {
             contract_type: CONTRACT_OF[t.side],
             underlying_symbol: t.symbol,
             currency: t.currency,
+            basis: 'stake',
             amount: stake,
             multiplier: t.multiplier,
             ...(Object.keys(limit).length ? { limit_order: limit } : {}),
