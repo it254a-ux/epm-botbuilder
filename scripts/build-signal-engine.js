@@ -11,8 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 
-// engine.ts is the H1 strategy logic; mtf.ts is the M15 + M5 multi-timeframe analysis (it uses engine.ts).
-const FILES = ['engine', 'mtf'];
+// engine.ts is the H1 strategy logic; mtf.ts is the M15 + M5 multi-timeframe analysis (it uses engine.ts); ict.ts is the ICT strategy (it uses mtf.ts).
+const FILES = ['engine', 'mtf', 'ict'];
 
 try {
     const ts = require('typescript');

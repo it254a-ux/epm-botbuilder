@@ -172,12 +172,18 @@ async function getUnsentMtf(sql) {
 }
 
 /** Was a signal saved for this market and timeframe in the last `minutes` minutes? */
-async function hasRecentSignal(sql, symbol, timeframe, minutes) {
-    const rows = await sql`
-        SELECT 1 FROM signals
-        WHERE symbol = ${symbol} AND timeframe = ${timeframe} AND created_at > now() - (${minutes} * interval '1 minute')
-        LIMIT 1
-    `;
+async function hasRecentSignal(sql, symbol, timeframe, minutes, strategyName = null) {
+    const rows = strategyName === null
+        ? await sql`
+            SELECT 1 FROM signals
+            WHERE symbol = ${symbol} AND timeframe = ${timeframe} AND created_at > now() - (${minutes} * interval '1 minute')
+            LIMIT 1
+        `
+        : await sql`
+            SELECT 1 FROM signals
+            WHERE symbol = ${symbol} AND timeframe = ${timeframe} AND strategy_name = ${strategyName} AND created_at > now() - (${minutes} * interval '1 minute')
+            LIMIT 1
+        `;
     return rows.length > 0;
 }
 

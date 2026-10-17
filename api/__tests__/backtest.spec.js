@@ -5,12 +5,14 @@ const { PGlite } = require('@electric-sql/pglite');
 
 jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
 jest.mock('../_lib/mtf', () => ({ ...jest.requireActual('../_lib/mtf'), analyseMtf: jest.fn() }));
+jest.mock('../_lib/ict', () => ({ ...jest.requireActual('../_lib/ict'), analyseIct: jest.fn() }));
 jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandlesBack: jest.fn() }));
 jest.mock('../_lib/engine', () => ({ ...jest.requireActual('../_lib/engine'), analyse: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
 const engine = require('../_lib/engine');
 const mtfLib = require('../_lib/mtf');
+const ictLib = require('../_lib/ict');
 const bt = require('../_lib/backtest');
 const handler = require('../signal-backtest');
 
@@ -32,7 +34,7 @@ function readyAt(indexes, planOver, bosAgeCandles = 0) {
 }
 const run = (candles, extra = {}) => bt.runBacktest({ symbol: 'frxEURUSD', symbolName: 'EUR/USD', market: 'forex', candles, timeframe: TF, strategies: [1], cfg: CFG, window: 5, ...extra });
 
-beforeEach(() => { engine.analyse.mockReset(); mtfLib.analyseMtf.mockReset().mockReturnValue({ signal: 'WAIT', plan: null, setupId: null }); });
+beforeEach(() => { ictLib.analyseIct.mockReset().mockReturnValue({ signal: 'WAIT', plan: null, setupId: null }); engine.analyse.mockReset(); mtfLib.analyseMtf.mockReset().mockReturnValue({ signal: 'WAIT', plan: null, setupId: null }); });
 
 describe('scoring trades like the live results', () => {
     test('entered then target reached = hit_tp', () => {
@@ -320,6 +322,22 @@ describe('the endpoint', () => {
         expect(r.body.symbolsTested).toBe(1);
         expect(r.body.overall).toMatchObject({ signals: 1, wins: 1, touched: 1, touchRate: 100 });
         expect(r.body.byStrategy[0].name).toBe('6. M15 direction + M5 entry');
+    });
+    test('mode=ict replays the ICT strategy (its own name and number) and not the M15+M5 rules', async () => {
+        const end5 = Math.floor(Date.now() / 1000 / 300) * 300 - 600;
+        const m5 = Array.from({ length: 700 }, (_, i) => ({ time: end5 - (699 - i) * 300, open: 101, high: 101.2, low: 100.8, close: 101 })).map((c, i) => (i === 401 ? { ...c, low: 99.8, high: 101 } : i === 402 ? { ...c, high: 103.5 } : c));
+        const end15 = Math.floor(Date.now() / 1000 / 900) * 900 - 1800;
+        const m15 = Array.from({ length: 400 }, (_, i) => ({ time: end15 - (399 - i) * 900, open: 101, high: 101.5, low: 100.5, close: 101 }));
+        deriv.getCandlesBack.mockReset().mockImplementation(async (c, symbol, gran) => (gran === 300 ? m5 : m15));
+        ictLib.analyseIct.mockImplementation((a, b) => (b[b.length - 1].time === m5[400].time
+            ? { signal: 'BUY', plan: { side: 'BUY', entry: 100, stopLoss: 99, takeProfit: 103, rr: 3, risk: 1 }, setupId: 'ICT|BUY|99|100' }
+            : { signal: 'WAIT', plan: null, setupId: null }));
+        const r = await call({ symbols: 'frxEURUSD', mode: 'ict' });
+        expect(r.status).toBe(200);
+        expect(r.body.mode).toMatch(/ict/);
+        expect(r.body.overall).toMatchObject({ signals: 1, wins: 1 });
+        expect(r.body.byStrategy[0].name).toBe('7. ICT sweep + shift + gap');
+        expect(mtfLib.analyseMtf).not.toHaveBeenCalled();
     });
     test('the report says how much history each market really had', async () => {
         deriv.getCandlesBack.mockImplementation(async (c, symbol, tf, days, stats) => { Object.assign(stats, { pages: 2, wanted: 17520, perPage: [1000, 1000] }); return recentCandles; });

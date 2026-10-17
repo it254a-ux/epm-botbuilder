@@ -12,6 +12,8 @@
 //   - the same confirmation can never be sent twice (database duplicate check)
 //   - high-impact news around the market holds the signal, like in the H1 mode
 //   - MTF_ENABLED=off switches this mode off completely
+//   - the ICT strategy (sweep + structure shift + fair value gap, api/_lib/ict.js) runs on the same candles in the same run, with its own
+//     open-trade and cool-down checks. ICT_ENABLED=off switches only ICT off.
 //
 // Protected by SIGNALS_SECRET: header   Authorization: Bearer <SIGNALS_SECRET>   or   ?key=<SIGNALS_SECRET>
 // Testing:  ?dry=1 shows what it would send (nothing is sent or saved)   ?force=1 re-analyses even without a new candle
@@ -21,6 +23,7 @@ const { sendTelegram } = require('./_lib/telegram');
 const chart = require('./_lib/signal-chart');
 const { deliverSignal } = require('./_lib/signal-deliver');
 const mtf = require('./_lib/mtf');
+const ict = require('./_lib/ict');
 const core = require('./_lib/signals-core');
 const store = require('./_lib/signals-store');
 const news = require('./_lib/news');
@@ -30,6 +33,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MTF_TF = 300;
 const MTF_STRATEGY_ID = 6;
 const MTF_STRATEGY_NAME = 'M15 direction + M5 entry';
+const ICT_STRATEGY_ID = 7;
+const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
 
 const numOr = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
 
@@ -68,7 +73,9 @@ module.exports = async function handler(req, res) {
     const started = Date.now();
     const cfg = core.readConfig();
     const cooldownMin = Math.max(0, numOr(process.env.MTF_COOLDOWN_MIN, 30));
+    const ictEnabled = String(process.env.ICT_ENABLED || 'on').toLowerCase() !== 'off';
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
+    if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
     const report = { ok: true, dry, mode: 'M15 direction + M5 entry', summary, markets: [] };
 
     let client;
@@ -109,7 +116,7 @@ module.exports = async function handler(req, res) {
         const states = sql ? await store.getStates(sql, MTF_TF) : new Map();
         const symbols = core.orderForRun(core.resolveWatchSymbols(rows, cfg.symbols), cfg.priority, states);
         summary.watching = symbols.length;
-        const openNow = new Set(sql ? (await store.getOpenSignals(sql)).filter(s => s.timeframe === MTF_TF).map(s => s.symbol) : []);
+        const openNow = new Set(sql ? (await store.getOpenSignals(sql)).filter(s => s.timeframe === MTF_TF).map(s => `${s.symbol}|${s.strategyName}`) : []);
 
         const newsCfg = news.readNewsConfig();
         let newsData = { status: 'off', events: [] };
@@ -149,61 +156,71 @@ module.exports = async function handler(req, res) {
                 entry.m5 = a.m5Text;
                 const lastClosedM5 = a.signalTime ? a.signalTime - MTF_TF : null; // open time of the latest closed M5 candle
 
-                if (a.signal === 'WAIT' || !a.plan) {
-                    summary.waiting++;
-                    entry.reasons = a.reasons;
-                } else {
-                    entry.reasons = a.reasons;
+                const runs = [{ id: MTF_STRATEGY_ID, name: MTF_STRATEGY_NAME, a, out: entry }];
+                if (ictEnabled) {
+                    const ia = ict.analyseIct(c15, c5, now);
+                    entry.ict = { signal: ia.signal, bias: ia.bias, m5: ia.m5Text };
+                    runs.push({ id: ICT_STRATEGY_ID, name: ICT_STRATEGY_NAME, a: ia, out: entry.ict });
+                }
+                for (const run of runs) {
+                    const { a: ra, out } = run;
+                    const isIct = run.id === ICT_STRATEGY_ID;
+                    const count = isIct ? summary.ict : summary;
+                    out.reasons = ra.reasons;
+                    if (ra.signal === 'WAIT' || !ra.plan) {
+                        count.waiting++;
+                        continue;
+                    }
                     const ccys = news.currenciesFor(symbol, info.market);
                     const nw = ccys.length && newsData.events.length ? news.check(ccys, newsData.events, now, newsCfg) : {};
-                    if (openNow.has(symbol)) {
-                        entry.skipped = 'A trade from this mode is still open for this market';
+                    if (openNow.has(`${symbol}|${run.name}`)) {
+                        out.skipped = 'A trade from this strategy is still open for this market';
                     } else if (nw.blackout) {
-                        entry.skipped = `News blackout: ${news.describe(nw.blackout, now)}`;
-                        summary.newsHeld++;
-                    } else if (!dry && cooldownMin > 0 && (await store.hasRecentSignal(sql, symbol, MTF_TF, cooldownMin))) {
-                        entry.skipped = `Cool-down: a signal was already sent for this market in the last ${cooldownMin} minutes`;
+                        out.skipped = `News blackout: ${news.describe(nw.blackout, now)}`;
+                        count.newsHeld = (count.newsHeld || 0) + 1;
+                    } else if (!dry && cooldownMin > 0 && (await store.hasRecentSignal(sql, symbol, MTF_TF, cooldownMin, run.name))) {
+                        out.skipped = `Cool-down: a signal was already sent for this market in the last ${cooldownMin} minutes`;
                     } else {
                         const sig = {
                             // one signal per setup: the setup id stays the same while the same setup is still valid (older analysis results without one: per confirming candle)
-                            key: `${symbol}|mtf|${a.setupId || `${a.plan.side}|${a.signalTime}`}`,
+                            key: `${symbol}|${isIct ? 'ict' : 'mtf'}|${ra.setupId || `${ra.plan.side}|${ra.signalTime}`}`,
                             symbol,
                             symbolName: info.underlying_symbol_name,
                             market: info.market,
-                            strategyId: MTF_STRATEGY_ID,
-                            strategyName: MTF_STRATEGY_NAME,
+                            strategyId: run.id,
+                            strategyName: run.name,
                             timeframe: MTF_TF,
-                            side: a.plan.side,
-                            entry: a.plan.entry,
-                            stopLoss: a.plan.stopLoss,
-                            takeProfit: a.plan.takeProfit,
-                            rr: a.plan.rr,
+                            side: ra.plan.side,
+                            entry: ra.plan.entry,
+                            stopLoss: ra.plan.stopLoss,
+                            takeProfit: ra.plan.takeProfit,
+                            rr: ra.plan.rr,
                             time: lastClosedM5,
-                            m15Text: a.m15Text,
-                            m5Text: a.m5Text,
+                            m15Text: ra.m15Text,
+                            m5Text: ra.m5Text,
                             newsNote: nw.upcoming ? news.newsNote(nw.upcoming, now) : null,
                         };
                         const text = () => core.formatMtfTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
                         const chartInput = { candles: closed5.slice(-120), analysis: {}, signal: sig };
                         if (!write) {
-                            entry.wouldSend = text();
-                            try { entry.picture = `ok (${chart.renderChartPng(chartInput).length} bytes)`; } catch (err) { entry.picture = `would fail: ${err.message}`; }
+                            out.wouldSend = text();
+                            try { out.picture = `ok (${chart.renderChartPng(chartInput).length} bytes)`; } catch (err) { out.picture = `would fail: ${err.message}`; }
                         } else {
                             const id = await store.insertSignal(sql, sig);
                             if (id === null) {
-                                entry.skipped = 'Already sent before (duplicate)';
+                                out.skipped = 'Already sent before (duplicate)';
                             } else {
-                                entry.saved = true;
-                                summary.signalsSaved++;
-                                openNow.add(symbol);
+                                out.saved = true;
+                                count.signalsSaved++;
+                                openNow.add(`${symbol}|${run.name}`);
                                 try {
                                     const sent = await send(() => deliverSignal(text(), chartInput));
                                     await store.markTelegramSent(sql, id, sent.messageId);
-                                    entry.telegram = 'sent';
-                                    entry.picture = sent.picture;
-                                    summary.telegramSent++;
+                                    out.telegram = 'sent';
+                                    out.picture = sent.picture;
+                                    count.telegramSent++;
                                 } catch (err) {
-                                    entry.telegram = `failed: ${err.message}`;
+                                    out.telegram = `failed: ${err.message}`;
                                     console.error('signal-watch-mtf: Telegram failed:', err.message);
                                 }
                             }

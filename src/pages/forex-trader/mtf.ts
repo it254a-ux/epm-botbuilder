@@ -41,13 +41,13 @@ const MIN_LEG_ATR = 0.5;
 /** Price may not have run further than this many M5 ATR beyond the broken level (do not chase). */
 const MAX_CHASE_ATR = 1.5;
 /** Stop loss sits this many M5 ATR beyond the pullback extreme. */
-const SL_BUFFER_ATR = 0.25;
+export const SL_BUFFER_ATR = 0.25;
 /** Stop distance must be between these many M5 ATR (too tight = noise, too wide = undefined). */
-const MIN_RISK_ATR = 0.5;
-const MAX_RISK_ATR = 4;
+export const MIN_RISK_ATR = 0.5;
+export const MAX_RISK_ATR = 4;
 /** Data older than this many candle-lengths is treated as not fresh. */
-const M5_STALE_AFTER = 3;
-const M15_STALE_AFTER = 2;
+export const M5_STALE_AFTER = 3;
+export const M15_STALE_AFTER = 2;
 /** Two swing points closer than this many M15 ATR count as "equal" (a liquidity pool). */
 const EQUAL_LEVEL_ATR = 0.15;
 
@@ -129,16 +129,16 @@ export function pivots(candles: Candle[], kind: 'high' | 'low', side: number): P
     return out;
 }
 
-const mirror = (c: Candle): Candle => ({ time: c.time, open: -c.open, high: -c.low, low: -c.high, close: -c.close });
+export const mirror = (c: Candle): Candle => ({ time: c.time, open: -c.open, high: -c.low, low: -c.high, close: -c.close });
 
 const dayStart = (t: number) => Math.floor(t / 86400) * 86400;
 
-const fmt = (n: number) => String(Number(n.toPrecision(8)));
+export const fmt = (n: number) => String(Number(n.toPrecision(8)));
 
 // ---------------------------------------------------------------------------------------------
 // M15: direction and levels
 
-interface M15Read {
+export interface M15Read {
     bias: Bias;
     text: string;
     levels: MtfLevels;
@@ -262,7 +262,7 @@ export function confirmBuy(c5: Candle[], atr5: number, invalidation: number | nu
 // ---------------------------------------------------------------------------------------------
 // the full analysis
 
-function result(partial: Partial<MtfResult> & { reasons: string[]; m15Text: string; m5Text: string }): MtfResult {
+export function result(partial: Partial<MtfResult> & { reasons: string[]; m15Text: string; m5Text: string }): MtfResult {
     const r: MtfResult = {
         signal: 'WAIT',
         bias: 'unclear',

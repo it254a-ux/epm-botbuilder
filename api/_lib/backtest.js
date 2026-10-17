@@ -8,6 +8,7 @@ const engine = require('./engine');
 const core = require('./signals-core');
 const { evaluateSignal } = require('./signal-outcome');
 const mtfLib = require('./mtf');
+const ictLib = require('./ict');
 
 /** Candles needed before the first analysis: the same history the live watcher loads (15 days). */
 const historyCandles = tf => Math.ceil((15 * 86400) / tf);
@@ -53,6 +54,9 @@ function runBacktest({ symbol, symbolName, market, candles, timeframe, strategie
 /** The M15 + M5 mode is stored with this strategy number and name (the H1 strategies are 1-5). Same as the live watcher (api/signal-watch-mtf.js). */
 const MTF_STRATEGY_ID = 6;
 const MTF_STRATEGY_NAME = 'M15 direction + M5 entry';
+/** The ICT strategy (same ids as the live watcher). */
+const ICT_STRATEGY_ID = 7;
+const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
 const MTF_TF = 300;
 const MTF_FIRST = 100; // M5 candles needed before the first analysis
 
@@ -62,7 +66,11 @@ const MTF_FIRST = 100; // M5 candles needed before the first analysis
  * live results (entry = the close of the last closed M5 candle). Same safety rules as the live watcher: one signal per setup, only one open
  * trade per market at a time, and a cool-down (default 30 minutes) after each signal before the same market can signal again.
  */
-function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 86400, cooldownMinutes = 30 }) {
+function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 86400, cooldownMinutes = 30, strategy = 'mtf' }) {
+    const isIct = strategy === 'ict';
+    const stratId = isIct ? ICT_STRATEGY_ID : MTF_STRATEGY_ID;
+    const stratName = isIct ? ICT_STRATEGY_NAME : MTF_STRATEGY_NAME;
+    const analyse = isIct ? ictLib.analyseIct : mtfLib.analyseMtf;
     const kind = engine.marketKind(market);
     const trades = [];
     const seen = new Set();
@@ -77,16 +85,16 @@ function runMtfBacktest({ symbol, symbolName, market, m5, m15, expirySeconds = 8
         if (now < blockedUntil) continue;
         const m5w = m5.slice(Math.max(0, i - 299), i + 1);
         const m15w = m15.slice(Math.max(0, j - 399), j + 1);
-        const r = mtfLib.analyseMtf(m15w, m5w, now);
+        const r = analyse(m15w, m5w, now);
         if (r.signal === 'WAIT' || !r.plan || !r.setupId) continue;
         if (seen.has(r.setupId)) continue;
         seen.add(r.setupId);
         const atr = engine.atr(m5w, 14);
-        const sig = { symbol, strategyId: MTF_STRATEGY_ID, timeframe: MTF_TF, side: r.plan.side, entry: r.plan.entry, stopLoss: r.plan.stopLoss, takeProfit: r.plan.takeProfit, rr: r.plan.rr, time: m5[i].time };
+        const sig = { symbol, strategyId: stratId, timeframe: MTF_TF, side: r.plan.side, entry: r.plan.entry, stopLoss: r.plan.stopLoss, takeProfit: r.plan.takeProfit, rr: r.plan.rr, time: m5[i].time };
         const outcome = evaluateSignal(sig, m5.slice(i + 1), endNow, expirySeconds);
         blockedUntil = Math.max(now + cooldownMinutes * 60, outcome ? outcome.closedTime + MTF_TF : Infinity);
         trades.push({
-            symbol, symbolName: symbolName || symbol, kind, strategyId: MTF_STRATEGY_ID, strategyName: MTF_STRATEGY_NAME, side: r.plan.side,
+            symbol, symbolName: symbolName || symbol, kind, strategyId: stratId, strategyName: stratName, side: r.plan.side,
             rr: r.plan.rr, stopAtr: atr ? r.plan.risk / atr : null, age: 0, time: m5[i].time, hourUtc: new Date(now * 1000).getUTCHours(),
             status: outcome ? outcome.status : 'open',
         });

@@ -7,12 +7,14 @@ jest.mock('../_lib/db', () => ({ getDb: () => global.__sql }));
 jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.fn(), getCandles: jest.fn() }));
 jest.mock('../_lib/telegram', () => ({ sendTelegram: jest.fn(), sendTelegramPhoto: jest.fn() }));
 jest.mock('../_lib/mtf', () => ({ analyseMtf: jest.fn() }));
+jest.mock('../_lib/ict', () => ({ analyseIct: jest.fn() }));
 jest.mock('../_lib/signal-chart', () => ({ renderChartPng: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
 const { sendTelegram, sendTelegramPhoto } = require('../_lib/telegram');
 const chart = require('../_lib/signal-chart');
 const mtf = require('../_lib/mtf');
+const ict = require('../_lib/ict');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
 const handler = require('../signal-watch-mtf');
@@ -66,6 +68,7 @@ beforeEach(async () => {
     // By default the picture cannot be drawn, so the tests below keep checking the plain-text message.
     chart.renderChartPng.mockReset().mockImplementation(() => { throw new Error('no chart in this test'); });
     mtf.analyseMtf.mockReset().mockReturnValue(BUY());
+    ict.analyseIct.mockReset().mockReturnValue(WAIT()); // the ICT strategy has its own describe block below
 });
 afterEach(() => { process.env = ENV; if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
@@ -323,5 +326,65 @@ describe('chart picture and once-per-setup', () => {
         expect(r.body.markets[0].picture).toMatch(/^ok/);
         expect(sendTelegram).not.toHaveBeenCalled();
         expect(sendTelegramPhoto).not.toHaveBeenCalled();
+    });
+});
+
+describe('ICT strategy (same run, own rules)', () => {
+    const ICT_BUY = (over = {}) => BUY({ m5Text: 'ICT confirmed: swept the low 2340, structure shifted above 2348, price returned to the fair value gap 2349 - 2350.', setupId: 'ICT|BUY|2340|2348', ...over });
+
+    test('a confirmed ICT setup is saved as its own strategy and sent with its own name', async () => {
+        mtf.analyseMtf.mockReturnValue(WAIT());
+        ict.analyseIct.mockReturnValue(ICT_BUY());
+        const r = await call();
+        expect(r.body.summary.ict).toEqual(expect.objectContaining({ signalsSaved: 1, telegramSent: 1 }));
+        expect(r.body.summary.signalsSaved).toBe(0);
+        const rows = await global.__sql`SELECT strategy_name, side FROM signals`;
+        expect(rows).toEqual([{ strategy_name: 'ICT sweep + shift + gap', side: 'BUY' }]);
+        const text = sendTelegram.mock.calls[0][0];
+        expect(text).toContain('Mode: ICT sweep + shift + gap');
+        expect(text).toContain('fair value gap');
+    });
+
+    test('the same ICT setup is never sent twice', async () => {
+        mtf.analyseMtf.mockReturnValue(WAIT());
+        ict.analyseIct.mockReturnValue(ICT_BUY());
+        await call({ force: '1' });
+        process.env.MTF_COOLDOWN_MIN = '0';
+        const second = await call({ force: '1' });
+        expect(second.body.summary.ict.signalsSaved).toBe(0);
+        expect(sendTelegram).toHaveBeenCalledTimes(1);
+    });
+
+    test('ICT and M15+M5 do not block each other: both can be open on the same market', async () => {
+        mtf.analyseMtf.mockReturnValue(BUY());
+        ict.analyseIct.mockReturnValue(ICT_BUY());
+        const r = await call();
+        expect(r.body.summary.signalsSaved).toBe(1);
+        expect(r.body.summary.ict.signalsSaved).toBe(1);
+        const rows = await global.__sql`SELECT strategy_name FROM signals ORDER BY id`;
+        expect(rows.map(x => x.strategy_name)).toEqual(['M15 direction + M5 entry', 'ICT sweep + shift + gap']);
+    });
+
+    test('an open ICT trade holds back a second ICT signal on that market, but not an M15+M5 one', async () => {
+        mtf.analyseMtf.mockReturnValue(WAIT());
+        ict.analyseIct.mockReturnValue(ICT_BUY());
+        await call({ force: '1' });
+        process.env.MTF_COOLDOWN_MIN = '0';
+        ict.analyseIct.mockReturnValue(ICT_BUY({ setupId: 'ICT|BUY|2300|2310' }));
+        const r = await call({ force: '1' });
+        expect(r.body.markets[0].ict.skipped).toMatch(/still open/);
+        mtf.analyseMtf.mockReturnValue(BUY());
+        const r2 = await call({ force: '1' });
+        expect(r2.body.summary.signalsSaved).toBe(1);
+    });
+
+    test('ICT_ENABLED=off leaves ICT out completely', async () => {
+        process.env.ICT_ENABLED = 'off';
+        mtf.analyseMtf.mockReturnValue(WAIT());
+        ict.analyseIct.mockReturnValue(ICT_BUY());
+        const r = await call();
+        expect(ict.analyseIct).not.toHaveBeenCalled();
+        expect(r.body.summary.ict).toBeUndefined();
+        expect(sendTelegram).not.toHaveBeenCalled();
     });
 });

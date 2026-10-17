@@ -54,7 +54,7 @@ function formatMtfTelegram(sig, { siteUrl, newsNote } = {}) {
     return [
         `${buy ? '🟢' : '🔴'} <b>${sig.side} SIGNAL</b>: ${escapeHtml(sig.symbolName || sig.symbol)}`,
         '',
-        '📊 Mode: M15 direction + M5 entry',
+        `📊 Mode: ${escapeHtml(sig.strategyName || 'M15 direction + M5 entry')}`,
         `🧭 ${escapeHtml(sig.m15Text)}`,
         `✅ ${escapeHtml(sig.m5Text)}`,
         '',
