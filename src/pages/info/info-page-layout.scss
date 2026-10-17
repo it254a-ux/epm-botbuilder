@@ -1,404 +1,432 @@
 @use 'components/shared/styles/wallpaper' as *;
-
-// Rendered inside Layout's <Body> (.main-body: flex-grow: 1; overflow:
-// hidden -- see components/layout/main-body/main-body.scss), not a bare
-// full-viewport page, so this needs its own height + scroll rather than
-// min-height: 100vh (which would just get clipped by that overflow: hidden
-// once the header above it takes its own real space).
 @use 'components/shared/styles/mixins' as *;
 
+// Info / legal pages (About, Contact, Risk disclosure, Terms, Privacy).
 //
-// --info-accent is set inline per page (info-page-layout.tsx), pulled from
-// one of the app's existing --brand-* tokens (_themes.scss) -- so each page
-// reads as its own thing (Risk Disclosure in amber, Terms in violet, ...)
-// without introducing a single new color to the app's palette.
-//
-// Headlines use the brand's own secondary serif (brand.config.json ->
-// font_family.secondary, Georgia) against the sans body copy -- an
-// editorial pairing already defined for this brand but unused anywhere
-// else in the app, rather than a new font or a decorative effect.
+// A reading document on a frosted sheet floating over the page wallpaper:
+// a serif title with the brand's five-bar mark, a long single reading column,
+// and (on wide screens) a contents rail that follows the reader. The accent
+// (--info-accent) is the page's own colour and is used sparingly: the mark, the
+// rule under the title, links, the contents marker and the pull-quote line.
+
 .info-page {
+    --info-serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+    --info-ink: var(--text-prominent);
+    --info-muted: color-mix(in srgb, var(--text-prominent) 60%, transparent);
+    --info-hairline: color-mix(in srgb, var(--text-prominent) 16%, transparent);
+
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
     display: flex;
     flex-direction: column;
     @include page-wallpaper;
-    color: var(--text-general);
+    --wall-tint: rgba(8, 8, 10, 0.5);
+    color: var(--info-ink);
 
-    // A wrapping row of equal-height cards, not a single centered column: on
-    // a wide screen each <InfoSection> card sits beside its siblings, and
-    // falls back to fewer per row (down to one on a phone) on its own.
-    //
-    // Flex-wrap rather than CSS grid on purpose: every card has flex-grow: 1,
-    // so whatever cards land on the LAST row stretch to share that row's full
-    // width. A grid can't do that -- an odd card count always leaves empty
-    // cells beside the final card, which is the blank space that kept
-    // showing up at the bottom of each page. Widths flex, heights never do.
-    //
-    // The card's flex-basis is min(34rem, 100%) -- a plain 34rem basis would
-    // be wider than a phone screen, and since this renders inside .main-body
-    // (overflow: hidden, see the note above) that excess would be clipped
-    // off the edge rather than scrolled, which is what made these pages look
-    // "cut" / "crashed" on mobile before.
-    &__content {
-        width: 100%;
-        max-width: 128rem;
-        margin: 0 auto;
-        padding: 4.8rem 3.2rem 6.4rem;
-        line-height: 1.65;
-        counter-reset: info-section;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 2rem 2.4rem;
-        align-items: flex-start;
+    .theme--light & {
+        --wall-tint: rgba(255, 255, 255, 0.55);
+    }
 
-        // Everything that isn't a section (the eyebrow, h1, updated line,
-        // lead paragraph, and any top-level Callout) is the page's intro --
-        // takes a full row of its own above the cards.
-        > :not(section) {
-            flex: 0 0 100%;
-        }
+    @media (prefers-reduced-motion: reduce) {
+        scroll-behavior: auto;
+    }
 
-        // A short mark above the eyebrow instead of a banner/hero block --
-        // reads as a signature accent, not a decoration competing with the
-        // content. It's a flex item of the container (a ::before on a flex/
-        // grid container is one), but the intro rows after it each take a
-        // full 100% line, so it always ends up alone on its own line.
-        &::before {
-            content: '';
-            display: block;
-            flex: none;
-            width: 4.8rem;
-            height: 0.4rem;
-            border-radius: 0.2rem;
-            margin-bottom: 2rem;
-            background: var(--info-accent);
-        }
+    // ---- the sheet -------------------------------------------------------
+    &__shell {
+        width: calc(100% - 4.8rem);
+        max-width: 112rem;
+        margin: 3.2rem auto 0;
+        padding: 6.4rem 6.4rem 7.2rem;
+        border: 1px solid var(--info-hairline);
+        border-radius: 2.4rem;
+        background: color-mix(in srgb, var(--general-main-1) 80%, transparent);
+        -webkit-backdrop-filter: blur(18px) saturate(1.15);
+        backdrop-filter: blur(18px) saturate(1.15);
+        box-shadow:
+            inset 0 1px 0 color-mix(in srgb, var(--text-prominent) 10%, transparent),
+            0 3rem 8rem -2rem rgba(0, 0, 0, 0.45);
+        animation: info-sheet-in 0.7s ease-out both;
 
-        // Below this, the desktop paddings/font sizes (built for a 128rem-
-        // wide canvas) are themselves oversized for a phone screen -- large
-        // padding eats most of the readable width, and the 4rem heading /
-        // 7.2rem ghost numeral (comfortable at desktop card widths) crowd a
-        // single narrow mobile column. Scaled down together here instead of
-        // reusing the desktop sizes as-is.
         @media (max-width: 60rem) {
-            padding: 2.8rem 1.6rem 4rem;
-            gap: 1.6rem;
+            width: 100%;
+            margin-top: 0;
+            padding: 3.2rem 2rem 4.8rem;
+            border-radius: 0;
+            border-inline: 0;
+            border-top: 0;
         }
     }
 
-    // Each topical block, as its own card. A faint tint of the page's own
-    // accent (not a solid color) plus a lift on hover.
-    //
-    // EVERY card is the same fixed height -- desktop and mobile -- exactly
-    // like the bot cards on the Trading Bots tab (freebots.tsx/.scss).
-    // Content that doesn't fit is clipped behind a fade, and clicking
-    // anywhere on the card opens the full text in a modal (see InfoSection
-    // in info-page-layout.tsx). Width is the only thing that flexes (see
-    // &__content above), never height.
-    &__section {
+    // ---- title block: the one orchestrated moment ---------------------------
+    &__header {
         position: relative;
-        overflow: hidden;
-        flex: 1 1 min(34rem, 100%);
-        background: var(--general-section-1);
-        border: 1px solid color-mix(in srgb, var(--info-accent) 12%, var(--general-section-1));
-        border-radius: 1.2rem;
-        padding: 2.4rem;
-        height: 22rem;
+        padding-bottom: 3.2rem;
+        margin-bottom: 4.8rem;
+    }
+
+    // Five bars, the same mark as the loading screen, rising once on arrival.
+    &__mark {
         display: flex;
-        flex-direction: column;
-        cursor: pointer;
-        // The numbering lives on the card itself (see ::before below), so the
-        // counter has to tick up here, on the same element -- ticking it on
-        // the h2 inside would run AFTER this card's own ::before had already
-        // been generated, and every number would be one behind.
-        counter-increment: info-section;
-        transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
+        align-items: flex-end;
+        gap: 0.5rem;
+        height: 3.6rem;
+        margin-bottom: 2.4rem;
 
-        &:hover {
-            transform: translateY(-0.2rem);
-            box-shadow: 0 0.8rem 2.4rem color-mix(in srgb, var(--info-accent) 10%, transparent);
+        i {
+            display: block;
+            width: 0.6rem;
+            border-radius: 0.3rem;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--info-accent) 55%, #fff) 0%, var(--info-accent) 60%);
+            transform-origin: bottom;
+            animation: info-bar-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+            &:nth-child(1) {
+                height: 38%;
+                animation-delay: 0.05s;
+            }
+            &:nth-child(2) {
+                height: 62%;
+                animation-delay: 0.14s;
+            }
+            &:nth-child(3) {
+                height: 100%;
+                animation-delay: 0.23s;
+            }
+            &:nth-child(4) {
+                height: 62%;
+                animation-delay: 0.32s;
+            }
+            &:nth-child(5) {
+                height: 38%;
+                animation-delay: 0.41s;
+            }
+        }
+    }
+
+    h1 {
+        font-family: var(--info-serif);
+        font-size: clamp(3.8rem, 5.2vw, 6.4rem);
+        font-weight: 500;
+        font-variation-settings: 'opsz' 72;
+        letter-spacing: -0.022em;
+        line-height: 1.04;
+        color: var(--info-ink);
+        max-width: 60rem;
+        animation: info-title-in 0.8s 0.3s ease-out both;
+    }
+
+    &__updated {
+        margin-top: 1.6rem;
+        font-size: 1.3rem;
+        color: var(--info-muted);
+        animation: info-title-in 0.8s 0.45s ease-out both;
+    }
+
+    &__rule {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: 1px;
+        background: linear-gradient(90deg, var(--info-accent), color-mix(in srgb, var(--info-accent) 0%, transparent) 78%);
+        transform-origin: left;
+        animation: info-rule-draw 1.1s 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+        [dir='rtl'] & {
+            transform-origin: right;
+            background: linear-gradient(270deg, var(--info-accent), color-mix(in srgb, var(--info-accent) 0%, transparent) 78%);
+        }
+    }
+
+    // ---- body: rail + reading column --------------------------------------
+    &__body {
+        display: grid;
+        grid-template-columns: 22rem minmax(0, 1fr);
+        column-gap: 6.4rem;
+        align-items: start;
+
+        &:not(:has(.info-page__rail)) {
+            grid-template-columns: minmax(0, 1fr);
         }
 
-        &:focus-visible {
-            outline: 2px solid var(--info-accent);
-            outline-offset: 2px;
+        @media (max-width: 60rem) {
+            display: block;
+        }
+    }
+
+    &__rail {
+        position: sticky;
+        top: 2.4rem;
+        align-self: start;
+
+        @media (max-width: 60rem) {
+            display: none;
         }
 
-        // A large, faint serif numeral in the card's top-right corner. It
-        // sits INSIDE the card (never bleeding above/outside it), and the
-        // h2 reserves room for it (padding-inline-end below) so a long,
-        // wrapping heading can't run underneath it -- that overlap is what
-        // the old, larger, h2-anchored numeral kept causing.
-        &::before {
-            content: counter(info-section, decimal-leading-zero);
-            position: absolute;
-            top: 1rem;
-            inset-inline-end: 1.6rem;
-            font-family: Georgia, 'Times New Roman', Times, serif;
-            font-size: 4.4rem;
-            font-weight: 700;
-            color: var(--info-accent);
-            opacity: 0.14;
-            line-height: 1;
-            pointer-events: none;
+        ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            text-align: start;
+            font: inherit;
+            font-size: 1.4rem;
+            line-height: 1.4;
+            color: var(--info-muted);
+            background: none;
+            border: 0;
+            border-inline-start: 2px solid var(--info-hairline);
+            padding: 0.9rem 0 0.9rem 1.8rem;
+            cursor: pointer;
+            transition:
+                color 0.25s ease,
+                border-color 0.25s ease,
+                padding 0.25s ease;
+
+            &:hover {
+                color: var(--info-ink);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--info-accent);
+                outline-offset: 2px;
+            }
+
+            &.is-active {
+                color: var(--info-ink);
+                font-weight: 600;
+                border-inline-start-color: var(--info-accent);
+                padding-inline-start: 2.2rem;
+            }
+        }
+    }
+
+    &__content {
+        min-width: 0;
+        max-width: 72rem;
+        line-height: 1.75;
+
+        // The opening paragraph reads as an introduction.
+        > p:first-child {
+            font-family: var(--info-serif);
+            font-size: 2.2rem;
+            line-height: 1.5;
+            letter-spacing: -0.005em;
+            margin-bottom: 2.8rem;
+            color: var(--info-ink);
+
+            @media (max-width: 60rem) {
+                font-size: 1.9rem;
+            }
+        }
+    }
+
+    &__section {
+        scroll-margin-top: 2.4rem;
+        padding-top: 4rem;
+        margin-top: 4.8rem;
+        border-top: 1px solid var(--info-hairline);
+
+        &:first-child {
+            margin-top: 0;
         }
 
         h2 {
-            padding-inline-end: 6rem;
+            font-family: var(--info-serif);
+            font-size: clamp(2.6rem, 2.6vw, 3.2rem);
+            font-weight: 500;
+            font-variation-settings: 'opsz' 36;
+            letter-spacing: -0.012em;
+            line-height: 1.2;
+            margin-bottom: 2rem;
+            color: var(--info-ink);
         }
-
-        @media (max-width: 60rem) {
-            padding: 2rem;
-            height: 24rem;
-
-            &::before {
-                font-size: 3.4rem;
-                top: 0.8rem;
-                inset-inline-end: 1.4rem;
-            }
-
-            h2 {
-                padding-inline-end: 4.8rem;
-            }
-        }
-    }
-
-    // Wraps everything below the h2 (paragraphs, lists, Callouts). flex: 1
-    // lets it claim exactly the card's remaining fixed height; overflow:
-    // hidden + the ::after fade let a short section and a five-paragraph one
-    // sit in identical cards -- the long one is clipped, not stretched.
-    &__section-body {
-        position: relative;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-
-        &::after {
-            content: '';
-            position: absolute;
-            inset-inline: 0;
-            bottom: 0;
-            height: 3.2rem;
-            background: linear-gradient(to bottom, transparent, var(--general-section-1));
-            pointer-events: none;
-        }
-    }
-
-    // Sits over the fade, bottom-right -- the cue that the whole card is
-    // clickable for the full text, rather than hunting for a button.
-    &__section-more {
-        position: absolute;
-        bottom: 0.8rem;
-        inset-inline-end: 2rem;
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: var(--info-accent);
-        background: var(--general-section-1);
-        padding-inline-start: 0.4rem;
-
-        @media (max-width: 60rem) {
-            inset-inline-end: 1.4rem;
-        }
-    }
-
-    &__eyebrow {
-        font-size: 1.2rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--info-accent);
-        margin-bottom: 0.8rem;
-    }
-
-    // A fixed brand blue (not the per-page --info-accent) so every page's
-    // headings read as one consistent, premium identity, while --info-accent
-    // keeps doing its job on the smaller per-page details (numerals, the
-    // signature mark, callouts, links).
-    h1 {
-        font-family: Georgia, 'Times New Roman', Times, serif;
-        font-size: 4rem;
-        font-weight: 700;
-        letter-spacing: -0.01em;
-        line-height: 1.15;
-        margin-bottom: 0.6rem;
-        max-width: 56rem;
-        color: var(--brand-primary);
-
-        // 4rem (40px) is sized for the desktop canvas; on a ~340px-wide
-        // phone screen it wraps to 2-3 lines and reads as oversized against
-        // everything else on the page.
-        @media (max-width: 60rem) {
-            font-size: 2.6rem;
-        }
-    }
-
-    h2 {
-        position: relative;
-        font-size: 1.8rem;
-        font-weight: 800;
-        margin-bottom: 1.2rem;
-        color: var(--brand-primary);
-        // Inside a card, h2 is a flex child above the flex: 1 body -- pinned
-        // to its own size so a tall body never squeezes the heading itself.
-        flex-shrink: 0;
     }
 
     p,
     ul,
     ol {
-        font-size: 1.5rem;
-        color: var(--text-general);
-        margin-bottom: 1.2rem;
+        font-size: 1.6rem;
+        color: color-mix(in srgb, var(--info-ink) 88%, transparent);
+        margin-bottom: 1.6rem;
 
         &:last-child {
             margin-bottom: 0;
         }
     }
 
-    // Intro paragraphs (outside any card) read best at article width even
-    // though the grid itself now spans the full wide container.
-    &__content > p {
-        max-width: 76rem;
-    }
-
+    // Lists: a short accent bar as the marker (echoes the five-bar mark).
     ul,
     ol {
-        padding-inline-start: 2rem;
+        padding-inline-start: 0;
+        list-style: none;
+
+        li {
+            position: relative;
+            padding-inline-start: 2.4rem;
+            margin-bottom: 0.9rem;
+
+            &::before {
+                content: '';
+                position: absolute;
+                inset-inline-start: 0;
+                top: 1.35rem;
+                width: 1.2rem;
+                height: 2px;
+                border-radius: 1px;
+                background: var(--info-accent);
+            }
+        }
     }
 
-    a {
-        color: var(--info-accent);
-        font-weight: 600;
+    ol {
+        counter-reset: info-step;
 
-        &:hover {
-            text-decoration: none;
+        li {
+            counter-increment: info-step;
+
+            &::before {
+                content: counter(info-step);
+                top: 0;
+                width: auto;
+                height: auto;
+                background: none;
+                font-weight: 700;
+                color: var(--info-accent);
+            }
         }
     }
 
     strong {
-        font-weight: 700;
+        font-weight: 650;
+        color: var(--info-ink);
     }
 
-    &__updated {
-        font-size: 1.2rem;
-        color: var(--text-less-prominent);
-        margin-bottom: 2.8rem;
-    }
-
-    // The one sentence on a page that matters most (a core risk warning, a
-    // no-custody statement) -- pulled out of the regular paragraph flow
-    // instead of leaning on <strong> alone.
-    &__callout {
-        position: relative;
-        border-inline-start: 0.3rem solid var(--info-accent);
-        background: color-mix(in srgb, var(--info-accent) 8%, transparent);
-        border-radius: 0 0.6rem 0.6rem 0;
-        padding: 1.6rem 2rem;
-        margin-bottom: 1.2rem;
-        font-size: 1.6rem;
+    a {
+        color: var(--info-accent);
         font-weight: 600;
-        line-height: 1.5;
-        max-width: 76rem;
+        text-decoration: none;
+        background-image: linear-gradient(currentColor, currentColor);
+        background-repeat: no-repeat;
+        background-position: 0 100%;
+        background-size: 0% 1px;
+        transition: background-size 0.3s ease;
 
-        &:last-child {
-            margin-bottom: 0;
+        &:hover,
+        &:focus-visible {
+            background-size: 100% 1px;
         }
     }
 
-    // Inside a card, the callout doesn't need the intro's article-width cap.
-    &__section &__callout {
-        max-width: none;
+    // The sentence that matters most: set apart, larger, with the page's line.
+    &__callout {
+        font-family: var(--info-serif);
+        font-size: 2rem;
+        font-weight: 500;
+        line-height: 1.5;
+        color: var(--info-ink);
+        border-inline-start: 2px solid var(--info-accent);
+        padding: 0.4rem 0 0.4rem 2.4rem;
+        margin: 3.2rem 0;
+        max-width: 64rem;
+
+        @media (max-width: 60rem) {
+            font-size: 1.8rem;
+            padding-inline-start: 1.8rem;
+        }
     }
 
+    &__section &__callout {
+        font-size: 1.8rem;
+        margin: 2.4rem 0;
+    }
+
+    // ---- footer links -------------------------------------------------------
     &__footer {
-        border-top: 1px solid var(--general-section-1);
-        padding: 2.4rem;
+        margin-top: auto;
+        padding: 4rem 2.4rem 4.8rem;
 
         nav {
-            max-width: 128rem;
+            max-width: 112rem;
             margin: 0 auto;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 0.8rem;
+            gap: 0.8rem 3.2rem;
         }
 
         a {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--text-less-prominent);
-            text-decoration: none;
-            padding: 0.6rem 1.4rem;
-            border-radius: 999px;
-            border: 1px solid var(--general-section-1);
-            transition:
-                color 0.15s ease,
-                border-color 0.15s ease;
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: color-mix(in srgb, var(--info-ink) 72%, transparent);
+            padding: 0.4rem 0;
 
-            &:hover {
-                color: var(--text-general);
-                border-color: var(--text-less-prominent);
+            &:hover,
+            &:focus-visible {
+                color: var(--info-ink);
             }
 
             &.is-current {
-                color: var(--general-main-1);
-                background: var(--info-accent);
-                border-color: var(--info-accent);
+                color: var(--info-ink);
+                font-weight: 650;
+                background-size: 100% 1px;
+                color: var(--info-accent);
             }
         }
     }
 }
 
-// The pop-out modal opened by clicking any InfoSection card (see
-// info-page-layout.tsx) -- same underlying Modal (shared_ui/modal) and same
-// treatment as the bot-details modal on the Trading Bots tab
-// (freebots.scss): dc-modal__container has no max-height of its own, so a
-// long section (or a small phone viewport) would otherwise grow the modal
-// straight past the screen edge with nothing to scroll.
-.dc-modal__container_info-section-details-modal {
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 4.8rem);
-
-    @include mobile-screen {
-        max-height: calc(100vh - 3.2rem);
+@keyframes info-sheet-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
     }
 }
 
-.info-section-details-modal__body {
-    font-size: 1.5rem;
-    line-height: 1.65;
-    color: var(--text-general);
-    overflow-y: auto;
-
-    p,
-    ul,
-    ol {
-        margin-bottom: 1.2rem;
-
-        &:last-child {
-            margin-bottom: 0;
-        }
+@keyframes info-bar-rise {
+    from {
+        transform: scaleY(0.12);
+        opacity: 0;
     }
-
-    ul,
-    ol {
-        padding-inline-start: 2rem;
+    to {
+        transform: scaleY(1);
+        opacity: 1;
     }
+}
 
-    a {
-        color: var(--brand-primary);
-        font-weight: 600;
+@keyframes info-title-in {
+    from {
+        opacity: 0;
+        transform: translateY(1rem);
     }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
 
-    // A Callout reads fine inline in a card, but inside the modal it no
-    // longer needs the card's own faint background tint doubled on top of
-    // the modal's -- kept as a bordered strip, dropped the fill.
-    .info-page__callout {
-        background: none;
-        border: 1px solid var(--general-section-1);
+@keyframes info-rule-draw {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .info-page__shell,
+    .info-page__mark i,
+    .info-page h1,
+    .info-page__updated,
+    .info-page__rule {
+        animation: none;
     }
 }

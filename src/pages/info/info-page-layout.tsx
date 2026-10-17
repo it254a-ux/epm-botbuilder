@@ -1,14 +1,21 @@
 // Shared chrome for the standalone info/legal pages (About, Contact, Risk
 // Disclosure, Terms, Privacy). These are plain routes (see App.tsx) nested
-// inside the same Layout/AppHeader as every other page (Dashboard, Bot
-// Builder, Chart, ...) -- so the real nav bar, account switcher, etc. all
-// render above this automatically. This component is just the page body:
-// eyebrow + title, content (with auto-numbered h2 sections via CSS
-// counters), and a small footer cross-linking the other four.
-import { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, useState } from 'react';
+// inside the same Layout/AppHeader as every other page, so the real nav bar and
+// account switcher render above this automatically. This component is the page
+// body: a title, a reading column of sections, a contents rail that follows the
+// reader (desktop), and a small footer linking the other pages.
+import {
+    Children,
+    CSSProperties,
+    Fragment,
+    isValidElement,
+    ReactNode,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import Modal from '@/components/shared_ui/modal';
-import { Localize } from '@deriv-com/translations';
 import './info-page-layout.scss';
 
 const FOOTER_LINKS: { to: string; label: string }[] = [
@@ -20,32 +27,124 @@ const FOOTER_LINKS: { to: string; label: string }[] = [
 ];
 
 type TInfoPageLayout = {
-    eyebrow: string;
+    /** Kept so existing pages still compile; the page category is shown by the footer links. */
+    eyebrow?: string;
     title: string;
-    /** A --brand-* token from _themes.scss, e.g. 'var(--brand-warning)' -- keeps
-     *  each page's accent drawn from the app's existing palette rather than a
-     *  one-off color, so pages feel distinct without feeling inconsistent. */
+    /** A --brand-* token from _themes.scss, e.g. 'var(--brand-warning)'. Used for the
+     *  page's accent line, links and the contents marker, so each page keeps its own colour. */
     accent: string;
     updated?: string;
     children: ReactNode;
 };
 
-const InfoPageLayout = ({ eyebrow, title, accent, updated, children }: TInfoPageLayout) => {
+const toId = (title: string) =>
+    `section-${title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')}`;
+
+// Finds every <InfoSection> (also inside fragments) so the contents rail can list them.
+const collectSectionTitles = (nodes: ReactNode): string[] => {
+    const titles: string[] = [];
+    Children.forEach(nodes, child => {
+        if (!isValidElement(child)) return;
+        const props = child.props as { title?: string; children?: ReactNode };
+        if (child.type === InfoSection && props.title) titles.push(props.title);
+        else if (child.type === Fragment) titles.push(...collectSectionTitles(props.children));
+    });
+    return titles;
+};
+
+const InfoPageLayout = ({ title, accent, updated, children }: TInfoPageLayout) => {
     const { pathname } = useLocation();
+    const page_ref = useRef<HTMLDivElement>(null);
+    const titles = useMemo(() => collectSectionTitles(children), [children]);
+    const [active_id, setActiveId] = useState<string>('');
+
+    // Highlights the section being read, in the contents rail.
+    useEffect(() => {
+        const root = page_ref.current;
+        if (!root || titles.length < 2 || !('IntersectionObserver' in window)) return undefined;
+        const sections = Array.from(root.querySelectorAll<HTMLElement>('.info-page__section[id]'));
+        const visible = new Set<string>();
+        const pick = () => {
+            const first = sections.find(section => visible.has(section.id));
+            if (first) setActiveId(first.id);
+        };
+        const observer = new IntersectionObserver(
+            entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) visible.add((entry.target as HTMLElement).id);
+                    else visible.delete((entry.target as HTMLElement).id);
+                });
+                pick();
+            },
+            { root, rootMargin: '-12% 0px -62% 0px', threshold: 0 }
+        );
+        sections.forEach(section => observer.observe(section));
+        setActiveId(sections[0]?.id ?? '');
+        return () => observer.disconnect();
+    }, [titles, pathname]);
+
+    const goTo = (id: string) => {
+        const el = page_ref.current?.querySelector<HTMLElement>(`#${id}`);
+        if (!el) return;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        setActiveId(id);
+    };
 
     return (
-        <div className='info-page' style={{ '--info-accent': accent } as CSSProperties}>
-            <main className='info-page__content'>
-                <div className='info-page__eyebrow'>{eyebrow}</div>
-                <h1>{title}</h1>
-                {updated && <div className='info-page__updated'>Last updated: {updated}</div>}
-                {children}
-            </main>
+        <div className='info-page' ref={page_ref} style={{ '--info-accent': accent } as CSSProperties}>
+            <div className='info-page__shell'>
+                <header className='info-page__header'>
+                    <span className='info-page__mark' aria-hidden='true'>
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                    </span>
+                    <h1>{title}</h1>
+                    {updated && <p className='info-page__updated'>Last updated {updated}</p>}
+                    <span className='info-page__rule' aria-hidden='true' />
+                </header>
+
+                <div className='info-page__body'>
+                    {titles.length > 1 && (
+                        <nav className='info-page__rail' aria-label={title}>
+                            <ul>
+                                {titles.map(item => {
+                                    const id = toId(item);
+                                    return (
+                                        <li key={id}>
+                                            <button
+                                                type='button'
+                                                className={id === active_id ? 'is-active' : undefined}
+                                                aria-current={id === active_id ? 'true' : undefined}
+                                                onClick={() => goTo(id)}
+                                            >
+                                                {item}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </nav>
+                    )}
+                    <main className='info-page__content'>{children}</main>
+                </div>
+            </div>
 
             <footer className='info-page__footer'>
                 <nav aria-label='Legal and company'>
                     {FOOTER_LINKS.map(({ to, label }) => (
-                        <Link key={to} to={to} className={pathname === to ? 'is-current' : undefined}>
+                        <Link
+                            key={to}
+                            to={to}
+                            className={pathname === to ? 'is-current' : undefined}
+                            aria-current={pathname === to ? 'page' : undefined}
+                        >
                             {label}
                         </Link>
                     ))}
@@ -55,65 +154,17 @@ const InfoPageLayout = ({ eyebrow, title, accent, updated, children }: TInfoPage
     );
 };
 
-/** A visually-elevated box for the one sentence on a page that matters most
- *  (a core risk warning, a no-custody statement) -- pulls it out of the
- *  regular paragraph flow instead of leaning on <strong> alone. */
+/** The one sentence on a page that matters most (a core risk warning, a no-custody
+ *  statement), set apart from the paragraphs around it. */
 export const Callout = ({ children }: { children: ReactNode }) => <div className='info-page__callout'>{children}</div>;
 
-// One topic block, rendered as a fixed-height card. Every card on every
-// page is the SAME height (see info-page-layout.scss) -- not "as tall as
-// whatever this section's own text needs". Whatever doesn't fit is clipped
-// behind a fade at the card's own bottom edge;
-// clicking anywhere on the card (not just a specific button) opens the same
-// content in full via a modal -- the same fixed-card + pop-out-modal
-// pattern already used for the bot cards on the Trading Bots tab
-// (src/pages/epm-trading-bots/freebots/freebots.tsx).
-export const InfoSection = ({ title, children }: { title: string; children: ReactNode }) => {
-    const [isOpen, setIsOpen] = useState(false);
-
-    // A card can contain a real <Link> (e.g. "see our Risk disclosure") --
-    // clicking that should navigate, not also pop the modal open behind it.
-    const handleCardClick = (event: MouseEvent<HTMLElement>) => {
-        if ((event.target as HTMLElement).closest('a')) return;
-        setIsOpen(true);
-    };
-
-    const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            setIsOpen(true);
-        }
-    };
-
-    return (
-        <>
-            <section
-                className='info-page__section'
-                onClick={handleCardClick}
-                onKeyDown={handleKeyDown}
-                role='button'
-                tabIndex={0}
-                aria-haspopup='dialog'
-            >
-                <h2>{title}</h2>
-                <div className='info-page__section-body'>{children}</div>
-                <span className='info-page__section-more'>
-                    <Localize i18n_default_text='Read more' />
-                </span>
-            </section>
-
-            <Modal
-                is_open={isOpen}
-                toggleModal={() => setIsOpen(false)}
-                title={title}
-                width='560px'
-                className='info-section-details-modal'
-                should_header_stick_body={false}
-            >
-                <Modal.Body className='info-section-details-modal__body'>{children}</Modal.Body>
-            </Modal>
-        </>
-    );
-};
+// One topic of the page: a heading and its text, in full. The contents rail
+// (above) links to each of them by the id built from the title.
+export const InfoSection = ({ title, children }: { title: string; children: ReactNode }) => (
+    <section className='info-page__section' id={toId(title)}>
+        <h2>{title}</h2>
+        <div className='info-page__section-body'>{children}</div>
+    </section>
+);
 
 export default InfoPageLayout;
