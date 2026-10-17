@@ -112,6 +112,8 @@ export interface Position {
     result: number | null;
     /** Deriv says the trade can be closed right now. */
     canClose: boolean;
+    /** The close request is on its way (shown as "Closing…"). */
+    closing?: boolean;
 }
 
 type Raw = Record<string, any>;

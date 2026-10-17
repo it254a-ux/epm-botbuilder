@@ -85,7 +85,7 @@ const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
                             </span>
                             <span className={`forex-live__rowpl${sign(p.profit)}`}>{formatMoney(p.profit)}</span>
                             <button type='button' disabled={!p.canClose} onClick={() => onClose([p])}>
-                                Close
+                                {p.closing ? 'Closing…' : 'Close'}
                             </button>
                         </li>
                     ))}

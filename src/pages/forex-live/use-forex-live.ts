@@ -40,6 +40,8 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
 
     const book = useRef<Map<number, Position>>(new Map());
     const dirty = useRef(false);
+    // trades whose close request is on its way: they cannot be closed twice, and show "Closing…" at once
+    const closing = useRef<Set<number>>(new Set());
     const logId = useRef(0);
     const authorized = useRef(isAuthorized);
     authorized.current = isAuthorized;
@@ -53,19 +55,26 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         dirty.current = true;
     }, []);
 
-    // Show updates in batches, so many live trades never make the page stutter.
+    // Show updates in batches, so many live trades never make the page stutter. Closing calls this straight away.
+    const flush = useCallback(() => {
+        dirty.current = false;
+        const all = [...book.current.values()];
+        // forget the oldest closed trades
+        const closed = all.filter(p => p.closed).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
+        closed.slice(KEEP_CLOSED).forEach(p => book.current.delete(p.id));
+        setPositions(
+            [...book.current.values()]
+                .sort((a, b) => (b.openedAt ?? b.id) - (a.openedAt ?? a.id))
+                .map(p => (closing.current.has(p.id) && !p.closed ? { ...p, canClose: false, closing: true } : p))
+        );
+    }, []);
+
     useEffect(() => {
         const t = window.setInterval(() => {
-            if (!dirty.current) return;
-            dirty.current = false;
-            const all = [...book.current.values()];
-            // forget the oldest closed trades
-            const closed = all.filter(p => p.closed).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
-            closed.slice(KEEP_CLOSED).forEach(p => book.current.delete(p.id));
-            setPositions([...book.current.values()].sort((a, b) => (b.openedAt ?? b.id) - (a.openedAt ?? a.id)));
+            if (dirty.current) flush();
         }, FLUSH_MS);
         return () => window.clearInterval(t);
-    }, []);
+    }, [flush]);
 
     // A different account has different trades.
     useEffect(() => {
@@ -150,24 +159,52 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 note('err', 'Not connected to Deriv yet. Please wait a moment.');
                 return;
             }
+            // a trade that is already being closed is not sent a second time
+            const todo = list.filter(p => !closing.current.has(p.id));
+            if (!todo.length) return;
+            todo.forEach(p => closing.current.add(p.id));
+            flush(); // the rows show "Closing…" this instant, before Deriv even answers
+
             // all at once: closing many trades should not take many round trips one after another
             const results = await Promise.allSettled(
-                list.map(async p => {
-                    const res = await api().send(buildSellRequest(p.id));
-                    if (res?.error) throw res;
-                    const soldFor = Number(res?.sell?.sold_for);
-                    if (Number.isFinite(soldFor)) {
-                        upsert({ ...p, closed: true, canClose: false, result: Math.round((soldFor - p.stake) * 100) / 100, profit: Math.round((soldFor - p.stake) * 100) / 100 });
+                todo.map(async p => {
+                    try {
+                        const res = await api().send(buildSellRequest(p.id));
+                        if (res?.error) throw res;
+                        const soldFor = Number(res?.sell?.sold_for);
+                        if (Number.isFinite(soldFor)) {
+                            const pl = Math.round((soldFor - p.stake) * 100) / 100;
+                            upsert({ ...p, closed: true, canClose: false, result: pl, profit: pl });
+                        }
+                        return p;
+                    } catch (e) {
+                        // it may already be closed (its stop loss or take profit was reached a moment ago): then there is nothing to fix
+                        const check: any = await Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: p.id })).catch(() => null);
+                        const poc = check?.proposal_open_contract;
+                        if (poc && (poc.is_sold === 1 || poc.is_sold === true)) {
+                            const pos = toPosition(poc);
+                            if (pos) upsert(pos);
+                            return p;
+                        }
+                        throw e;
+                    } finally {
+                        closing.current.delete(p.id);
                     }
-                    return p;
                 })
             );
+            flush();
             const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
             const done = results.length - failed.length;
             if (done) note('ok', `Closed ${done} trade${done === 1 ? '' : 's'}.`);
-            failed.forEach(f => note('err', `Could not close a trade: ${errorText(f.reason)}`));
+            // the same reason for many trades is shown once, with a count
+            const reasons = new Map<string, number>();
+            failed.forEach(f => {
+                const t = errorText(f.reason);
+                reasons.set(t, (reasons.get(t) ?? 0) + 1);
+            });
+            reasons.forEach((n, t) => note('err', `Could not close ${n === 1 ? 'a trade' : `${n} trades`}: ${t}`));
         },
-        [note, upsert]
+        [note, upsert, flush]
     );
 
     return { positions, log, pending, openTrade, closeTrades, note };
