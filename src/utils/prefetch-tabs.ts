@@ -22,6 +22,7 @@ const PREFETCHABLE_TABS = {
     [DBOT_TABS.EPM_TRADING_BOTS]: () => import('@/pages/epm-trading-bots'),
     [DBOT_TABS.EPM_ANALYSIS_TOOL]: () => import('@/pages/epm-analysis-tool'),
     [DBOT_TABS.FOREX_TRADER]: () => import('@/pages/forex-trader'),
+    [DBOT_TABS.FOREX_LIVE]: () => import('@/pages/forex-live'),
 } as const;
 
 const already_prefetched = new Set<number>();

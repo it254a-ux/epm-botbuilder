@@ -665,3 +665,16 @@
         font-family: inherit;
     }
 }
+
+/* Forex Live shows its own SmartCharts chart, so the tool's chart is kept out of sight. It still runs (the
+   analysis and the picture sent to the AI come from it), it just is not on the screen. */
+.forex-trader--chart-hidden .forex-trader__chart-wrap {
+    position: absolute !important;
+    left: -10000px;
+    top: 0;
+    width: 640px !important;
+    height: 360px !important;
+    min-height: 360px !important;
+    opacity: 0;
+    pointer-events: none;
+}

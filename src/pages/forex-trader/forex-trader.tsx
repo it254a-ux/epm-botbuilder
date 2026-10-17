@@ -114,10 +114,33 @@ const fmtTime = (t: number) => {
     return `${d.toUTCString().slice(5, 11)} ${d.toISOString().slice(11, 16)} GMT`;
 };
 
-const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'panel'; panelWidth?: number }) => {
+/** A planned trade, reported to a page that draws it on its own chart (Forex Live). */
+export interface ReportedPlan {
+    side: 'BUY' | 'SELL';
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+}
+
+interface ForexTraderProps {
+    variant?: 'page' | 'panel';
+    panelWidth?: number;
+    /** When given, this market is shown and follows the value (a parent page owns the market choice). */
+    controlledSymbol?: string;
+    /** Called when the person picks a market inside the tool. */
+    onSymbolChange?: (symbol: string) => void;
+    /** Called whenever the plan (entry, stop loss, take profit) changes; null when there is none. */
+    onPlan?: (plan: ReportedPlan | null, symbol: string) => void;
+    /** Start in the M15 analysis + M5 entry mode instead of the H1 strategies. */
+    initialMode?: 'h1' | 'mtf';
+    /** Keep the tool's own chart out of sight (it still runs, so the analysis is identical). */
+    hideChart?: boolean;
+}
+
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart }: ForexTraderProps) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
-    const [symbol, setSymbol] = useState('R_25');
+    const [symbol, setSymbol] = useState(controlledSymbol ?? 'R_25');
     const [tf, setTf] = useState(3600);
     const [category, setCategory] = useState(STRATEGY_CATEGORIES[0]);
     const [strategyId, setStrategyId] = useState(1);
@@ -128,7 +151,7 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
-    const [mode, setMode] = useState<'h1' | 'mtf'>('h1');
+    const [mode, setMode] = useState<'h1' | 'mtf'>(initialMode ?? 'h1');
     const [mtf, setMtf] = useState<MtfResult | null>(null);
     const [m15Ready, setM15Ready] = useState(false);
     const [m15Error, setM15Error] = useState<string | null>(null);
@@ -160,6 +183,22 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
             window.visualViewport?.removeEventListener('resize', measure);
         };
     }, [variant]);
+
+    // ---- a parent page can own the market choice
+    useEffect(() => {
+        if (controlledSymbol && controlledSymbol !== symbol) setSymbol(controlledSymbol);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [controlledSymbol]);
+
+    // ---- tell a parent page about the current plan (so it can draw it on its chart)
+    const onPlanRef = useRef(onPlan);
+    onPlanRef.current = onPlan;
+    useEffect(() => {
+        if (!onPlanRef.current) return;
+        const p = mode === 'mtf' ? mtf?.plan : outcome?.analysis.plan;
+        const usable = p && Number.isFinite(p.entry) && Number.isFinite(p.stopLoss) && Number.isFinite(p.takeProfit);
+        onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit } : null, symbol);
+    }, [mode, mtf, outcome, symbol]);
 
     // ---- markets list
     useEffect(() => {
@@ -535,11 +574,18 @@ const ForexTrader = ({ variant = 'page', panelWidth }: { variant?: 'page' | 'pan
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}`}
+            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             <div className='forex-trader__controls'>
-                <MarketPicker symbols={symbols} value={symbol} onChange={setSymbol} />
+                <MarketPicker
+                    symbols={symbols}
+                    value={symbol}
+                    onChange={s => {
+                        setSymbol(s);
+                        onSymbolChange?.(s);
+                    }}
+                />
                 <label>
                     <span>Mode</span>
                     <select value={mode} onChange={e => setMode(e.target.value as 'h1' | 'mtf')}>
