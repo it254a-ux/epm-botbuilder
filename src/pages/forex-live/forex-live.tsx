@@ -26,7 +26,7 @@ const ForexLive = observer(() => {
 
     const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
     const [granularity, setGranularity] = useState(DEFAULT_GRANULARITY);
-    const [chartType, setChartType] = useState('candle');
+    const [chartType, setChartType] = useState('candles');
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
     const [notice, setNotice] = useState('');
 
