@@ -58,7 +58,6 @@ const ForexLive = observer(() => {
     }, []);
 
     const currency = client?.currency || (authData as any)?.currency || '';
-    const balance = client?.balance ?? (authData as any)?.balance;
     const demo = !!activeLoginid && isDemoAccount(activeLoginid);
     const demoAccount = accountList?.find(a => isDemoAccount(a.loginid));
     const botRunning = !!(run_panel?.is_running || api_base.is_running);
@@ -127,19 +126,6 @@ const ForexLive = observer(() => {
             </div>
 
             <aside className='forex-live__side'>
-                {isAuthorized && (
-                    <section className={`forex-live__account${demo ? ' is-demo' : ' is-real'}`}>
-                        <span className='forex-live__badge'>{demo ? 'DEMO' : 'REAL MONEY'}</span>
-                        <b>
-                            {balance !== undefined && balance !== null && balance !== '' ? Number(balance).toFixed(2) : '—'} {currency}
-                        </b>
-                        {!demo && demoAccount && (
-                            <button type='button' disabled={botRunning} onClick={switchToDemo} title={botRunning ? 'Stop the running bot first' : ''}>
-                                Switch to Demo
-                            </button>
-                        )}
-                    </section>
-                )}
                 {notice && (
                     <p className='forex-live__notice' role='status' onClick={() => setNotice('')}>
                         {notice}
