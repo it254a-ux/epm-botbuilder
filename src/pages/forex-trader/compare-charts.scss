@@ -1,0 +1,149 @@
+// The compare-charts pop-up on Forex Live: covers the whole page (chart and right-hand panel).
+.fl-compare {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    color: var(--text-general);
+    font-family: var(--brand-font-primary), sans-serif;
+    background: color-mix(in srgb, var(--general-main-1) 94%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+
+    &__head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: none;
+
+        b {
+            font-size: 15px;
+            color: var(--text-prominent);
+        }
+    }
+
+    &__hint {
+        flex: 1;
+        font-size: 12px;
+        color: var(--text-less-prominent);
+    }
+
+    &__layout,
+    &__sizes {
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: 9px;
+        background: var(--general-section-1);
+
+        button {
+            padding: 3px 9px;
+            border: 0;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-general);
+            background: transparent;
+
+            &.is-on {
+                color: #fff;
+                background: #6366f1;
+            }
+        }
+    }
+
+    &__close {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--text-prominent);
+        background: var(--general-section-1);
+    }
+
+    &__grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        gap: 8px;
+
+        &--2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        &--4 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: repeat(2, minmax(0, 1fr));
+        }
+
+        // phones: charts stack and the pop-up scrolls
+        @media (max-width: 900px) {
+            overflow-y: auto;
+            grid-template-columns: minmax(0, 1fr) !important;
+            grid-template-rows: none !important;
+            grid-auto-rows: 52vh;
+        }
+    }
+
+    &__panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        min-width: 0;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 14%, transparent);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--general-main-1);
+    }
+
+    &__panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 5px 8px;
+        flex: none;
+        overflow-x: auto;
+    }
+
+    &__price {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-prominent);
+    }
+
+    &__chart {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        touch-action: none;
+
+        .forex-trader__chart-host {
+            position: absolute;
+            inset: 0;
+        }
+    }
+
+    &__note {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: var(--text-less-prominent);
+        background: color-mix(in srgb, var(--general-main-1) 70%, transparent);
+
+        &--error {
+            color: #ef4444;
+        }
+    }
+}

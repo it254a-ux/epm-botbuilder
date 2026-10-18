@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { useSharedPick } from '../forex-trader/shared-picks';
+import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import PositionsPanel from './positions-panel';
 import {
@@ -29,6 +30,7 @@ const ForexLive = observer(() => {
     // the market is shared with the Forex Trader page (see shared-picks)
     const [symbol, setSymbol] = useSharedPick('symbol', DEFAULT_SYMBOL, true);
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
+    const [compare, setCompare] = useState(false);
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
@@ -128,6 +130,17 @@ const ForexLive = observer(() => {
                         onMarkets={setNames}
                         resultHost={resultHost}
                     />
+                    <button
+                        type='button'
+                        className='forex-live__compare-btn'
+                        onClick={() => {
+                            rootRef.current?.scrollTo({ top: 0 });
+                            setCompare(true);
+                        }}
+                        title='Open 2 or 4 charts of this market, each with its own candle size'
+                    >
+                        Compare charts
+                    </button>
                     {tradesDrawn && (
                         <div className='forex-live__legend'>
                             <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
@@ -179,6 +192,10 @@ const ForexLive = observer(() => {
                     <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
                 </aside>
             </div>
+
+            {compare && (
+                <CompareCharts symbol={symbol} marketName={marketName} lines={lines} onClose={() => setCompare(false)} />
+            )}
         </div>
     );
 });

@@ -8,6 +8,7 @@
     font-family: var(--brand-font-primary), sans-serif;
     color: var(--text-general);
     font-size: 13px;
+    position: relative;
     height: var(--tab-content-height);
     display: block;
     padding: 8px 10px;
@@ -68,6 +69,27 @@
             flex: none;
             height: 84vh;
             min-height: 520px;
+        }
+    }
+
+    // opens the compare-charts pop-up; sits left of the LIVE button of the chart
+    &__compare-btn {
+        position: absolute;
+        top: 8px;
+        right: 170px;
+        z-index: 7;
+        padding: 3px 11px;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 20%, transparent);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        color: var(--text-prominent);
+        background: color-mix(in srgb, var(--general-main-1) 82%, transparent);
+        backdrop-filter: blur(8px);
+
+        &:hover {
+            border-color: #6366f1;
         }
     }
 
