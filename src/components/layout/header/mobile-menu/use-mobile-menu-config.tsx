@@ -73,7 +73,7 @@ const useMobileMenuConfig = (
                     // (see MenuHeader / mobile-menu.tsx's showThemeToggle prop).
 
                     // Same tab the desktop nav's "More" dropdown links to
-                    // (see menu-items.tsx's PINNED_OVERFLOW_ITEMS) — mobile
+                    // (see menu-items.tsx's EXTRA_NAV_ITEMS) — mobile
                     // had no equivalent entry point to it at all.
                     onNavigateToTutorials && {
                         as: 'button',

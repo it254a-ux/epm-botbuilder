@@ -10,6 +10,29 @@
         flex: 1 1 auto;
     }
 
+    // The row of apps: scrolls sideways with a hidden scrollbar, fading at the
+    // right edge so it is clear there is more to swipe to.
+    &__menu-scroll {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+        padding-inline-end: 14px;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
     &__menu-item {
         display: inline-flex;
         align-items: center;
