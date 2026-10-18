@@ -18,6 +18,8 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import './info-page-layout.scss';
 
+const BRAND_WORDS = ['Executive', 'Prime', 'Markets'];
+
 const FOOTER_LINKS: { to: string; label: string }[] = [
     { to: '/about', label: 'About us' },
     { to: '/contact', label: 'Contact us' },
@@ -98,13 +100,28 @@ const InfoPageLayout = ({ title, accent, updated, children }: TInfoPageLayout) =
         <div className='info-page' ref={page_ref} style={{ '--info-accent': accent } as CSSProperties}>
             <div className='info-page__shell'>
                 <header className='info-page__header'>
-                    <span className='info-page__mark' aria-hidden='true'>
-                        <i />
-                        <i />
-                        <i />
-                        <i />
-                        <i />
-                    </span>
+                    <div className='info-page__brand'>
+                        <span className='info-page__logo' aria-hidden='true'>
+                            <span className='info-page__logo-img' />
+                        </span>
+                        <span className='info-page__brand-text'>
+                            <span className='info-page__wordmark' role='img' aria-label='Executive Prime Markets'>
+                                {BRAND_WORDS.map((word, w) => (
+                                    <span className='info-page__word' key={word} aria-hidden='true'>
+                                        {word.split('').map((ch, i) => (
+                                            <span
+                                                key={i}
+                                                style={{ '--i': i + w * 4 } as CSSProperties}
+                                            >
+                                                {ch}
+                                            </span>
+                                        ))}
+                                    </span>
+                                ))}
+                            </span>
+                            <span className='info-page__tagline'>Tools for Deriv traders</span>
+                        </span>
+                    </div>
                     <h1>{title}</h1>
                     {updated && <p className='info-page__updated'>Last updated {updated}</p>}
                     <span className='info-page__rule' aria-hidden='true' />
