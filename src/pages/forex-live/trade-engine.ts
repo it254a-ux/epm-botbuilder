@@ -260,6 +260,36 @@ export function errorText(e: unknown): string {
     return typeof msg === 'string' && msg ? msg : 'Something went wrong. Please try again.';
 }
 
+export interface PlanLevels {
+    side: Side;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+}
+
+/**
+ * Turns the analysis plan (prices) into the money amounts a multiplier needs.
+ * A multiplier moves by stake x multiplier x (price change / price), so a stop at distance d from the entry
+ * loses stake x multiplier x d / entry. Returns null when the plan is for the other side or unusable.
+ * The stop loss is kept just under the stake (a multiplier cannot lose more than its stake anyway).
+ */
+export function amountsFromPlan(
+    plan: PlanLevels | null | undefined,
+    side: Side,
+    stake: number,
+    multiplier: number
+): { stopLoss: number; takeProfit: number } | null {
+    if (!plan || plan.side !== side || !positive(plan.entry) || !positive(stake) || !positive(multiplier)) return null;
+    const per = (level: number) => (stake * multiplier * Math.abs(level - plan.entry)) / plan.entry;
+    // the stop must be on the losing side and the target on the winning side of the entry
+    const slOk = side === 'BUY' ? plan.stopLoss < plan.entry : plan.stopLoss > plan.entry;
+    const tpOk = side === 'BUY' ? plan.takeProfit > plan.entry : plan.takeProfit < plan.entry;
+    const sl = slOk ? Math.min(money(per(plan.stopLoss)), money(stake - 0.01)) : 0;
+    const tp = tpOk ? money(per(plan.takeProfit)) : 0;
+    if (!(sl > 0) || !(tp > 0)) return null;
+    return { stopLoss: sl, takeProfit: tp };
+}
+
 export interface PositionLine {
     key: string;
     title: string;

@@ -158,6 +158,7 @@ const ForexLive = observer(() => {
                     onMultiplier={setMultiplier}
                     notice={marketNotice}
                     openHere={here}
+                    plan={plan.symbol === symbol ? plan.plan : null}
                 />
 
                 <PositionsPanel positions={positions} currency={currency} symbol={symbol} onClose={list => void closeTrades(list)} />

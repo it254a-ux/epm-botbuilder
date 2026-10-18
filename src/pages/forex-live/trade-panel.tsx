@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Side, TradeInput } from './trade-engine';
+import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './trade-engine';
 
 interface Props {
     symbol: string;
@@ -19,6 +19,8 @@ interface Props {
     /** A short message at the top, for example when the market was just changed. */
     notice?: string;
     /** The contracts that are open on this market right now. */
+    /** The analysis plan for this market, when there is one: its stop loss and take profit can be used for the trade. */
+    plan?: PlanLevels | null;
     openHere?: { count: number; buys: number; sells: number; profit: number };
 }
 
@@ -31,10 +33,12 @@ interface Prefs {
     multiplier: number;
     stopLoss: string;
     takeProfit: string;
+    /** Use the analysis plan's stop loss and take profit (when it has one for the side clicked). */
+    useAnalysis: boolean;
     count: number;
 }
 
-const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', count: 1 };
+const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', useAnalysis: true, count: 1 };
 
 const loadPrefs = (): Prefs => {
     try {
@@ -49,7 +53,7 @@ const loadPrefs = (): Prefs => {
 const nearest = (list: number[], want: number): number =>
     list.length ? list.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a)) : want;
 
-const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere }: Props) => {
+const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan }: Props) => {
     const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
     const set = (patch: Partial<Prefs>) => setPrefs(p => ({ ...p, ...patch }));
     const [stakeNote, setStakeNote] = useState('');
@@ -90,14 +94,15 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
             return;
         }
+        const fromPlan = prefs.useAnalysis ? amountsFromPlan(plan, side, Number(prefs.stake), prefs.multiplier) : null;
         const trade: TradeInput = {
             side,
             symbol,
             currency,
             stake: Number(prefs.stake),
             multiplier: prefs.multiplier,
-            stopLoss: prefs.stopLoss.trim() ? Number(prefs.stopLoss) : null,
-            takeProfit: prefs.takeProfit.trim() ? Number(prefs.takeProfit) : null,
+            stopLoss: fromPlan ? fromPlan.stopLoss : prefs.stopLoss.trim() ? Number(prefs.stopLoss) : null,
+            takeProfit: fromPlan ? fromPlan.takeProfit : prefs.takeProfit.trim() ? Number(prefs.takeProfit) : null,
         };
         // every click is sent straight away; "trades per click" opens several at the same moment
         onTrade(Array.from({ length: prefs.count }, () => trade));
@@ -186,6 +191,20 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     />
                 </label>
             </div>
+
+            <label className='forex-live__auto'>
+                <input type='checkbox' checked={prefs.useAnalysis} onChange={e => set({ useAnalysis: e.target.checked })} />
+                <span>Set stop loss and take profit from the analysis</span>
+            </label>
+            {prefs.useAnalysis && (
+                <p className='forex-live__hint'>
+                    {(['BUY', 'SELL'] as Side[])
+                        .map(sd => ({ sd, a: amountsFromPlan(plan, sd, Number(prefs.stake), prefs.multiplier) }))
+                        .filter(x => x.a)
+                        .map(x => `${x.sd}: stop loss ${x.a!.stopLoss}, take profit ${x.a!.takeProfit} ${currency}`)
+                        .join(' · ') || 'No analysis plan for this market right now: your own stop loss / take profit below are used.'}
+                </p>
+            )}
 
             {stakeNote && (
                 <p className='forex-live__warn' role='alert'>

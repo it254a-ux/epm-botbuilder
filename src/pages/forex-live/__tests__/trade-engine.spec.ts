@@ -261,3 +261,25 @@ describe('positionLines', () => {
         expect(positionLines([closed, other, noEntry], 'frxEURUSD')).toEqual([]);
     });
 });
+
+describe('amountsFromPlan', () => {
+    const { amountsFromPlan } = require('../trade-engine');
+    it('turns plan prices into money amounts for a BUY', () => {
+        // stake 10 x100 = exposure 1000; stop 0.1% away loses 1.00, target 0.3% away wins 3.00
+        const a = amountsFromPlan({ side: 'BUY', entry: 1, stopLoss: 0.999, takeProfit: 1.003 }, 'BUY', 10, 100);
+        expect(a).toEqual({ stopLoss: 1, takeProfit: 3 });
+    });
+    it('works for a SELL', () => {
+        const a = amountsFromPlan({ side: 'SELL', entry: 1, stopLoss: 1.001, takeProfit: 0.997 }, 'SELL', 10, 100);
+        expect(a).toEqual({ stopLoss: 1, takeProfit: 3 });
+    });
+    it('keeps the stop under the stake', () => {
+        const a = amountsFromPlan({ side: 'BUY', entry: 1, stopLoss: 0.9, takeProfit: 1.1 }, 'BUY', 10, 100);
+        expect(a!.stopLoss).toBe(9.99);
+    });
+    it('is null for the other side, no plan, or wrong-way levels', () => {
+        expect(amountsFromPlan({ side: 'BUY', entry: 1, stopLoss: 0.99, takeProfit: 1.01 }, 'SELL', 10, 100)).toBeNull();
+        expect(amountsFromPlan(null, 'BUY', 10, 100)).toBeNull();
+        expect(amountsFromPlan({ side: 'BUY', entry: 1, stopLoss: 1.01, takeProfit: 1.02 }, 'BUY', 10, 100)).toBeNull();
+    });
+});
