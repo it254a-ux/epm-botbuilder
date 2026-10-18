@@ -139,9 +139,13 @@ interface ForexTraderProps {
     initialMode?: 'h1' | 'mtf';
     /** Keep the tool's own chart out of sight (it still runs, so the analysis is identical). */
     hideChart?: boolean;
+    /** Plain price lines a parent page wants drawn on the tool's chart (for example the open trades). */
+    extraLines?: { key: string; title: string; price: number; color: string }[];
+    /** Tells a parent page the readable name of every market (symbol code -> name). */
+    onMarkets?: (names: Record<string, string>) => void;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets }: ForexTraderProps) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     const [symbol, setSymbol] = useState(controlledSymbol ?? 'R_25');
@@ -218,6 +222,15 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, levels } : null, symbol);
     }, [mode, mtf, outcome, symbol]);
 
+    // ---- lines from a parent page (open trades) go on this chart too
+    const onMarketsRef = useRef(onMarkets);
+    onMarketsRef.current = onMarkets;
+    const extraKey = (extraLines ?? []).map(l => `${l.key}:${l.price}:${l.title}:${l.color}`).join('|');
+    useEffect(() => {
+        chartRef.current?.drawLines(extraLines ?? []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [extraKey, loading]);
+
     // ---- markets list
     useEffect(() => {
         if (!ws || !isConnected) return;
@@ -227,6 +240,13 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 if (off) return;
                 const list = (res.active_symbols ?? []).filter(s => s.underlying_symbol);
                 setSymbols(list);
+                if (onMarketsRef.current) {
+                    const names: Record<string, string> = {};
+                    list.forEach(a => {
+                        if (a.underlying_symbol && a.underlying_symbol_name) names[a.underlying_symbol] = a.underlying_symbol_name;
+                    });
+                    onMarketsRef.current(names);
+                }
             })
             .catch(() => {});
         return () => {

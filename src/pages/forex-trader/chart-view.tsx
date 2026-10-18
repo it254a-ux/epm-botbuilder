@@ -25,6 +25,8 @@ export interface ChartViewHandle {
     drawAnalysis: (analysis: Analysis | null, candles: Candle[]) => void;
     /** Draw (or clear, with null) the Previous Day High/Low picture: levels, named arrows, and the trade plan. */
     drawPdh: (result: PdhResult | null) => void;
+    /** Draw (or clear, with an empty list) plain price lines owned by a parent page, such as open trades. They stay when the analysis is redrawn. */
+    drawLines: (lines: { key: string; title: string; price: number; color: string }[]) => void;
     /** JPEG data URL of the chart as it looks right now, or null. */
     screenshot: () => string | null;
 }
@@ -111,6 +113,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const linesRef = useRef<IPriceLine[]>([]);
     const extraRef = useRef<ISeriesApi<SeriesType>[]>([]);
+    // lines a parent page asks for (open trades): kept apart from the analysis drawing so redrawing one never erases the other
+    const parentLinesRef = useRef<IPriceLine[]>([]);
     const levelsRef = useRef<{ min: number; max: number } | null>(null);
     // candles kept here so the drawing tools' magnet can snap to them
     const candlesRef = useRef<Candle[]>([]);
@@ -180,6 +184,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setApis(null);
             linesRef.current = [];
             extraRef.current = [];
+            parentLinesRef.current = [];
         };
     }, []);
 
@@ -206,6 +211,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             chartRef.current?.timeScale().fitContent();
+        },
+        drawLines(lines) {
+            const series = seriesRef.current;
+            if (!series) return;
+            parentLinesRef.current.forEach(l => series.removePriceLine(l));
+            parentLinesRef.current = lines
+                .filter(l => Number.isFinite(l.price))
+                .map(l =>
+                    series.createPriceLine({ price: l.price, color: l.color, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: l.title })
+                );
         },
         updateCandle(candle) {
             const list = candlesRef.current;

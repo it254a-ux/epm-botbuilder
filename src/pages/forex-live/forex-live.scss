@@ -56,16 +56,19 @@
         border: 1px solid color-mix(in srgb, var(--text-prominent) 11%, transparent);
         box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.55);
 
+        // the Forex Trader tool lives inside: it fills this box and scrolls by itself
+        .forex-trader {
+            height: 100% !important;
+            max-height: 100%;
+            background: transparent;
+            border-radius: inherit;
+        }
+
         @media (max-width: 900px) {
             flex: none;
-            height: 62vh;
-            min-height: 380px;
+            height: 84vh;
+            min-height: 520px;
         }
-    }
-
-    &__chart {
-        position: absolute;
-        inset: 0;
     }
 
     &__legend {

@@ -3,11 +3,9 @@ import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
-import LiveChart, { type ChartLine } from './live-chart';
 import PositionsPanel from './positions-panel';
 import {
     BUY_COLOR,
-    DEFAULT_GRANULARITY,
     DEFAULT_SYMBOL,
     SELL_COLOR,
     positionLines,
@@ -21,15 +19,13 @@ import './forex-live.scss';
  * Forex Live: trade forex with no fixed time. Every trade is a Deriv multiplier, so it stays open until you
  * close it. One click opens a trade straight away (no confirmation step, because the price moves while you
  * confirm), and as many can be open together as you like, buys and sells at the same time.
- * The chart is Deriv's SmartCharts on forex, 15-minute candles, with the Forex Trader analysis beside it.
+ * The chart is the Forex Trader's own chart (all its strategies and drawings), with the open trades drawn on it.
  */
 const ForexLive = observer(() => {
     const { client } = useStore();
     const { isAuthorized, activeLoginid, authData } = useApiBase();
 
     const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
-    const [granularity, setGranularity] = useState(DEFAULT_GRANULARITY);
-    const [chartType, setChartType] = useState('candles');
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
@@ -108,25 +104,10 @@ const ForexLive = observer(() => {
         [openTrade]
     );
 
-    const lines: ChartLine[] = useMemo(() => {
-        const p = plan.symbol === symbol ? plan.plan : null;
-        const planned: ChartLine[] = p
-            ? [
-                  { key: 'entry', title: 'Entry', price: p.entry, color: '#3B82F6' },
-                  { key: 'sl', title: 'Stop loss', price: p.stopLoss, color: '#ef4444' },
-                  { key: 'tp', title: 'Take profit', price: p.takeProfit, color: '#10b981' },
-                  ...(p.levels ?? []).map(l => ({
-                      key: `lvl-${l.label}`,
-                      title: l.label,
-                      price: l.price,
-                      color: '#a78bfa',
-                  })),
-              ]
-            : [];
-        // the open trades on this market, drawn where they were entered
-        return [...planned, ...positionLines(positions, symbol)];
-    }, [plan, symbol, positions]);
-    const tradesDrawn = lines.some(l => l.key.startsWith('pos-'));
+    // the open trades on this market, drawn on the Forex Trader chart where they were entered
+    // (the analysis plan and key levels are drawn by the Forex Trader chart itself)
+    const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
+    const tradesDrawn = lines.length > 0;
 
     const onPlan = useCallback((p: ReportedPlan | null, s: string) => setPlan({ plan: p, symbol: s }), []);
 
@@ -134,36 +115,20 @@ const ForexLive = observer(() => {
         <div className='forex-live' ref={rootRef} style={fitHeight ? { height: `${fitHeight}px` } : undefined}>
             <div className='forex-live__top'>
                 <div className='forex-live__chartcol'>
-                    <LiveChart
-                        symbol={symbol}
-                        granularity={granularity}
-                        chartType={chartType}
-                        lines={lines}
-                        onSymbol={setSymbol}
-                        onGranularity={setGranularity}
-                        onChartType={setChartType}
+                    <ForexTrader
+                        variant='page'
+                        controlledSymbol={symbol}
+                        onSymbolChange={setSymbol}
+                        onPlan={onPlan}
+                        initialMode='mtf'
+                        extraLines={lines}
                         onMarkets={setNames}
                     />
-                    {lines.length > 0 && (
+                    {tradesDrawn && (
                         <div className='forex-live__legend'>
-                            {lines.some(l => !l.key.startsWith('pos-')) && (
-                                <>
-                                    <span style={{ color: '#3B82F6' }}>— Entry</span>
-                                    <span style={{ color: '#ef4444' }}>— Stop loss</span>
-                                    <span style={{ color: '#10b981' }}>— Take profit</span>
-                                    {lines.some(l => l.key.startsWith('lvl-')) && (
-                                        <span style={{ color: '#a78bfa' }}>— Key levels</span>
-                                    )}
-                                    <em>from the analysis</em>
-                                </>
-                            )}
-                            {tradesDrawn && (
-                                <>
-                                    <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
-                                    <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
-                                    <em>at their entry price, with live profit</em>
-                                </>
-                            )}
+                            <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
+                            <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
+                            <em>at their entry price, with live profit</em>
                         </div>
                     )}
                 </div>
@@ -207,18 +172,6 @@ const ForexLive = observer(() => {
                     )}
                 </aside>
             </div>
-
-            <details className='forex-live__card forex-live__analysis' open>
-                <summary>Market analysis (same as Forex Trader)</summary>
-                <ForexTrader
-                    variant='panel'
-                    controlledSymbol={symbol}
-                    onSymbolChange={setSymbol}
-                    onPlan={onPlan}
-                    initialMode='mtf'
-                    hideChart
-                />
-            </details>
         </div>
     );
 });
