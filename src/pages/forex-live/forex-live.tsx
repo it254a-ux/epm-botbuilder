@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
+import { useSharedPick } from '../forex-trader/shared-picks';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import PositionsPanel from './positions-panel';
 import {
@@ -25,7 +26,8 @@ const ForexLive = observer(() => {
     const { client } = useStore();
     const { isAuthorized, activeLoginid, authData } = useApiBase();
 
-    const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
+    // the market is shared with the Forex Trader page (see shared-picks)
+    const [symbol, setSymbol] = useSharedPick('symbol', DEFAULT_SYMBOL, true);
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);

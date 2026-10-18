@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useSharedPick } from './shared-picks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
@@ -151,10 +152,12 @@ interface ForexTraderProps {
 const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost }: ForexTraderProps) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
-    const [symbol, setSymbol] = useState(controlledSymbol ?? 'R_25');
-    const [tf, setTf] = useState(3600);
-    const [category, setCategory] = useState(STRATEGY_CATEGORIES[0]);
-    const [strategyId, setStrategyId] = useState(1);
+    // the two full pages (Forex Trader and Forex Live) keep the same picks; the small side panel keeps its own
+    const shared = variant === 'page';
+    const [symbol, setSymbol] = useSharedPick('symbol', controlledSymbol ?? 'R_25', shared);
+    const [tf, setTf] = useSharedPick('tf', 3600, shared);
+    const [category, setCategory] = useSharedPick('category', STRATEGY_CATEGORIES[0], shared);
+    const [strategyId, setStrategyId] = useSharedPick('strategyId', 1, shared);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -162,7 +165,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
-    const [mode, setMode] = useState<'h1' | 'mtf'>(initialMode ?? 'h1');
+    const [mode, setMode] = useSharedPick('mode', initialMode ?? 'h1', shared);
     const [mtf, setMtf] = useState<MtfResult | null>(null);
     // Previous Day High / Low rejection (inside the M15 + M5 mode)
     const [pdh, setPdh] = useState<PdhResult | null>(null);
