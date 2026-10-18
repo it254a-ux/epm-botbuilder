@@ -28,7 +28,8 @@ export interface LogEntry {
     text: string;
 }
 
-const FLUSH_MS = 250;
+// how often the trade list and the chart lines catch up with the live stream (10 times a second)
+const FLUSH_MS = 100;
 const KEEP_CLOSED = 40;
 const KEEP_LOG = 40;
 
