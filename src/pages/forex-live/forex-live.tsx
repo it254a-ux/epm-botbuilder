@@ -5,7 +5,7 @@ import { useStore } from '@/hooks/useStore';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import LiveChart, { type ChartLine } from './live-chart';
 import PositionsPanel from './positions-panel';
-import { DEFAULT_GRANULARITY, DEFAULT_SYMBOL, type TradeInput } from './trade-engine';
+import { BUY_COLOR, DEFAULT_GRANULARITY, DEFAULT_SYMBOL, SELL_COLOR, positionLines, type TradeInput } from './trade-engine';
 import TradePanel from './trade-panel';
 import { useForexLive, useMultipliers } from './use-forex-live';
 import './forex-live.scss';
@@ -97,13 +97,17 @@ const ForexLive = observer(() => {
 
     const lines: ChartLine[] = useMemo(() => {
         const p = plan.symbol === symbol ? plan.plan : null;
-        if (!p) return [];
-        return [
-            { key: 'entry', title: 'Entry', price: p.entry, color: '#3B82F6' },
-            { key: 'sl', title: 'Stop loss', price: p.stopLoss, color: '#ef4444' },
-            { key: 'tp', title: 'Take profit', price: p.takeProfit, color: '#10b981' },
-        ];
-    }, [plan, symbol]);
+        const planned: ChartLine[] = p
+            ? [
+                  { key: 'entry', title: 'Entry', price: p.entry, color: '#3B82F6' },
+                  { key: 'sl', title: 'Stop loss', price: p.stopLoss, color: '#ef4444' },
+                  { key: 'tp', title: 'Take profit', price: p.takeProfit, color: '#10b981' },
+              ]
+            : [];
+        // the open trades on this market, drawn where they were entered
+        return [...planned, ...positionLines(positions, symbol)];
+    }, [plan, symbol, positions]);
+    const tradesDrawn = lines.some(l => l.key.startsWith('pos-'));
 
     const onPlan = useCallback((p: ReportedPlan | null, s: string) => setPlan({ plan: p, symbol: s }), []);
 
@@ -122,10 +126,21 @@ const ForexLive = observer(() => {
                 />
                 {lines.length > 0 && (
                     <div className='forex-live__legend'>
-                        <span style={{ color: '#3B82F6' }}>— Entry</span>
-                        <span style={{ color: '#ef4444' }}>— Stop loss</span>
-                        <span style={{ color: '#10b981' }}>— Take profit</span>
-                        <em>from the analysis</em>
+                        {lines.some(l => !l.key.startsWith('pos-')) && (
+                            <>
+                                <span style={{ color: '#3B82F6' }}>— Entry</span>
+                                <span style={{ color: '#ef4444' }}>— Stop loss</span>
+                                <span style={{ color: '#10b981' }}>— Take profit</span>
+                                <em>from the analysis</em>
+                            </>
+                        )}
+                        {tradesDrawn && (
+                            <>
+                                <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
+                                <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
+                                <em>at their entry price, with live profit</em>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

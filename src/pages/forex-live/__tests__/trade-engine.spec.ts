@@ -244,3 +244,20 @@ describe('explainRefusal', () => {
         expect(explainRefusal('Market is closed.', { stake: 25 }).text).toBe('Market is closed.');
     });
 });
+
+describe('positionLines', () => {
+    const { positionLines, toPosition } = require('../trade-engine');
+    const raw = (o: any) => ({ contract_type: 'MULTUP', contract_id: 1, underlying_symbol: 'frxEURUSD', buy_price: 10, entry_spot: 1.1, profit: 0.5, ...o });
+    it('draws an entry line with live profit, and SL/TP levels when known', () => {
+        const p = toPosition(raw({ limit_order: { stop_loss: { order_amount: -2, value: '1.09' }, take_profit: { order_amount: 3, value: '1.12' } } }));
+        const l = positionLines([p], 'frxEURUSD');
+        expect(l.map((x: any) => x.price)).toEqual([1.1, 1.09, 1.12]);
+        expect(l[0].title).toBe('BUY +0.50');
+    });
+    it('skips closed trades, other markets and trades without an entry yet', () => {
+        const closed = toPosition(raw({ is_sold: 1 }));
+        const other = toPosition(raw({ contract_id: 2, underlying_symbol: 'frxGBPUSD' }));
+        const noEntry = toPosition(raw({ contract_id: 3, entry_spot: undefined }));
+        expect(positionLines([closed, other, noEntry], 'frxEURUSD')).toEqual([]);
+    });
+});

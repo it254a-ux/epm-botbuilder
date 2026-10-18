@@ -79,6 +79,7 @@ const LiveChart = observer(({ symbol, granularity, chartType, lines, onSymbol, o
     // plain price lines: no shading, not draggable, absolute prices
     const barriers = lines.map(l => ({
         color: l.color,
+        title: l.title,
         shade: 'NONE_SINGLE',
         high: l.price,
         relative: false,

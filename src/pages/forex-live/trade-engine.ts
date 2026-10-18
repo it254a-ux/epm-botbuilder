@@ -105,6 +105,9 @@ export interface Position {
     stopLoss: number | null;
     takeProfit: number | null;
     openedAt: number | null;
+    /** Price levels where the stop loss / take profit will trigger, when Deriv tells them. */
+    stopLossAt?: number;
+    takeProfitAt?: number;
     currency: string;
     /** True once the trade is closed (sold, stopped out or limit hit). */
     closed: boolean;
@@ -154,6 +157,8 @@ export function toPosition(raw: Raw | null | undefined): Position | null {
         spot: num(raw.current_spot),
         stopLoss: orderAmount(limit.stop_loss),
         takeProfit: orderAmount(limit.take_profit),
+        ...(num((limit.stop_loss as Raw | undefined)?.value) !== null ? { stopLossAt: num((limit.stop_loss as Raw).value) as number } : {}),
+        ...(num((limit.take_profit as Raw | undefined)?.value) !== null ? { takeProfitAt: num((limit.take_profit as Raw).value) as number } : {}),
         openedAt: num(raw.purchase_time ?? raw.date_start),
         currency: String(raw.currency ?? ''),
         closed: sold,
@@ -177,6 +182,8 @@ export function mergePosition(prev: Position | undefined, next: Position): Posit
         stopLoss: next.stopLoss ?? prev.stopLoss,
         takeProfit: next.takeProfit ?? prev.takeProfit,
         openedAt: next.openedAt ?? prev.openedAt,
+        ...(next.stopLossAt ?? prev.stopLossAt) !== undefined ? { stopLossAt: (next.stopLossAt ?? prev.stopLossAt) as number } : {},
+        ...(next.takeProfitAt ?? prev.takeProfitAt) !== undefined ? { takeProfitAt: (next.takeProfitAt ?? prev.takeProfitAt) as number } : {},
         currency: next.currency || prev.currency,
     };
 }
@@ -251,6 +258,32 @@ export function errorText(e: unknown): string {
     const any = e as Raw | null;
     const msg = any?.error?.message ?? any?.message ?? any?.error;
     return typeof msg === 'string' && msg ? msg : 'Something went wrong. Please try again.';
+}
+
+export interface PositionLine {
+    key: string;
+    title: string;
+    price: number;
+    color: string;
+}
+
+export const BUY_COLOR = '#06b6d4';
+export const SELL_COLOR = '#f59e0b';
+
+/** Chart lines for the open trades on one market: where each was entered (with its live profit) and its stop loss / take profit levels. */
+export function positionLines(positions: Position[], symbol: string): PositionLine[] {
+    const out: PositionLine[] = [];
+    for (const p of positions) {
+        if (p.closed || p.symbol !== symbol) continue;
+        const color = p.side === 'BUY' ? BUY_COLOR : SELL_COLOR;
+        if (p.entry !== null) {
+            const pl = p.profit === null ? '' : ` ${formatMoney(p.profit)}`;
+            out.push({ key: `pos-${p.id}`, title: `${p.side}${pl}`, price: p.entry, color });
+        }
+        if (p.stopLossAt !== undefined) out.push({ key: `pos-${p.id}-sl`, title: 'SL', price: p.stopLossAt, color: '#ef4444' });
+        if (p.takeProfitAt !== undefined) out.push({ key: `pos-${p.id}-tp`, title: 'TP', price: p.takeProfitAt, color: '#10b981' });
+    }
+    return out;
 }
 
 /** Deriv refuses a stake that is too small and says the minimum in its message ("Enter an amount equal to or higher than 1.64."). */
