@@ -27,6 +27,7 @@ const ForexLive = observer(() => {
 
     const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
+    const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
 
@@ -123,6 +124,7 @@ const ForexLive = observer(() => {
                         initialMode='mtf'
                         extraLines={lines}
                         onMarkets={setNames}
+                        resultHost={resultHost}
                     />
                     {tradesDrawn && (
                         <div className='forex-live__legend'>
@@ -170,6 +172,9 @@ const ForexLive = observer(() => {
                             </ul>
                         </section>
                     )}
+
+                    {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
+                    <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
                 </aside>
             </div>
         </div>

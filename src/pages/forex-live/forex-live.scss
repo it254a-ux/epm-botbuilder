@@ -740,6 +740,18 @@
         }
     }
 
+    // ---- the Forex Trader analysis inside the side column: plain block, the column does the scrolling
+    &__trader-host.forex-trader {
+        flex: none;
+        display: block;
+        width: 100%;
+        height: auto !important;
+        min-height: 0;
+        padding: 0;
+        overflow: visible;
+        background: none !important;
+    }
+
     // ---- analysis (the Forex Trader tool, no page height of its own here)
     &__analysis {
         margin-top: 10px;

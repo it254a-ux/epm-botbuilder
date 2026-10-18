@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
@@ -143,9 +144,11 @@ interface ForexTraderProps {
     extraLines?: { key: string; title: string; price: number; color: string }[];
     /** Tells a parent page the readable name of every market (symbol code -> name). */
     onMarkets?: (names: Record<string, string>) => void;
+    /** When given, the analysis / results card is shown inside this element (a parent page's side column) instead of beside the chart. */
+    resultHost?: HTMLElement | null;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost }: ForexTraderProps) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     const [symbol, setSymbol] = useState(controlledSymbol ?? 'R_25');
@@ -625,10 +628,13 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const fmt = (n: number) => n.toFixed(pipSize);
     const tone = status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
 
+    // the results card can live in a parent page's side column; it then has to carry the tool's own class so its styles still apply
+    const renderResult = (node: JSX.Element) => (resultHost ? createPortal(node, resultHost) : node);
+
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
+            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             <div className='forex-trader__controls'>
@@ -739,6 +745,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 )}
             </div>
 
+            {renderResult(
             <div className='forex-trader__result'>
                 {mode === 'mtf' && (
                     <>
@@ -991,6 +998,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     </>
                 )}
             </div>
+            )}
         </div>
     );
 };

@@ -678,3 +678,10 @@
     opacity: 0;
     pointer-events: none;
 }
+
+/* The chart on its own, full width, when the results card has moved to a parent page's side column. */
+.forex-trader--result-out {
+    @media (min-width: 1100px) {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
