@@ -122,6 +122,8 @@ export interface ReportedPlan {
     entry: number;
     stopLoss: number;
     takeProfit: number;
+    /** Other price levels the analysis found (support, resistance, previous day high / low), for a parent chart to draw. */
+    levels?: { label: string; price: number }[];
 }
 
 interface ForexTraderProps {
@@ -202,7 +204,18 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         if (!onPlanRef.current) return;
         const p = mode === 'mtf' ? mtf?.plan : outcome?.analysis.plan;
         const usable = p && Number.isFinite(p.entry) && Number.isFinite(p.stopLoss) && Number.isFinite(p.takeProfit);
-        onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit } : null, symbol);
+        const lv = mode === 'mtf' ? mtf?.levels : null;
+        const levels = lv
+            ? ([
+                  ['Resistance', lv.resistance],
+                  ['Support', lv.support],
+                  ['Prev day high', lv.prevDayHigh],
+                  ['Prev day low', lv.prevDayLow],
+              ] as [string, number | null][])
+                  .filter(([, v]) => v !== null && Number.isFinite(v))
+                  .map(([label, price]) => ({ label, price: price as number }))
+            : [];
+        onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, levels } : null, symbol);
     }, [mode, mtf, outcome, symbol]);
 
     // ---- markets list

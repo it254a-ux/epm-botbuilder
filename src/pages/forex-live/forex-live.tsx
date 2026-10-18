@@ -5,7 +5,14 @@ import { useStore } from '@/hooks/useStore';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import LiveChart, { type ChartLine } from './live-chart';
 import PositionsPanel from './positions-panel';
-import { BUY_COLOR, DEFAULT_GRANULARITY, DEFAULT_SYMBOL, SELL_COLOR, positionLines, type TradeInput } from './trade-engine';
+import {
+    BUY_COLOR,
+    DEFAULT_GRANULARITY,
+    DEFAULT_SYMBOL,
+    SELL_COLOR,
+    positionLines,
+    type TradeInput,
+} from './trade-engine';
 import TradePanel from './trade-panel';
 import { useForexLive, useMultipliers } from './use-forex-live';
 import './forex-live.scss';
@@ -54,7 +61,10 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(isAuthorized, activeLoginid);
+    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(
+        isAuthorized,
+        activeLoginid
+    );
     const multipliers = useMultipliers(symbol, isAuthorized);
 
     // readable market names, the multiplier chosen in the trade panel, and a notice when the market changes
@@ -90,10 +100,13 @@ const ForexLive = observer(() => {
         };
     }, [positions, symbol]);
 
-    const trade = useCallback((list: TradeInput[]) => {
-        // all sent at once; nothing waits for anything else
-        list.forEach(t => void openTrade(t));
-    }, [openTrade]);
+    const trade = useCallback(
+        (list: TradeInput[]) => {
+            // all sent at once; nothing waits for anything else
+            list.forEach(t => void openTrade(t));
+        },
+        [openTrade]
+    );
 
     const lines: ChartLine[] = useMemo(() => {
         const p = plan.symbol === symbol ? plan.plan : null;
@@ -102,6 +115,12 @@ const ForexLive = observer(() => {
                   { key: 'entry', title: 'Entry', price: p.entry, color: '#3B82F6' },
                   { key: 'sl', title: 'Stop loss', price: p.stopLoss, color: '#ef4444' },
                   { key: 'tp', title: 'Take profit', price: p.takeProfit, color: '#10b981' },
+                  ...(p.levels ?? []).map(l => ({
+                      key: `lvl-${l.label}`,
+                      title: l.label,
+                      price: l.price,
+                      color: '#a78bfa',
+                  })),
               ]
             : [];
         // the open trades on this market, drawn where they were entered
@@ -113,83 +132,93 @@ const ForexLive = observer(() => {
 
     return (
         <div className='forex-live' ref={rootRef} style={fitHeight ? { height: `${fitHeight}px` } : undefined}>
-            <div className='forex-live__chartcol'>
-                <LiveChart
-                    symbol={symbol}
-                    granularity={granularity}
-                    chartType={chartType}
-                    lines={lines}
-                    onSymbol={setSymbol}
-                    onGranularity={setGranularity}
-                    onChartType={setChartType}
-                    onMarkets={setNames}
-                />
-                {lines.length > 0 && (
-                    <div className='forex-live__legend'>
-                        {lines.some(l => !l.key.startsWith('pos-')) && (
-                            <>
-                                <span style={{ color: '#3B82F6' }}>— Entry</span>
-                                <span style={{ color: '#ef4444' }}>— Stop loss</span>
-                                <span style={{ color: '#10b981' }}>— Take profit</span>
-                                <em>from the analysis</em>
-                            </>
-                        )}
-                        {tradesDrawn && (
-                            <>
-                                <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
-                                <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
-                                <em>at their entry price, with live profit</em>
-                            </>
-                        )}
-                    </div>
-                )}
+            <div className='forex-live__top'>
+                <div className='forex-live__chartcol'>
+                    <LiveChart
+                        symbol={symbol}
+                        granularity={granularity}
+                        chartType={chartType}
+                        lines={lines}
+                        onSymbol={setSymbol}
+                        onGranularity={setGranularity}
+                        onChartType={setChartType}
+                        onMarkets={setNames}
+                    />
+                    {lines.length > 0 && (
+                        <div className='forex-live__legend'>
+                            {lines.some(l => !l.key.startsWith('pos-')) && (
+                                <>
+                                    <span style={{ color: '#3B82F6' }}>— Entry</span>
+                                    <span style={{ color: '#ef4444' }}>— Stop loss</span>
+                                    <span style={{ color: '#10b981' }}>— Take profit</span>
+                                    {lines.some(l => l.key.startsWith('lvl-')) && (
+                                        <span style={{ color: '#a78bfa' }}>— Key levels</span>
+                                    )}
+                                    <em>from the analysis</em>
+                                </>
+                            )}
+                            {tradesDrawn && (
+                                <>
+                                    <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
+                                    <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
+                                    <em>at their entry price, with live profit</em>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <aside className='forex-live__side'>
+                    <TradePanel
+                        symbol={symbol}
+                        currency={currency}
+                        multipliers={multipliers}
+                        disabled={!isAuthorized}
+                        pending={pending}
+                        onTrade={trade}
+                        marketName={marketName}
+                        minStake={minStakes[`${symbol}|${multiplier}`] ?? null}
+                        onMultiplier={setMultiplier}
+                        notice={marketNotice}
+                        openHere={here}
+                        plan={plan.symbol === symbol ? plan.plan : null}
+                    />
+
+                    <PositionsPanel
+                        positions={positions}
+                        currency={currency}
+                        symbol={symbol}
+                        onClose={list => void closeTrades(list)}
+                    />
+
+                    {log.length > 0 && (
+                        <section className='forex-live__card forex-live__log' aria-live='polite'>
+                            <header className='forex-live__card-head'>
+                                <h3>Activity</h3>
+                            </header>
+                            <ul>
+                                {log.slice(0, 8).map(l => (
+                                    <li key={l.id} className={`is-${l.kind}`}>
+                                        {l.text}
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+                </aside>
             </div>
 
-            <aside className='forex-live__side'>
-                <TradePanel
-                    symbol={symbol}
-                    currency={currency}
-                    multipliers={multipliers}
-                    disabled={!isAuthorized}
-                    pending={pending}
-                    onTrade={trade}
-                    marketName={marketName}
-                    minStake={minStakes[`${symbol}|${multiplier}`] ?? null}
-                    onMultiplier={setMultiplier}
-                    notice={marketNotice}
-                    openHere={here}
-                    plan={plan.symbol === symbol ? plan.plan : null}
+            <details className='forex-live__card forex-live__analysis' open>
+                <summary>Market analysis (same as Forex Trader)</summary>
+                <ForexTrader
+                    variant='panel'
+                    controlledSymbol={symbol}
+                    onSymbolChange={setSymbol}
+                    onPlan={onPlan}
+                    initialMode='mtf'
+                    hideChart
                 />
-
-                <PositionsPanel positions={positions} currency={currency} symbol={symbol} onClose={list => void closeTrades(list)} />
-
-                {log.length > 0 && (
-                    <section className='forex-live__card forex-live__log' aria-live='polite'>
-                        <header className='forex-live__card-head'>
-                            <h3>Activity</h3>
-                        </header>
-                        <ul>
-                            {log.slice(0, 8).map(l => (
-                                <li key={l.id} className={`is-${l.kind}`}>
-                                    {l.text}
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
-
-                <details className='forex-live__card forex-live__analysis' open>
-                    <summary>Market analysis (same as Forex Trader)</summary>
-                    <ForexTrader
-                        variant='panel'
-                        controlledSymbol={symbol}
-                        onSymbolChange={setSymbol}
-                        onPlan={onPlan}
-                        initialMode='mtf'
-                        hideChart
-                    />
-                </details>
-            </aside>
+            </details>
         </div>
     );
 });
