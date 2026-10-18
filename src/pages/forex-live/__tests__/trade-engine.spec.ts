@@ -5,6 +5,7 @@ import {
     FALLBACK_MULTIPLIERS,
     formatMoney,
     mergePosition,
+    parseMinStake,
     pickToClose,
     readMultipliers,
     summarize,
@@ -211,5 +212,16 @@ describe('errorText and formatMoney', () => {
         expect(formatMoney(0)).toBe('0.00');
         expect(formatMoney(null)).toBe('—');
         expect(formatMoney(3, 'USD')).toBe('+3.00 USD');
+    });
+});
+
+describe('parseMinStake', () => {
+    it('reads the minimum out of Deriv\'s message', () => {
+        expect(parseMinStake('Enter an amount equal to or higher than 1.64.')).toBe(1.64);
+        expect(parseMinStake('Minimum stake of 0.35 USD')).toBe(0.35);
+    });
+    it('returns null when there is no minimum in the message', () => {
+        expect(parseMinStake('Please specify either payout or stake.')).toBeNull();
+        expect(parseMinStake('')).toBeNull();
     });
 });

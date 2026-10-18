@@ -5,6 +5,7 @@ import {
     buildSellRequest,
     errorText,
     mergePosition,
+    parseMinStake,
     readMultipliers,
     FALLBACK_MULTIPLIERS,
     toPosition,
@@ -42,6 +43,9 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     const dirty = useRef(false);
     // trades whose close request is on its way: they cannot be closed twice, and show "Closing…" at once
     const closing = useRef<Set<number>>(new Set());
+    // the smallest stake each market accepts (learned from Deriv), keyed by "market|multiplier"
+    const [minStakes, setMinStakes] = useState<Record<string, number>>({});
+    const probed = useRef<Set<string>>(new Set());
     const logId = useRef(0);
     const authorized = useRef(isAuthorized);
     authorized.current = isAuthorized;
@@ -140,7 +144,14 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 note('ok', `${input.side} ${input.symbol.replace(/^frx/, '')} opened · stake ${input.stake} · x${input.multiplier}`);
                 return true;
             } catch (e) {
-                note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: ${errorText(e)}`);
+                const why = errorText(e);
+                const min = parseMinStake(why);
+                if (min) {
+                    setMinStakes(m => ({ ...m, [`${input.symbol}|${input.multiplier}`]: min }));
+                    note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: the smallest stake on this market is ${min}. Your stake was below it.`);
+                } else {
+                    note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: ${why}`);
+                }
                 return false;
             } finally {
                 setPending(n => n - 1);
@@ -207,7 +218,32 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         [note, upsert, flush]
     );
 
-    return { positions, log, pending, openTrade, closeTrades, note };
+    // Asks Deriv for a price with a tiny stake (nothing is bought): if it is too small, the answer tells the market's minimum.
+    const probeMinStake = useCallback(async (symbol: string, currency: string, multiplier: number): Promise<void> => {
+        if (!authorized.current || !api_base.api || !symbol || !currency || !multiplier) return;
+        const key = `${symbol}|${multiplier}`;
+        if (probed.current.has(key)) return;
+        probed.current.add(key);
+        try {
+            const res: any = await api().send({
+                proposal: 1,
+                amount: 0.01,
+                basis: 'stake',
+                contract_type: 'MULTUP',
+                currency,
+                underlying_symbol: symbol,
+                multiplier,
+            });
+            const min = res?.error ? parseMinStake(errorText(res)) : null;
+            if (min) setMinStakes(m => ({ ...m, [key]: min }));
+        } catch (e) {
+            const min = parseMinStake(errorText(e));
+            if (min) setMinStakes(m => ({ ...m, [key]: min }));
+            else probed.current.delete(key); // try again next time
+        }
+    }, []);
+
+    return { positions, log, pending, openTrade, closeTrades, note, minStakes, probeMinStake };
 }
 
 /** Multipliers Deriv allows for a symbol. Always returns something usable. */

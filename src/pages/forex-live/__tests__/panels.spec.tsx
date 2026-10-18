@@ -73,6 +73,54 @@ describe('TradePanel', () => {
     });
 });
 
+describe('TradePanel: market info, minimum stake and market-change notice', () => {
+    beforeEach(() => localStorage.clear());
+    const base = { symbol: '1HZ75V', currency: 'USD', multipliers: [10, 20, 50], disabled: false, pending: 0 };
+
+    it('shows the market name, the contract type and the smallest stake', () => {
+        render(<TradePanel {...base} onTrade={jest.fn()} marketName='Volatility 75 (1s) Index' minStake={1.64} />);
+        expect(screen.getByText(/Trade Volatility 75 \(1s\) Index/)).toBeInTheDocument();
+        expect(screen.getByText(/Multiplier x/)).toBeInTheDocument();
+        expect(screen.getByText('Min stake 1.64 USD')).toBeInTheDocument();
+    });
+
+    it('raises a too-small stake to the minimum and says so, so the click is not refused', () => {
+        const onTrade = jest.fn();
+        render(<TradePanel {...base} onTrade={onTrade} marketName='Vol 75' minStake={1.64} />);
+        expect(screen.getByLabelText(/^Stake/)).toHaveValue(1.64);
+        expect(screen.getByRole('alert')).toHaveTextContent(/raised to 1.64/);
+        fireEvent.click(screen.getByRole('button', { name: /BUY/ }));
+        expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stake).toBe(1.64);
+    });
+
+    it('does not send a trade whose typed stake is below the minimum', () => {
+        const onTrade = jest.fn();
+        render(<TradePanel {...base} onTrade={onTrade} minStake={1.64} />);
+        fireEvent.change(screen.getByLabelText(/^Stake/), { target: { value: '0.5' } });
+        fireEvent.click(screen.getByRole('button', { name: /SELL/ }));
+        expect(onTrade).not.toHaveBeenCalled();
+        expect(screen.getByRole('alert')).toHaveTextContent(/smallest stake on this market is 1.64/);
+    });
+
+    it('shows the notice when the market changed', () => {
+        render(<TradePanel {...base} onTrade={jest.fn()} notice='Market changed to Vol 75. Trades now open on this market.' />);
+        expect(screen.getByRole('status')).toHaveTextContent(/Market changed to Vol 75/);
+    });
+
+    it('shows the contracts open on this market, or says there are none', () => {
+        const { rerender } = render(<TradePanel {...base} onTrade={jest.fn()} openHere={{ count: 0, buys: 0, sells: 0, profit: 0 }} />);
+        expect(screen.getByText('No contracts open here')).toBeInTheDocument();
+        rerender(<TradePanel {...base} onTrade={jest.fn()} openHere={{ count: 3, buys: 2, sells: 1, profit: 0.31 }} />);
+        expect(screen.getByText('3 open here · ▲2 ▼1 · +0.31')).toBeInTheDocument();
+    });
+
+    it('tells the page which multiplier is chosen', () => {
+        const onMultiplier = jest.fn();
+        render(<TradePanel {...base} onTrade={jest.fn()} onMultiplier={onMultiplier} />);
+        expect(onMultiplier).toHaveBeenCalled();
+    });
+});
+
 describe('PositionsPanel', () => {
     const list = [
         pos({ id: 1, side: 'BUY', profit: 2 }),

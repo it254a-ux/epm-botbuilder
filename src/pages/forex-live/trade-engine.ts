@@ -253,6 +253,13 @@ export function errorText(e: unknown): string {
     return typeof msg === 'string' && msg ? msg : 'Something went wrong. Please try again.';
 }
 
+/** Deriv refuses a stake that is too small and says the minimum in its message ("Enter an amount equal to or higher than 1.64."). */
+export function parseMinStake(text: string): number | null {
+    const m = /(?:equal to or higher than|equal to or greater than|at least|minimum(?: stake)?(?: is| of)?)\s*:?\s*(\d+(?:\.\d+)?)/i.exec(text || '');
+    const n = m ? Number(m[1]) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export const formatMoney = (n: number | null | undefined, currency = ''): string => {
     if (n === null || n === undefined || !Number.isFinite(n)) return '—';
     const sign = n > 0 ? '+' : n < 0 ? '-' : '';

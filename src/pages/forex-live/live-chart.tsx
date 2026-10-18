@@ -24,6 +24,8 @@ interface Props {
     onSymbol: (s: string) => void;
     onGranularity: (g: number) => void;
     onChartType: (t: string) => void;
+    /** Tells the page the readable name of every market (symbol code -> name). */
+    onMarkets?: (names: Record<string, string>) => void;
 }
 
 /**
@@ -31,10 +33,24 @@ interface Props {
  * the Charts tab. Opens on forex, 15-minute candles. The analysis plan (entry, stop loss, take profit)
  * is drawn on it as price lines.
  */
-const LiveChart = observer(({ symbol, granularity, chartType, lines, onSymbol, onGranularity, onChartType }: Props) => {
+const LiveChart = observer(({ symbol, granularity, chartType, lines, onSymbol, onGranularity, onChartType, onMarkets }: Props) => {
     const { common, ui, chart_store } = useStore();
     const { chartData, getQuotes, subscribeQuotes, unsubscribeQuotes } = useSmartChartAdaptor();
     const { isDesktop, isMobile } = useDevice();
+
+    // the readable name of every market, so the trade panel can say "Volatility 75 (1s) Index" and not "1HZ75V"
+    useEffect(() => {
+        const list = chartData.activeSymbols as any[];
+        if (!onMarkets || !list?.length) return;
+        const names: Record<string, string> = {};
+        list.forEach(a => {
+            const code = a.underlying_symbol ?? a.symbol;
+            const label = a.underlying_symbol_name ?? a.display_name ?? a.name;
+            if (code && label) names[String(code)] = String(label);
+        });
+        onMarkets(names);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chartData.activeSymbols]);
 
     // if the wanted symbol is not offered (for example a market that is closed for the weekend), fall back to any forex market
     useEffect(() => {

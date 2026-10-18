@@ -384,6 +384,71 @@
         }
     }
 
+    // the market was just changed
+    &__flash {
+        margin: 0 0 10px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-prominent);
+        background: linear-gradient(135deg, var(--fl-gold-soft), transparent);
+        border: 1px solid var(--fl-gold);
+        animation: forex-live-flash 0.9s ease-out;
+    }
+
+    @keyframes forex-live-flash {
+        0% {
+            box-shadow: 0 0 0 0 var(--fl-gold);
+            transform: translateY(-4px);
+            opacity: 0;
+        }
+
+        60% {
+            box-shadow: 0 0 0 6px transparent;
+            opacity: 1;
+        }
+
+        100% {
+            transform: none;
+        }
+    }
+
+    // a row about the market on the chart: contract type, smallest stake, contracts open on it
+    &__market {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    &__pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-less-prominent);
+        background: var(--fl-field);
+        border: 1px solid var(--fl-line);
+
+        &.is-live {
+            color: var(--text-prominent);
+            border-color: var(--fl-gold);
+            background: var(--fl-gold-soft);
+        }
+    }
+
+    &__warn {
+        margin: 8px 0 0;
+        padding: 7px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-loss-danger);
+        background: color-mix(in srgb, #ef4444 12%, transparent);
+        border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);
+    }
+
     &__hint {
         margin: 10px 0 0;
         font-size: 11px;

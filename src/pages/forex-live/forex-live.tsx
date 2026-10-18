@@ -54,8 +54,41 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades } = useForexLive(isAuthorized, activeLoginid);
+    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(isAuthorized, activeLoginid);
     const multipliers = useMultipliers(symbol, isAuthorized);
+
+    // readable market names, the multiplier chosen in the trade panel, and a notice when the market changes
+    const [names, setNames] = useState<Record<string, string>>({});
+    const [multiplier, setMultiplier] = useState(0);
+    const [marketNotice, setMarketNotice] = useState('');
+    const marketName = names[symbol] || symbol.replace(/^frx/, '');
+    const first = useRef(true);
+    useEffect(() => {
+        // not on the first load: only when the person (or the chart) really changes the market
+        if (first.current) {
+            first.current = false;
+            return;
+        }
+        setMarketNotice(`Market changed to ${marketName}. Trades now open on this market.`);
+        const t = window.setTimeout(() => setMarketNotice(''), 8000);
+        return () => window.clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbol]);
+
+    // look up the smallest stake of the chosen market (Deriv's answer to a price quote with a tiny stake; nothing is bought)
+    useEffect(() => {
+        if (isAuthorized && currency && multiplier) void probeMinStake(symbol, currency, multiplier);
+    }, [isAuthorized, currency, symbol, multiplier, probeMinStake]);
+
+    const here = useMemo(() => {
+        const open = positions.filter(p => !p.closed && p.symbol === symbol);
+        return {
+            count: open.length,
+            buys: open.filter(p => p.side === 'BUY').length,
+            sells: open.filter(p => p.side === 'SELL').length,
+            profit: Math.round(open.reduce((t, p) => t + (p.profit ?? 0), 0) * 100) / 100,
+        };
+    }, [positions, symbol]);
 
     const trade = useCallback((list: TradeInput[]) => {
         // all sent at once; nothing waits for anything else
@@ -85,6 +118,7 @@ const ForexLive = observer(() => {
                     onSymbol={setSymbol}
                     onGranularity={setGranularity}
                     onChartType={setChartType}
+                    onMarkets={setNames}
                 />
                 {lines.length > 0 && (
                     <div className='forex-live__legend'>
@@ -104,6 +138,11 @@ const ForexLive = observer(() => {
                     disabled={!isAuthorized}
                     pending={pending}
                     onTrade={trade}
+                    marketName={marketName}
+                    minStake={minStakes[`${symbol}|${multiplier}`] ?? null}
+                    onMultiplier={setMultiplier}
+                    notice={marketNotice}
+                    openHere={here}
                 />
 
                 <PositionsPanel positions={positions} currency={currency} symbol={symbol} onClose={list => void closeTrades(list)} />

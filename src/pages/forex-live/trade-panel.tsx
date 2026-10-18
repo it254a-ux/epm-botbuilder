@@ -10,6 +10,16 @@ interface Props {
     /** How many requests are on their way to Deriv right now. */
     pending: number;
     onTrade: (trades: TradeInput[]) => void;
+    /** Readable name of the market (for example "Volatility 75 (1s) Index"). */
+    marketName?: string;
+    /** The smallest stake this market accepts, once known. */
+    minStake?: number | null;
+    /** Tells the page which multiplier is chosen (the minimum stake is looked up for it). */
+    onMultiplier?: (multiplier: number) => void;
+    /** A short message at the top, for example when the market was just changed. */
+    notice?: string;
+    /** The contracts that are open on this market right now. */
+    openHere?: { count: number; buys: number; sells: number; profit: number };
 }
 
 const PREFS_KEY = 'epm_forex_live_prefs';
@@ -39,9 +49,26 @@ const loadPrefs = (): Prefs => {
 const nearest = (list: number[], want: number): number =>
     list.length ? list.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a)) : want;
 
-const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade }: Props) => {
+const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere }: Props) => {
     const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
     const set = (patch: Partial<Prefs>) => setPrefs(p => ({ ...p, ...patch }));
+    const [stakeNote, setStakeNote] = useState('');
+
+    // the page needs to know the multiplier, to look up the smallest stake that goes with it
+    useEffect(() => {
+        onMultiplier?.(prefs.multiplier);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prefs.multiplier]);
+
+    // a market with a bigger minimum stake: the stake moves up to that minimum and says so, instead of every click being refused
+    useEffect(() => {
+        setStakeNote('');
+        if (minStake && Number(prefs.stake) + 1e-9 < minStake) {
+            set({ stake: String(minStake) });
+            setStakeNote(`Stake raised to ${minStake}: the smallest this market accepts.`);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [minStake, symbol]);
 
     useEffect(() => {
         try {
@@ -59,6 +86,10 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade 
 
     const fire = (side: Side) => {
         if (disabled) return;
+        if (minStake && Number(prefs.stake) + 1e-9 < minStake) {
+            setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
+            return;
+        }
         const trade: TradeInput = {
             side,
             symbol,
@@ -72,7 +103,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade 
         onTrade(Array.from({ length: prefs.count }, () => trade));
     };
 
-    const name = symbol.replace(/^frx/, '');
+    const name = marketName || symbol.replace(/^frx/, '');
 
     return (
         <section className='forex-live__card forex-live__trade'>
@@ -80,6 +111,22 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade 
                 <h3>Trade {name}</h3>
                 {pending > 0 && <span className='forex-live__sending'>sending {pending}…</span>}
             </header>
+
+            {notice && (
+                <p className='forex-live__flash' role='status'>
+                    {notice}
+                </p>
+            )}
+
+            <div className='forex-live__market' aria-label='This market'>
+                <span className='forex-live__pill'>Multiplier x{prefs.multiplier}</span>
+                <span className='forex-live__pill'>{minStake ? `Min stake ${minStake} ${currency}` : 'Min stake: checking…'}</span>
+                <span className={`forex-live__pill forex-live__pill--open${openHere && openHere.count ? ' is-live' : ''}`}>
+                    {openHere && openHere.count
+                        ? `${openHere.count} open here · ▲${openHere.buys} ▼${openHere.sells} · ${openHere.profit > 0 ? '+' : ''}${openHere.profit.toFixed(2)}`
+                        : 'No contracts open here'}
+                </span>
+            </div>
 
             <div className='forex-live__buttons'>
                 <button type='button' className='forex-live__go forex-live__go--buy' disabled={disabled} onClick={() => fire('BUY')}>
@@ -139,6 +186,12 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade 
                     />
                 </label>
             </div>
+
+            {stakeNote && (
+                <p className='forex-live__warn' role='alert'>
+                    {stakeNote}
+                </p>
+            )}
 
             <div className='forex-live__chips' aria-label='Quick stakes'>
                 {STAKES.map(s => (
