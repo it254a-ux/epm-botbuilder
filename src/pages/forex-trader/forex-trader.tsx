@@ -6,6 +6,8 @@ import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStra
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
 import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
 import MtfPanel from './mtf-panel';
+import PdhPanel from './pdh-panel';
+import { analysePreviousDay, type PdhResult } from './pdh';
 import './forex-trader.scss';
 import './forex-trader-premium.scss';
 
@@ -153,6 +155,9 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
     const [mode, setMode] = useState<'h1' | 'mtf'>(initialMode ?? 'h1');
     const [mtf, setMtf] = useState<MtfResult | null>(null);
+    // Previous Day High / Low rejection (inside the M15 + M5 mode)
+    const [pdh, setPdh] = useState<PdhResult | null>(null);
+    const pdhKey = useRef('');
     const [m15Ready, setM15Ready] = useState(false);
     const [m15Error, setM15Error] = useState<string | null>(null);
     const m15Ref = useRef<Candle[]>([]);
@@ -230,6 +235,8 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         setLoadError(null);
         setOutcome(null);
         setMtf(null);
+        setPdh(null);
+        pdhKey.current = '';
         chartRef.current?.drawAnalysis(null, []);
         candlesRef.current = [];
         // M15 + M5 mode draws the M5 chart (the entry timeframe) with about 2 days of history
@@ -483,12 +490,26 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         }
     };
 
+    // Previous Day High / Low picture on the chart (levels, named arrows, trade plan); cleared by the chart whenever its candles reload
+    useEffect(() => {
+        if (mode !== 'mtf' || loading) return;
+        chartRef.current?.drawPdh(pdh);
+    }, [pdh, mode, loading]);
+
     // every price update from the feed (at most once a second)
     const lastTickAt = useRef(0);
     const tickTimer = useRef<number | null>(null);
     const mtfCompute = () => {
         if (ctx.current.mode !== 'mtf') return;
-        setMtf(analyseMtf(m15Ref.current, candlesRef.current, Math.floor(Date.now() / 1000)));
+        const nowSec = Math.floor(Date.now() / 1000);
+        setMtf(analyseMtf(m15Ref.current, candlesRef.current, nowSec));
+        // only update (and redraw the chart) when something about the Previous Day setup really changed
+        const r = analysePreviousDay(m15Ref.current, candlesRef.current, nowSec);
+        const key = [r.stage, r.side, r.levelPrice, r.footprint.count, r.sweep?.time, r.sweep?.price, r.rejection?.time, r.plan?.entry, r.plan?.stopLoss, r.signalTime, r.dataProblem].join('|');
+        if (key !== pdhKey.current) {
+            pdhKey.current = key;
+            setPdh(r);
+        }
     };
     liveTick.current = () => {
         const c = ctx.current;
@@ -687,14 +708,17 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
 
             <div className='forex-trader__result'>
                 {mode === 'mtf' && (
-                    <MtfPanel
-                        result={mtf}
-                        market={info?.underlying_symbol_name ?? symbol}
-                        fmt={fmt}
-                        loading={loading || !m15Ready}
-                        error={loadError ?? m15Error}
-                        marketClosed={closed}
-                    />
+                    <>
+                        <MtfPanel
+                            result={mtf}
+                            market={info?.underlying_symbol_name ?? symbol}
+                            fmt={fmt}
+                            loading={loading || !m15Ready}
+                            error={loadError ?? m15Error}
+                            marketClosed={closed}
+                        />
+                        <PdhPanel result={pdh} fmt={fmt} marketClosed={closed} />
+                    </>
                 )}
                 {mode === 'h1' && !outcome && (
                     <p className='forex-trader__hint'>

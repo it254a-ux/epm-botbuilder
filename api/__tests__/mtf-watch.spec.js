@@ -8,6 +8,7 @@ jest.mock('../_lib/deriv', () => ({ connect: jest.fn(), getActiveSymbols: jest.f
 jest.mock('../_lib/telegram', () => ({ sendTelegram: jest.fn(), sendTelegramPhoto: jest.fn() }));
 jest.mock('../_lib/mtf', () => ({ analyseMtf: jest.fn() }));
 jest.mock('../_lib/ict', () => ({ analyseIct: jest.fn() }));
+jest.mock('../_lib/pdh', () => ({ analysePreviousDay: jest.fn() }));
 jest.mock('../_lib/signal-chart', () => ({ renderChartPng: jest.fn() }));
 
 const deriv = require('../_lib/deriv');
@@ -15,6 +16,7 @@ const { sendTelegram, sendTelegramPhoto } = require('../_lib/telegram');
 const chart = require('../_lib/signal-chart');
 const mtf = require('../_lib/mtf');
 const ict = require('../_lib/ict');
+const pdh = require('../_lib/pdh');
 const store = require('../_lib/signals-store');
 const core = require('../_lib/signals-core');
 const handler = require('../_lib/routes/signal-watch-mtf');
@@ -51,10 +53,30 @@ const WAIT = (over = {}) => ({
     plan: null, reasons: ['WAIT / NO SIGNAL: M15 direction is unclear.'], signalTime: closeOfLast(), lastPrice: 1, key: 'w', ...over,
 });
 
+const DAY_START = Math.floor(nowSec() / 86400) * 86400;
+const PDH_NONE = () => ({
+    stage: 'none', side: null, levelName: null, levelPrice: null, levels: { high: null, low: null, equilibrium: null, day: null },
+    footprint: { count: 0, times: [] }, sweep: null, rejection: null, plan: null, markers: [],
+    headline: 'No Previous Day High/Low setup right now.', reasons: [], signalTime: closeOfLast(), alertKey: null,
+});
+const PDH_WATCH = (over = {}) => ({
+    ...PDH_NONE(), stage: 'watch', side: 'SELL', levelName: 'Previous Day High', levelPrice: 2345.2,
+    levels: { high: 2345.2, low: 2310, equilibrium: 2327.6, day: DAY_START - 86400 },
+    footprint: { count: 3, times: [1, 2, 3] }, sweep: { time: closeOfLast() - 300, price: 2345.6 },
+    headline: 'WATCH: price touched the Previous Day High after an Institutional Footprint. Do NOT enter yet.',
+    reasons: ['Previous Day High: 2345.2.', 'Wait for ONE red M5 candle.'], alertKey: `PDH|${DAY_START}`, ...over,
+});
+const PDH_CONFIRMED = (over = {}) => ({
+    ...PDH_WATCH(), stage: 'confirmed', rejection: { time: closeOfLast() - 300, close: 2342.1 },
+    plan: { side: 'SELL', entry: 2342.1, stopLoss: 2346, takeProfit: 2327.6, takeProfit2: 2310, rr: 3.72, risk: 3.9 },
+    headline: 'CONFIRMED SELL: the Rejection Candle formed at the Previous Day High. This is the entry.',
+    reasons: ['Previous Day High: 2345.2.', 'A red M5 candle closed below the candle before it: the Rejection Candle.'], ...over,
+});
+
 const ENV = { ...process.env };
 beforeEach(async () => {
     global.__sql = makeSql();
-    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache');
+    await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache, signal_alerts');
     process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MTF_COOLDOWN_MIN: '30' };
     deriv.connect.mockReset().mockResolvedValue({ close: jest.fn() });
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
@@ -69,6 +91,7 @@ beforeEach(async () => {
     chart.renderChartPng.mockReset().mockImplementation(() => { throw new Error('no chart in this test'); });
     mtf.analyseMtf.mockReset().mockReturnValue(BUY());
     ict.analyseIct.mockReset().mockReturnValue(WAIT()); // the ICT strategy has its own describe block below
+    pdh.analysePreviousDay.mockReset().mockReturnValue(PDH_NONE()); // Previous Day High/Low has its own describe block below
 });
 afterEach(() => { process.env = ENV; if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
@@ -386,5 +409,164 @@ describe('ICT strategy (same run, own rules)', () => {
         expect(ict.analyseIct).not.toHaveBeenCalled();
         expect(r.body.summary.ict).toBeUndefined();
         expect(sendTelegram).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('Previous Day High / Low rejection', () => {
+    const rowsOf = async () => global.__sql`SELECT strategy_id, strategy_name, timeframe, side, status, dedupe_key FROM signals`;
+    const alertRows = async () => global.__sql`SELECT key FROM signal_alerts`;
+    // the trend pattern stays quiet in these tests so only Previous Day High/Low acts
+    beforeEach(() => { mtf.analyseMtf.mockReturnValue(WAIT()); });
+
+    describe('WATCH: the heads-up when price touches the level', () => {
+        test('is sent once with the names a student needs, and it is not a trade', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            const r = await call();
+            expect(r.body.markets[0].pdh).toMatchObject({ stage: 'watch', alert: 'sent' });
+            expect(r.body.summary.pdh.alerts).toBe(1);
+            expect(sendTelegram).toHaveBeenCalledTimes(1);
+            const text = sendTelegram.mock.calls[0][0];
+            for (const part of ['WATCH', 'Do NOT enter yet', 'Previous Day High', '2345.2', 'Institutional Footprint: 3 tall green M5 candles', 'Liquidity Sweep', '2345.6',
+                'Rejection Candle', 'ONE red M5 candle', 'keep waiting', 'Equilibrium', '2327.6', 'Previous Day Low', 'Signals only, not financial advice.']) expect(text).toContain(part);
+            expect(await rowsOf()).toHaveLength(0); // an alert is not a signal: no trade, no result tracking
+            expect(await alertRows()).toHaveLength(1);
+        });
+        test('only once per level per market per day', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            await call();
+            const again = await call({ force: '1' });
+            expect(again.body.markets[0].pdh.alert).toMatch(/already sent today/);
+            expect(sendTelegram).toHaveBeenCalledTimes(1);
+        });
+        test('the next day (a new key) the alert is sent again', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            await call();
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH({ alertKey: `PDH|${DAY_START + 86400}` }));
+            await call({ force: '1' });
+            expect(sendTelegram).toHaveBeenCalledTimes(2);
+        });
+        test('the Previous Day Low gets its own alert, in the mirrored words', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH({ side: 'BUY', levelName: 'Previous Day Low', levelPrice: 2310, alertKey: `PDL|${DAY_START}` }));
+            await call();
+            const text = sendTelegram.mock.calls[0][0];
+            expect(text).toContain('Previous Day Low');
+            expect(text).toContain('tall red M5 candles');
+            expect(text).toContain('ONE green M5 candle');
+            expect(text).toContain('<b>BUY</b>');
+            expect(text).toContain('Target 2 Previous Day High');
+        });
+        test('if Telegram refuses it, the alert is given back and sent on the next run', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            sendTelegram.mockRejectedValueOnce(new Error('Telegram refused the message (429)'));
+            const first = await call();
+            expect(first.body.markets[0].pdh.alert).toMatch(/failed/);
+            expect(await alertRows()).toHaveLength(0);
+            const second = await call({ force: '1' });
+            expect(second.body.markets[0].pdh.alert).toBe('sent');
+        });
+        test('a dry run shows the alert and claims nothing', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            const r = await call({ dry: '1' });
+            expect(r.body.markets[0].pdh.wouldAlert).toContain('Do NOT enter yet');
+            expect(sendTelegram).not.toHaveBeenCalled();
+            expect(await alertRows()).toHaveLength(0);
+        });
+        test('news ahead is added to the alert as a warning line', async () => {
+            process.env.NEWS_FILTER = 'on';
+            const ev = { title: 'Non-Farm Employment Change', country: 'USD', impact: 'High', date: new Date(Date.now() + 600 * 60000).toISOString().replace('Z', '+00:00') };
+            jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200, json: async () => [ev] });
+            pdh.analysePreviousDay.mockReturnValue(PDH_WATCH());
+            await call();
+            expect(sendTelegram.mock.calls[0][0]).toContain('High-impact news ahead');
+        });
+    });
+
+    describe('CONFIRMED: the entry at the Rejection Candle', () => {
+        test('is saved as its own strategy and sent with the four numbered steps', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+            const r = await call();
+            expect(r.body.markets[0].pdh).toMatchObject({ stage: 'confirmed', saved: true, telegram: 'sent' });
+            expect(r.body.summary.pdh.signalsSaved).toBe(1);
+            const rows = await rowsOf();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ strategy_id: 8, strategy_name: 'Previous Day High/Low rejection', timeframe: 300, side: 'SELL', status: 'active' });
+            const text = sendTelegram.mock.calls[0][0];
+            for (const part of ['CONFIRMED SELL', 'Previous Day High rejection (M5)', '1️⃣', '2️⃣', '3️⃣', '4️⃣', 'Rejection Candle', 'This is the entry', 'Entry: <code>2342.1</code>',
+                'Stop loss (beyond the sweep)', '2346', 'Target 1 (Equilibrium)', '2327.6', 'Target 2 (Previous Day Low)', '2310', '1 : 3.72', 'GMT', 'Signals only, not financial advice.']) expect(text).toContain(part);
+        });
+        test('the Previous Day Low entry is a BUY with the mirrored words', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED({
+                side: 'BUY', levelName: 'Previous Day Low', levelPrice: 2310, rejection: { time: closeOfLast() - 300, close: 2313 },
+                plan: { side: 'BUY', entry: 2313, stopLoss: 2309, takeProfit: 2327.6, takeProfit2: 2345.2, rr: 3.65, risk: 4 },
+            }));
+            await call();
+            const text = sendTelegram.mock.calls[0][0];
+            for (const part of ['CONFIRMED BUY', 'Previous Day Low rejection (M5)', 'tall red M5 candles', 'a green M5 candle closed at', 'Target 2 (Previous Day High)']) expect(text).toContain(part);
+        });
+        test('the same setup is never sent twice', async () => {
+            process.env.MTF_COOLDOWN_MIN = '0';
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+            await call();
+            await global.__sql`UPDATE signals SET status = 'hit_sl'`;
+            const r = await call({ force: '1' });
+            expect(r.body.markets[0].pdh.skipped).toMatch(/duplicate/i);
+            expect(sendTelegram).toHaveBeenCalledTimes(1);
+        });
+        test('while its trade is open there is no second Previous Day High/Low entry, and then a cool-down applies', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+            await call();
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED({ rejection: { time: closeOfLast(), close: 2341 } }));
+            const open = await call({ force: '1' });
+            expect(open.body.markets[0].pdh.skipped).toMatch(/still open/i);
+            await global.__sql`UPDATE signals SET status = 'hit_sl'`;
+            const cool = await call({ force: '1' });
+            expect(cool.body.markets[0].pdh.skipped).toMatch(/cool-down/i);
+            expect(sendTelegram).toHaveBeenCalledTimes(1);
+        });
+        test('high-impact news around the market holds it', async () => {
+            process.env.NEWS_FILTER = 'on';
+            const ev = { title: 'Non-Farm Employment Change', country: 'USD', impact: 'High', date: new Date(Date.now() + 45 * 60000).toISOString().replace('Z', '+00:00') };
+            jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200, json: async () => [ev] });
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+            const r = await call();
+            expect(r.body.markets[0].pdh.skipped).toMatch(/news blackout/i);
+            expect(await rowsOf()).toHaveLength(0);
+        });
+        test('a dry run shows the entry and saves nothing', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+            const r = await call({ dry: '1' });
+            expect(r.body.markets[0].pdh.wouldSend).toContain('CONFIRMED SELL');
+            expect(sendTelegram).not.toHaveBeenCalled();
+            expect(await rowsOf()).toHaveLength(0);
+        });
+        test('a setup with no Rejection Candle (stage none) is never sent', async () => {
+            pdh.analysePreviousDay.mockReturnValue(PDH_NONE());
+            await call();
+            expect(sendTelegram).not.toHaveBeenCalled();
+        });
+    });
+
+    test('MTF_PDH=off switches only this setup off', async () => {
+        process.env.MTF_PDH = 'off';
+        pdh.analysePreviousDay.mockReturnValue(PDH_CONFIRMED());
+        const r = await call();
+        expect(pdh.analysePreviousDay).not.toHaveBeenCalled();
+        expect(r.body.markets[0].pdh).toBeUndefined();
+        expect(r.body.summary.pdh).toBeUndefined();
+        expect(sendTelegram).not.toHaveBeenCalled();
+    });
+
+    test('alert claims: the first claim wins, a released claim can be taken again', async () => {
+        await store.ensureTables(global.__sql);
+        expect(await store.claimAlert(global.__sql, 'k1')).toBe(true);
+        expect(await store.claimAlert(global.__sql, 'k1')).toBe(false);
+        await store.releaseAlert(global.__sql, 'k1');
+        expect(await store.claimAlert(global.__sql, 'k1')).toBe(true);
+    });
+
+    test('text from the data cannot break the Telegram message', () => {
+        const t = core.formatPdhWatchTelegram(PDH_WATCH(), 'Gold <b>&</b> Co');
+        expect(t).toContain('Gold &lt;b&gt;&amp;&lt;/b&gt; Co');
     });
 });

@@ -12,6 +12,8 @@
 //   - the same confirmation can never be sent twice (database duplicate check)
 //   - high-impact news around the market holds the signal, like in the H1 mode
 //   - MTF_ENABLED=off switches this mode off completely
+//   - Previous Day High/Low rejection (api/_lib/pdh.js): a WATCH alert when price touches yesterday's high/low after an Institutional
+//     Footprint (once per level per market per day: "do not enter yet"), then the entry when the Rejection Candle forms. MTF_PDH=off switches it off.
 //   - the ICT strategy (sweep + structure shift + fair value gap, api/_lib/ict.js) runs on the same candles in the same run, with its own
 //     open-trade and cool-down checks. ICT_ENABLED=off switches only ICT off.
 //
@@ -24,6 +26,7 @@ const chart = require('../signal-chart');
 const { deliverSignal } = require('../signal-deliver');
 const mtf = require('../mtf');
 const ict = require('../ict');
+const pdhMod = require('../pdh');
 const core = require('../signals-core');
 const store = require('../signals-store');
 const news = require('../news');
@@ -35,8 +38,25 @@ const MTF_STRATEGY_ID = 6;
 const MTF_STRATEGY_NAME = 'M15 direction + M5 entry';
 const ICT_STRATEGY_ID = 7;
 const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
+const PDH_STRATEGY_ID = 8;
+const PDH_STRATEGY_NAME = 'Previous Day High/Low rejection';
 
 const numOr = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
+
+/** The Previous Day High/Low result in the shape the shared signal loop expects (it is only a trade when the Rejection Candle has formed). */
+function pdhAsRun(p) {
+    const ok = p.stage === 'confirmed' && p.plan && p.rejection;
+    return {
+        signal: ok ? p.plan.side : 'WAIT',
+        bias: p.side === 'BUY' ? 'bullish' : p.side === 'SELL' ? 'bearish' : 'unclear',
+        plan: ok ? { side: p.plan.side, entry: p.plan.entry, stopLoss: p.plan.stopLoss, takeProfit: p.plan.takeProfit, rr: p.plan.rr } : null,
+        setupId: ok ? `${p.plan.side}|${p.rejection.time}` : null,
+        signalTime: p.signalTime,
+        m15Text: p.headline,
+        m5Text: p.reasons[p.reasons.length - 1] || '',
+        reasons: p.reasons,
+    };
+}
 
 /** Telegram messages one at a time, with a pause between them. */
 function makeSender(gapMs) {
@@ -74,8 +94,11 @@ module.exports = async function handler(req, res) {
     const cfg = core.readConfig();
     const cooldownMin = Math.max(0, numOr(process.env.MTF_COOLDOWN_MIN, 30));
     const ictEnabled = String(process.env.ICT_ENABLED || 'on').toLowerCase() !== 'off';
+    // Previous Day High/Low rejection: a WATCH alert at the touch, then the entry at the Rejection Candle. MTF_PDH=off switches only this off.
+    const pdhEnabled = String(process.env.MTF_PDH || 'on').toLowerCase() !== 'off';
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
+    if (pdhEnabled) summary.pdh = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, alerts: 0 };
     const report = { ok: true, dry, mode: 'M15 direction + M5 entry', summary, markets: [] };
 
     let client;
@@ -162,10 +185,42 @@ module.exports = async function handler(req, res) {
                     entry.ict = { signal: ia.signal, bias: ia.bias, m5: ia.m5Text };
                     runs.push({ id: ICT_STRATEGY_ID, name: ICT_STRATEGY_NAME, a: ia, out: entry.ict });
                 }
+                let pdhResult = null;
+                if (pdhEnabled) {
+                    pdhResult = pdhMod.analysePreviousDay(c15, c5, now);
+                    entry.pdh = { stage: pdhResult.stage, headline: pdhResult.headline };
+                    runs.push({ id: PDH_STRATEGY_ID, name: PDH_STRATEGY_NAME, a: pdhAsRun(pdhResult), out: entry.pdh });
+
+                    // Heads-up when price touches the level (after an Institutional Footprint). Not a trade: "do not enter yet". Once per level per market per day.
+                    if (pdhResult.stage === 'watch' && pdhResult.alertKey) {
+                        const wc = news.currenciesFor(symbol, info.market);
+                        const wn = wc.length && newsData.events.length ? news.check(wc, newsData.events, now, newsCfg) : {};
+                        const alertText = core.formatPdhWatchTelegram(pdhResult, info.underlying_symbol_name, { siteUrl: core.signalsPageUrl(), newsNote: wn.upcoming ? news.newsNote(wn.upcoming, now) : null });
+                        if (!write) {
+                            entry.pdh.wouldAlert = alertText;
+                        } else {
+                            const alertKey = `${symbol}|pdh-watch|${pdhResult.alertKey}`;
+                            if (await store.claimAlert(sql, alertKey)) {
+                                try {
+                                    await send(() => sendTelegram(alertText));
+                                    entry.pdh.alert = 'sent';
+                                    summary.pdh.alerts++;
+                                } catch (err) {
+                                    await store.releaseAlert(sql, alertKey); // let the next run try again
+                                    entry.pdh.alert = `failed: ${err.message}`;
+                                    console.error('signal-watch-mtf: PDH alert failed:', err.message);
+                                }
+                            } else {
+                                entry.pdh.alert = 'already sent today for this level';
+                            }
+                        }
+                    }
+                }
                 for (const run of runs) {
                     const { a: ra, out } = run;
                     const isIct = run.id === ICT_STRATEGY_ID;
-                    const count = isIct ? summary.ict : summary;
+                    const isPdh = run.id === PDH_STRATEGY_ID;
+                    const count = isIct ? summary.ict : isPdh ? summary.pdh : summary;
                     out.reasons = ra.reasons;
                     if (ra.signal === 'WAIT' || !ra.plan) {
                         count.waiting++;
@@ -183,7 +238,7 @@ module.exports = async function handler(req, res) {
                     } else {
                         const sig = {
                             // one signal per setup: the setup id stays the same while the same setup is still valid (older analysis results without one: per confirming candle)
-                            key: `${symbol}|${isIct ? 'ict' : 'mtf'}|${ra.setupId || `${ra.plan.side}|${ra.signalTime}`}`,
+                            key: `${symbol}|${isIct ? 'ict' : isPdh ? 'pdh' : 'mtf'}|${ra.setupId || `${ra.plan.side}|${ra.signalTime}`}`,
                             symbol,
                             symbolName: info.underlying_symbol_name,
                             market: info.market,
@@ -199,8 +254,18 @@ module.exports = async function handler(req, res) {
                             m15Text: ra.m15Text,
                             m5Text: ra.m5Text,
                             newsNote: nw.upcoming ? news.newsNote(nw.upcoming, now) : null,
+                            ...(isPdh
+                                ? {
+                                      takeProfit2: pdhResult.plan.takeProfit2,
+                                      levelName: pdhResult.levelName,
+                                      levelPrice: pdhResult.levelPrice,
+                                      footprintCount: pdhResult.footprint.count,
+                                      sweepPrice: pdhResult.sweep ? pdhResult.sweep.price : pdhResult.levelPrice,
+                                      rejectionClose: pdhResult.rejection.close,
+                                  }
+                                : {}),
                         };
-                        const text = () => core.formatMtfTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote });
+                        const text = () => (isPdh ? core.formatPdhEntryTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote }) : core.formatMtfTelegram(sig, { siteUrl: core.signalsPageUrl(), newsNote: sig.newsNote }));
                         const chartInput = { candles: closed5.slice(-120), analysis: {}, signal: sig };
                         if (!write) {
                             out.wouldSend = text();

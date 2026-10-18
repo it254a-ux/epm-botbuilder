@@ -70,6 +70,63 @@ function formatMtfTelegram(sig, { siteUrl, newsNote } = {}) {
     ].join('\n');
 }
 
+/** Wording for either side of the Previous Day High/Low rejection (a PDL setup is the mirror image of a PDH one). */
+function pdhWords(side) {
+    return side === 'BUY'
+        ? { footprint: 'red', rejection: 'green', way: 'above', farName: 'Previous Day High' }
+        : { footprint: 'green', rejection: 'red', way: 'below', farName: 'Previous Day Low' };
+}
+
+/** Heads-up when price touches the Previous Day High/Low: the trader must NOT enter yet. p is a PdhResult (stage 'watch'). */
+function formatPdhWatchTelegram(p, symbolName, { siteUrl, newsNote } = {}) {
+    const w = pdhWords(p.side);
+    const far = p.side === 'BUY' ? p.levels.high : p.levels.low;
+    return [
+        `👀 <b>WATCH</b>: ${escapeHtml(symbolName)} touched the <b>${p.levelName}</b>`,
+        '🚫 Do NOT enter yet.',
+        '',
+        `1️⃣ ${p.levelName}: <code>${px(p.levelPrice)}</code>`,
+        `2️⃣ Institutional Footprint: ${p.footprint.count} tall ${w.footprint} M5 candles ran into the level`,
+        `3️⃣ Liquidity Sweep: price reached <code>${px(p.sweep.price)}</code> at ${p.sweep.time ? gmtStamp(p.sweep.time) : 'the touch'}`,
+        '',
+        `⏳ Wait for the <b>Rejection Candle</b>: ONE ${w.rejection} M5 candle with a real body that closes ${w.way} the candle before it. If price keeps running past the level, keep waiting for that candle.`,
+        `🎯 If it confirms: <b>${p.side}</b>. Target 1 Equilibrium <code>${px(p.levels.equilibrium)}</code>, Target 2 ${w.farName} <code>${px(far)}</code>.`,
+        ...(newsNote ? ['', newsNote] : []),
+        ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
+        '',
+        '⚠️ Signals only, not financial advice.',
+    ].join('\n');
+}
+
+/**
+ * The confirmed entry after the Rejection Candle. sig: side, symbolName, levelName, levelPrice, footprintCount, sweepPrice,
+ * rejectionClose, entry, stopLoss, takeProfit (Target 1), takeProfit2 (Target 2), rr, time (open of the last closed M5 candle), timeframe.
+ */
+function formatPdhEntryTelegram(sig, { siteUrl, newsNote } = {}) {
+    const w = pdhWords(sig.side);
+    const buy = sig.side === 'BUY';
+    return [
+        `${buy ? '🟢' : '🔴'} <b>CONFIRMED ${sig.side}</b>: ${escapeHtml(sig.symbolName || sig.symbol)}`,
+        `📊 Setup: ${sig.levelName} rejection (M5)`,
+        '',
+        `1️⃣ ${sig.levelName}: <code>${px(sig.levelPrice)}</code>`,
+        `2️⃣ Institutional Footprint: ${sig.footprintCount} tall ${w.footprint} M5 candles`,
+        `3️⃣ Liquidity Sweep: price reached <code>${px(sig.sweepPrice)}</code>`,
+        `4️⃣ Rejection Candle: a ${w.rejection} M5 candle closed at <code>${px(sig.rejectionClose)}</code>, ${w.way} the candle before it. <b>This is the entry.</b>`,
+        '',
+        `🎯 Entry: <code>${px(sig.entry)}</code>`,
+        `🛑 Stop loss (beyond the sweep): <code>${px(sig.stopLoss)}</code>`,
+        `✅ Target 1 (Equilibrium): <code>${px(sig.takeProfit)}</code>`,
+        `🏁 Target 2 (${w.farName}): <code>${px(sig.takeProfit2)}</code>`,
+        `⚖️ Risk : Reward (to Target 1) = 1 : ${sig.rr.toFixed(2)}`,
+        `🕒 ${gmtStamp(sig.time + sig.timeframe)}`,
+        ...(newsNote ? ['', newsNote] : []),
+        ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
+        '',
+        '⚠️ Signals only, not financial advice.',
+    ].join('\n');
+}
+
 /** Reads the watcher settings from environment variables (Phase 1: simple and explicit). */
 function readConfig(env = process.env) {
     const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
@@ -174,4 +231,4 @@ function setupCheck(analysis, lastClosed, cfg, atr = null) {
 /** Open time of the candle that closed most recently, by the clock. */
 const expectedLastClosed = (nowSec, tf) => Math.floor(nowSec / tf) * tf - tf;
 
-module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, formatMtfTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck, orderForRun, MAIN_MARKETS };
+module.exports = { timeframeLabel, dedupeKey, escapeHtml, gmtStamp, formatTelegram, formatMtfTelegram, formatPdhWatchTelegram, formatPdhEntryTelegram, signalsPageUrl, readConfig, resolveWatchSymbols, expectedLastClosed, levelsProblem, setupCheck, orderForRun, MAIN_MARKETS };

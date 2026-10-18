@@ -14,6 +14,7 @@ import {
 import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
+import type { PdhResult } from './pdh';
 
 export interface ChartViewHandle {
     /** Replace all candles (initial load / market or timeframe change). */
@@ -22,6 +23,8 @@ export interface ChartViewHandle {
     updateCandle: (candle: Candle) => void;
     /** Draw (or clear, with null) the named lines for an analysis. */
     drawAnalysis: (analysis: Analysis | null, candles: Candle[]) => void;
+    /** Draw (or clear, with null) the Previous Day High/Low picture: levels, named arrows, and the trade plan. */
+    drawPdh: (result: PdhResult | null) => void;
     /** JPEG data URL of the chart as it looks right now, or null. */
     screenshot: () => string | null;
 }
@@ -210,6 +213,41 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             if (last && last.time === candle.time) list[list.length - 1] = candle;
             else if (!last || candle.time > last.time) list.push(candle);
             seriesRef.current?.update(toBar(candle));
+        },
+        drawPdh(result) {
+            const series = seriesRef.current;
+            clearDrawing();
+            if (!series || !result) return;
+            const addLine = (price: number, title: string, color: string, dashed = false, width: 1 | 2 = 2) => {
+                linesRef.current.push(series.createPriceLine({ price, color, lineWidth: width, lineStyle: dashed ? 2 : 0, axisLabelVisible: true, title }));
+            };
+            const lv = result.levels;
+            if (lv.high !== null) addLine(lv.high, 'Previous Day High', '#f0b429');
+            if (lv.low !== null) addLine(lv.low, 'Previous Day Low', '#f0b429');
+            if (lv.equilibrium !== null) addLine(lv.equilibrium, 'Equilibrium (50%)', '#94a3b8', true, 1);
+            const plan = result.plan;
+            if (plan) {
+                addLine(plan.entry, `ENTRY ${plan.side}`, '#38bdf8');
+                addLine(plan.stopLoss, 'Stop Loss', '#ef4444');
+                addLine(plan.takeProfit, 'Target 1 (Equilibrium)', '#22c55e');
+                addLine(plan.takeProfit2, 'Target 2', '#22c55e', true, 1);
+            }
+            const buy = result.side === 'BUY';
+            const markers: SeriesMarker<Time>[] = result.markers.map(m => {
+                const color = m.kind === 'footprint' ? '#f59e0b' : m.kind === 'sweep' ? '#a78bfa' : buy ? '#22c55e' : '#ef4444';
+                const shape = m.kind === 'footprint' ? 'circle' : m.above ? 'arrowDown' : 'arrowUp';
+                return { time: m.time as UTCTimestamp, position: m.above ? 'aboveBar' : 'belowBar', color, shape, text: m.text };
+            });
+            markers.sort((a, b) => (a.time as number) - (b.time as number));
+            series.setMarkers(markers);
+            // keep the active level and the plan inside the visible price range
+            const vals: number[] = [];
+            if (result.levelPrice !== null) vals.push(result.levelPrice);
+            if (plan) vals.push(plan.entry, plan.stopLoss, plan.takeProfit);
+            if (vals.length) {
+                const span = Math.max(...vals) - Math.min(...vals) || Math.abs(vals[0]) * 0.001;
+                levelsRef.current = { min: Math.min(...vals) - span * 0.06, max: Math.max(...vals) + span * 0.06 };
+            }
         },
         drawAnalysis(analysis, candles) {
             const series = seriesRef.current;

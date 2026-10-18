@@ -84,6 +84,12 @@ async function ensureTables(sql) {
             updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     `;
+    await sql`
+        CREATE TABLE IF NOT EXISTS signal_alerts (
+            key        TEXT PRIMARY KEY,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    `;
     prepared.add(sql);
 }
 
@@ -185,6 +191,17 @@ async function hasRecentSignal(sql, symbol, timeframe, minutes, strategyName = n
             LIMIT 1
         `;
     return rows.length > 0;
+}
+
+/** Heads-up alerts (not trades): true the first time a key is claimed, false if it was already claimed. */
+async function claimAlert(sql, key) {
+    const rows = await sql`INSERT INTO signal_alerts (key) VALUES (${key}) ON CONFLICT (key) DO NOTHING RETURNING key`;
+    return rows.length > 0;
+}
+
+/** Give a claimed alert back (Telegram refused it), so the next run can send it. */
+async function releaseAlert(sql, key) {
+    await sql`DELETE FROM signal_alerts WHERE key = ${key}`;
 }
 
 async function getOpenSignals(sql) {
@@ -363,4 +380,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { claimAlert, releaseAlert, getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
