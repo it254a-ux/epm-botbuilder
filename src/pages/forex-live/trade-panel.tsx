@@ -36,9 +36,11 @@ interface Prefs {
     /** Use the analysis plan's stop loss and take profit (when it has one for the side clicked). */
     useAnalysis: boolean;
     count: number;
+    /** The stake the person chose on each market (so it comes back when they return to that market). */
+    stakeBy: Record<string, string>;
 }
 
-const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', useAnalysis: true, count: 1 };
+const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', useAnalysis: true, count: 1, stakeBy: {} };
 
 const loadPrefs = (): Prefs => {
     try {
@@ -56,6 +58,8 @@ const nearest = (list: number[], want: number): number =>
 const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan }: Props) => {
     const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
     const set = (patch: Partial<Prefs>) => setPrefs(p => ({ ...p, ...patch }));
+    // a stake the person types or picks is remembered for this market
+    const setStake = (stake: string) => setPrefs(p => ({ ...p, stake, stakeBy: { ...p.stakeBy, [symbol]: stake } }));
     const [stakeNote, setStakeNote] = useState('');
 
     // the page needs to know the multiplier, to look up the smallest stake that goes with it
@@ -64,23 +68,23 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefs.multiplier]);
 
-    // a market with a bigger minimum stake: the stake moves up to that minimum and says so, instead of every click being refused
+    // On a market, the stake box fills itself with the smallest stake Deriv accepts there. It is only a starting point:
+    // the person can clear it and type any amount (at or above that minimum), and that amount is remembered for the market.
     useEffect(() => {
         setStakeNote('');
-        if (minStake && Number(prefs.stake) + 1e-9 < minStake) {
+        const mine = prefs.stakeBy?.[symbol];
+        if (mine !== undefined && mine !== '') {
+            if (mine !== prefs.stake) set({ stake: mine });
+            if (minStake && Number(mine) + 1e-9 < minStake) {
+                set({ stake: String(minStake) });
+                setStakeNote(`Stake set to ${minStake}: the smallest Deriv accepts on this market.`);
+            }
+        } else if (minStake) {
             set({ stake: String(minStake) });
-            setStakeNote(`Stake raised to ${minStake}: the smallest this market accepts.`);
+            setStakeNote(`Stake set to ${minStake}: the smallest Deriv accepts on this market. Change it to any amount you want.`);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [minStake, symbol]);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-        } catch {
-            /* ignore */
-        }
-    }, [prefs]);
 
     // a market with different allowed multipliers: move to the closest one
     useEffect(() => {
@@ -153,7 +157,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                         step='any'
                         inputMode='decimal'
                         value={prefs.stake}
-                        onChange={e => set({ stake: e.target.value })}
+                        onChange={e => setStake(e.target.value)}
                     />
                 </label>
                 <label>
@@ -214,7 +218,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
 
             <div className='forex-live__chips' aria-label='Quick stakes'>
                 {STAKES.map(s => (
-                    <button key={s} type='button' className={Number(prefs.stake) === s ? 'is-on' : ''} onClick={() => set({ stake: String(s) })}>
+                    <button key={s} type='button' className={Number(prefs.stake) === s ? 'is-on' : ''} onClick={() => setStake(String(s))}>
                         {s}
                     </button>
                 ))}
