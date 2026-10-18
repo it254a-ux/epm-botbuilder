@@ -31,16 +31,16 @@
         color: var(--text-less-prominent);
     }
 
-    &__layout,
     &__sizes {
         display: flex;
+        flex: none;
         gap: 2px;
         padding: 2px;
         border-radius: 9px;
         background: var(--general-section-1);
 
         button {
-            padding: 3px 9px;
+            padding: 3px 8px;
             border: 0;
             border-radius: 7px;
             font-size: 12px;
@@ -53,19 +53,72 @@
                 color: #fff;
                 background: #6366f1;
             }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
         }
     }
 
-    &__close {
-        width: 30px;
-        height: 30px;
-        border: 0;
+    &__btn,
+    &__chip {
+        flex: none;
+        padding: 4px 11px;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 18%, transparent);
         border-radius: 8px;
-        font-size: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-general);
+        background: var(--general-section-1);
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        &.is-on {
+            color: #fff;
+            border-color: #6366f1;
+            background: #6366f1;
+        }
+    }
+
+    &__x {
+        flex: none;
+        width: 24px;
+        height: 24px;
+        margin-left: auto;
+        border: 0;
+        border-radius: 6px;
+        font-size: 17px;
         line-height: 1;
         cursor: pointer;
         color: var(--text-prominent);
         background: var(--general-section-1);
+    }
+
+    &__pill {
+        flex: none;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        background: #64748b;
+
+        &--buy {
+            background: #10b981;
+        }
+
+        &--sell {
+            background: #ef4444;
+        }
     }
 
     &__grid {
@@ -78,6 +131,7 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        &--3,
         &--4 {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -110,7 +164,8 @@
         gap: 8px;
         padding: 5px 8px;
         flex: none;
-        overflow-x: auto;
+        flex-wrap: wrap;
+        row-gap: 4px;
     }
 
     &__price {

@@ -114,6 +114,11 @@ const ForexLive = observer(() => {
     const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
     const tradesDrawn = lines.length > 0;
 
+    const openCompare = useCallback(() => {
+        rootRef.current?.scrollTo({ top: 0 });
+        setCompare(true);
+    }, []);
+
     const onPlan = useCallback((p: ReportedPlan | null, s: string) => setPlan({ plan: p, symbol: s }), []);
 
     return (
@@ -125,18 +130,15 @@ const ForexLive = observer(() => {
                         controlledSymbol={symbol}
                         onSymbolChange={setSymbol}
                         onPlan={onPlan}
-                        initialMode='mtf'
                         extraLines={lines}
                         onMarkets={setNames}
                         resultHost={resultHost}
+                        onOpenCompare={openCompare}
                     />
                     <button
                         type='button'
                         className='forex-live__compare-btn'
-                        onClick={() => {
-                            rootRef.current?.scrollTo({ top: 0 });
-                            setCompare(true);
-                        }}
+                        onClick={openCompare}
                         title='Open 2 or 4 charts of this market, each with its own candle size'
                     >
                         Compare charts
@@ -194,7 +196,13 @@ const ForexLive = observer(() => {
             </div>
 
             {compare && (
-                <CompareCharts symbol={symbol} marketName={marketName} lines={lines} onClose={() => setCompare(false)} />
+                <CompareCharts
+                    symbol={symbol}
+                    marketName={marketName}
+                    kind={symbol.startsWith('frx') ? 'forex' : 'synthetic'}
+                    lines={lines}
+                    onClose={() => setCompare(false)}
+                />
             )}
         </div>
     );

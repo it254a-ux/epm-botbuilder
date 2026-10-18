@@ -147,9 +147,11 @@ interface ForexTraderProps {
     onMarkets?: (names: Record<string, string>) => void;
     /** When given, the analysis / results card is shown inside this element (a parent page's side column) instead of beside the chart. */
     resultHost?: HTMLElement | null;
+    /** When given, choosing "M15 analysis + M5 entry" opens this (a charts pop-up) instead of switching the tool into that mode. */
+    onOpenCompare?: () => void;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare }: ForexTraderProps) => {
     const { ws, isConnected } = useDerivWS();
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     // the two full pages (Forex Trader and Forex Live) keep the same picks; the small side panel keeps its own
@@ -165,7 +167,9 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
-    const [mode, setMode] = useSharedPick('mode', initialMode ?? 'h1', shared);
+    const [rawMode, setMode] = useSharedPick('mode', initialMode ?? 'h1', shared);
+    // with a charts pop-up on hand, the M15 + M5 mode lives in the pop-up and never switches this tool
+    const mode: 'h1' | 'mtf' = rawMode === 'mtf' && onOpenCompare ? 'h1' : rawMode;
     const [mtf, setMtf] = useState<MtfResult | null>(null);
     // Previous Day High / Low rejection (inside the M15 + M5 mode)
     const [pdh, setPdh] = useState<PdhResult | null>(null);
@@ -664,9 +668,15 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 />
                 <label>
                     <span>Mode</span>
-                    <select value={mode} onChange={e => setMode(e.target.value as 'h1' | 'mtf')}>
+                    <select
+                        value={mode}
+                        onChange={e => {
+                            if (e.target.value === 'mtf' && onOpenCompare) onOpenCompare();
+                            else setMode(e.target.value as 'h1' | 'mtf');
+                        }}
+                    >
                         <option value='h1'>H1 strategies (existing)</option>
-                        <option value='mtf'>M15 analysis + M5 entry</option>
+                        <option value='mtf'>M15 analysis + M5 entry{onOpenCompare ? ' (opens charts)' : ''}</option>
                     </select>
                 </label>
                 {mode === 'h1' && (
