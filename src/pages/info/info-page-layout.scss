@@ -123,16 +123,15 @@
 
         span {
             display: inline-block;
-            background: linear-gradient(100deg, #8a6a14 0%, #f6d36b 28%, #fff6d0 50%, #f6d36b 72%, #8a6a14 100%);
-            background-size: 260% 100%;
+            // Always solid gold: the text is never hidden or wiped, only lifted and brightened.
+            background: linear-gradient(180deg, #fff1b8 0%, #f6d36b 45%, #b8892a 100%);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
             -webkit-text-fill-color: transparent;
-            animation:
-                info-letter-wave 2.6s ease-in-out infinite,
-                info-letter-shine 4.5s linear infinite;
-            animation-delay: calc(var(--i) * 0.09s), calc(var(--i) * 0.09s);
+            // One wave runs through the letters (about 2.2s), rests about 2s, then runs again.
+            animation: info-letter-wave 4.4s ease-in-out infinite;
+            animation-delay: calc(var(--i) * 0.09s);
         }
     }
 
@@ -496,19 +495,14 @@
 }
 @keyframes info-letter-wave {
     0%,
+    18%,
     100% {
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
+        filter: brightness(1);
     }
-    50% {
-        transform: translateY(-0.45rem);
-    }
-}
-@keyframes info-letter-shine {
-    from {
-        background-position: 130% 0;
-    }
-    to {
-        background-position: -130% 0;
+    9% {
+        transform: translateY(-0.55rem) scale(1.08);
+        filter: brightness(1.35) drop-shadow(0 0 0.6rem rgba(246, 211, 107, 0.7));
     }
 }
 @keyframes info-tagline-pulse {
