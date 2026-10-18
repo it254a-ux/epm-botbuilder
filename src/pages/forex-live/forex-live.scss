@@ -449,16 +449,19 @@
         color: var(--text-loss-danger);
     }
 
-    &__closebar {
+    // filter chips: they only choose which open trades are listed, they never close anything
+    &__filters {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
         margin-bottom: 10px;
 
         button {
-            flex: 1 1 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             height: 28px;
-            padding: 0 10px;
+            padding: 0 11px;
             border-radius: 999px;
             font-size: 11px;
             font-weight: 700;
@@ -468,20 +471,40 @@
             border: 1px solid var(--fl-line);
             transition: border-color 0.15s;
 
-            &:hover:not(:disabled) {
+            small {
+                font-size: 10px;
+                opacity: 0.7;
+            }
+
+            &:hover {
                 border-color: var(--fl-gold);
             }
 
-            &.is-main {
-                color: #fff;
-                background: linear-gradient(135deg, #f87171, #dc2626);
-                border-color: transparent;
+            &.is-on {
+                color: #1a1405;
+                background: linear-gradient(135deg, #f3e2a0, var(--fl-gold));
+                border-color: var(--fl-gold);
             }
+        }
+    }
 
-            &:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-            }
+    // the one button that closes the trades on the list
+    &__closeall {
+        width: 100%;
+        height: 32px;
+        margin-top: 8px;
+        border: 0;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(135deg, #f87171, #dc2626);
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
     }
 
@@ -567,19 +590,54 @@
     }
 
     &__toggle {
-        margin-top: 10px;
-        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin-top: 12px;
+        padding: 8px 0 0;
         border: 0;
+        border-top: 1px solid var(--fl-line);
         background: none;
         color: var(--text-less-prominent);
         font-size: 12px;
+        font-weight: 600;
         cursor: pointer;
+
+        b {
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    // WIN / LOSS tag on a closed trade
+    &__result {
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: var(--text-less-prominent);
+        border: 1px solid var(--fl-line);
+
+        &.is-up {
+            color: var(--text-profit-success);
+            border-color: currentColor;
+        }
+
+        &.is-down {
+            color: var(--text-loss-danger);
+            border-color: currentColor;
+        }
     }
 
     &__list--closed {
-        margin-top: 6px;
-        max-height: 150px;
-        opacity: 0.85;
+        margin-top: 8px;
+        max-height: 220px;
+
+        .forex-live__row {
+            grid-template-columns: 64px minmax(0, 1fr) auto auto;
+        }
     }
 
     // ---- activity

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { formatMoney, pickToClose, summarize, type CloseFilter, type Position } from './trade-engine';
+import { formatMoney, summarize, type CloseFilter, type Position } from './trade-engine';
 
 interface Props {
     positions: Position[];
@@ -11,16 +11,37 @@ interface Props {
 
 const sign = (n: number | null) => (n === null || n === 0 ? '' : n > 0 ? ' is-up' : ' is-down');
 
+const FILTERS: { key: CloseFilter; label: string; word: string }[] = [
+    { key: 'all', label: 'All', word: 'all' },
+    { key: 'buy', label: 'Buys', word: 'buys' },
+    { key: 'sell', label: 'Sells', word: 'sells' },
+    { key: 'winning', label: 'Winners', word: 'winners' },
+    { key: 'losing', label: 'Losers', word: 'losers' },
+];
+
+/** Does this open trade belong to the chosen list? */
+const matches = (p: Position, f: CloseFilter): boolean => {
+    const pl = p.profit ?? 0;
+    return f === 'all' || (f === 'buy' && p.side === 'BUY') || (f === 'sell' && p.side === 'SELL') || (f === 'winning' && pl > 0) || (f === 'losing' && pl < 0);
+};
+
 const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
     const [thisMarket, setThisMarket] = useState(false);
-    const [showClosed, setShowClosed] = useState(false);
+    const [showClosed, setShowClosed] = useState(true);
+    // These buttons only choose WHICH open trades are listed. Nothing is closed by them.
+    const [filter, setFilter] = useState<CloseFilter>('all');
 
     const open = useMemo(() => positions.filter(p => !p.closed), [positions]);
-    const closed = useMemo(() => positions.filter(p => p.closed).slice(0, 15), [positions]);
-    const shown = thisMarket ? open.filter(p => p.symbol === symbol) : open;
-    const sum = useMemo(() => summarize(shown), [shown]);
+    const base = thisMarket ? open.filter(p => p.symbol === symbol) : open;
+    const sum = useMemo(() => summarize(base), [base]);
+    // the open trades on the list: only those matching the chosen filter
+    const shown = useMemo(() => base.filter(p => matches(p, filter)), [base, filter]);
+    const closed = useMemo(() => positions.filter(p => p.closed && (!thisMarket || p.symbol === symbol)).slice(0, 15), [positions, thisMarket, symbol]);
+    const closedNet = useMemo(() => Math.round(closed.reduce((t, p) => t + (p.result ?? p.profit ?? 0), 0) * 100) / 100, [closed]);
 
-    const close = (filter: CloseFilter) => onClose(pickToClose(open, filter, thisMarket ? symbol : undefined));
+    const count = (f: CloseFilter) => (f === 'all' ? sum.open : f === 'buy' ? sum.buys : f === 'sell' ? sum.sells : f === 'winning' ? sum.winning : sum.losing);
+    const closable = shown.filter(p => p.canClose);
+    const word = FILTERS.find(f => f.key === filter)?.word ?? 'all';
 
     return (
         <section className='forex-live__card forex-live__positions'>
@@ -52,63 +73,73 @@ const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
                 </div>
             </div>
 
-            <div className='forex-live__closebar'>
-                <button type='button' className='is-main' disabled={!sum.open} onClick={() => close('all')}>
-                    Close all
-                </button>
-                <button type='button' disabled={!sum.buys} onClick={() => close('buy')}>
-                    Buys
-                </button>
-                <button type='button' disabled={!sum.sells} onClick={() => close('sell')}>
-                    Sells
-                </button>
-                <button type='button' disabled={!sum.winning} onClick={() => close('winning')}>
-                    Winners
-                </button>
-                <button type='button' disabled={!sum.losing} onClick={() => close('losing')}>
-                    Losers
-                </button>
+            <div className='forex-live__filters' role='group' aria-label='Show open trades'>
+                {FILTERS.map(f => (
+                    <button
+                        key={f.key}
+                        type='button'
+                        className={filter === f.key ? 'is-on' : ''}
+                        aria-pressed={filter === f.key}
+                        onClick={() => setFilter(f.key)}
+                    >
+                        {f.label} <small>{count(f.key)}</small>
+                    </button>
+                ))}
             </div>
 
             {shown.length === 0 ? (
-                <p className='forex-live__empty'>No open trades. Press BUY or SELL to open one.</p>
+                <p className='forex-live__empty'>{open.length === 0 ? 'No open trades. Press BUY or SELL to open one.' : `No ${word} among the open trades.`}</p>
             ) : (
-                <ul className='forex-live__list'>
-                    {shown.map(p => (
-                        <li key={p.id} className={`forex-live__row forex-live__row--${p.side.toLowerCase()}`}>
-                            <span className='forex-live__side'>{p.side === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
-                            <span className='forex-live__sym'>
-                                {p.symbol.replace(/^frx/, '')}
-                                <small>
-                                    {p.stake.toFixed(2)} · x{p.multiplier ?? '?'}
-                                </small>
-                            </span>
-                            <span className={`forex-live__rowpl${sign(p.profit)}`}>{formatMoney(p.profit)}</span>
-                            <button type='button' disabled={!p.canClose} onClick={() => onClose([p])}>
-                                {p.closing ? 'Closing…' : 'Close'}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
+                <>
+                    <ul className='forex-live__list'>
+                        {shown.map(p => (
+                            <li key={p.id} className={`forex-live__row forex-live__row--${p.side.toLowerCase()}`}>
+                                <span className='forex-live__side'>{p.side === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
+                                <span className='forex-live__sym'>
+                                    {p.symbol.replace(/^frx/, '')}
+                                    <small>
+                                        {p.stake.toFixed(2)} · x{p.multiplier ?? '?'}
+                                    </small>
+                                </span>
+                                <span className={`forex-live__rowpl${sign(p.profit)}`}>{formatMoney(p.profit)}</span>
+                                <button type='button' disabled={!p.canClose} onClick={() => onClose([p])}>
+                                    {p.closing ? 'Closing…' : 'Close'}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <button type='button' className='forex-live__closeall' disabled={!closable.length} onClick={() => onClose(closable)}>
+                        {filter === 'all' ? 'Close all' : `Close ${word}`} ({closable.length})
+                    </button>
+                </>
             )}
 
             {closed.length > 0 && (
                 <>
                     <button type='button' className='forex-live__toggle' onClick={() => setShowClosed(v => !v)}>
-                        {showClosed ? '▾' : '▸'} Closed this session ({closed.length})
+                        <span>
+                            {showClosed ? '▾' : '▸'} Closed trades ({closed.length})
+                        </span>
+                        <b className={`forex-live__rowpl${sign(closedNet)}`}>
+                            {formatMoney(closedNet)} {currency}
+                        </b>
                     </button>
                     {showClosed && (
                         <ul className='forex-live__list forex-live__list--closed'>
-                            {closed.map(p => (
-                                <li key={p.id} className='forex-live__row'>
-                                    <span className='forex-live__side'>{p.side === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
-                                    <span className='forex-live__sym'>
-                                        {p.symbol.replace(/^frx/, '')}
-                                        <small>{p.stake.toFixed(2)}</small>
-                                    </span>
-                                    <span className={`forex-live__rowpl${sign(p.result)}`}>{formatMoney(p.result)}</span>
-                                </li>
-                            ))}
+                            {closed.map(p => {
+                                const pl = p.result ?? p.profit;
+                                return (
+                                    <li key={p.id} className={`forex-live__row forex-live__row--${p.side.toLowerCase()}`}>
+                                        <span className='forex-live__side'>{p.side === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
+                                        <span className='forex-live__sym'>
+                                            {p.symbol.replace(/^frx/, '')}
+                                            <small>{p.stake.toFixed(2)} · x{p.multiplier ?? '?'}</small>
+                                        </span>
+                                        <span className={`forex-live__result${sign(pl)}`}>{pl === null ? '—' : pl > 0 ? 'WIN' : pl < 0 ? 'LOSS' : 'EVEN'}</span>
+                                        <span className={`forex-live__rowpl${sign(pl)}`}>{formatMoney(pl)}</span>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </>
