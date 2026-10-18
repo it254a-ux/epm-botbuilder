@@ -152,7 +152,8 @@ interface ForexTraderProps {
 }
 
 const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare }: ForexTraderProps) => {
-    const { ws, isConnected } = useDerivWS();
+    // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
+    const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
     // the two full pages (Forex Trader and Forex Live) keep the same picks; the small side panel keeps its own
     const shared = variant === 'page';
@@ -180,6 +181,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
 
     const chartRef = useRef<ChartViewHandle>(null);
     const candlesRef = useRef<Candle[]>([]);
+    const streamRef = useRef('');
     const wrapRef = useRef<HTMLDivElement>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
@@ -276,16 +278,23 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         if (!ws || !isConnected || !symbol) return;
         let off = false;
         let unsub: (() => void) | null = null;
-        setLoading(true);
-        setLoadError(null);
-        setOutcome(null);
-        setMtf(null);
-        setPdh(null);
-        pdhKey.current = '';
-        chartRef.current?.drawAnalysis(null, []);
-        candlesRef.current = [];
         // M15 + M5 mode draws the M5 chart (the entry timeframe) with about 2 days of history
         const effTf = mode === 'mtf' ? M5_SEC : tf;
+        // The same market and candle size starting again (the connection dropped and came back) is not a new
+        // chart: keep what is on screen (drawings, analysis, zoom) and only fill in what was missed.
+        const streamKey = `${symbol}|${effTf}|${mode}`;
+        const sameStream = streamRef.current === streamKey && candlesRef.current.length > 0;
+        streamRef.current = streamKey;
+        setLoadError(null);
+        if (!sameStream) {
+            setLoading(true);
+            setOutcome(null);
+            setMtf(null);
+            setPdh(null);
+            pdhKey.current = '';
+            chartRef.current?.drawAnalysis(null, []);
+            candlesRef.current = [];
+        }
         const count = Math.min(5000, Math.ceil(((mode === 'mtf' ? 2 : 15) * 86400) / effTf));
 
         ws.subscribe(
@@ -310,10 +319,19 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         low: Number(c.low),
                         close: Number(c.close),
                     }));
-                    candlesRef.current = list;
-                    chartRef.current?.setCandles(list);
-                    drawKey.current = '';
-                    setLastPrice(list.length ? list[list.length - 1].close : null);
+                    if (sameStream && candlesRef.current.length) {
+                        // after a reconnect: merge, so no candle is missed and nothing drawn is lost
+                        const byTime = new Map<number, Candle>();
+                        candlesRef.current.forEach(c => byTime.set(c.time, c));
+                        list.forEach(c => byTime.set(c.time, c));
+                        candlesRef.current = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+                        chartRef.current?.mergeCandles(list);
+                    } else {
+                        candlesRef.current = list;
+                        chartRef.current?.setCandles(list);
+                        drawKey.current = '';
+                    }
+                    setLastPrice(candlesRef.current.length ? candlesRef.current[candlesRef.current.length - 1].close : null);
                     setLoading(false);
                 } else if (d.ohlc) {
                     const c: Candle = {
@@ -752,7 +770,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     onClick={() => setLive(l => !l)}
                     title={live ? 'Updating on every price change. Tap to pause.' : 'Paused. Tap to resume.'}
                 >
-                    {live ? '● LIVE' : '❚❚ PAUSED'}
+                    {!isConnected ? '⟳ RECONNECTING…' : live ? '● LIVE' : '❚❚ PAUSED'}
                 </button>
                 {loading && !loadError && <div className='forex-trader__overlay'>Loading chart…</div>}
                 {loadError && <div className='forex-trader__overlay forex-trader__overlay--error'>{loadError}</div>}

@@ -24,10 +24,30 @@ export class DerivWS {
   private reconnectExhaustedHandlers: ReconnectExhaustedHandler[] = [];
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  /** When on, the socket never gives up reconnecting and restarts itself if it goes silent (used by the live charts). */
+  private persistent = false;
+  private closedByUser = false;
+  private lastMessageAt = Date.now();
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private url: string;
   private isConnecting = false;
+
+  /** Keep the connection alive for good: retry forever (at most every 30 s) and restart a silent socket. */
+  setPersistent(on: boolean): void {
+    this.persistent = on;
+  }
+
+  /** Try to connect right now (the tab came back, the network came back) instead of waiting for the next retry. */
+  reviveNow(): void {
+    if (this.closedByUser || this.isConnected || this.isConnecting) return;
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.reconnectAttempts = 0;
+    this.connect().catch(() => {});
+  }
 
   constructor(url?: string) {
     this.url = url ?? getPublicWsUrl();
@@ -88,6 +108,7 @@ export class DerivWS {
 
       this.ws.onopen = () => {
         this.isConnecting = false;
+        this.lastMessageAt = Date.now();
         this.reconnectAttempts = 0;
         this.startPing();
         this.notifyConnectionState(true);
@@ -95,6 +116,7 @@ export class DerivWS {
       };
 
       this.ws.onmessage = (event) => {
+        this.lastMessageAt = Date.now();
         const data = JSON.parse(event.data);
         this.handleMessage(data);
       };
@@ -186,6 +208,7 @@ export class DerivWS {
   }
 
   disconnect(): void {
+    this.closedByUser = true;
     this.stopPing();
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -250,6 +273,11 @@ export class DerivWS {
   private startPing(): void {
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
+        // the server answers every ping, so a socket that has said nothing for over a minute is dead without saying so
+        if (this.persistent && Date.now() - this.lastMessageAt > 70000) {
+          this.ws.close();
+          return;
+        }
         this.ws.send(JSON.stringify({ ping: 1 }));
       }
     }, 30000);
@@ -263,13 +291,14 @@ export class DerivWS {
   }
 
   private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+    if (this.closedByUser) return;
+    if (!this.persistent && this.reconnectAttempts >= this.maxReconnectAttempts) {
       for (const handler of this.reconnectExhaustedHandlers) handler();
       return;
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = Math.min(1000 * Math.pow(2, Math.min(this.reconnectAttempts, 5)), 30000);
 
     this.reconnectTimeout = setTimeout(() => {
       this.connect().catch(() => {});

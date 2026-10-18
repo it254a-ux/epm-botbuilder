@@ -19,6 +19,8 @@ import type { PdhResult } from './pdh';
 export interface ChartViewHandle {
     /** Replace all candles (initial load / market or timeframe change). */
     setCandles: (candles: Candle[]) => void;
+    /** Fold candles into the ones already shown (after a reconnect): fills any gap and keeps the drawings and the zoom. */
+    mergeCandles: (candles: Candle[]) => void;
     /** Add or update the newest candle (live stream). */
     updateCandle: (candle: Candle) => void;
     /** Draw (or clear, with null) the named lines for an analysis. */
@@ -211,6 +213,14 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             chartRef.current?.timeScale().fitContent();
+        },
+        mergeCandles(candles) {
+            const byTime = new Map<number, Candle>();
+            candlesRef.current.forEach(c => byTime.set(c.time, c));
+            candles.forEach(c => byTime.set(c.time, c));
+            const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+            candlesRef.current = merged;
+            seriesRef.current?.setData(merged.map(toBar));
         },
         drawLines(lines) {
             const series = seriesRef.current;

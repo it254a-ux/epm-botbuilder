@@ -14,6 +14,11 @@ export interface UseDerivWSOptions {
    * an account switch (must reconnect) from an OTP refresh (keep alive).
    */
   accountId?: string;
+  /**
+   * Never give up: keep reconnecting for good, restart a silent connection, and reconnect at once when the
+   * tab is shown again or the network returns. For live charts that must not miss anything.
+   */
+  persistent?: boolean;
 }
 
 interface UseDerivWSReturn {
@@ -33,7 +38,7 @@ interface UseDerivWSReturn {
  * - OTP refresh (url changes, same accountId): updateUrl() only — live socket untouched
  */
 export function useDerivWS(options?: UseDerivWSOptions): UseDerivWSReturn {
-  const { url, accountId } = options ?? {};
+  const { url, accountId, persistent } = options ?? {};
 
   const wsRef = useRef<DerivWS | null>(null);
   const listenersRef = useRef(new Set<() => void>());
@@ -57,6 +62,7 @@ export function useDerivWS(options?: UseDerivWSOptions): UseDerivWSReturn {
     let disposed = false;
 
     const instance = new DerivWS(url);
+    if (persistent) instance.setPersistent(true);
     wsRef.current = instance;
     listenersRef.current.forEach((l) => l());
 
@@ -77,9 +83,21 @@ export function useDerivWS(options?: UseDerivWSOptions): UseDerivWSReturn {
       }
     });
 
+    const revive = () => {
+      if (document.visibilityState === 'visible') instance.reviveNow();
+    };
+    if (persistent) {
+      document.addEventListener('visibilitychange', revive);
+      window.addEventListener('online', revive);
+      window.addEventListener('focus', revive);
+    }
+
     const listeners = listenersRef.current;
     return () => {
       disposed = true;
+      document.removeEventListener('visibilitychange', revive);
+      window.removeEventListener('online', revive);
+      window.removeEventListener('focus', revive);
       setIsConnected(false);
       setIsExhausted(false);
       unsubscribeState();

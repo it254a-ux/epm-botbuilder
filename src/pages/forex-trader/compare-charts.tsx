@@ -78,7 +78,7 @@ interface PanelProps {
  * on or off here, so a chart can be kept clean for reading the trend.
  */
 const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: PanelProps) => {
-    const { ws, isConnected } = useDerivWS();
+    const { ws, isConnected } = useDerivWS({ persistent: true });
     const [sec, setSec] = useState(startSec);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +89,7 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
     const [pill, setPill] = useState<{ text: string; tone: 'buy' | 'sell' | 'wait' } | null>(null);
     const chartRef = useRef<ChartViewHandle>(null);
     const candlesRef = useRef<Candle[]>([]);
+    const streamRef = useRef('');
     const m15Ref = useRef<Candle[]>([]);
     const drawKey = useRef('');
     const live = useRef({ overlay, strategyId, kind, sec });
@@ -142,10 +143,16 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
         if (!ws || !isConnected || !symbol) return undefined;
         let off = false;
         let unsub: (() => void) | null = null;
-        setLoading(true);
+        // same market and candle size starting again after a dropped connection: keep the chart as it is, fill in what was missed
+        const streamKey = `${symbol}|${sec}`;
+        const sameStream = streamRef.current === streamKey && candlesRef.current.length > 0;
+        streamRef.current = streamKey;
         setError(null);
-        candlesRef.current = [];
-        drawKey.current = '';
+        if (!sameStream) {
+            setLoading(true);
+            candlesRef.current = [];
+            drawKey.current = '';
+        }
         const count = Math.min(600, Math.ceil((10 * 86400) / sec));
         ws.subscribe(
             { ticks_history: symbol, style: 'candles', granularity: sec, end: 'latest', count, adjust_start_time: 1 },
@@ -159,11 +166,20 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
                 }
                 if (d.candles) {
                     const list = d.candles.map(toCandle);
-                    candlesRef.current = list;
-                    drawKey.current = '';
-                    setPip(Math.max(2, ...list.slice(-50).map(c => decimalsOf(c.close))));
-                    chartRef.current?.setCandles(list);
-                    setLast(list.length ? list[list.length - 1].close : null);
+                    if (sameStream && candlesRef.current.length) {
+                        const byTime = new Map<number, Candle>();
+                        candlesRef.current.forEach(c => byTime.set(c.time, c));
+                        list.forEach(c => byTime.set(c.time, c));
+                        candlesRef.current = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+                        chartRef.current?.mergeCandles(list);
+                    } else {
+                        candlesRef.current = list;
+                        drawKey.current = '';
+                        setPip(Math.max(2, ...list.slice(-50).map(c => decimalsOf(c.close))));
+                        chartRef.current?.setCandles(list);
+                    }
+                    const all = candlesRef.current;
+                    setLast(all.length ? all[all.length - 1].close : null);
                     setLoading(false);
                     refreshOverlay();
                 } else if (d.ohlc) {
