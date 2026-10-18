@@ -260,6 +260,22 @@ export function parseMinStake(text: string): number | null {
     return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Turns Deriv's refusal into words that point at the right field. Deriv uses the same "equal to or higher
+ * than N" wording for a too-small stake AND for a too-small stop loss / take profit, so the number alone
+ * cannot say which: only a minimum ABOVE the stake can be about the stake. Anything else is shown as Deriv wrote it.
+ */
+export function explainRefusal(why: string, t: Pick<TradeInput, 'stake' | 'stopLoss' | 'takeProfit'>): { text: string; minStake: number | null } {
+    const min = parseMinStake(why);
+    if (min === null) return { text: why, minStake: null };
+    if (min > t.stake) return { text: `the smallest stake on this market is ${min}. Your stake was below it.`, minStake: min };
+    const limits = [t.stopLoss ? 'stop loss' : '', t.takeProfit ? 'take profit' : ''].filter(Boolean).join(' / ');
+    return {
+        text: limits ? `${why} Your stake is fine; it is your ${limits} that is too small. Raise it, or leave it empty.` : why,
+        minStake: null,
+    };
+}
+
 export const formatMoney = (n: number | null | undefined, currency = ''): string => {
     if (n === null || n === undefined || !Number.isFinite(n)) return '—';
     const sign = n > 0 ? '+' : n < 0 ? '-' : '';

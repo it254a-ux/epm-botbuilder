@@ -4,6 +4,7 @@ import {
     buildBuyRequest,
     buildSellRequest,
     errorText,
+    explainRefusal,
     mergePosition,
     parseMinStake,
     readMultipliers,
@@ -145,13 +146,9 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 return true;
             } catch (e) {
                 const why = errorText(e);
-                const min = parseMinStake(why);
-                if (min) {
-                    setMinStakes(m => ({ ...m, [`${input.symbol}|${input.multiplier}`]: min }));
-                    note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: the smallest stake on this market is ${min}. Your stake was below it.`);
-                } else {
-                    note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: ${why}`);
-                }
+                const r = explainRefusal(why, input);
+                if (r.minStake) setMinStakes(m => ({ ...m, [`${input.symbol}|${input.multiplier}`]: r.minStake as number }));
+                note('err', `${input.side} ${input.symbol.replace(/^frx/, '')} not opened: ${r.text}`);
                 return false;
             } finally {
                 setPending(n => n - 1);

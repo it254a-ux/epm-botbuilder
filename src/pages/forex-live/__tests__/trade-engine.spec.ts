@@ -225,3 +225,22 @@ describe('parseMinStake', () => {
         expect(parseMinStake('')).toBeNull();
     });
 });
+
+describe('explainRefusal', () => {
+    const { explainRefusal } = require('../trade-engine');
+    const msg = 'Enter an amount equal to or higher than 1.51.';
+    it('blames the stake only when the minimum is above it', () => {
+        const r = explainRefusal(msg, { stake: 1, stopLoss: null, takeProfit: null });
+        expect(r.minStake).toBe(1.51);
+        expect(r.text).toMatch(/smallest stake/);
+    });
+    it('does not blame a 25 stake for a 1.51 limit; points at stop loss / take profit', () => {
+        const r = explainRefusal(msg, { stake: 25, stopLoss: 1, takeProfit: 1 });
+        expect(r.minStake).toBeNull();
+        expect(r.text).toMatch(/stop loss \/ take profit/);
+        expect(r.text).toContain(msg);
+    });
+    it('passes other messages through', () => {
+        expect(explainRefusal('Market is closed.', { stake: 25 }).text).toBe('Market is closed.');
+    });
+});
