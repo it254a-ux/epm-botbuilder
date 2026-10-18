@@ -679,9 +679,61 @@
     pointer-events: none;
 }
 
-/* The chart on its own, full width, when the results card has moved to a parent page's side column. */
+/* The chart on its own, full width, when the results card has moved to a parent page's side column.
+   The trade setup (market, mode, strategy) then floats over the chart instead of taking a column of its own. */
+.forex-trader__setup-toggle {
+    display: none;
+}
+
 .forex-trader--result-out {
     @media (min-width: 1100px) {
+        position: relative;
         grid-template-columns: minmax(0, 1fr) !important;
+
+        .forex-trader__controls {
+            position: absolute;
+            z-index: 8;
+            top: 44px;
+            left: 24px;
+            width: 300px;
+            max-height: calc(100% - 64px);
+            overflow-y: auto;
+            grid-column: auto !important;
+            border: 1px solid rgba(148, 163, 184, 0.3) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .forex-trader__setup-toggle {
+            position: absolute;
+            z-index: 9;
+            top: 48px;
+            left: 24px;
+            display: block;
+            padding: 2px 9px;
+            border: 0;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+            cursor: pointer;
+            color: var(--text-prominent);
+            background: color-mix(in srgb, var(--general-section-1) 85%, transparent);
+        }
+
+        // open: the button is the little close mark in the card's corner
+        &:not(.forex-trader--setup-closed) .forex-trader__setup-toggle {
+            top: 52px;
+            margin-left: 262px;
+            font-size: 16px;
+            padding: 0 8px;
+            background: transparent;
+        }
+
+        &.forex-trader--setup-closed .forex-trader__controls {
+            display: none;
+        }
     }
 }

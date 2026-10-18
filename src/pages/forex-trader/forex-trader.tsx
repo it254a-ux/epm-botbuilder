@@ -179,6 +179,8 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const wrapRef = useRef<HTMLDivElement>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
+    // on Forex Live the trade setup floats over the chart; this opens and closes it
+    const [setupOpen, setSetupOpen] = useState(true);
 
     // ---- keep the page exactly as tall as the visible area (same approach as the Analysis Tool)
     useEffect(() => {
@@ -637,9 +639,20 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
+            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
+            {resultHost && (
+                <button
+                    type='button'
+                    className='forex-trader__setup-toggle'
+                    onClick={() => setSetupOpen(o => !o)}
+                    aria-expanded={setupOpen}
+                    title={setupOpen ? 'Hide the trade setup' : 'Show the trade setup'}
+                >
+                    {setupOpen ? '×' : 'Setup'}
+                </button>
+            )}
             <div className='forex-trader__controls'>
                 <MarketPicker
                     symbols={symbols}
