@@ -94,7 +94,8 @@
         width: 100%;
         height: 100%;
         border-radius: 50%;
-        background: #0c0c0e url('/logo.png') 49.5% 39% / 250% auto no-repeat;
+        // the picture itself is set in the component (a '/logo.png' url here makes the build fail)
+        background: #0c0c0e 49.5% 39% / 250% auto no-repeat;
         // the ring spins, the emblem inside stays upright
         animation: info-ring-spin 9s linear infinite reverse;
     }

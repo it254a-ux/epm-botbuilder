@@ -102,7 +102,7 @@ const InfoPageLayout = ({ title, accent, updated, children }: TInfoPageLayout) =
                 <header className='info-page__header'>
                     <div className='info-page__brand'>
                         <span className='info-page__logo' aria-hidden='true'>
-                            <span className='info-page__logo-img' />
+                            <span className='info-page__logo-img' style={{ backgroundImage: 'url(/logo.png)' }} />
                         </span>
                         <span className='info-page__brand-text'>
                             <span className='info-page__wordmark' role='img' aria-label='Executive Prime Markets'>
