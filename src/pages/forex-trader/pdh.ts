@@ -28,7 +28,7 @@ export type PdhSide = 'BUY' | 'SELL';
 export interface PdhMarker {
     time: number;
     price: number;
-    kind: 'footprint' | 'sweep' | 'rejection';
+    kind: 'footprint' | 'sweep' | 'rejection' | 'second';
     /** Draw above the candle (true) or below it (false). */
     above: boolean;
     text: string;
@@ -61,6 +61,10 @@ export interface PdhResult {
     signalTime: number | null;
     /** Stable for one level on one day: used to send the WATCH alert only once. */
     alertKey: string | null;
+    /** 'second' = the failed second push setup (lower high after the sweep); 'rejection' = the plain rejection candle. */
+    pattern?: 'second' | 'rejection';
+    /** True when a giant (about 3 x ATR) Institutional Footprint candle was seen. */
+    strong?: boolean;
     dataProblem?: string;
 }
 
@@ -105,13 +109,100 @@ interface Scan {
     notes: string[];
     /** Why there is no setup, when stage is none. */
     why: string;
+    kind?: 'second';
+    secondIdx?: number;
+    strong?: boolean;
+}
+
+export const GIANT_FOOTPRINT_ATR = 3;
+const PULLBACK_ATR = 1;
+const SECOND_PUSH_MIN_ATR = 0.5;
+/** The second push must show up within this many M5 candles (2 hours) of the pullback low. */
+const SECOND_PUSH_MAX = 24;
+
+type Words = { level: string; up: string; down: string; green: string; red: string; high: string; low: string };
+
+/**
+ * The failed second push (PDH / SELL frame): price goes above the level with a big Institutional Footprint and makes a
+ * top H, pulls back (it may even go back through the level), pushes up again but stays BELOW H (a lower high), then a
+ * red candle closes below the candle before it: SELL. A new high above H cancels it (H would simply move up).
+ */
+function scanSecond(w: Candle[], L: number, eq: number, far: number, atr5: number, word: Words): Scan {
+    const none = (why: string, extra: Partial<Scan> = {}): Scan => ({ stage: 'none', touchIdx: -1, footprintIdx: [], rejectionIdx: -1, plan: null, notes: [], why, ...extra });
+    const last = w.length - 1;
+    const tol = TOUCH_TOLERANCE_ATR * atr5;
+    let h = -1;
+    for (let i = 0; i <= last; i++) if (h < 0 || w[i].high > w[h].high) h = i;
+    if (h < 0 || w[h].high < L - tol) return none(`Price has not reached the ${word.level} in the last ${WINDOW} M5 candles.`);
+    const H = w[h].high;
+    const footprintIdx: number[] = [];
+    let strong = false;
+    // tall is measured against the normal candle size BEFORE the top (the pullback itself makes candles bigger)
+    const aTop = atr(w.slice(0, h), 14) || atr5;
+    for (let i = Math.max(0, h - FOOTPRINT_LOOKBACK); i <= h; i++) {
+        const c = w[i];
+        if (c.close > c.open && c.high >= L - 3 * aTop && c.high - c.low >= FOOTPRINT_TALL_ATR * aTop) {
+            footprintIdx.push(i);
+            if (c.high - c.low >= GIANT_FOOTPRINT_ATR * aTop) strong = true;
+        }
+    }
+    if (footprintIdx.length < MIN_FOOTPRINT) return none(`Only ${footprintIdx.length} tall ${word.green} candle(s) above the ${word.level}: no big Institutional Footprint.`, { touchIdx: h, footprintIdx });
+    // pullback low after the top
+    let pi = -1;
+    for (let i = h + 1; i <= last; i++) if (pi < 0 || w[i].low < w[pi].low) pi = i;
+    const base = { touchIdx: h, footprintIdx, strong, kind: 'second' as const };
+    if (pi < 0 || H - w[pi].low < PULLBACK_ATR * atr5) {
+        return { stage: 'watch', ...base, rejectionIdx: -1, plan: null, why: '', notes: [`Top made at ${fmt(H)} after a big Institutional Footprint. Waiting for a pullback and a second push that fails to reach it.`] };
+    }
+    if (last - pi > SECOND_PUSH_MAX + 12) return none('The pullback is too old: no second push came in time, so this setup is over.', base);
+    // second push: the highest point after the pullback low
+    let q = -1;
+    for (let i = pi + 1; i <= last; i++) if (q < 0 || w[i].high > w[q].high) q = i;
+    if (q < 0 || w[q].high - w[pi].low < SECOND_PUSH_MIN_ATR * atr5) {
+        return { stage: 'watch', ...base, rejectionIdx: -1, secondIdx: -1, plan: null, why: '', notes: [`Top ${fmt(H)}, pullback to ${fmt(w[pi].low)}. Waiting for the second push; it must stay below ${fmt(H)}.`] };
+    }
+    if (q - pi > SECOND_PUSH_MAX) return none('The second push took too long (more than 2 hours): setup cancelled.', base);
+    const Q = w[q].high;
+    const b2 = { ...base, secondIdx: q };
+    let j = -1;
+    for (let i = q + 1; i <= last; i++) {
+        const c = w[i];
+        if (c.close < c.open && c.open - c.close >= REJECTION_BODY_ATR * atr5 && c.close < w[i - 1].low) {
+            j = i;
+            break;
+        }
+    }
+    if (j < 0) {
+        return { stage: 'watch', ...b2, rejectionIdx: -1, plan: null, why: '', notes: [`Top ${fmt(H)}. Second push stopped lower at ${fmt(Q)}.`, `Wait for ONE ${word.red} M5 candle with a real body that closes ${word.down} the candle before it.`] };
+    }
+    const age = last - j;
+    if (age > FRESH) return none(`The sell candle formed ${age} candles ago, so the entry has already passed.`, { ...b2, rejectionIdx: j });
+    const b3 = { ...b2, rejectionIdx: j };
+    if (w[j].close - w[last].close > CHASE_ATR * atr5) return none('Price has already moved too far from the sell candle: chasing is not allowed.', b3);
+    const entry = w[last].close;
+    const stop = Q + SL_BUFFER_ATR * atr5;
+    const risk = stop - entry;
+    if (!(risk > 0)) return none('The stop loss would not be on the right side of the entry.', b3);
+    if (risk < MIN_RISK_ATR * atr5) return none(`The stop loss would be only ${(risk / atr5).toFixed(2)} ATR from the entry (minimum ${MIN_RISK_ATR}).`, b3);
+    if (risk > MAX_RISK_ATR * atr5) return none(`The stop loss would be ${(risk / atr5).toFixed(2)} ATR from the entry (maximum ${MAX_RISK_ATR}).`, b3);
+    if (!(eq < entry)) return none('Price is already at or beyond the Equilibrium, so there is no room for Target 1.', b3);
+    const rr = (entry - eq) / risk;
+    if (rr < PDH_MIN_RR) return none(`Target 1 (Equilibrium ${fmt(eq)}) gives a reward of only ${rr.toFixed(2)} times the risk (minimum ${PDH_MIN_RR}).`, b3);
+    return {
+        stage: 'confirmed', ...b3, why: '',
+        plan: { entry, stop, tp1: eq, tp2: far, rr, risk },
+        notes: [
+            `Top ${fmt(H)} after ${footprintIdx.length} tall candles${strong ? ' (including a giant one)' : ''}; pullback; second push failed lower at ${fmt(Q)}.`,
+            `A ${word.red} M5 candle closed ${word.down} the candle before it: the entry.`,
+        ],
+    };
 }
 
 /**
  * The PDH / SELL rule. `L` is the level, `eq` the equilibrium and `far` the opposite level, all in the scanned frame
  * (for the PDL case the caller passes flipped values and flipped candles).
  */
-function scanHigh(w: Candle[], L: number, eq: number, far: number, atr5: number, word: { level: string; up: string; down: string; green: string; red: string; high: string; low: string }): Scan {
+function scanHigh(w: Candle[], L: number, eq: number, far: number, atr5: number, word: Words): Scan {
     const none = (why: string, extra: Partial<Scan> = {}): Scan => ({ stage: 'none', touchIdx: -1, footprintIdx: [], rejectionIdx: -1, plan: null, notes: [], why, ...extra });
     const last = w.length - 1;
     const tol = TOUCH_TOLERANCE_ATR * atr5;
@@ -224,9 +315,12 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
 
     const wordsHigh = { level: 'Previous Day High', up: 'above', down: 'below', green: 'green', red: 'red', high: 'high', low: 'low' };
     const wordsLow = { level: 'Previous Day Low', up: 'below', down: 'above', green: 'red', red: 'green', high: 'low', low: 'high' };
-    const hi = scanHigh(w, pdh, eq, pdl, a5, wordsHigh);
-    const lo = scanHigh(w.map(flip), -pdl, -eq, -pdh, a5, wordsLow);
     const rank = (s: Scan) => (s.stage === 'confirmed' ? 3 : s.stage === 'watch' ? 2 : s.touchIdx >= 0 ? 1 : 0);
+    // the failed second push is the stronger setup: it wins when it is at least as advanced as the plain rejection
+    const best = (a: Scan, b: Scan) => (b.stage === 'confirmed' || (b.stage === 'watch' && (b.secondIdx ?? -1) >= 0 && a.stage !== 'confirmed') ? b : a);
+    const wf = w.map(flip);
+    const hi = best(scanHigh(w, pdh, eq, pdl, a5, wordsHigh), scanSecond(w, pdh, eq, pdl, a5, wordsHigh));
+    const lo = best(scanHigh(wf, -pdl, -eq, -pdh, a5, wordsLow), scanSecond(wf, -pdl, -eq, -pdh, a5, wordsLow));
     const useLow = rank(lo) > rank(hi) || (rank(lo) === rank(hi) && rank(lo) > 0 && lo.touchIdx > hi.touchIdx);
     const scan = useLow ? lo : hi;
     const sign = useLow ? -1 : 1;
@@ -248,9 +342,18 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
         markers.push({ time: at(scan.touchIdx).time, price: useLow ? at(scan.touchIdx).low : at(scan.touchIdx).high, kind: 'sweep', above: !useLow, text: 'Liquidity Sweep' });
     }
     if (scan.rejectionIdx >= 0) {
-        markers.push({ time: at(scan.rejectionIdx).time, price: at(scan.rejectionIdx).close, kind: 'rejection', above: !useLow, text: scan.stage === 'confirmed' ? `Rejection Candle: ${side}` : 'Rejection Candle' });
+        markers.push({ time: at(scan.rejectionIdx).time, price: at(scan.rejectionIdx).close, kind: 'rejection', above: !useLow, text: scan.stage === 'confirmed' ? (scan.kind === 'second' ? `${side} (strong)` : `Rejection Candle: ${side}`) : 'Rejection Candle' });
     }
 
+    const isSecond = scan.kind === 'second';
+    if (isSecond && (scan.secondIdx ?? -1) >= 0) {
+        const k = scan.secondIdx as number;
+        markers.push({ time: at(k).time, price: useLow ? at(k).low : at(k).high, kind: 'second', above: !useLow, text: 'Second push (failed)' });
+    }
+    if (isSecond && scan.strong) {
+        const k = scan.footprintIdx.find(i => at(i).high - at(i).low >= GIANT_FOOTPRINT_ATR * a5);
+        if (k !== undefined) markers.push({ time: at(k).time, price: useLow ? at(k).low : at(k).high, kind: 'footprint', above: !useLow, text: 'Giant footprint' });
+    }
     const footprint = { count: scan.footprintIdx.length, times: scan.footprintIdx.map(i => at(i).time) };
     // the extreme reached since the touch, in real (unflipped) prices
     const sweep =
@@ -260,12 +363,14 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
     const rejection = scan.rejectionIdx >= 0 ? { time: at(scan.rejectionIdx).time, close: at(scan.rejectionIdx).close } : null;
 
     const footLine = `Institutional Footprint: ${footprint.count} tall ${useLow ? 'red' : 'green'} M5 candles on the way to the level (tall = at least ${FOOTPRINT_TALL_ATR} x the normal candle size).`;
-    const common = { levels, side, levelName, levelPrice, footprint, sweep, rejection, markers, signalTime: lastEnd, alertKey: `${useLow ? 'PDL' : 'PDH'}|${days[0] + 86400}` } as const;
+    const common = { levels, side, levelName, levelPrice, footprint, sweep, rejection, markers, signalTime: lastEnd, alertKey: `${useLow ? 'PDL' : 'PDH'}|${days[0] + 86400}`, pattern: scan.kind === 'second' ? 'second' : 'rejection', strong: !!scan.strong } as const;
 
     if (scan.stage === 'watch') {
         return emptyResult({
             ...common, stage: 'watch',
-            headline: `WATCH: price touched the ${levelName} after an Institutional Footprint. Do NOT enter yet. Wait for the Rejection Candle (${useLow ? 'a green' : 'a red'} M5 candle).`,
+            headline: isSecond
+                ? `WATCH: price pushed through the ${levelName} with a big Institutional Footprint. Do NOT enter yet. Wait for a second push that fails, then a ${useLow ? 'green' : 'red'} M5 candle.`
+                : `WATCH: price touched the ${levelName} after an Institutional Footprint. Do NOT enter yet. Wait for the Rejection Candle (${useLow ? 'a green' : 'a red'} M5 candle).`,
             reasons: [`${levelName}: ${fmt(levelPrice)}.`, footLine, ...scan.notes, `Target 1 will be the Equilibrium ${fmt(eq)}, Target 2 the ${useLow ? 'Previous Day High' : 'Previous Day Low'} ${fmt(useLow ? pdh : pdl)}.`],
         });
     }
@@ -274,7 +379,9 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
         return emptyResult({
             ...common, stage: 'confirmed',
             plan: { side, entry: sign * p.entry, stopLoss: sign * p.stop, takeProfit: sign * p.tp1, takeProfit2: sign * p.tp2, rr: p.rr, risk: p.risk },
-            headline: `CONFIRMED ${side}: the Rejection Candle formed at the ${levelName}. This is the entry.`,
+            headline: isSecond
+                ? `CONFIRMED ${side}${scan.strong ? ' (STRONG)' : ''}: failed second push at the ${levelName}. This is the entry.`
+                : `CONFIRMED ${side}: the Rejection Candle formed at the ${levelName}. This is the entry.`,
             reasons: [`${levelName}: ${fmt(levelPrice)}.`, footLine, ...scan.notes, `Stop loss just beyond the sweep. Target 1 = Equilibrium ${fmt(eq)}, Target 2 = ${useLow ? 'Previous Day High' : 'Previous Day Low'} ${fmt(useLow ? pdh : pdl)}. Reward ${p.rr.toFixed(2)} times the risk.`],
         });
     }

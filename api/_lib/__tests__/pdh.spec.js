@@ -272,3 +272,32 @@ describe('bad or missing data is never turned into a setup', () => {
         expect(analysePreviousDay(a, b, NOW)).toEqual(run(CONFIRMED));
     });
 });
+
+describe('failed second push (top, pullback, lower high, red candle)', () => {
+    const TOP = [...QUIET, ...RUN, TOUCH];
+    const PULL = [[109.8, 108.3, 0.1, 0.1], [108.3, 106.8, 0.1, 0.1], [106.8, 106.0, 0.1, 0.1]];
+    const PUSH = [[106.0, 107.2, 0.1, 0.1], [107.2, 108.4, 0.1, 0.1]]; // high 108.5, below the top 110.0
+    const SELL = [108.4, 106.9, 0.1, 0.1];
+    test('waits for the red candle after the lower high', () => {
+        const r = run([...TOP, ...PULL, ...PUSH]);
+        expect(r.stage).toBe('watch');
+        expect(r.pattern).toBe('second');
+    });
+    test('confirms SELL with the stop above the lower high', () => {
+        const r = run([...TOP, ...PULL, ...PUSH, SELL]);
+        expect(r.stage).toBe('confirmed');
+        expect(r.side).toBe('SELL');
+        expect(r.pattern).toBe('second');
+        expect(r.plan.stopLoss).toBeGreaterThan(108.5);
+        expect(r.plan.stopLoss).toBeLessThan(110);
+    });
+    test('mirror at the Previous Day Low gives BUY', () => {
+        const r = runFlipped([...TOP, ...PULL, ...PUSH, SELL]);
+        expect(r.stage).toBe('confirmed');
+        expect(r.side).toBe('BUY');
+    });
+    test('a new high above the top cancels the second-push setup', () => {
+        const r = run([...TOP, ...PULL, ...PUSH, [108.4, 110.6, 0.1, 0.1], SELL]);
+        expect(r.pattern === 'second' && r.stage === 'confirmed').toBe(false);
+    });
+});
