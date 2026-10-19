@@ -211,7 +211,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             )}
 
             {stakeNote && (
-                <p className='forex-live__warn' role='alert'>
+                <p className={stakeNote.startsWith('Stake set to') ? 'forex-live__note' : 'forex-live__warn'} role='alert'>
                     {stakeNote}
                 </p>
             )}

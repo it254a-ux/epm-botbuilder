@@ -76,7 +76,7 @@
     &__compare-btn {
         position: absolute;
         top: 8px;
-        right: 170px;
+        right: 200px;
         z-index: 7;
         padding: 3px 11px;
         border: 1px solid color-mix(in srgb, var(--text-prominent) 20%, transparent);
@@ -472,6 +472,18 @@
             border-color: var(--fl-gold);
             background: var(--fl-gold-soft);
         }
+    }
+
+    // good-to-know messages (for example "stake set to the minimum"): calm, not an alarm
+    &__note {
+        margin: 8px 0 0;
+        padding: 7px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-prominent);
+        background: color-mix(in srgb, #38bdf8 12%, transparent);
+        border: 1px solid color-mix(in srgb, #38bdf8 40%, transparent);
     }
 
     &__warn {

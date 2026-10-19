@@ -694,10 +694,8 @@
             position: absolute;
             z-index: 8;
             top: 44px;
-            left: 24px;
+            left: 76px; // right of the drawing tools
             width: 300px;
-            max-height: calc(100% - 64px);
-            overflow-y: auto;
             grid-column: auto !important;
             border: 1px solid rgba(148, 163, 184, 0.3) !important;
             border-radius: 12px !important;
@@ -710,7 +708,7 @@
             position: absolute;
             z-index: 9;
             top: 48px;
-            left: 24px;
+            left: 76px;
             display: block;
             padding: 2px 9px;
             border: 0;
@@ -735,5 +733,35 @@
         &.forex-trader--setup-closed .forex-trader__controls {
             display: none;
         }
+    }
+}
+
+/* The LIVE badge sits clear of the price scale when the page makes the chart wide. */
+.forex-trader--result-out .forex-trader__live {
+    right: 100px;
+}
+
+/* Slim scrollbars that match the dark pages (the plain white ones looked out of place). */
+.forex-live,
+.forex-live__side,
+.forex-trader,
+.forex-trader__controls,
+.fl-compare__grid,
+.market-picker__list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        border-radius: 8px;
+        background: rgba(148, 163, 184, 0.4);
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
     }
 }

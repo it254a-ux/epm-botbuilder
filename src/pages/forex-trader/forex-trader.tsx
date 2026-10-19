@@ -269,7 +269,10 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     }, [ws, isConnected]);
 
     const info = symbols.find(s => s.underlying_symbol === symbol);
-    const pipSize = info ? Math.max(0, Math.round(-Math.log10(info.pip_size || 0.01))) : 2;
+    const marketPip = info ? Math.max(0, Math.round(-Math.log10(info.pip_size || 0.01))) : 2;
+    // show only the decimals the prices really have (ETH/USD 2415.405, not 2415.40500)
+    const [dataDp, setDataDp] = useState<number | null>(null);
+    const pipSize = dataDp === null ? marketPip : Math.min(marketPip, dataDp);
     const kind = marketKind(info?.market);
     const closed = !!info && (info.exchange_is_open === 0 || info.is_trading_suspended === 1);
 
@@ -331,6 +334,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         chartRef.current?.setCandles(list);
                         drawKey.current = '';
                     }
+                    setDataDp(Math.max(2, ...candlesRef.current.slice(-50).map(c => Math.min(6, (String(c.close).split('.')[1] ?? '').length))));
                     setLastPrice(candlesRef.current.length ? candlesRef.current[candlesRef.current.length - 1].close : null);
                     setLoading(false);
                 } else if (d.ohlc) {
