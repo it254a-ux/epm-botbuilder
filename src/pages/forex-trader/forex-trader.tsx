@@ -178,6 +178,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [m15Ready, setM15Ready] = useState(false);
     const [m15Error, setM15Error] = useState<string | null>(null);
     const m15Ref = useRef<Candle[]>([]);
+    const m15StreamRef = useRef('');
 
     const chartRef = useRef<ChartViewHandle>(null);
     const candlesRef = useRef<Candle[]>([]);
@@ -377,8 +378,14 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         if (mode !== 'mtf' || !ws || !isConnected || !symbol) return;
         let off = false;
         let unsub: (() => void) | null = null;
-        m15Ref.current = [];
-        setM15Ready(false);
+        // the connection dropped and came back for the same market: keep the M15 candles, only fill in what was missed
+        const m15Key = `${symbol}|m15`;
+        const sameM15 = m15StreamRef.current === m15Key && m15Ref.current.length > 0;
+        m15StreamRef.current = m15Key;
+        if (!sameM15) {
+            m15Ref.current = [];
+            setM15Ready(false);
+        }
         setM15Error(null);
         ws.subscribe(
             { ticks_history: symbol, style: 'candles', granularity: M15_SEC, end: 'latest', count: 400, adjust_start_time: 1 },
@@ -394,7 +401,15 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     return;
                 }
                 if (d.candles) {
-                    m15Ref.current = d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+                    const fresh = d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+                    if (sameM15) {
+                        const byTime = new Map<number, Candle>();
+                        m15Ref.current.forEach(c => byTime.set(c.time, c));
+                        fresh.forEach(c => byTime.set(c.time, c));
+                        m15Ref.current = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+                    } else {
+                        m15Ref.current = fresh;
+                    }
                     setM15Ready(true);
                     liveTick.current();
                 } else if (d.ohlc) {
@@ -619,14 +634,14 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         drawKey.current = '';
         refresh(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading, loadError, closed, strategyId, kind, symbol, tf, isConnected, mode]);
+    }, [loading, loadError, closed, strategyId, kind, symbol, tf, mode]);
 
     // M15 + M5 mode: first calculation as soon as both timeframes are loaded
     useEffect(() => {
         if (mode !== 'mtf' || loading || loadError || closed || !m15Ready || !isConnected) return;
         mtfCompute();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, loading, loadError, closed, m15Ready, symbol, isConnected]);
+    }, [mode, loading, loadError, closed, m15Ready, symbol]);
 
     useEffect(
         () => () => {

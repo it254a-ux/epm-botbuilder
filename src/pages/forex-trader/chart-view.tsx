@@ -220,7 +220,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             candles.forEach(c => byTime.set(c.time, c));
             const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
             candlesRef.current = merged;
+            // keep the zoom and position the person is looking at
+            const ts = chartRef.current?.timeScale();
+            const range = ts?.getVisibleLogicalRange() ?? null;
             seriesRef.current?.setData(merged.map(toBar));
+            if (ts && range) ts.setVisibleLogicalRange(range);
         },
         drawLines(lines) {
             const series = seriesRef.current;
@@ -334,7 +338,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             };
 
             // ---- session bands (Asian / London / New York): one continuous soft shade per session
-            chart.priceScale('sess').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
             const sessionOf = (t: number) => {
                 const h = new Date(t * 1000).getUTCHours();
                 return h < 7 ? 'asian' : h < 13 ? 'london' : h < 21 ? 'ny' : null;
@@ -355,6 +358,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 area.applyOptions({
                     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }),
                 } as never);
+                // set after the series exists (before that the scale does not exist yet and the margins were ignored, leaving the shade short)
+                area.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
                 // candles outside this session are blank points, so the shade stops there
                 area.setData(
                     recent.map(c => (sessionOf(c.time) === name ? { time: c.time as UTCTimestamp, value: 1 } : { time: c.time as UTCTimestamp }))
