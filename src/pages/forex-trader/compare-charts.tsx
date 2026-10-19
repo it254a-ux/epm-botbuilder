@@ -278,9 +278,12 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
                     <button
                         type='button'
                         className={overlay === 'prevday' ? 'is-on' : ''}
-                        disabled={!prevdayOk}
-                        onClick={() => setOverlay('prevday')}
-                        title={prevdayOk ? 'Draw the Previous Day High / Low setup (M15 direction + M5 entry)' : 'Needs 5m candles'}
+                        onClick={() => {
+                            // the setup is read on 5-minute candles: this chart switches to 5m by itself
+                            if (!prevdayOk) setSec(300);
+                            setOverlay('prevday');
+                        }}
+                        title={prevdayOk ? 'Draw the Previous Day High / Low setup (M15 direction + M5 entry)' : 'Draw the Previous Day High / Low setup (this chart switches to 5m)'}
                     >
                         Prev day
                     </button>
