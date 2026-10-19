@@ -14,14 +14,28 @@
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 
+    // Position: the "Free" row is lifted a little (about a quarter inch) so it is never cut off at the bottom of the screen,
+    // and the "Welcome" row is lifted half an inch (4.8rem; 1rem = 10px on this site). Only the rows move: the title and
+    // the buttons between them stay where they are. Change the two numbers below to move them more or less.
+    --db-welcome-lift: -4.8rem;
+    --db-markets-lift: -2.4rem;
+
     &--markets {
         --ticker-accent: var(--brand-success, #00a79e);
 
         margin-top: 3.2rem;
+        transform: translateY(var(--db-markets-lift));
     }
 
     &--welcome {
         margin-bottom: 3.2rem;
+        transform: translateY(var(--db-welcome-lift));
+    }
+
+    // on tablets and phones the Dashboard is more crowded: no lift there
+    @media (max-width: 1024px) {
+        --db-welcome-lift: 0rem;
+        --db-markets-lift: 0rem;
     }
 
     &__label {
