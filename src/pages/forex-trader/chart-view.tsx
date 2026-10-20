@@ -206,7 +206,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         levelsRef.current = null;
     };
 
-    useImperativeHandle(ref, () => ({
+    useImperativeHandle(ref, () => {
+      const impl: ChartViewHandle = {
         setCandles(candles) {
             clearDrawing();
             candlesRef.current = candles.slice();
@@ -556,7 +557,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 return null;
             }
         },
-    }));
+      };
+      // redrawing the analysis must never move or re-zoom what the person is looking at
+      const keepView = <A extends unknown[]>(fn: (...a: A) => void) => (...a: A) => {
+          const ts = chartRef.current?.timeScale();
+          const range = ts?.getVisibleLogicalRange() ?? null;
+          fn(...a);
+          if (ts && range) ts.setVisibleLogicalRange(range);
+      };
+      return { ...impl, drawAnalysis: keepView(impl.drawAnalysis), drawPdh: keepView(impl.drawPdh) };
+    });
 
     return (
         <>
