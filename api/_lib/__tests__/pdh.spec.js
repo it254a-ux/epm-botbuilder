@@ -291,6 +291,12 @@ describe('failed second push (top, pullback, lower high, red candle)', () => {
         expect(r.plan.stopLoss).toBeGreaterThan(108.5);
         expect(r.plan.stopLoss).toBeLessThan(110);
     });
+    test('the second push may come many hours after the top (here about 6 hours)', () => {
+        const SLOW = Array.from({ length: 70 }, () => [106.2, 106.25, 0.15, 0.15]);
+        const r = run([...QUIET, ...RUN, TOUCH, ...PULL, ...SLOW, ...PUSH, SELL]);
+        expect(r.stage).toBe('confirmed');
+        expect(r.pattern).toBe('second');
+    });
     test('mirror at the Previous Day Low gives BUY', () => {
         const r = runFlipped([...TOP, ...PULL, ...PUSH, SELL]);
         expect(r.stage).toBe('confirmed');

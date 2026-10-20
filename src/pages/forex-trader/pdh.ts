@@ -116,9 +116,13 @@ interface Scan {
 
 export const GIANT_FOOTPRINT_ATR = 3;
 const PULLBACK_ATR = 1;
-const SECOND_PUSH_MIN_ATR = 0.5;
-/** The second push must show up within this many M5 candles (2 hours) of the pullback low. */
-const SECOND_PUSH_MAX = 24;
+const SECOND_PUSH_MIN_ATR = 1;
+/** ...and the second push must win back at least this share of the pullback (so small chop is not a push). */
+const SECOND_PUSH_MIN_SHARE = 0.25;
+/** The second push must show up within this many M5 candles (24 hours) of the pullback low. */
+const SECOND_PUSH_MAX = 288;
+/** The failed second push may build up over a day or two: look back this many M5 candles (2 days). */
+const SECOND_WINDOW = 576;
 
 type Words = { level: string; up: string; down: string; green: string; red: string; high: string; low: string };
 
@@ -158,10 +162,10 @@ function scanSecond(w: Candle[], L: number, eq: number, far: number, atr5: numbe
     // second push: the highest point after the pullback low
     let q = -1;
     for (let i = pi + 1; i <= last; i++) if (q < 0 || w[i].high > w[q].high) q = i;
-    if (q < 0 || w[q].high - w[pi].low < SECOND_PUSH_MIN_ATR * atr5) {
+    if (q < 0 || w[q].high - w[pi].low < Math.max(SECOND_PUSH_MIN_ATR * atr5, SECOND_PUSH_MIN_SHARE * (H - w[pi].low))) {
         return { stage: 'watch', ...base, rejectionIdx: -1, secondIdx: -1, plan: null, why: '', notes: [`Top ${fmt(H)}, pullback to ${fmt(w[pi].low)}. Waiting for the second push; it must stay below ${fmt(H)}.`] };
     }
-    if (q - pi > SECOND_PUSH_MAX) return none('The second push took too long (more than 2 hours): setup cancelled.', base);
+    if (q - pi > SECOND_PUSH_MAX) return none('The second push took too long (more than 24 hours): setup cancelled.', base);
     const Q = w[q].high;
     const b2 = { ...base, secondIdx: q };
     let j = -1;
@@ -319,15 +323,19 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
     // the failed second push is the stronger setup: it wins when it is at least as advanced as the plain rejection
     const best = (a: Scan, b: Scan) => (b.stage === 'confirmed' || (b.stage === 'watch' && (b.secondIdx ?? -1) >= 0 && a.stage !== 'confirmed') ? b : a);
     const wf = w.map(flip);
-    const hi = best(scanHigh(w, pdh, eq, pdl, a5, wordsHigh), scanSecond(w, pdh, eq, pdl, a5, wordsHigh));
-    const lo = best(scanHigh(wf, -pdl, -eq, -pdh, a5, wordsLow), scanSecond(wf, -pdl, -eq, -pdh, a5, wordsLow));
+    const wS = m5.slice(-SECOND_WINDOW);
+    const wSf = wS.map(flip);
+    const hi = best(scanHigh(w, pdh, eq, pdl, a5, wordsHigh), scanSecond(wS, pdh, eq, pdl, a5, wordsHigh));
+    const lo = best(scanHigh(wf, -pdl, -eq, -pdh, a5, wordsLow), scanSecond(wSf, -pdl, -eq, -pdh, a5, wordsLow));
     const useLow = rank(lo) > rank(hi) || (rank(lo) === rank(hi) && rank(lo) > 0 && lo.touchIdx > hi.touchIdx);
     const scan = useLow ? lo : hi;
     const sign = useLow ? -1 : 1;
     const side: PdhSide = useLow ? 'BUY' : 'SELL';
     const levelName = useLow ? 'Previous Day Low' : 'Previous Day High';
     const levelPrice = useLow ? pdl : pdh;
-    const at = (i: number) => w[i];
+    // the second-push setup is scanned over a longer stretch (up to 2 days), so its candle numbers refer to that stretch
+    const arr = scan.kind === 'second' ? wS : w;
+    const at = (i: number) => arr[i];
 
     if (scan.touchIdx < 0 && rank(scan) === 0) {
         return emptyResult({ levels, signalTime: lastEnd, reasons: [`Previous Day High ${fmt(pdh)}, Previous Day Low ${fmt(pdl)}.`, hi.why, lo.why] });
@@ -358,7 +366,7 @@ function analyseUnsafe(m15Raw: Candle[], m5Raw: Candle[], now: number): PdhResul
     // the extreme reached since the touch, in real (unflipped) prices
     const sweep =
         scan.touchIdx >= 0
-            ? { time: at(scan.touchIdx).time, price: useLow ? Math.min(...w.slice(scan.touchIdx).map(c => c.low)) : Math.max(...w.slice(scan.touchIdx).map(c => c.high)) }
+            ? { time: at(scan.touchIdx).time, price: useLow ? Math.min(...arr.slice(scan.touchIdx).map(c => c.low)) : Math.max(...arr.slice(scan.touchIdx).map(c => c.high)) }
             : null;
     const rejection = scan.rejectionIdx >= 0 ? { time: at(scan.rejectionIdx).time, close: at(scan.rejectionIdx).close } : null;
 
