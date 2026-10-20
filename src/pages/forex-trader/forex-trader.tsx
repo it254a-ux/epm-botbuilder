@@ -165,6 +165,12 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [loadError, setLoadError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
     const [lastPrice, setLastPrice] = useState<number | null>(null);
+    // feed health shown on the LIVE badge: seconds since the last price update, and how many times the connection dropped
+    const lastMsgAt = useRef(Date.now());
+    const dropsRef = useRef(0);
+    const wasConnected = useRef(false);
+    const [feedAge, setFeedAge] = useState(0);
+    const [drops, setDrops] = useState(0);
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
@@ -245,6 +251,18 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         chartRef.current?.drawLines(extraLines ?? []);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [extraKey, loading]);
+
+    useEffect(() => {
+        if (wasConnected.current && !isConnected) {
+            dropsRef.current += 1;
+            setDrops(dropsRef.current);
+        }
+        wasConnected.current = isConnected;
+    }, [isConnected]);
+    useEffect(() => {
+        const t = window.setInterval(() => setFeedAge(Math.round((Date.now() - lastMsgAt.current) / 100) / 10), 500);
+        return () => window.clearInterval(t);
+    }, []);
 
     // ---- markets list
     useEffect(() => {
@@ -352,6 +370,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     else if (!last || c.time > last.time) arr.push(c);
                     chartRef.current?.updateCandle(c);
                     setLastPrice(c.close);
+                    lastMsgAt.current = Date.now();
                     liveTick.current();
                 }
             }
@@ -790,6 +809,12 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     title={live ? 'Updating on every price change. Tap to pause.' : 'Paused. Tap to resume.'}
                 >
                     {!isConnected ? '⟳ RECONNECTING…' : live ? '● LIVE' : '❚❚ PAUSED'}
+                    {isConnected && (
+                        <small className='forex-trader__feed' title='Seconds since the last price update, and how many times the connection dropped'>
+                            {' '}
+                            {feedAge.toFixed(1)}s{drops ? ` · ${drops} drop${drops === 1 ? '' : 's'}` : ''}
+                        </small>
+                    )}
                 </button>
                 {loading && !loadError && <div className='forex-trader__overlay'>Loading chart…</div>}
                 {loadError && <div className='forex-trader__overlay forex-trader__overlay--error'>{loadError}</div>}
