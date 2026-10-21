@@ -1,0 +1,125 @@
+// Round contact / social buttons on the Dashboard.
+// "Live": every button floats up and down and pulses a soft ring, in a loop that never ends and never resets
+// (alternate + infinite, with each button offset so they move like a wave and never blink out together).
+
+.db-actions {
+    --db-actions-size: 5.2rem;
+
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+
+    // wide screens: a column in the empty space on the left of the Dashboard
+    @media (min-width: 1200px) {
+        position: absolute;
+        left: 2.4rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+    }
+
+    // smaller screens: a centred row at the bottom of the page flow
+    @media (max-width: 1199px) {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 2.4rem auto 1.6rem;
+    }
+
+    &__btn {
+        --btn-color: #475569;
+
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--db-actions-size);
+        height: var(--db-actions-size);
+        border-radius: 50%;
+        color: #fff;
+        background: var(--btn-color);
+        box-shadow: 0 0.4rem 1.4rem rgb(0 0 0 / 35%);
+        text-decoration: none;
+        animation: db-actions-float 3.2s ease-in-out infinite alternate;
+        transition: transform 0.2s ease, filter 0.2s ease;
+
+        // the pulsing ring
+        &::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 0.2rem solid var(--btn-color);
+            opacity: 0;
+            animation: db-actions-ring 2.6s ease-out infinite;
+            animation-delay: var(--db-delay, 0s);
+            pointer-events: none;
+        }
+
+        &:hover,
+        &:focus-visible {
+            filter: brightness(1.15);
+            outline: none;
+        }
+
+        &:focus-visible {
+            box-shadow: 0 0 0 0.3rem rgb(255 255 255 / 70%);
+        }
+
+        &--whatsapp {
+            --btn-color: #25d366;
+        }
+
+        &--call {
+            --btn-color: #16a34a;
+        }
+
+        &--text {
+            --btn-color: #2563eb;
+        }
+
+        &--tiktok {
+            --btn-color: #111827;
+            box-shadow: 0 0.4rem 1.4rem rgb(0 0 0 / 35%), -0.2rem 0 0 #25f4ee, 0.2rem 0 0 #fe2c55;
+        }
+
+        &--instagram {
+            background: linear-gradient(45deg, #f9ce34, #ee2a7b 55%, #6228d7);
+            --btn-color: #ee2a7b;
+        }
+
+        &--facebook {
+            --btn-color: #1877f2;
+        }
+    }
+}
+
+@keyframes db-actions-float {
+    from {
+        transform: translateY(-0.5rem);
+    }
+
+    to {
+        transform: translateY(0.5rem);
+    }
+}
+
+@keyframes db-actions-ring {
+    0% {
+        opacity: 0.55;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.6);
+    }
+}
+
+// people who asked their device for less motion get still buttons (they stay visible, they just do not move)
+@media (prefers-reduced-motion: reduce) {
+    .db-actions__btn,
+    .db-actions__btn::after {
+        animation: none;
+    }
+}

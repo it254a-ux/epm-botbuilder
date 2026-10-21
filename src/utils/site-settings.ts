@@ -44,6 +44,15 @@ export const PLATFORM_CONTACTS: TSiteContacts = {
     telegram: '',
 };
 
+// Your own social pages (platform and free sites). Custom-domain operator sites never show these.
+export type TSiteSocials = { tiktok: string; instagram: string; facebook: string };
+export const PLATFORM_SOCIALS: TSiteSocials = {
+    tiktok: 'https://www.tiktok.com/@akyidafx',
+    instagram: 'https://www.instagram.com/akyidafx',
+    facebook: 'https://www.facebook.com/kenyanharmonize',
+};
+const NO_SOCIALS: TSiteSocials = { tiktok: '', instagram: '', facebook: '' };
+
 const PLATFORM_DEFAULT: TSiteSettings = { kind: 'platform' };
 let current: TSiteSettings = PLATFORM_DEFAULT;
 
@@ -62,6 +71,13 @@ export const getActiveSite = (): TSite | null => (current.kind === 'site' ? curr
  */
 export const getSiteContacts = (): TSiteContacts =>
     current.kind === 'site' && current.site.plan === 'custom' ? current.site.contacts : PLATFORM_CONTACTS;
+
+/** Social pages to show: yours on the platform and on free sites, nothing on a custom-domain operator site. */
+export const getSiteSocials = (): TSiteSocials =>
+    current.kind === 'site' && current.site.plan === 'custom' ? NO_SOCIALS : PLATFORM_SOCIALS;
+
+/** Only ever link to the three social networks over https (never build a link from an unchecked string). */
+export const socialHref = (url: string): string => (/^https:\/\/(www\.)?(tiktok|instagram|facebook)\.com\/[A-Za-z0-9_.@\/-]+$/.test(url) ? url : '');
 
 // Defensive re-validation: even though the API sanitizes, never build a link
 // from a string we haven't checked.

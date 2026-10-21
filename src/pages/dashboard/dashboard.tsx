@@ -8,6 +8,7 @@ import { useDevice } from '@deriv-com/ui';
 import OnboardTourHandler from '../tutorials/dbot-tours/onboarding-tour';
 import Announcements from './announcements';
 import Cards from './cards';
+import DashboardActions from './dashboard-actions';
 import DashboardTicker from './dashboard-ticker';
 import InfoPanel from './info-panel';
 import './dashboard-ticker.scss';
@@ -31,6 +32,7 @@ const DashboardComponent = observer(({ handleTabChange }: TMobileIconGuide) => {
                     'tab__dashboard--tour-active': active_tour,
                 })}
             >
+                <DashboardActions />
                 <div className='tab__dashboard__content'>
                     {client.is_logged_in && (
                         <Announcements is_mobile={!isDesktop} is_tablet={isTablet} handleTabChange={handleTabChange} />

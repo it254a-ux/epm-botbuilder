@@ -1,0 +1,1123 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for pages/forex-live/trade-engine.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">pages/forex-live</a> trade-engine.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>346/346</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">84.69% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>166/196</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>19/19</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>346/346</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">80x</span>
+<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">80x</span>
+<span class="cline-any cline-yes">80x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">27x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">21x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">88x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">97x</span>
+<span class="cline-any cline-yes">97x</span>
+<span class="cline-any cline-yes">97x</span>
+<span class="cline-any cline-yes">97x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * Pure logic for the Forex Live page: no React, no network.
+ *
+ * Forex Live trades Deriv "Multipliers" (MULTUP = BUY, MULTDOWN = SELL). A multiplier has NO fixed
+ * duration: it stays open until you close it (or an optional stop loss / take profit is hit), so a trade
+ * can be exited whenever you like. Many of them can be open at the same time.
+ *
+ * Everything that touches the exchange lives in use-forex-live.ts; this file only builds requests and
+ * reads the answers, so it can be tested on its own.
+ */
+&nbsp;
+export type Side = 'BUY' | 'SELL';
+export type MultiplierContract = 'MULTUP' | 'MULTDOWN';
+&nbsp;
+export const CONTRACT_OF: Record&lt;Side, MultiplierContract&gt; = { BUY: 'MULTUP', SELL: 'MULTDOWN' };
+&nbsp;
+/** Used when the multipliers allowed for a symbol cannot be loaded. */
+export const FALLBACK_MULTIPLIERS = [30, 50, 100, 200, 300];
+&nbsp;
+export const DEFAULT_SYMBOL = 'frxEURUSD';
+/** 15 minutes, in seconds (SmartCharts granularity). */
+export const DEFAULT_GRANULARITY = 900;
+&nbsp;
+export interface TradeInput {
+    side: Side;
+    symbol: string;
+    stake: number;
+    multiplier: number;
+    currency: string;
+    /** Loss amount (in account currency) at which the trade closes itself. Empty = none. */
+    stopLoss?: number | null;
+    /** Profit amount (in account currency) at which the trade closes itself. Empty = none. */
+    takeProfit?: number | null;
+}
+&nbsp;
+export interface BuyRequest {
+    buy: '1';
+    price: number;
+    parameters: {
+        contract_type: MultiplierContract;
+        underlying_symbol: string;
+        currency: string;
+        /** Deriv needs to be told what the amount is: here, the stake. */
+        basis: 'stake';
+        amount: number;
+        multiplier: number;
+        limit_order?: { stop_loss?: number; take_profit?: number };
+    };
+}
+&nbsp;
+const positive = (n: unknown): n is number =&gt; typeof n === 'number' &amp;&amp; Number.isFinite(n) &amp;&amp; n &gt; 0;
+&nbsp;
+/** Returns a plain-words problem with the input, or null when it is fine to send. */
+export function validateTrade(t: TradeInput): string | null {
+    if (!t.symbol) return 'Pick a market first.';
+    if (!t.currency) return 'Your account is still loading.';
+    if (!positive(t.stake)) return 'Enter a stake above 0.';
+    if (!positive(t.multiplier)) return 'Pick a multiplier.';
+    if (t.stopLoss !== null &amp;&amp; t.stopLoss !== undefined &amp;&amp; !positive(t.stopLoss)) return 'Stop loss must be above 0, or empty.';
+    if (t.takeProfit !== null &amp;&amp; t.takeProfit !== undefined &amp;&amp; !positive(t.takeProfit)) return 'Take profit must be above 0, or empty.';
+    // A multiplier can never lose more than its stake, so a stop loss at or above the stake would never trigger.
+    if (positive(t.stopLoss) &amp;&amp; t.stopLoss &gt;= t.stake) return 'Stop loss must be less than the stake.';
+    return null;
+}
+&nbsp;
+const money = (n: number) =&gt; Math.round(n * 100) / 100;
+&nbsp;
+/** The exact message Deriv needs to open the trade immediately at the current price. */
+export function buildBuyRequest(t: TradeInput): BuyRequest {
+    const stake = money(t.stake);
+    const limit: { stop_loss?: number; take_profit?: number } = {};
+    if (positive(t.stopLoss)) limit.stop_loss = money(t.stopLoss);
+    if (positive(t.takeProfit)) limit.take_profit = money(t.takeProfit);
+    return {
+        buy: '1', // written exactly like the bots' own buy request
+        // For a multiplier the price is the stake: the most we agree to pay.
+        price: stake,
+        parameters: {
+            contract_type: CONTRACT_OF[t.side],
+            underlying_symbol: t.symbol,
+            currency: t.currency,
+            basis: 'stake',
+            amount: stake,
+            multiplier: t.multiplier,
+            ...(Object.keys(limit).length ? { limit_order: limit } : {}),
+        },
+    };
+}
+&nbsp;
+/** The message that closes an open trade at the current market price. */
+export function buildSellRequest(contractId: number): { sell: number; price: 0 } {
+    return { sell: contractId, price: 0 };
+}
+&nbsp;
+export interface Position {
+    id: number;
+    symbol: string;
+    side: Side;
+    stake: number;
+    multiplier: number | null;
+    /** Current profit or loss. Null until the first live update arrives. */
+    profit: number | null;
+    entry: number | null;
+    spot: number | null;
+    stopLoss: number | null;
+    takeProfit: number | null;
+    openedAt: number | null;
+    /** Price levels where the stop loss / take profit will trigger, when Deriv tells them. */
+    stopLossAt?: number;
+    takeProfitAt?: number;
+    currency: string;
+    /** True once the trade is closed (sold, stopped out or limit hit). */
+    closed: boolean;
+    /** Final result, when closed. */
+    result: number | null;
+    /** Deriv says the trade can be closed right now. */
+    canClose: boolean;
+    /** The close request is on its way (shown as "Closing…"). */
+    closing?: boolean;
+}
+&nbsp;
+type Raw = Record&lt;string, any&gt;;
+&nbsp;
+const num = (v: unknown): number | null =&gt; {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n <span class="branch-0 cbranch-no" title="branch not covered" >: null;</span>
+};
+&nbsp;
+const orderAmount = (o: unknown): number | null =&gt; {
+    if (o &amp;&amp; typeof o === 'object') return num((o as Raw).order_amount<span class="branch-0 cbranch-no" title="branch not covered" > ?? (o as Raw).amount)</span>;
+    return num(o);
+};
+&nbsp;
+/**
+ * Reads one open-contract message (or one portfolio row) into a Position.
+ * Returns null for anything that is not a multiplier, so bot trades never show up here.
+ */
+export function toPosition(raw: Raw | null | undefined): Position | null {
+    if (!raw) return null;
+    const type = String(raw.contract_type<span class="branch-0 cbranch-no" title="branch not covered" > ?? '')</span>;
+    if (type !== 'MULTUP' &amp;&amp; type !== 'MULTDOWN') return null;
+    const id = num(raw.contract_id);
+    if (id === null) return null;
+&nbsp;
+    const sold = raw.is_sold === 1 || raw.is_sold === true || (raw.status !== undefined<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; raw.status !== 'open')</span>;
+    const profit = num(raw.profit);
+    const limit = (raw.limit_order ?? {}) as Raw;
+    return {
+        id,
+        symbol: String(raw.underlying_symbol ?? raw.underlying<span class="branch-0 cbranch-no" title="branch not covered" > ?? raw.symbol<span class="branch-0 cbranch-no" title="branch not covered" > </span>?? '')</span>,
+        side: type === 'MULTUP' ? 'BUY' : 'SELL',
+        stake: num(raw.buy_price)<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0,</span>
+        multiplier: num(raw.multiplier),
+        profit,
+        entry: num(raw.entry_spot ?? raw.entry_tick),
+        spot: num(raw.current_spot),
+        stopLoss: orderAmount(limit.stop_loss),
+        takeProfit: orderAmount(limit.take_profit),
+        ...(num((limit.stop_loss as Raw | undefined)?.value) !== null ? { stopLossAt: num((limit.stop_loss as Raw).value) as number } : {}),
+        ...(num((limit.take_profit as Raw | undefined)?.value) !== null ? { takeProfitAt: num((limit.take_profit as Raw).value) as number } : {}),
+        openedAt: num(raw.purchase_time ?? raw.date_start),
+        currency: String(raw.currency ?? ''),
+        closed: sold,
+        result: sold ? (profit<span class="branch-0 cbranch-no" title="branch not covered" > ?? (num(raw.sell_price) !== null &amp;&amp; num(raw.buy_price) !== null ? money(num(raw.sell_price)! - num(raw.buy_price)!) : null))</span> : null,
+        // a closed trade can never be closed again; an open one can unless Deriv says it cannot right now
+        canClose: !sold &amp;&amp; (raw.is_valid_to_sell === undefined || raw.is_valid_to_sell === 1<span class="branch-0 cbranch-no" title="branch not covered" > || raw.is_valid_to_sell === true)</span>,
+    };
+}
+&nbsp;
+/** A later message for the same trade replaces the earlier one, but never wipes out numbers it does not carry. */
+export function mergePosition(prev: Position | undefined, next: Position): Position {
+    if (!prev) <span class="branch-0 cbranch-no" title="branch not covered" >return next;</span>
+    return {
+        ...next,
+        symbol: next.symbol<span class="branch-0 cbranch-no" title="branch not covered" > || prev.symbol,</span>
+        stake: next.stake<span class="branch-0 cbranch-no" title="branch not covered" > || prev.stake,</span>
+        multiplier: next.multiplier<span class="branch-0 cbranch-no" title="branch not covered" > ?? prev.multiplier,</span>
+        profit: next.profit ?? prev.profit,
+        entry: next.entry ?? prev.entry,
+        spot: next.spot ?? prev.spot,
+        stopLoss: next.stopLoss ?? prev.stopLoss,
+        takeProfit: next.takeProfit ?? prev.takeProfit,
+        openedAt: next.openedAt<span class="branch-0 cbranch-no" title="branch not covered" > ?? prev.openedAt,</span>
+        ...(next.stopLossAt ?? prev.stopLossAt) !== undefined <span class="branch-0 cbranch-no" title="branch not covered" >? { stopLossAt: (next.stopLossAt ?? prev.stopLossAt) as number } </span>: {},
+        ...(next.takeProfitAt ?? prev.takeProfitAt) !== undefined <span class="branch-0 cbranch-no" title="branch not covered" >? { takeProfitAt: (next.takeProfitAt ?? prev.takeProfitAt) as number } </span>: {},
+        currency: next.currency<span class="branch-0 cbranch-no" title="branch not covered" > || prev.currency,</span>
+    };
+}
+&nbsp;
+export interface Summary {
+    open: number;
+    buys: number;
+    sells: number;
+    stake: number;
+    profit: number;
+    winning: number;
+    losing: number;
+}
+&nbsp;
+export function summarize(positions: Position[]): Summary {
+    const s: Summary = { open: 0, buys: 0, sells: 0, stake: 0, profit: 0, winning: 0, losing: 0 };
+    for (const p of positions) {
+        if (p.closed) continue;
+        s.open += 1;
+        if (p.side === 'BUY') s.buys += 1;
+        else s.sells += 1;
+        s.stake += p.stake;
+        const pl = p.profit<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0;</span>
+        s.profit += pl;
+        if (pl &gt; 0) s.winning += 1;
+        else if (pl &lt; 0) s.losing += 1;
+    }
+    s.stake = money(s.stake);
+    s.profit = money(s.profit);
+    return s;
+}
+&nbsp;
+export type CloseFilter = 'all' | 'buy' | 'sell' | 'winning' | 'losing';
+&nbsp;
+/** Which open trades a "close ..." button applies to. `symbol` limits it to one market when given. */
+export function pickToClose(positions: Position[], filter: CloseFilter, symbol?: string): Position[] {
+    return positions.filter(p =&gt; {
+        if (p.closed || !p.canClose) return false;
+        if (symbol &amp;&amp; p.symbol !== symbol) return false;
+        switch (filter) {
+            case 'buy':
+                return p.side === 'BUY';
+            case 'sell':
+                return p.side === 'SELL';
+            case 'winning':
+                return (p.profit<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0)</span> &gt; 0;
+            case 'losing':
+                return (p.profit<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0)</span> &lt; 0;
+            default:
+                return true;
+        }
+    });
+}
+&nbsp;
+/** Multipliers Deriv allows for a symbol, read from a contracts_for answer. Falls back to a sensible list. */
+export function readMultipliers(answer: Raw | null | undefined): number[] {
+    const list: Raw[] = answer?.contracts_for?.available ?? answer<span class="branch-0 cbranch-no" title="branch not covered" >?.contracts_for?.contracts </span>?? answer<span class="branch-0 cbranch-no" title="branch not covered" >?.available </span>?? [];
+    const found = new Set&lt;number&gt;();
+    for (const c of Array.isArray(list) ? list <span class="branch-0 cbranch-no" title="branch not covered" >: [])</span> {
+        const isMultiplier = c?.contract_category === 'multiplier' || c?.contract_type === 'MULTUP' || c?.contract_type === 'MULTDOWN';
+        if (!isMultiplier) continue;
+        const range = c.multiplier_range;
+        if (Array.isArray(range)) range.forEach((m: unknown) =&gt; positive(Number(m)) &amp;&amp; found.add(Number(m)));
+    }
+    const out = [...found].sort((a, b) =&gt; a - b);
+    return out.length ? out : FALLBACK_MULTIPLIERS;
+}
+&nbsp;
+/** One plain sentence from whatever shape an error arrives in (Error, { error: { message } }, or a response). */
+export function errorText(e: unknown): string {
+    if (typeof e === 'string') return e;
+    const any = e as Raw | null;
+    const msg = any?.error?.message ?? any?.message ?? any<span class="branch-0 cbranch-no" title="branch not covered" >?.error;</span>
+    return typeof msg === 'string' &amp;&amp; msg ? msg : 'Something went wrong. Please try again.';
+}
+&nbsp;
+export interface PlanLevels {
+    side: Side;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+}
+&nbsp;
+/**
+ * Turns the analysis plan (prices) into the money amounts a multiplier needs.
+ * A multiplier moves by stake x multiplier x (price change / price), so a stop at distance d from the entry
+ * loses stake x multiplier x d / entry. Returns null when the plan is for the other side or unusable.
+ * The stop loss is kept just under the stake (a multiplier cannot lose more than its stake anyway).
+ */
+export function amountsFromPlan(
+    plan: PlanLevels | null | undefined,
+    side: Side,
+    stake: number,
+    multiplier: number
+): { stopLoss: number; takeProfit: number } | null {
+    if (!plan || plan.side !== side || !positive(plan.entry) || !positive(stake) || !positive(multiplier)) return null;
+    const per = (level: number) =&gt; (stake * multiplier * Math.abs(level - plan.entry)) / plan.entry;
+    // the stop must be on the losing side and the target on the winning side of the entry
+    const slOk = side === 'BUY' ? plan.stopLoss &lt; plan.entry : plan.stopLoss &gt; plan.entry;
+    const tpOk = side === 'BUY' ? plan.takeProfit &gt; plan.entry : plan.takeProfit &lt; plan.entry;
+    const sl = slOk ? Math.min(money(per(plan.stopLoss)), money(stake - 0.01)) : 0;
+    const tp = tpOk ? money(per(plan.takeProfit)) <span class="branch-0 cbranch-no" title="branch not covered" >: 0;</span>
+    if (!(sl &gt; 0) || !(tp &gt; 0)) return null;
+    return { stopLoss: sl, takeProfit: tp };
+}
+&nbsp;
+export interface PositionLine {
+    key: string;
+    title: string;
+    price: number;
+    color: string;
+}
+&nbsp;
+export const BUY_COLOR = '#06b6d4';
+export const SELL_COLOR = '#f59e0b';
+&nbsp;
+/** Chart lines for the open trades on one market: where each was entered (with its live profit) and its stop loss / take profit levels. */
+export function positionLines(positions: Position[], symbol: string): PositionLine[] {
+    const out: PositionLine[] = [];
+    for (const p of positions) {
+        if (p.closed || p.symbol !== symbol) continue;
+        const color = p.side === 'BUY' ? BUY_COLOR <span class="branch-0 cbranch-no" title="branch not covered" >: SELL_COLOR;</span>
+        if (p.entry !== null) {
+            const pl = p.profit === null <span class="branch-0 cbranch-no" title="branch not covered" >? '' </span>: ` ${formatMoney(p.profit)}`;
+            out.push({ key: `pos-${p.id}`, title: `${p.side}${pl}`, price: p.entry, color });
+        }
+        if (p.stopLossAt !== undefined) out.push({ key: `pos-${p.id}-sl`, title: 'SL', price: p.stopLossAt, color: '#ef4444' });
+        if (p.takeProfitAt !== undefined) out.push({ key: `pos-${p.id}-tp`, title: 'TP', price: p.takeProfitAt, color: '#10b981' });
+    }
+    return out;
+}
+&nbsp;
+/** Deriv refuses a stake that is too small and says the minimum in its message ("Enter an amount equal to or higher than 1.64."). */
+export function parseMinStake(text: string): number | null {
+    const m = /(?:equal to or higher than|equal to or greater than|at least|minimum(?: stake)?(?: is| of)?)\s*:?\s*(\d+(?:\.\d+)?)/i.exec(text || '');
+    const n = m ? Number(m[1]) : NaN;
+    return Number.isFinite(n) &amp;&amp; n &gt; 0 ? n : null;
+}
+&nbsp;
+/**
+ * Turns Deriv's refusal into words that point at the right field. Deriv uses the same "equal to or higher
+ * than N" wording for a too-small stake AND for a too-small stop loss / take profit, so the number alone
+ * cannot say which: only a minimum ABOVE the stake can be about the stake. Anything else is shown as Deriv wrote it.
+ */
+export function explainRefusal(why: string, t: Pick&lt;TradeInput, 'stake' | 'stopLoss' | 'takeProfit'&gt;): { text: string; minStake: number | null } {
+    const min = parseMinStake(why);
+    if (min === null) return { text: why, minStake: null };
+    if (min &gt; t.stake) return { text: `the smallest stake on this market is ${min}. Your stake was below it.`, minStake: min };
+    const limits = [t.stopLoss ? 'stop loss' <span class="branch-0 cbranch-no" title="branch not covered" >: '',</span> t.takeProfit ? 'take profit' <span class="branch-0 cbranch-no" title="branch not covered" >: '']</span>.filter(Boolean).join(' / ');
+    return {
+        text: limits ? `${why} Your stake is fine; it is your ${limits} that is too small. Raise it, or leave it empty.` <span class="branch-0 cbranch-no" title="branch not covered" >: why,</span>
+        minStake: null,
+    };
+}
+&nbsp;
+export const formatMoney = (n: number | null | undefined, currency = ''): string =&gt; {
+    if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+    const sign = n &gt; 0 ? '+' : n &lt; 0 ? '-' : '';
+    return `${sign}${Math.abs(n).toFixed(2)}${currency ? ` ${currency}` : ''}`;
+};
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-10-21T09:28:55.489Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    
