@@ -5,6 +5,23 @@ import { useDevice } from '@deriv-com/ui';
 import { usePanelWidth } from '../forex-trader/panel-size';
 import './trading-view-page.scss';
 
+// Deriv's own chart (charts.deriv.com) only lists Deriv's markets, so it has no
+// XAUUSD and many other forex pairs. "All markets" is the real TradingView chart,
+// which has every forex pair, metal, index and crypto and a symbol search.
+const MODE_KEY = 'epm_trading_view_mode';
+type TMode = 'all' | 'deriv';
+const loadMode = (): TMode => {
+    try {
+        return localStorage.getItem(MODE_KEY) === 'deriv' ? 'deriv' : 'all';
+    } catch {
+        return 'all';
+    }
+};
+const ALL_MARKETS_URL =
+    'https://s.tradingview.com/widgetembed/?frameElementId=epm_tv&symbol=OANDA%3AXAUUSD&interval=15' +
+    '&hidesidetoolbar=0&symboledit=1&saveimage=1&studies=%5B%5D&theme=dark&style=1' +
+    '&timezone=Africa%2FNairobi&withdateranges=1&allow_symbol_change=1&locale=en';
+
 // Full-page version of the same TradingView iframe already used by Bot
 // Builder's draggable "TradingView Chart" popup
 // (src/components/trading-view-chart/trading-view-modal.tsx) — reuses that
@@ -43,6 +60,15 @@ function TradingViewPageComponent() {
     const page_ref = useRef<HTMLDivElement | null>(null);
     const [height, setHeight] = useState<number | undefined>(undefined);
     const { isDesktop } = useDevice();
+    const [mode, setMode] = useState<TMode>(loadMode);
+    const pick = (next: TMode) => {
+        setMode(next);
+        try {
+            localStorage.setItem(MODE_KEY, next);
+        } catch {
+            /* storage blocked: the choice just is not remembered */
+        }
+    };
 
     // The right-hand panel on this tab is the Forex Trader tool (always open on desktop).
     const panel_width = usePanelWidth();
@@ -90,14 +116,33 @@ function TradingViewPageComponent() {
                 transition: 'width 0.3s ease',
             }}
         >
-            <div
-                style={{
-                    marginTop: `-${CROP_TOP}px`,
-                    height: height ? `${height + CROP_TOP}px` : '100%',
-                }}
-            >
-                <TradingViewComponent />
+            <div className='trading-view-page__switch' role='group' aria-label='Chart source'>
+                <button type='button' className={mode === 'all' ? 'is-on' : ''} onClick={() => pick('all')}>
+                    All markets
+                </button>
+                <button type='button' className={mode === 'deriv' ? 'is-on' : ''} onClick={() => pick('deriv')}>
+                    Deriv chart
+                </button>
             </div>
+            {mode === 'all' ? (
+                <iframe
+                    key='all'
+                    title='TradingView, all markets'
+                    id='trading-view-all-iframe'
+                    src={ALL_MARKETS_URL}
+                    style={{ width: '100%', height: height ? `${height}px` : '100%' }}
+                    allow='fullscreen'
+                />
+            ) : (
+                <div
+                    style={{
+                        marginTop: `-${CROP_TOP}px`,
+                        height: height ? `${height + CROP_TOP}px` : '100%',
+                    }}
+                >
+                    <TradingViewComponent />
+                </div>
+            )}
         </div>
     );
 }

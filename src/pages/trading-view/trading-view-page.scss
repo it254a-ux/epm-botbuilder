@@ -5,8 +5,41 @@
 // Width is also set inline now, reserving space for the Run Panel drawer
 // when it's open (desktop only) — see DESKTOP_DRAWER_OPEN_WIDTH there.
 .trading-view-page {
+    position: relative;
     min-height: 300px;
     overflow: hidden;
+
+    // Small switch floating over the chart's top-right corner.
+    &__switch {
+        position: absolute;
+        top: 6px;
+        right: 64px;
+        z-index: 5;
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: 999px;
+        background: rgba(20, 22, 30, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(6px);
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.72);
+            background: transparent;
+            cursor: pointer;
+
+            &.is-on {
+                color: #1a1405;
+                background: linear-gradient(180deg, #f6d36b, #c99a2e);
+            }
+        }
+    }
 
     iframe {
         display: block;
