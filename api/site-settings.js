@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
     // GET /api/site-settings?flag=forced_real -> { on: true|false }: an admin switch (see the Admin page).
     // If the database cannot be reached the switch keeps its normal value, so the site looks the same as always.
     if (req.query && req.query.flag === 'forced_real') {
-        res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+        res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=2');
         try {
             res.status(200).json({ on: await getFlag(getDb(), 'forced_real') });
         } catch (err) {
