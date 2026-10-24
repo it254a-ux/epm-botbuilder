@@ -718,9 +718,15 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
-            {apis && showStudies && <ChartStudies state={studies} onChange={setStudies} />}
             {apis && (
-                <ChartDrawings chart={apis.chart} series={apis.series} getCandles={() => candlesRef.current} pipSize={pipSize} resetKey={resetKey} />
+                <ChartDrawings
+                    chart={apis.chart}
+                    series={apis.series}
+                    getCandles={() => candlesRef.current}
+                    pipSize={pipSize}
+                    resetKey={resetKey}
+                    extra={showStudies ? <ChartStudies state={studies} onChange={setStudies} /> : undefined}
+                />
             )}
         </>
     );

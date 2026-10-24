@@ -232,9 +232,11 @@ interface Props {
     pipSize: number;
     /** Changes whenever new candles are loaded (market / timeframe change): drawings are cleared. */
     resetKey: number;
+    /** More buttons for the top of the toolbar (the chart style and indicators menus). */
+    extra?: ReactNode;
 }
 
-export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey }: Props) {
+export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey, extra }: Props) {
     const svgRef = useRef<SVGSVGElement>(null);
     const [drawings, setDrawings] = useState<Drawing[]>([]);
     const [draft, setDraft] = useState<{ tool: DrawTool; pts: Pt[] } | null>(null);
@@ -344,6 +346,13 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         return () => cancelAnimationFrame(raf);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chart, series]);
+
+    // the style / indicators menus tell this toolbar when they open, so only one menu is open at a time
+    useEffect(() => {
+        const close = () => setMenu(null);
+        window.addEventListener('fx-close-menus', close);
+        return () => window.removeEventListener('fx-close-menus', close);
+    }, []);
 
     // clicking empty chart: deselect and close menus
     useEffect(() => {
@@ -692,7 +701,10 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         setSelected(null);
         setMenu(null);
     };
-    const toggle = (name: string) => setMenu(m => (m === name ? null : name));
+    const toggle = (name: string) => {
+        window.dispatchEvent(new Event('fx-close-menus-from-rail'));
+        setMenu(m => (m === name ? null : name));
+    };
     const isLine = LINE_TOOLS.some(x => x.tool === tool);
     const isText = TEXT_TOOLS.some(x => x.tool === tool);
     const isShape = SHAPE_TOOLS.some(x => x.tool === tool);
@@ -721,10 +733,11 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
             {tool !== 'cursor' && <div className='fx-hint'>{HINTS[tool]} · Esc to cancel</div>}
 
             <div className='fx-bar' onPointerDown={e => e.stopPropagation()}>
+                {extra}
                 <button
                     type='button'
                     className={`fx-btn${tool === 'cursor' ? ' is-on' : ''}`}
-                    title='Cursor'
+                    data-tip='Cursor' aria-label='Cursor'
                     onClick={() => {
                         setTool('cursor');
                         setDraft(null);
@@ -735,7 +748,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </button>
 
                 <div className='fx-group'>
-                    <button type='button' className={`fx-btn${isLine ? ' is-on' : ''}`} title='Lines' onClick={() => toggle('lines')}>
+                    <button type='button' className={`fx-btn${isLine ? ' is-on' : ''}`} data-tip='Lines' aria-label='Lines' onClick={() => toggle('lines')}>
                         {ICONS[lastLine]}
                     </button>
                     {menu === 'lines' && (
@@ -752,7 +765,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </div>
 
                 <div className='fx-group'>
-                    <button type='button' className={`fx-btn${isShape ? ' is-on' : ''}`} title='Shapes & measuring' onClick={() => toggle('shapes')}>
+                    <button type='button' className={`fx-btn${isShape ? ' is-on' : ''}`} data-tip='Shapes & measuring' aria-label='Shapes & measuring' onClick={() => toggle('shapes')}>
                         {ICONS[lastShape]}
                     </button>
                     {menu === 'shapes' && (
@@ -769,7 +782,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </div>
 
                 <div className='fx-group'>
-                    <button type='button' className={`fx-btn${isText ? ' is-on' : ''}`} title='Text & notes' onClick={() => toggle('text')}>
+                    <button type='button' className={`fx-btn${isText ? ' is-on' : ''}`} data-tip='Text & notes' aria-label='Text & notes' onClick={() => toggle('text')}>
                         {ICONS[lastText]}
                     </button>
                     {menu === 'text' && (
@@ -786,7 +799,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </div>
 
                 <div className='fx-group'>
-                    <button type='button' className={`fx-btn${magnet !== 'off' ? ' is-on' : ''}`} title='Magnet' onClick={() => toggle('magnet')}>
+                    <button type='button' className={`fx-btn${magnet !== 'off' ? ' is-on' : ''}`} data-tip='Magnet' aria-label='Magnet' onClick={() => toggle('magnet')}>
                         {ICONS.magnet}
                     </button>
                     {menu === 'magnet' && (
@@ -809,7 +822,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                     )}
                 </div>
 
-                <label className='fx-btn fx-color' title='Colour (also recolours the selected drawing)'>
+                <label className='fx-btn fx-color' data-tip='Colour (also recolours the selected drawing)' aria-label='Colour (also recolours the selected drawing)'>
                     <input
                         type='color'
                         value={color}
@@ -822,7 +835,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </label>
 
                 <div className='fx-group'>
-                    <button type='button' className='fx-btn' title='Remove' onClick={() => toggle('trash')}>
+                    <button type='button' className='fx-btn' data-tip='Remove' aria-label='Remove' onClick={() => toggle('trash')}>
                         {ICONS.trash}
                     </button>
                     {menu === 'trash' && (
