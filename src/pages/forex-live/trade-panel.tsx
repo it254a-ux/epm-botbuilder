@@ -102,13 +102,21 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         // plan only fills a box you left empty, and only when you switched that option on (it is off by default).
         const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, Number(prefs.stake), prefs.multiplier) : null;
         const own = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
+        const stake = Number(prefs.stake);
+        let stopLoss = own(prefs.stopLoss) ?? (fromPlan && fromPlan.stopLoss > 0 ? fromPlan.stopLoss : null);
+        // A stop loss at or above the stake can never trigger (a multiplier cannot lose more than its stake), and a
+        // missing stop loss is allowed anyway: so the trade goes ahead without it instead of being refused.
+        if (stopLoss !== null && stopLoss >= stake) {
+            setStakeNote(`Stop loss ignored: ${stopLoss} is not below your stake of ${stake}. The trade was sent without a stop loss.`);
+            stopLoss = null;
+        }
         const trade: TradeInput = {
             side,
             symbol,
             currency,
-            stake: Number(prefs.stake),
+            stake,
             multiplier: prefs.multiplier,
-            stopLoss: own(prefs.stopLoss) ?? (fromPlan && fromPlan.stopLoss > 0 ? fromPlan.stopLoss : null),
+            stopLoss,
             takeProfit: own(prefs.takeProfit) ?? (fromPlan && fromPlan.takeProfit > 0 ? fromPlan.takeProfit : null),
         };
         // every click is sent straight away; "trades per click" opens several at the same moment
@@ -214,7 +222,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             )}
 
             {stakeNote && (
-                <p className={stakeNote.startsWith('Stake set to') ? 'forex-live__note' : 'forex-live__warn'} role='alert'>
+                <p className={/^(Stake set to|Stop loss ignored)/.test(stakeNote) ? 'forex-live__note' : 'forex-live__warn'} role='alert'>
                     {stakeNote}
                 </p>
             )}

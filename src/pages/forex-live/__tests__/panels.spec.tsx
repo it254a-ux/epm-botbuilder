@@ -57,6 +57,21 @@ describe('TradePanel', () => {
         expect(onTrade.mock.calls[0][0]).toHaveLength(5);
     });
 
+    it('a stop loss that is not below the stake never blocks the trade: it is sent without one, with a note', () => {
+        const onTrade = setup();
+        fireEvent.change(screen.getByLabelText(/^Stop loss/), { target: { value: '5' } });
+        fireEvent.click(screen.getByRole('button', { name: /^BUY/ }));
+        expect(onTrade).toHaveBeenCalledTimes(1);
+        expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stopLoss).toBeNull();
+        expect(screen.getByRole('alert').textContent).toMatch(/Stop loss ignored/);
+    });
+
+    it('an empty stop loss box sends no stop loss at all', () => {
+        const onTrade = setup();
+        fireEvent.click(screen.getByRole('button', { name: /^SELL/ }));
+        expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stopLoss).toBeNull();
+    });
+
     it('passes stake, stop loss and take profit through', () => {
         const onTrade = setup();
         fireEvent.change(screen.getByLabelText(/^Stake/), { target: { value: '25' } });
