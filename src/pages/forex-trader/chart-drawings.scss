@@ -16,12 +16,16 @@
         cursor: crosshair;
     }
 
+    // The layer itself lets the chart be dragged and zoomed, but a drawing (and its handles) must still be
+    // reachable to select and move it: pointer-events is inherited, so they have to switch it back on.
     .fx-shape {
         cursor: move;
+        pointer-events: auto;
     }
 
     .fx-handle {
         cursor: grab;
+        pointer-events: auto;
     }
 }
 

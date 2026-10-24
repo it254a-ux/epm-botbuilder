@@ -11,7 +11,7 @@ import './chart-drawings.scss';
  * { x: candle index, y: price }, so drawings follow the chart when it is zoomed or scrolled.
  */
 
-export type Tool = 'cursor' | 'trend' | 'ray' | 'extended' | 'hline' | 'hray' | 'vline' | 'cross' | 'text' | 'callout' | 'pricelabel';
+export type Tool = 'cursor' | 'trend' | 'ray' | 'extended' | 'hline' | 'hray' | 'vline' | 'cross' | 'text' | 'callout' | 'pricelabel' | 'rect' | 'fib' | 'measure';
 type DrawTool = Exclude<Tool, 'cursor'>;
 type Magnet = 'off' | 'weak' | 'strong';
 
@@ -43,6 +43,9 @@ const NEEDS: Record<DrawTool, number> = {
     text: 1,
     callout: 2,
     pricelabel: 1,
+    rect: 2,
+    fib: 2,
+    measure: 2,
 };
 
 const HINTS: Record<DrawTool, string> = {
@@ -56,6 +59,9 @@ const HINTS: Record<DrawTool, string> = {
     text: 'Click where the text should go',
     callout: 'Click the point to mark, then where the box should sit',
     pricelabel: 'Click the price to label',
+    rect: 'Click one corner, then the opposite corner',
+    fib: 'Click the start of the move, then its end',
+    measure: 'Click the start, then the end to measure price, percent and candles',
 };
 
 const LINE_TOOLS: Array<{ tool: DrawTool; label: string }> = [
@@ -72,6 +78,31 @@ const TEXT_TOOLS: Array<{ tool: DrawTool; label: string }> = [
     { tool: 'callout', label: 'Callout' },
     { tool: 'pricelabel', label: 'Price Label' },
 ];
+
+const SHAPE_TOOLS: Array<{ tool: DrawTool; label: string }> = [
+    { tool: 'rect', label: 'Rectangle' },
+    { tool: 'fib', label: 'Fib Retracement' },
+    { tool: 'measure', label: 'Measure' },
+];
+
+/** The Fibonacci levels drawn, with the colour of each line. */
+const FIB_LEVELS: Array<{ at: number; color: string }> = [
+    { at: 0, color: '#94a3b8' },
+    { at: 0.236, color: '#f87171' },
+    { at: 0.382, color: '#fb923c' },
+    { at: 0.5, color: '#4ade80' },
+    { at: 0.618, color: '#2dd4bf' },
+    { at: 0.786, color: '#60a5fa' },
+    { at: 1, color: '#94a3b8' },
+];
+
+/** '#rrggbb' as an rgba() string with the given opacity. */
+const tint = (hex: string, alpha: number) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return `rgba(250,204,21,${alpha})`;
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+};
 
 const SNAP_PX = 14; // weak magnet: how close (in pixels) to a candle's O/H/L/C it must be
 const HIDDEN = 'rgba(0,0,0,0)';
@@ -165,6 +196,22 @@ const ICONS: Record<Tool | 'magnet' | 'trash', ReactNode> = {
             <path d='M3 12l5-5h13v10H8z' />
         </Svg>
     ),
+    rect: (
+        <Svg>
+            <rect x='4' y='6' width='16' height='12' rx='1' />
+        </Svg>
+    ),
+    fib: (
+        <Svg>
+            <path d='M3 5h18M3 10h18M3 14h18M3 19h18' />
+            <path d='M6 19L18 5' strokeDasharray='2 2' />
+        </Svg>
+    ),
+    measure: (
+        <Svg>
+            <path d='M4 17L20 7M4 17v-4M4 17h4M20 7v4M20 7h-4' />
+        </Svg>
+    ),
     magnet: (
         <Svg>
             <path d='M6 3v8a6 6 0 0012 0V3h-4v8a2 2 0 01-4 0V3z' />
@@ -194,6 +241,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const [tool, setTool] = useState<Tool>('cursor');
     const [lastLine, setLastLine] = useState<DrawTool>('trend');
     const [lastText, setLastText] = useState<DrawTool>('text');
+    const [lastShape, setLastShape] = useState<DrawTool>('rect');
     const [magnet, setMagnet] = useState<Magnet>('off');
     const [color, setColor] = useState('#facc15');
     const [selected, setSelected] = useState<number | null>(null);
@@ -536,6 +584,76 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 );
                 break;
             }
+            case 'rect': {
+                const x = Math.min(P[0].x, P[1].x);
+                const y = Math.min(P[0].y, P[1].y);
+                body = (
+                    <rect
+                        x={x}
+                        y={y}
+                        width={Math.abs(P[1].x - P[0].x)}
+                        height={Math.abs(P[1].y - P[0].y)}
+                        fill={tint(stroke, 0.16)}
+                        stroke={stroke}
+                        strokeWidth={sel ? 2.5 : 1.5}
+                        strokeDasharray={preview ? '5 4' : undefined}
+                    />
+                );
+                break;
+            }
+            case 'fib': {
+                const [a, b] = d.pts;
+                const left = Math.max(0, Math.min(P[0].x, P[1].x));
+                const at = (level: number): number | null => {
+                    const yy = series.priceToCoordinate(b.y + (a.y - b.y) * level);
+                    return yy === null ? null : (yy as number);
+                };
+                const rows = FIB_LEVELS.map(l => ({ ...l, y: at(l.at) })).filter((l): l is { at: number; color: string; y: number } => l.y !== null);
+                body = (
+                    <g>
+                        {rows.slice(1).map((r, i) => (
+                            <rect key={`band${i}`} x={left} y={Math.min(r.y, rows[i].y)} width={Math.max(0, plotW - left)} height={Math.abs(r.y - rows[i].y)} fill={tint(r.color, 0.07)} pointerEvents='none' />
+                        ))}
+                        {rows.map(r => (
+                            <g key={`lv${r.at}`}>
+                                <line x1={left} y1={r.y} x2={plotW} y2={r.y} stroke={r.color} strokeWidth={sel ? 2 : 1.3} />
+                                <line x1={left} y1={r.y} x2={plotW} y2={r.y} stroke={HIDDEN} strokeWidth={10} />
+                                <text x={left + 4} y={r.y - 3} fontSize={11} fill={r.color} stroke='rgba(0,0,0,0.55)' strokeWidth={3} paintOrder='stroke'>
+                                    {`${r.at} (${(b.y + (a.y - b.y) * r.at).toFixed(pipSize)})`}
+                                </text>
+                            </g>
+                        ))}
+                        <line x1={P[0].x} y1={P[0].y} x2={P[1].x} y2={P[1].y} stroke={stroke} strokeWidth={1.2} strokeDasharray='4 4' />
+                    </g>
+                );
+                break;
+            }
+            case 'measure': {
+                const [a, b] = d.pts;
+                const up = b.y >= a.y;
+                const col = up ? '#22c55e' : '#ef4444';
+                const diff = b.y - a.y;
+                const pct = a.y !== 0 ? (diff / a.y) * 100 : 0;
+                const bars = Math.round(Math.abs(b.x - a.x));
+                const label = `${diff >= 0 ? '+' : ''}${diff.toFixed(pipSize)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) · ${bars} candle${bars === 1 ? '' : 's'}`;
+                const x = Math.min(P[0].x, P[1].x);
+                const y = Math.min(P[0].y, P[1].y);
+                const tw = label.length * 6.6 + 16;
+                const cx = (P[0].x + P[1].x) / 2;
+                const ty = up ? y - 8 : y + Math.abs(P[1].y - P[0].y) + 22;
+                body = (
+                    <g>
+                        <rect x={x} y={y} width={Math.abs(P[1].x - P[0].x)} height={Math.abs(P[1].y - P[0].y)} fill={tint(col, 0.14)} stroke={col} strokeWidth={sel ? 2 : 1} strokeDasharray='4 3' pointerEvents='none' />
+                        <line x1={P[0].x} y1={P[0].y} x2={P[1].x} y2={P[1].y} stroke={col} strokeWidth={1.5} />
+                        <line x1={P[0].x} y1={P[0].y} x2={P[1].x} y2={P[1].y} stroke={HIDDEN} strokeWidth={14} />
+                        <rect x={cx - tw / 2} y={ty - 15} width={tw} height={20} rx={4} fill={col} />
+                        <text x={cx} y={ty - 1} fontSize={11} fontWeight={600} textAnchor='middle' fill='#fff'>
+                            {label}
+                        </text>
+                    </g>
+                );
+                break;
+            }
         }
 
         return (
@@ -565,8 +683,9 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     };
 
     // ---- toolbar ------------------------------------------------------------------------------
-    const pick = (t: DrawTool, group: 'lines' | 'text') => {
+    const pick = (t: DrawTool, group: 'lines' | 'text' | 'shapes') => {
         if (group === 'lines') setLastLine(t);
+        else if (group === 'shapes') setLastShape(t);
         else setLastText(t);
         setTool(t);
         setDraft(null);
@@ -576,6 +695,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const toggle = (name: string) => setMenu(m => (m === name ? null : name));
     const isLine = LINE_TOOLS.some(x => x.tool === tool);
     const isText = TEXT_TOOLS.some(x => x.tool === tool);
+    const isShape = SHAPE_TOOLS.some(x => x.tool === tool);
 
     return (
         <>
@@ -623,6 +743,23 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                             <div className='fx-menu__title'>Lines</div>
                             {LINE_TOOLS.map(x => (
                                 <button key={x.tool} type='button' className={`fx-item${tool === x.tool ? ' is-on' : ''}`} onClick={() => pick(x.tool, 'lines')}>
+                                    {ICONS[x.tool]}
+                                    <span>{x.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className='fx-group'>
+                    <button type='button' className={`fx-btn${isShape ? ' is-on' : ''}`} title='Shapes & measuring' onClick={() => toggle('shapes')}>
+                        {ICONS[lastShape]}
+                    </button>
+                    {menu === 'shapes' && (
+                        <div className='fx-menu'>
+                            <div className='fx-menu__title'>Shapes &amp; measuring</div>
+                            {SHAPE_TOOLS.map(x => (
+                                <button key={x.tool} type='button' className={`fx-item${tool === x.tool ? ' is-on' : ''}`} onClick={() => pick(x.tool, 'shapes')}>
                                     {ICONS[x.tool]}
                                     <span>{x.label}</span>
                                 </button>
