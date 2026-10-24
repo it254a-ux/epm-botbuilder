@@ -2,6 +2,7 @@ const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent } = require('./_lib/events');
+const { getFlag, setFlag } = require('./_lib/app-flags');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -20,8 +21,8 @@ const audit = (sql, adminId, action, target, detail) =>
 //   2. needs a valid session whose account has role 'admin' (created only by scripts/create-admin.js)
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
-//   GET  /api/admin?resource=sites | owners | audit
-//   POST /api/admin  { action: set_status | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   GET  /api/admin?resource=sites | owners | audit | flags
+//   POST /api/admin  { action: set_status | set_flag | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -51,6 +52,9 @@ module.exports = async function handler(req, res) {
                 const rows = await sql`SELECT id, owner_id, action, target, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 200`;
                 return send(res, 200, { audit: rows });
             }
+            if (resource === 'flags') {
+                return send(res, 200, { forced_real: await getFlag(sql, 'forced_real') });
+            }
             return send(res, 400, { error: 'Unknown resource' });
         }
 
@@ -63,6 +67,12 @@ module.exports = async function handler(req, res) {
             (await sql`SELECT id, domain, plan, status, custom_domain_requested, commission_rate_override FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
 
         switch (body.action) {
+            case 'set_flag': {
+                if (body.key !== 'forced_real' || typeof body.on !== 'boolean') return send(res, 400, { error: 'Bad request' });
+                await setFlag(sql, body.key, body.on);
+                await audit(sql, me.id, 'set_flag', body.key, { on: body.on });
+                return send(res, 200, { ok: true, on: body.on });
+            }
             case 'set_status': {
                 if (!STATUSES.includes(body.status)) return send(res, 400, { error: 'Invalid status.' });
                 const r = await sql`UPDATE sites SET status = ${body.status}, updated_at = now() WHERE id = ${siteId} RETURNING id`;

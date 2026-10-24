@@ -1,4 +1,5 @@
 const { getDb } = require('./_lib/db');
+const { getFlag } = require('./_lib/app-flags');
 const { normalizeHost, parsePlatformHosts, decide, isLocalHost } = require('./_lib/site-settings');
 
 // GET /api/site-settings
@@ -16,6 +17,19 @@ const { normalizeHost, parsePlatformHosts, decide, isLocalHost } = require('./_l
 module.exports = async function handler(req, res) {
     if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+
+    // GET /api/site-settings?flag=forced_real -> { on: true|false }: an admin switch (see the Admin page).
+    // If the database cannot be reached the switch keeps its normal value, so the site looks the same as always.
+    if (req.query && req.query.flag === 'forced_real') {
+        res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+        try {
+            res.status(200).json({ on: await getFlag(getDb(), 'forced_real') });
+        } catch (err) {
+            res.setHeader('Cache-Control', 'no-store');
+            res.status(200).json({ on: true });
+        }
         return;
     }
 

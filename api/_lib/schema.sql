@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS forex_ai_usage (
 CREATE INDEX IF NOT EXISTS forex_ai_usage_time_idx ON forex_ai_usage (created_at);
 CREATE INDEX IF NOT EXISTS forex_ai_usage_visitor_idx ON forex_ai_usage (visitor, created_at);
 
+-- Admin on/off switches (created automatically by api/_lib/app-flags.js the first time they are needed).
+CREATE TABLE IF NOT EXISTS app_flags (
+    key        TEXT PRIMARY KEY,
+    on_state   BOOLEAN NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ===== Signal machine (Telegram + website feed) =====
 -- These are created automatically by the app the first time they are needed, so running this
 -- by hand is optional. Safe to re-run.

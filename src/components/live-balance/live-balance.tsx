@@ -1,6 +1,7 @@
 import { observer } from 'mobx-react-lite';
 import { useStore } from '@/hooks/useStore';
 import { CurrencyIcon } from '@/components/currency/currency-icon';
+import { useForcedRealEnabled } from '@/utils/forced-real-flag';
 import './live-balance.scss';
 /**
  * Login IDs that should always display as "Real account" regardless of the
@@ -18,9 +19,10 @@ const formatBalance = (balance: string) => {
 };
 const LiveBalance = observer(() => {
     const { client } = useStore();
+    const forcedRealOn = useForcedRealEnabled();
     const { balance, currency, is_logged_in, is_virtual, loginid } = client;
     if (!is_logged_in) return null;
-    const forceRealLabel = !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
+    const forceRealLabel = forcedRealOn && !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
     const displayAsVirtual = is_virtual && !forceRealLabel;
     return (
         <div

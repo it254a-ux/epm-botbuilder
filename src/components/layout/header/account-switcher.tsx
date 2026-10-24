@@ -8,6 +8,7 @@ import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { isDemoAccount } from '@/utils/account-helpers';
+import { useForcedRealEnabled } from '@/utils/forced-real-flag';
 import { Localize } from '@deriv-com/translations';
 import { TAccountSwitcher } from './common/types';
 import AccountInfoWrapper from './account-info-wrapper';
@@ -26,9 +27,12 @@ import './account-switcher.scss';
  */
 const FORCED_REAL_LABEL_LOGIN_IDS = ['DOT94283012'];
 
-const isForcedReal = (loginid: string | undefined) => !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
+const isForcedRealId = (loginid: string | undefined) => !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
 
 const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
+    // the Admin page can switch the forced "Real account" label off
+    const forcedRealOn = useForcedRealEnabled();
+    const isForcedReal = (loginid: string | undefined) => forcedRealOn && isForcedRealId(loginid);
     const [isOpen, setIsOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<'real' | 'demo'>('real');
     const [isResetting, setIsResetting] = useState(false);
@@ -106,7 +110,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                 return accountDisplayAsVirtual === (activeCategory === 'demo');
             })
             .sort((a, b) => (a.loginid === activeLoginid ? -1 : b.loginid === activeLoginid ? 1 : 0));
-    }, [accountList, activeCategory, activeLoginid]);
+    }, [accountList, activeCategory, activeLoginid, forcedRealOn]);
 
     // All hooks above run on every render regardless of activeAccount, per
     // the Rules of Hooks — only now, after every hook has been called, is it

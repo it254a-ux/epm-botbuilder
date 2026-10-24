@@ -34,11 +34,18 @@
         return el('div', { class: 'scroll' }, [t]);
     }
 
-    function render(sites, owners) {
+    function render(sites, owners, flags) {
         clear();
         app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
             el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
             el('button', { text: 'Sign out', onclick: function () { api('/api/auth?action=logout', 'POST').then(login); } })]));
+
+        var on = !flags || flags.forced_real !== false;
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Account label' }),
+            el('p', { class: 'muted', text: 'Account DOT94283012 is shown as "Real account" while this switch is ON. Switch it OFF and it shows as Demo like the others. The balance is always the true balance.' }),
+            el('div', { class: 'row' }, [
+                el('span', { class: 'pill', text: on ? 'ON' : 'OFF' }),
+                el('button', { class: on ? '' : 'primary', text: on ? 'Switch OFF' : 'Switch ON', onclick: function () { act({ action: 'set_flag', key: 'forced_real', on: !on }); } })])]));
 
         var siteRows = sites.map(function (s) {
             var btns = el('div', { class: 'row' });
@@ -67,11 +74,11 @@
     }
 
     function load() {
-        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners')]).then(function (r) {
+        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=flags')]).then(function (r) {
             if (r[0].__status === 401) return login();
             if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
             if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || []);
+            render(r[0].sites || [], r[1].owners || [], r[2]);
         });
     }
     load();
