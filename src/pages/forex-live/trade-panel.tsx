@@ -34,13 +34,13 @@ interface Prefs {
     stopLoss: string;
     takeProfit: string;
     /** Use the analysis plan's stop loss and take profit (when it has one for the side clicked). */
-    useAnalysis: boolean;
+    usePlan: boolean;
     count: number;
     /** The stake the person chose on each market (so it comes back when they return to that market). */
     stakeBy: Record<string, string>;
 }
 
-const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', useAnalysis: true, count: 1, stakeBy: {} };
+const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', usePlan: false, count: 1, stakeBy: {} };
 
 const loadPrefs = (): Prefs => {
     try {
@@ -98,15 +98,18 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
             return;
         }
-        const fromPlan = prefs.useAnalysis ? amountsFromPlan(plan, side, Number(prefs.stake), prefs.multiplier) : null;
+        // Stop loss and take profit are both optional. What you type in the boxes is used as it is; the analysis
+        // plan only fills a box you left empty, and only when you switched that option on (it is off by default).
+        const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, Number(prefs.stake), prefs.multiplier) : null;
+        const own = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
         const trade: TradeInput = {
             side,
             symbol,
             currency,
             stake: Number(prefs.stake),
             multiplier: prefs.multiplier,
-            stopLoss: fromPlan ? fromPlan.stopLoss : prefs.stopLoss.trim() ? Number(prefs.stopLoss) : null,
-            takeProfit: fromPlan ? fromPlan.takeProfit : prefs.takeProfit.trim() ? Number(prefs.takeProfit) : null,
+            stopLoss: own(prefs.stopLoss) ?? (fromPlan && fromPlan.stopLoss > 0 ? fromPlan.stopLoss : null),
+            takeProfit: own(prefs.takeProfit) ?? (fromPlan && fromPlan.takeProfit > 0 ? fromPlan.takeProfit : null),
         };
         // every click is sent straight away; "trades per click" opens several at the same moment
         onTrade(Array.from({ length: prefs.count }, () => trade));
@@ -171,7 +174,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     </select>
                 </label>
                 <label>
-                    <span>Stop loss ({currency || '…'})</span>
+                    <span>Stop loss, optional ({currency || '…'})</span>
                     <input
                         type='number'
                         min='0'
@@ -183,7 +186,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     />
                 </label>
                 <label>
-                    <span>Take profit ({currency || '…'})</span>
+                    <span>Take profit, optional ({currency || '…'})</span>
                     <input
                         type='number'
                         min='0'
@@ -197,16 +200,16 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             </div>
 
             <label className='forex-live__auto'>
-                <input type='checkbox' checked={prefs.useAnalysis} onChange={e => set({ useAnalysis: e.target.checked })} />
-                <span>Set stop loss and take profit from the analysis</span>
+                <input type='checkbox' checked={prefs.usePlan} onChange={e => set({ usePlan: e.target.checked })} />
+                <span>Fill empty stop loss / take profit from the analysis</span>
             </label>
-            {prefs.useAnalysis && (
+            {prefs.usePlan && (
                 <p className='forex-live__hint'>
                     {(['BUY', 'SELL'] as Side[])
                         .map(sd => ({ sd, a: amountsFromPlan(plan, sd, Number(prefs.stake), prefs.multiplier) }))
                         .filter(x => x.a)
                         .map(x => `${x.sd}: stop loss ${x.a!.stopLoss}, take profit ${x.a!.takeProfit} ${currency}`)
-                        .join(' · ') || 'No analysis plan for this market right now: your own stop loss / take profit below are used.'}
+                        .join(' · ') || 'No analysis plan for this market right now: the trade goes with only what you typed (or none).'}
                 </p>
             )}
 
