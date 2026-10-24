@@ -828,9 +828,6 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         {mtf.signal === 'WAIT' ? 'WAIT / NO SIGNAL' : `${mtf.signal} signal`}
                     </div>
                 )}
-                {mode === 'h1' && status && (
-                    <div className={`forex-trader__badge forex-trader__badge--${tone}`}>{outcome && statusLabel(status, outcome.analysis)}</div>
-                )}
             </div>
 
             {renderResult(
