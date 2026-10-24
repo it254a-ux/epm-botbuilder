@@ -304,7 +304,7 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
                 </button>
             </div>
             <div className='fl-compare__chart'>
-                <ChartView ref={chartRef} pipSize={pip} />
+                <ChartView ref={chartRef} pipSize={pip} studies={false} />
                 {loading && !error && <div className='fl-compare__note'>Loading chart…</div>}
                 {error && <div className='fl-compare__note fl-compare__note--error'>{error}</div>}
             </div>

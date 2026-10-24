@@ -14,6 +14,8 @@ import {
 import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
+import ChartStudies from './chart-studies';
+import { bollinger, ema, heikinAshi, loadStudies, macd, rsi, saveStudies, sma, type Series, type StudyState } from './indicators';
 import type { PdhResult } from './pdh';
 
 export interface ChartViewHandle {
@@ -35,6 +37,8 @@ export interface ChartViewHandle {
 
 interface Props {
     pipSize: number;
+    /** Show the chart style and indicators buttons (on by default; the small compare charts switch them off). */
+    studies?: boolean;
 }
 
 const COLORS = {
@@ -109,7 +113,27 @@ const toBar = (c: Candle): CandlestickData => ({
     close: c.close,
 });
 
-const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSize }, ref) {
+/** Points for a line series: one per candle that has a value. */
+const toLine = (candles: Candle[], values: Series): LineData[] => {
+    const out: LineData[] = [];
+    candles.forEach((c, i) => {
+        const v = values[i];
+        if (v !== null && Number.isFinite(v)) out.push({ time: c.time as UTCTimestamp, value: v });
+    });
+    return out;
+};
+
+const UP = '#22c55e';
+const DOWN = '#ef4444';
+const CLEAR = 'rgba(0,0,0,0)';
+
+/** A series on the chart that is worked out from the candles (an indicator, or the line / area / bars style). */
+interface Derived {
+    series: ISeriesApi<SeriesType>;
+    compute: (candles: Candle[]) => unknown[];
+}
+
+const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSize, studies: showStudies = true }, ref) {
     const hostRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -122,6 +146,12 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const candlesRef = useRef<Candle[]>([]);
     const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null);
     const [resetKey, setResetKey] = useState(0);
+    // chart style + indicators the person switched on (remembered in the browser, shared by every chart)
+    const [studies, setStudies] = useState<StudyState>(loadStudies);
+    const studiesRef = useRef(studies);
+    studiesRef.current = studies;
+    const derivedRef = useRef<Derived[]>([]);
+    const refreshTimer = useRef<number>(0);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -187,8 +217,121 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             linesRef.current = [];
             extraRef.current = [];
             parentLinesRef.current = [];
+            derivedRef.current = [];
+            window.clearTimeout(refreshTimer.current);
+            refreshTimer.current = 0;
         };
     }, []);
+
+    /** Fill every derived series from the candles as they are now. */
+    const refreshDerived = () => {
+        const candles = candlesRef.current;
+        // indicators first, then the candle series itself (its own data may be the Heikin Ashi list)
+        const mine = derivedRef.current.filter(d => d.series !== (seriesRef.current as ISeriesApi<SeriesType>));
+        const main = derivedRef.current.filter(d => d.series === (seriesRef.current as ISeriesApi<SeriesType>));
+        [...mine, ...main].forEach(d => d.series.setData(d.compute(candles) as never));
+    };
+    /** Live ticks arrive many times a second: redo the indicators at most a few times a second. */
+    const refreshSoon = () => {
+        if (!derivedRef.current.length || refreshTimer.current) return;
+        refreshTimer.current = window.setTimeout(() => {
+            refreshTimer.current = 0;
+            refreshDerived();
+        }, 300);
+    };
+
+    /** Rebuild the chart style and the indicators for the current choices. */
+    const buildStudies = () => {
+        const chart = chartRef.current;
+        const series = seriesRef.current;
+        if (!chart || !series) return;
+        derivedRef.current.forEach(d => {
+            // the candle series itself (Heikin Ashi data) is never removed
+            if (d.series !== (series as ISeriesApi<SeriesType>)) chart.removeSeries(d.series);
+        });
+        derivedRef.current = [];
+        const st = studiesRef.current;
+        const list: Derived[] = [];
+        const add = (s: ISeriesApi<SeriesType>, compute: Derived['compute']) => list.push({ series: s, compute });
+        const quiet = { lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false } as const;
+
+        // candle style: the candle series always stays (drawings, markers and trade lines are attached to it)
+        const candleColors =
+            st.kind === 'hollow'
+                ? { upColor: CLEAR, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN }
+                : st.kind === 'candles' || st.kind === 'heikin'
+                  ? { upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN }
+                  : { upColor: CLEAR, downColor: CLEAR, borderUpColor: CLEAR, borderDownColor: CLEAR, wickUpColor: CLEAR, wickDownColor: CLEAR };
+        series.applyOptions(candleColors);
+        if (st.kind === 'heikin') add(series as ISeriesApi<SeriesType>, c => heikinAshi(c).map(toBar));
+        if (st.kind === 'line') add(chart.addLineSeries({ color: '#38bdf8', lineWidth: 2, ...quiet }), c => toLine(c, c.map(x => x.close)));
+        if (st.kind === 'area')
+            add(
+                chart.addAreaSeries({ lineColor: '#38bdf8', topColor: 'rgba(56,189,248,0.35)', bottomColor: 'rgba(56,189,248,0.02)', lineWidth: 2, ...quiet }),
+                c => toLine(c, c.map(x => x.close))
+            );
+        if (st.kind === 'bars') add(chart.addBarSeries({ upColor: UP, downColor: DOWN }), c => c.map(toBar));
+
+        // indicators drawn on the price
+        const onPrice = (color: string, compute: (c: Candle[]) => Series, width: 1 | 2 = 1, dashed = false) =>
+            add(chart.addLineSeries({ color, lineWidth: width, lineStyle: dashed ? 2 : 0, ...quiet }), c => toLine(c, compute(c)));
+        if (st.on.ma20) onPrice('#f59e0b', c => sma(c, 20), 2);
+        if (st.on.ema50) onPrice('#38bdf8', c => ema(c, 50), 2);
+        if (st.on.ema200) onPrice('#a78bfa', c => ema(c, 200), 2);
+        if (st.on.boll) {
+            onPrice('#94a3b8', c => bollinger(c).upper);
+            onPrice('#94a3b8', c => bollinger(c).lower);
+            onPrice('#64748b', c => bollinger(c).mid, 1, true);
+        }
+
+        // indicators with their own strip under the price: the price area gives them room
+        const subs = (['rsi', 'macd'] as const).filter(k => st.on[k]);
+        const strip = 0.22;
+        series.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: subs.length ? 0.1 + (strip + 0.02) * subs.length : 0.1 } });
+        subs.forEach((kind, i) => {
+            const left = subs.length - i;
+            const margins = { top: 1 - strip * left, bottom: strip * (left - 1) };
+            if (kind === 'rsi') {
+                const line = chart.addLineSeries({
+                    color: '#c084fc',
+                    lineWidth: 1,
+                    priceScaleId: 'rsi',
+                    lastValueVisible: true,
+                    priceLineVisible: false,
+                    crosshairMarkerVisible: false,
+                    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+                });
+                [70, 30].forEach(level => line.createPriceLine({ price: level, color: '#64748b', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' }));
+                chart.priceScale('rsi').applyOptions({ scaleMargins: margins, borderVisible: false });
+                add(line, c => toLine(c, rsi(c)));
+            } else {
+                const hist = chart.addHistogramSeries({ priceScaleId: 'macd', lastValueVisible: false, priceLineVisible: false });
+                const fast = chart.addLineSeries({ color: '#38bdf8', lineWidth: 1, priceScaleId: 'macd', ...quiet });
+                const slow = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1, priceScaleId: 'macd', ...quiet });
+                chart.priceScale('macd').applyOptions({ scaleMargins: margins, borderVisible: false });
+                add(hist, c =>
+                    toLine(c, macd(c).hist).map(p => ({ ...p, color: p.value >= 0 ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)' }))
+                );
+                add(fast, c => toLine(c, macd(c).line));
+                add(slow, c => toLine(c, macd(c).signal));
+            }
+        });
+        derivedRef.current = list;
+        // the candle series must go back to the plain candles when the style is left
+        if (st.kind !== 'heikin') series.setData(candlesRef.current.map(toBar));
+        refreshDerived();
+    };
+
+    // run when the person changes the style or the indicators (and once the chart exists)
+    useEffect(() => {
+        if (!apis) return;
+        saveStudies(studies);
+        const ts = chartRef.current?.timeScale();
+        const range = ts?.getVisibleLogicalRange() ?? null;
+        buildStudies();
+        if (ts && range) ts.setVisibleLogicalRange(range);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studies, apis]);
 
     useEffect(() => {
         const minMove = Math.pow(10, -pipSize);
@@ -213,6 +356,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             candlesRef.current = candles.slice();
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
+            refreshDerived();
             chartRef.current?.timeScale().fitContent();
         },
         mergeCandles(candles) {
@@ -225,6 +369,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             const ts = chartRef.current?.timeScale();
             const range = ts?.getVisibleLogicalRange() ?? null;
             seriesRef.current?.setData(merged.map(toBar));
+            refreshDerived();
             if (ts && range) ts.setVisibleLogicalRange(range);
         },
         drawLines(lines) {
@@ -242,7 +387,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             const last = list[list.length - 1];
             if (last && last.time === candle.time) list[list.length - 1] = candle;
             else if (!last || candle.time > last.time) list.push(candle);
-            seriesRef.current?.update(toBar(candle));
+            // Heikin Ashi is worked out from the whole list, so it is redone with the indicators
+            if (studiesRef.current.kind !== 'heikin') seriesRef.current?.update(toBar(candle));
+            refreshSoon();
         },
         drawPdh(result) {
             const series = seriesRef.current;
@@ -571,6 +718,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
+            {apis && showStudies && <ChartStudies state={studies} onChange={setStudies} />}
             {apis && (
                 <ChartDrawings chart={apis.chart} series={apis.series} getCandles={() => candlesRef.current} pipSize={pipSize} resetKey={resetKey} />
             )}
