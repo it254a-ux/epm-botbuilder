@@ -2,28 +2,56 @@
 // "Live": every button floats up and down and pulses a soft ring, in a loop that never ends and never resets
 // (alternate + infinite, with each button offset so they move like a wave and never blink out together).
 
+@use 'components/shared/styles/mixins' as *;
+
 .db-actions {
     --db-actions-size: 5.2rem;
+    // distance of each group's middle from the edge: the Dashboard has 216px of empty padding on each side, so 108px is its middle
+    --db-side-x: 108px;
 
-    display: flex;
-    flex-direction: column;
-    gap: 1.4rem;
-
-    // wide screens: a column in the empty space on the left of the Dashboard
-    @media (min-width: 1200px) {
+    // desktop: a full-size, click-through layer over the Dashboard content. Three buttons sit in the middle of the empty
+    // space on the left and three in the middle of the empty space on the right.
+    @include desktop-screen {
         position: absolute;
-        left: 2.4rem;
-        top: 50%;
-        transform: translateY(-50%);
+        inset: 0;
         z-index: 3;
+        pointer-events: none;
     }
 
-    // smaller screens: a centred row at the bottom of the page flow
-    @media (max-width: 1199px) {
-        flex-direction: row;
+    // tablets and phones: no empty side space, so one centred row in the page flow
+    @include mobile-or-tablet-screen {
+        display: flex;
         flex-wrap: wrap;
         justify-content: center;
+        gap: 1.4rem;
         margin: 2.4rem auto 1.6rem;
+    }
+
+    &__group {
+        display: flex;
+        flex-direction: column;
+        gap: 1.4rem;
+
+        @include desktop-screen {
+            position: absolute;
+            top: 50%;
+            pointer-events: auto;
+
+            &--left {
+                left: var(--db-side-x);
+                transform: translate(-50%, -50%);
+            }
+
+            &--right {
+                right: var(--db-side-x);
+                transform: translate(50%, -50%);
+            }
+        }
+
+        @include mobile-or-tablet-screen {
+            flex-direction: row;
+            gap: 1.4rem;
+        }
     }
 
     &__btn {

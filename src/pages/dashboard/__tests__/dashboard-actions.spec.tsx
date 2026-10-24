@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { PLATFORM_CONTACTS, setSiteSettings, socialHref, type TSite } from '@/utils/site-settings';
 import DashboardActions from '../dashboard-actions';
 
@@ -86,6 +86,41 @@ describe('DashboardActions', () => {
         const delays = screen.getAllByRole('link').map(a => (a as HTMLElement).style.animationDelay);
         expect(new Set(delays).size).toBe(6);
         expect(delays[0]).toBe('0s');
+    });
+});
+
+describe('left and right groups', () => {
+    afterEach(() => setSiteSettings({ kind: 'platform' }));
+
+    test('Contact (WhatsApp, Call, Text) on the left, Social media (TikTok, Instagram, Facebook) on the right', () => {
+        render(<DashboardActions />);
+        const left = screen.getByRole('navigation', { name: 'Contact' });
+        const right = screen.getByRole('navigation', { name: 'Social media' });
+        expect(left.className).toContain('db-actions__group--left');
+        expect(right.className).toContain('db-actions__group--right');
+        expect(within(left).getAllByRole('link').map(a => a.getAttribute('aria-label'))).toEqual(['WhatsApp', 'Call', 'Text message']);
+        expect(within(right).getAllByRole('link').map(a => a.getAttribute('aria-label'))).toEqual(['TikTok', 'Instagram', 'Facebook']);
+    });
+
+    test('a group with nothing to show is not drawn at all', () => {
+        setSiteSettings({ kind: 'site', site: site('custom', { whatsapp: '15551234567' }) });
+        render(<DashboardActions />);
+        expect(screen.getByRole('navigation', { name: 'Contact' })).toBeTruthy();
+        expect(screen.queryByRole('navigation', { name: 'Social media' })).toBeNull();
+    });
+});
+
+describe('placement', () => {
+    const css = fs.readFileSync(path.join(__dirname, '../dashboard-actions.scss'), 'utf8');
+
+    test('each group sits in the middle of the Dashboard\'s 216px side padding on desktop', () => {
+        expect(css).toMatch(/--db-side-x: 108px/);
+        expect(css).toMatch(/&--left {[^}]*left: var\(--db-side-x\)/);
+        expect(css).toMatch(/&--right {[^}]*right: var\(--db-side-x\)/);
+    });
+    test('they only appear inside the Dashboard content block (the component is rendered there)', () => {
+        const dashboard = fs.readFileSync(path.join(__dirname, '../dashboard.tsx'), 'utf8');
+        expect(dashboard).toMatch(/tab__dashboard__content'>\s*<DashboardActions \/>/);
     });
 });
 

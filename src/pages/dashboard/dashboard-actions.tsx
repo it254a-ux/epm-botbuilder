@@ -31,9 +31,10 @@ const ICONS = {
 };
 
 /**
- * Quick contact and social buttons for the Dashboard. They gently float and glow in a loop that never stops or resets
- * (the animation lives in dashboard-actions.scss and is switched off for people who asked their device for less motion).
- * Numbers and links come from the site settings, and a button with no valid link is simply not shown.
+ * Quick contact and social buttons for the Dashboard: WhatsApp, Call and Text in the empty space on the left, TikTok,
+ * Instagram and Facebook in the empty space on the right, each group in the middle of the page's own side padding. They gently float and glow
+ * in a loop that never stops or resets (see dashboard-actions.scss; switched off for people who asked their device for
+ * less motion). Numbers and links come from the site settings; a button with no valid link is simply not shown.
  */
 const DashboardActions = () => {
     const contacts = getSiteContacts();
@@ -46,24 +47,41 @@ const DashboardActions = () => {
         { key: 'instagram', label: 'Instagram', href: socialHref(socials.instagram), external: true, icon: ICONS.instagram },
         { key: 'facebook', label: 'Facebook', href: socialHref(socials.facebook), external: true, icon: ICONS.facebook },
     ].filter(a => a.href);
-    if (!actions.length) return null;
+
+    const shown = actions.length > 0;
+
+    if (!shown) return null;
+
+    const renderGroup = (side: 'left' | 'right', keys: string[]) => {
+        const group = actions.filter(a => keys.includes(a.key));
+        if (!group.length) return null;
+        return (
+            <nav className={`db-actions__group db-actions__group--${side}`} aria-label={side === 'left' ? 'Contact' : 'Social media'}>
+                {group.map(a => {
+                    const i = actions.indexOf(a);
+                    return (
+                        <a
+                            key={a.key}
+                            className={`db-actions__btn db-actions__btn--${a.key}`}
+                            style={{ animationDelay: `${i * 0.35}s`, ['--db-delay' as string]: `${i * 0.35}s` }}
+                            href={a.href}
+                            title={a.label}
+                            aria-label={a.label}
+                            {...(a.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                        >
+                            {a.icon}
+                        </a>
+                    );
+                })}
+            </nav>
+        );
+    };
 
     return (
-        <nav className='db-actions' aria-label='Contact and social links'>
-            {actions.map((a, i) => (
-                <a
-                    key={a.key}
-                    className={`db-actions__btn db-actions__btn--${a.key}`}
-                    style={{ animationDelay: `${i * 0.35}s`, ['--db-delay' as string]: `${i * 0.35}s` }}
-                    href={a.href}
-                    title={a.label}
-                    aria-label={a.label}
-                    {...(a.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                >
-                    {a.icon}
-                </a>
-            ))}
-        </nav>
+        <div className='db-actions'>
+            {renderGroup('left', ['whatsapp', 'call', 'text'])}
+            {renderGroup('right', ['tiktok', 'instagram', 'facebook'])}
+        </div>
     );
 };
 
