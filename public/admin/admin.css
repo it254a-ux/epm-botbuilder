@@ -1,0 +1,77 @@
+/* Admin page look: midnight glass with gold. Only this page loads it (panel.css stays as the base). */
+:root{color-scheme:dark;--ink:#070b14;--ink2:#0d1424;--glass:rgba(255,255,255,.045);--glass2:rgba(255,255,255,.08);--edge:rgba(255,255,255,.1);--text:#eef2fb;--muted:#93a0b8;--gold:#f5c451;--gold2:#ff9f43;--emerald:#22d39a;--amber:#ffb020;--rose:#ff5d73;--violet:#8b7bff;--sky:#38bdf8}
+html{background:var(--ink)}
+body.adm{margin:0;color:var(--text);font:15px/1.5 "Segoe UI","SF Pro Display",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  background:radial-gradient(900px 500px at 8% -10%,rgba(245,196,81,.16),transparent 60%),radial-gradient(800px 520px at 100% 0%,rgba(139,123,255,.18),transparent 55%),radial-gradient(700px 500px at 50% 110%,rgba(34,211,154,.10),transparent 60%),linear-gradient(180deg,var(--ink),var(--ink2));background-attachment:fixed;min-height:100vh}
+.adm main{max-width:1040px;margin:0 auto;padding:22px 16px 72px}
+.adm .muted,.adm small{color:var(--muted)}
+
+/* top bar */
+.adm-top{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:20px;border-radius:18px;background:var(--glass);border:1px solid var(--edge);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.adm-mark{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-weight:800;font-size:1.05rem;color:#1b1200;background:linear-gradient(135deg,var(--gold),var(--gold2));box-shadow:0 6px 22px rgba(245,196,81,.45)}
+.adm-title{display:flex;flex-direction:column;line-height:1.15}.adm-title b{font-size:1.15rem;letter-spacing:.2px}.adm-title span{color:var(--muted);font-size:.82rem}
+.adm-grow{flex:1}
+
+/* stat tiles */
+.adm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.adm-stat{position:relative;overflow:hidden;padding:16px 18px;border-radius:18px;border:1px solid var(--edge);background:var(--glass)}
+.adm-stat::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--c,var(--gold))}
+.adm-stat::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:var(--c,var(--gold));opacity:.13;filter:blur(6px)}
+.adm-stat b{display:block;font-size:2rem;line-height:1.1;font-variant-numeric:tabular-nums}.adm-stat span{color:var(--muted);font-size:.85rem}
+
+/* cards */
+.adm .card{background:var(--glass);border:1px solid var(--edge);border-radius:20px;padding:20px;margin-bottom:20px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.adm h2{margin:0 0 4px;font-size:1.15rem}.adm .sub{margin:0 0 14px;color:var(--muted);font-size:.9rem}
+
+/* the Account label switch */
+.adm-switch-card{display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-color:rgba(245,196,81,.35)!important;background:linear-gradient(135deg,rgba(245,196,81,.12),rgba(255,159,67,.05) 55%,var(--glass))!important}
+.adm-switch-text{flex:1;min-width:230px}
+.adm-switch{--w:96px;position:relative;width:var(--w);height:48px;padding:0;border-radius:99px;border:1px solid var(--edge);background:rgba(255,255,255,.08);cursor:pointer;transition:background .25s,box-shadow .25s,border-color .25s}
+.adm-switch::after{content:"";position:absolute;top:4px;left:4px;width:38px;height:38px;border-radius:50%;background:linear-gradient(145deg,#fff,#c9d2e6);box-shadow:0 3px 10px rgba(0,0,0,.45);transition:transform .25s cubic-bezier(.3,1.4,.5,1)}
+.adm-switch[aria-checked=true]{background:linear-gradient(135deg,var(--gold),var(--gold2));border-color:transparent;box-shadow:0 0 0 4px rgba(245,196,81,.18),0 8px 28px rgba(245,196,81,.45)}
+.adm-switch[aria-checked=true]::after{transform:translateX(48px)}
+.adm-switch:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
+.adm-state{min-width:56px;text-align:center;font-weight:800;font-size:1.05rem}.adm-state.on{color:var(--gold)}.adm-state.off{color:var(--muted)}
+
+/* lists */
+.adm-list{display:grid;gap:12px}
+.adm-item{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--edge);transition:transform .15s,border-color .15s,background .15s}
+.adm-item:hover{transform:translateY(-1px);border-color:rgba(245,196,81,.4);background:rgba(255,255,255,.06)}
+.adm-av{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-weight:800;color:#0b1020;background:linear-gradient(135deg,var(--c1,#f5c451),var(--c2,#ff9f43))}
+.adm-main{min-width:0}.adm-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700}
+.adm-meta{color:var(--muted);font-size:.85rem;overflow-wrap:anywhere}
+.adm-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+
+/* pills */
+.adm .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:99px;border:1px solid var(--edge);font-size:.76rem;font-weight:700;background:rgba(255,255,255,.05)}
+.adm .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.adm .pill.active,.adm .pill.ok{color:var(--emerald);background:rgba(34,211,154,.12);border-color:rgba(34,211,154,.35)}
+.adm .pill.pending{color:var(--amber);background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.35)}
+.adm .pill.suspended,.adm .pill.disabled{color:var(--rose);background:rgba(255,93,115,.12);border-color:rgba(255,93,115,.35)}
+.adm .pill.plan{color:var(--violet);background:rgba(139,123,255,.14);border-color:rgba(139,123,255,.35)}
+.adm .pill.share{color:var(--gold);background:rgba(245,196,81,.12);border-color:rgba(245,196,81,.35)}
+
+/* buttons */
+.adm button{font:inherit;cursor:pointer;border:1px solid var(--edge);border-radius:12px;padding:9px 15px;color:var(--text);background:var(--glass2);font-weight:650;transition:transform .12s,box-shadow .2s,filter .2s}
+.adm button:hover{transform:translateY(-1px);filter:brightness(1.12)}.adm button:active{transform:translateY(0) scale(.98)}
+.adm button:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.adm button.primary,.adm button.b-gold{color:#1b1200;border-color:transparent;background:linear-gradient(135deg,var(--gold),var(--gold2));box-shadow:0 6px 20px rgba(245,196,81,.35)}
+.adm button.b-ok{color:#04261a;border-color:transparent;background:linear-gradient(135deg,#34e8b0,#18b987);box-shadow:0 6px 20px rgba(34,211,154,.3)}
+.adm button.b-warn{color:#2a1900;border-color:transparent;background:linear-gradient(135deg,#ffc94d,#ff9f1c);box-shadow:0 6px 20px rgba(255,176,32,.28)}
+.adm button.b-info{color:#fff;border-color:transparent;background:linear-gradient(135deg,#8b7bff,#5b8cff);box-shadow:0 6px 20px rgba(110,120,255,.32)}
+.adm button.b-bad{color:#fff;border-color:transparent;background:linear-gradient(135deg,#ff6b81,#e0364f);box-shadow:0 6px 20px rgba(255,93,115,.3)}
+.adm button.b-ghost{background:transparent}
+.adm button:disabled{opacity:.55;cursor:default}
+
+/* sign in */
+.adm-login{max-width:420px;margin:8vh auto 0;text-align:center}
+.adm-login .adm-mark{margin:0 auto 14px;width:56px;height:56px;font-size:1.3rem}
+.adm input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--edge);background:rgba(255,255,255,.06);color:var(--text);font:inherit}
+.adm input:focus{outline:2px solid var(--gold);border-color:transparent}
+.adm .err{color:var(--rose);font-size:.9rem;margin-top:6px}
+
+@media (max-width:560px){.adm-item{grid-template-columns:1fr}.adm-av{display:none}.adm-top{padding:12px}.adm-stat b{font-size:1.6rem}}
+@media (prefers-reduced-motion:reduce){.adm *{transition:none!important}}
+.adm #app{color:var(--text)}
+.adm button{white-space:nowrap}
+.adm .adm-actions button{white-space:normal}

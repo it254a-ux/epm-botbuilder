@@ -50,8 +50,9 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     const displayAsVirtual = activeAccount ? activeAccount.isVirtual && !isForcedReal(activeAccount.loginid) : false;
 
     useEffect(() => {
-        setActiveCategory(displayAsVirtual ? 'demo' : 'real');
-    }, [displayAsVirtual, isOpen]);
+        // which column (Real / Demo tab) opens follows the account's TRUE type; only the label text can be forced
+        setActiveCategory(activeAccount?.isVirtual ? 'demo' : 'real');
+    }, [activeAccount?.isVirtual, isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -106,11 +107,11 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
         if (!accountList) return [];
         return accountList
             .filter(account => {
-                const accountDisplayAsVirtual = isDemoAccount(account.loginid) && !isForcedReal(account.loginid);
-                return accountDisplayAsVirtual === (activeCategory === 'demo');
+                // placed in the Real / Demo column by its true type (the forced label text is not affected)
+                return isDemoAccount(account.loginid) === (activeCategory === 'demo');
             })
             .sort((a, b) => (a.loginid === activeLoginid ? -1 : b.loginid === activeLoginid ? 1 : 0));
-    }, [accountList, activeCategory, activeLoginid, forcedRealOn]);
+    }, [accountList, activeCategory, activeLoginid]);
 
     // All hooks above run on every render regardless of activeAccount, per
     // the Rules of Hooks — only now, after every hook has been called, is it
@@ -274,7 +275,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                             <div className='acc-dropdown__account-id'>{account.loginid}</div>
                                         </div>
                                     </div>
-                                    {activeCategory === 'demo' && accountIsActive ? (
+                                    {activeCategory === 'demo' && accountIsActive && accountDisplayAsVirtual ? (
                                         <button
                                             type='button'
                                             className='acc-dropdown__reset-btn'
