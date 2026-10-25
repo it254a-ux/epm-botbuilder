@@ -63,7 +63,7 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(
+    const { positions, log, pending, openTrade, closeTrades, clearClosed, minStakes, probeMinStake } = useForexLive(
         isAuthorized,
         activeLoginid
     );
@@ -174,6 +174,7 @@ const ForexLive = observer(() => {
                         currency={currency}
                         symbol={symbol}
                         onClose={list => void closeTrades(list)}
+                        onClear={clearClosed}
                     />
 
                     <ActivityPanel positions={positions} log={log} currency={currency} />

@@ -52,6 +52,16 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     const seen = useRef<Map<number, number>>(new Map());
     const polled = useRef<Map<number, number>>(new Map());
     const lastMsg = useRef(0);
+    // closed trades the person cleared from the list: they stay gone, also after a refresh (kept per account)
+    const clearedKey = `epm_forex_live_cleared_${loginid}`;
+    const readCleared = (): Set<number> => {
+        try {
+            return new Set<number>(JSON.parse(localStorage.getItem(clearedKey) ?? '[]'));
+        } catch {
+            return new Set<number>();
+        }
+    };
+    const cleared = useRef<Set<number>>(new Set());
     const [streamAt, setStreamAt] = useState(0);
     // the smallest stake each market accepts (learned from Deriv), keyed by "market|multiplier"
     const [minStakes, setMinStakes] = useState<Record<string, number>>({});
@@ -137,14 +147,18 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         const t = window.setInterval(() => {
             if (!api_base.api) return;
             const now = Date.now();
-            let budget = 10;
-            book.current.forEach(p => {
-                if (p.closed || closing.current.has(p.id) || budget <= 0) return;
+            let budget = 12;
+            // the trades that have been quiet the longest are asked first
+            const stale = [...book.current.values()]
+                .filter(p => !p.closed && !closing.current.has(p.id))
+                .sort((a, b) => (seen.current.get(a.id) ?? 0) - (seen.current.get(b.id) ?? 0));
+            stale.forEach(p => {
+                if (budget <= 0) return;
                 const quiet = now - (seen.current.get(p.id) ?? 0);
-                if (quiet < 8000 || now - (polled.current.get(p.id) ?? 0) < 5000) return;
+                if (quiet < 2500 || now - (polled.current.get(p.id) ?? 0) < 2000) return;
                 budget -= 1;
                 polled.current.set(p.id, now);
-                if (quiet > 20000) watched.current.delete(p.id);
+                if (quiet > 10000) watched.current.delete(p.id);
                 Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: p.id }))
                     .then((res: any) => {
                         const pos = toPosition(res?.proposal_open_contract);
@@ -153,14 +167,16 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                     .catch(() => {});
                 watch(p.id);
             });
-        }, 3000);
+        }, 1500);
         return () => window.clearInterval(t);
     }, [isAuthorized, upsert, watch]);
 
     // A different account has different trades.
     useEffect(() => {
         book.current = new Map();
+        cleared.current = readCleared();
         dirty.current = true;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loginid]);
 
     // The connection object can be replaced (a reconnect): listen again on the new one.
@@ -217,7 +233,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 );
                 const ids: number[] = (res?.profit_table?.transactions ?? [])
                     .map((t: any) => Number(t.contract_id))
-                    .filter((id: number) => Number.isFinite(id) && !book.current.has(id));
+                    .filter((id: number) => Number.isFinite(id) && !book.current.has(id) && !cleared.current.has(id));
                 await Promise.all(
                     ids.map(async id => {
                         const check: any = await Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: id })).catch(() => null);
@@ -378,7 +394,24 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         }
     }, []);
 
-    return { positions, log, pending, openTrade, closeTrades, note, minStakes, probeMinStake, streamAt };
+    // Removes every closed trade from the list. Open trades are never touched.
+    const clearClosed = useCallback(() => {
+        const ids = [...book.current.values()].filter(p => p.closed).map(p => p.id);
+        if (!ids.length) return;
+        ids.forEach(id => {
+            cleared.current.add(id);
+            book.current.delete(id);
+        });
+        try {
+            localStorage.setItem(clearedKey, JSON.stringify([...cleared.current].slice(-500)));
+        } catch {
+            /* the list is cleared for now; it may come back after a refresh */
+        }
+        flush();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flush, clearedKey]);
+
+    return { positions, log, pending, openTrade, closeTrades, clearClosed, note, minStakes, probeMinStake, streamAt };
 }
 
 /** Multipliers Deriv allows for a symbol. Always returns something usable. */

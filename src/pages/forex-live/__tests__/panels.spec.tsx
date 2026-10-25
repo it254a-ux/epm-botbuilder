@@ -243,3 +243,12 @@ describe('PositionsPanel', () => {
         expect(screen.queryByRole('button', { name: /^Close/ })).toBeNull();
     });
 });
+
+describe('clear closed trades', () => {
+    it('calls onClear from the closed list', () => {
+        const onClear = jest.fn();
+        render(<PositionsPanel positions={[pos({ id: 9, closed: true, result: -1, canClose: false })]} currency='USD' symbol='frxEURUSD' onClose={jest.fn()} onClear={onClear} />);
+        fireEvent.click(screen.getByText('Clear closed trades'));
+        expect(onClear).toHaveBeenCalled();
+    });
+});

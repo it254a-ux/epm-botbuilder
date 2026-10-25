@@ -576,20 +576,68 @@
 
 .forex-trader__live {
     position: absolute;
-    right: 64px;
-    top: 8px;
+    right: 70px;
+    top: 10px;
     z-index: 6;
-    padding: 3px 9px;
-    border: 0;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.55);
-    color: #9ca3af;
-    font-size: 11px;
-    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    background: rgba(12, 14, 20, 0.6);
+    backdrop-filter: blur(6px);
     cursor: pointer;
 
-    &.is-on {
-        color: #22c55e;
+    // one small dot, no words: green while prices update, grey when paused, amber while reconnecting
+    i {
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #6b7280;
+    }
+
+    &.is-on i {
+        background: #22c55e;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+        animation: fx-live-ring 2.4s ease-out infinite;
+    }
+
+    &.is-wait i {
+        background: #f59e0b;
+        animation: fx-live-blink 1s ease-in-out infinite;
+    }
+
+    &.is-paused i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        background: #9ca3af;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        i {
+            animation: none !important;
+        }
+    }
+}
+
+@keyframes fx-live-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+    }
+    70%,
+    100% {
+        box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
+    }
+}
+
+@keyframes fx-live-blink {
+    50% {
+        opacity: 0.3;
     }
 }
 
@@ -736,9 +784,9 @@
     }
 }
 
-/* The LIVE badge sits clear of the price scale when the page makes the chart wide. */
+/* The live dot sits clear of the price scale when the page makes the chart wide. */
 .forex-trader--result-out .forex-trader__live {
-    right: 100px;
+    right: 106px;
 }
 
 /* Slim scrollbars that match the dark pages (the plain white ones looked out of place). */

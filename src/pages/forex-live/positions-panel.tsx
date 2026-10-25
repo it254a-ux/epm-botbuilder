@@ -7,6 +7,8 @@ interface Props {
     /** The market on the chart, for the "this market only" switch. */
     symbol: string;
     onClose: (list: Position[]) => void;
+    /** Removes the closed trades from the list. */
+    onClear?: () => void;
 }
 
 const sign = (n: number | null) => (n === null || n === 0 ? '' : n > 0 ? ' is-up' : ' is-down');
@@ -25,7 +27,7 @@ const matches = (p: Position, f: CloseFilter): boolean => {
     return f === 'all' || (f === 'buy' && p.side === 'BUY') || (f === 'sell' && p.side === 'SELL') || (f === 'winning' && pl > 0) || (f === 'losing' && pl < 0);
 };
 
-const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
+const PositionsPanel = ({ positions, currency, symbol, onClose, onClear }: Props) => {
     const [thisMarket, setThisMarket] = useState(false);
     const [showClosed, setShowClosed] = useState(true);
     // These buttons only choose WHICH open trades are listed. Nothing is closed by them.
@@ -124,6 +126,11 @@ const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
                             {formatMoney(closedNet)} {currency}
                         </b>
                     </button>
+                    {showClosed && onClear && (
+                        <button type='button' className='forex-live__clear' onClick={onClear}>
+                            Clear closed trades
+                        </button>
+                    )}
                     {showClosed && (
                         <ul className='forex-live__list forex-live__list--closed'>
                             {closed.map(p => {
