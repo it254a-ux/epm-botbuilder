@@ -813,3 +813,15 @@
         background: transparent;
     }
 }
+
+// The analysis result uses one small text size throughout (headings and body alike).
+.forex-trader__result,
+.forex-trader__result * {
+    font-size: 10px !important;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+}
+
+.forex-trader__result .forex-trader__badge {
+    padding: 4px 12px;
+}
