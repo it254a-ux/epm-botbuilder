@@ -825,3 +825,17 @@
 .forex-trader__result .forex-trader__badge {
     padding: 4px 12px;
 }
+
+// A light, even typeface for the analysis result: regular weight, medium for labels and headings only.
+.forex-trader__result,
+.forex-trader__result * {
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 400 !important;
+}
+
+.forex-trader__result .forex-trader__h,
+.forex-trader__result .forex-trader__badge,
+.forex-trader__result dt,
+.forex-trader__result th {
+    font-weight: 500 !important;
+}

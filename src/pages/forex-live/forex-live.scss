@@ -1005,3 +1005,20 @@
     font-size: 1.1rem;
     opacity: 0.75;
 }
+
+// The side cards use a light, even typeface: regular weight, medium only for headings, labels and the BUY / SELL buttons.
+.forex-live__card,
+.forex-live__card *,
+.forex-live__buttons--pinned,
+.forex-live__buttons--pinned * {
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 400 !important;
+}
+
+.forex-live__card h3,
+.forex-live__card label span,
+.forex-live__card small,
+.forex-live__go,
+.forex-live__go * {
+    font-weight: 500 !important;
+}
