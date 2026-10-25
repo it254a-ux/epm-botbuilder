@@ -63,7 +63,7 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake, streamAt } = useForexLive(
+    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(
         isAuthorized,
         activeLoginid
     );
@@ -176,7 +176,7 @@ const ForexLive = observer(() => {
                         onClose={list => void closeTrades(list)}
                     />
 
-                    <ActivityPanel positions={positions} log={log} currency={currency} streamAt={streamAt} />
+                    <ActivityPanel positions={positions} log={log} currency={currency} />
 
                     {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
                     <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
