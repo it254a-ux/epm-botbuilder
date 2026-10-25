@@ -520,6 +520,18 @@
     &__trade {
         padding: 10px 12px 12px;
 
+        // one text size through the whole panel, headings and body alike
+        &,
+        * {
+            font-size: 10px !important;
+            line-height: 1.35;
+        }
+
+        input[type='number'],
+        select {
+            line-height: 26px;
+        }
+
         .forex-live__card-head {
             margin-bottom: 8px;
         }
