@@ -164,7 +164,9 @@ const CoreStoreProvider: React.FC<{ children: React.ReactNode }> = observer(({ c
                 await client?.logout();
             }
 
-            if (msg_type === 'balance' && data && !error) {
+            // the all-accounts balance stream (used by the account dropdown) must never overwrite the header balance
+            const isAllAccountsStream = (data as { echo_req?: { account?: string } })?.echo_req?.account === 'all';
+            if (msg_type === 'balance' && data && !error && !isAllAccountsStream) {
                 const balance = data.balance;
                 if (balance && typeof balance.balance === 'number') {
                     client.setBalance(balance.balance.toString());

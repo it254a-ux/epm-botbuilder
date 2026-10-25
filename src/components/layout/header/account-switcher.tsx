@@ -6,6 +6,7 @@ import Text from '@/components/shared_ui/text';
 import { CurrencyIcon } from '@/components/currency/currency-icon';
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { useApiBase } from '@/hooks/useApiBase';
+import { useLiveAccountBalances } from '@/hooks/useLiveAccountBalances';
 import { useStore } from '@/hooks/useStore';
 import { isDemoAccount } from '@/utils/account-helpers';
 import { useForcedRealEnabled } from '@/utils/forced-real-flag';
@@ -32,6 +33,7 @@ const isForcedRealId = (loginid: string | undefined) => !!loginid && FORCED_REAL
 const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     // the Admin page can switch the forced "Real account" label off
     const forcedRealOn = useForcedRealEnabled();
+    const liveBalances = useLiveAccountBalances();
     const isForcedReal = (loginid: string | undefined) => forcedRealOn && isForcedRealId(loginid);
     const [isOpen, setIsOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<'real' | 'demo'>('real');
@@ -291,7 +293,12 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                     ) : (
                                         <Text size='xs' weight='bold' className='acc-dropdown__balance'>
                                             {account.currency ? (
-                                                formatBalance(account.balance, account.currency)
+                                                formatBalance(
+                                                    account.loginid === activeLoginid
+                                                        ? client?.balance // the active account: the same live balance the header uses
+                                                        : liveBalances[account.loginid] ?? account.balance,
+                                                    account.currency
+                                                )
                                             ) : (
                                                 <Localize i18n_default_text='No currency assigned' />
                                             )}
