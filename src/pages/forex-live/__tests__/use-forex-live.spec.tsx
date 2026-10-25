@@ -46,7 +46,8 @@ describe('useForexLive: a trade never just disappears', () => {
         let listed = true;
         mockState.answer = req => {
             if (req.portfolio) return { portfolio: { contracts: listed ? [open] : [] } };
-            if (req.proposal_open_contract) return { proposal_open_contract: { ...open, is_sold: 1, profit: -10 } };
+            // the live stream starts with the trade still open; a plain look-up later finds it closed
+            if (req.proposal_open_contract) return { proposal_open_contract: req.subscribe || listed ? open : { ...open, is_sold: 1, profit: -10 } };
             return {};
         };
         const { result } = renderHook(() => useForexLive(true, 'CR1'));
@@ -56,13 +57,37 @@ describe('useForexLive: a trade never just disappears', () => {
 
         listed = false;
         await act(async () => {
-            jest.advanceTimersByTime(20000);
+            jest.advanceTimersByTime(60000);
         });
         await flushPromises();
         act(() => void jest.advanceTimersByTime(200));
         const p = result.current.positions[0];
         expect(p.closed).toBe(true);
         expect(p.closeReason).toMatch(/Stopped out/);
+        expect(result.current.log[0].text).toMatch(/closed: Stopped out/);
+    });
+
+    it('every open trade gets its own live stream, and live messages move the numbers at once', async () => {
+        const asked: any[] = [];
+        mockState.answer = req => {
+            asked.push(req);
+            return req.portfolio ? { portfolio: { contracts: [open] } } : {};
+        };
+        const { result } = renderHook(() => useForexLive(true, 'CR1'));
+        await flushPromises();
+        expect(asked.filter(r => r.proposal_open_contract === 1 && r.contract_id === 11 && r.subscribe === 1)).toHaveLength(1);
+        // a stream message arrives: the profit changes without any re-check
+        act(() => {
+            mockState.listeners.forEach(l => l({ data: { msg_type: 'proposal_open_contract', proposal_open_contract: { ...open, profit: 3.21 } } }));
+            jest.advanceTimersByTime(150);
+        });
+        expect(result.current.positions[0].profit).toBe(3.21);
+        // and its final message closes it and says why
+        act(() => {
+            mockState.listeners.forEach(l => l({ data: { msg_type: 'proposal_open_contract', proposal_open_contract: { ...open, is_sold: 1, profit: -10 } } }));
+            jest.advanceTimersByTime(150);
+        });
+        expect(result.current.positions[0].closed).toBe(true);
         expect(result.current.log[0].text).toMatch(/closed: Stopped out/);
     });
 

@@ -46,6 +46,8 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     const dirty = useRef(false);
     // trades whose close request is on its way: they cannot be closed twice, and show "Closing…" at once
     const closing = useRef<Set<number>>(new Set());
+    // trades that Deriv is already streaming to this page one by one (tick by tick, until they close)
+    const watched = useRef<Set<number>>(new Set());
     // the smallest stake each market accepts (learned from Deriv), keyed by "market|multiplier"
     const [minStakes, setMinStakes] = useState<Record<string, number>>({});
     const probed = useRef<Set<string>>(new Set());
@@ -63,6 +65,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
             const merged = mergePosition(before, p);
             book.current.set(p.id, merged);
             dirty.current = true;
+            if (merged.closed) watched.current.delete(p.id);
             // Deriv closed it on its own (stop loss, take profit, stop out): say so, so a trade never just vanishes
             if (before && !before.closed && merged.closed && !closing.current.has(p.id) && !merged.closeReason?.startsWith('Closed by you')) {
                 const pl = merged.result ?? merged.profit;
@@ -96,6 +99,25 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         return () => window.clearInterval(t);
     }, [flush]);
 
+    // Ask Deriv to stream one trade live: a message on every price change, and a last one the moment it closes.
+    const watch = useCallback(
+        (id: number) => {
+            if (watched.current.has(id) || !api_base.api) return;
+            watched.current.add(id);
+            Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: id, subscribe: 1 }))
+                .then((res: any) => {
+                    if (res?.error) {
+                        watched.current.delete(id);
+                        return;
+                    }
+                    const p = toPosition(res?.proposal_open_contract);
+                    if (p) upsert(p);
+                })
+                .catch(() => watched.current.delete(id));
+        },
+        [upsert]
+    );
+
     // A different account has different trades.
     useEffect(() => {
         book.current = new Map();
@@ -108,6 +130,8 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     // Live stream of every open trade on the account, plus the ones that were already open.
     useEffect(() => {
         if (!isAuthorized || !apiObj) return undefined;
+        // a new connection has no streams yet: start them all again
+        watched.current.clear();
         const sub = api().onMessage().subscribe(({ data }: { data: any }) => {
             if (data?.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
                 const p = toPosition(data.proposal_open_contract);
@@ -127,6 +151,11 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                     if (!p) return;
                     openIds.add(p.id);
                     if (!book.current.has(p.id)) upsert(p);
+                    watch(p.id);
+                });
+                // trades opened here before the connection came back are streamed again too
+                book.current.forEach(p => {
+                    if (!p.closed) watch(p.id);
                 });
                 const gone = [...book.current.values()].filter(p => !p.closed && !openIds.has(p.id) && !closing.current.has(p.id));
                 await Promise.all(
@@ -163,12 +192,19 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         };
 
         void syncOnce().then(loadHistory);
-        const timer = window.setInterval(() => void syncOnce(), 20000);
+        // The live stream does the real work. This only catches what happened while the connection was down or the
+        // tab was asleep, so it runs when the tab wakes up or the network returns, and slowly otherwise.
+        const wake = () => void syncOnce();
+        window.addEventListener('focus', wake);
+        window.addEventListener('online', wake);
+        const timer = window.setInterval(wake, 60000);
         return () => {
             sub?.unsubscribe?.();
             window.clearInterval(timer);
+            window.removeEventListener('focus', wake);
+            window.removeEventListener('online', wake);
         };
-    }, [isAuthorized, loginid, upsert, apiObj]);
+    }, [isAuthorized, loginid, upsert, apiObj, watch]);
 
     const openTrade = useCallback(
         async (input: TradeInput): Promise<boolean> => {
@@ -204,6 +240,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                     result: null,
                     canClose: true,
                 });
+                watch(Number(b.contract_id));
                 note('ok', `${input.side} ${input.symbol.replace(/^frx/, '')} opened · stake ${input.stake} · x${input.multiplier}`);
                 return true;
             } catch (e) {
@@ -216,7 +253,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 setPending(n => n - 1);
             }
         },
-        [note, upsert]
+        [note, upsert, watch]
     );
 
     const closeTrades = useCallback(
