@@ -117,6 +117,8 @@ export interface Position {
     canClose: boolean;
     /** The close request is on its way (shown as "Closing…"). */
     closing?: boolean;
+    /** Why a closed trade closed, in plain words (you closed it, stop loss, take profit, stopped out). */
+    closeReason?: string;
 }
 
 type Raw = Record<string, any>;
@@ -131,6 +133,17 @@ const orderAmount = (o: unknown): number | null => {
     if (o && typeof o === 'object') return num((o as Raw).order_amount ?? (o as Raw).amount);
     return num(o);
 };
+
+/** Says in plain words why a finished multiplier closed, from its final numbers. */
+export function closeReasonOf(profit: number | null, stake: number, stopLoss: number | null, takeProfit: number | null): string {
+    if (profit === null) return 'Closed';
+    const tp = takeProfit !== null ? Math.abs(takeProfit) : null;
+    const sl = stopLoss !== null ? Math.abs(stopLoss) : null;
+    if (tp && Math.abs(profit - tp) <= 0.03) return 'Take profit reached';
+    if (sl && Math.abs(profit + sl) <= 0.03) return 'Stop loss reached';
+    if (stake > 0 && profit <= -stake + 0.03) return 'Stopped out: the whole stake was lost';
+    return 'Closed';
+}
 
 /**
  * Reads one open-contract message (or one portfolio row) into a Position.
@@ -165,6 +178,16 @@ export function toPosition(raw: Raw | null | undefined): Position | null {
         result: sold ? (profit ?? (num(raw.sell_price) !== null && num(raw.buy_price) !== null ? money(num(raw.sell_price)! - num(raw.buy_price)!) : null)) : null,
         // a closed trade can never be closed again; an open one can unless Deriv says it cannot right now
         canClose: !sold && (raw.is_valid_to_sell === undefined || raw.is_valid_to_sell === 1 || raw.is_valid_to_sell === true),
+        ...(sold
+            ? {
+                  closeReason: closeReasonOf(
+                      profit ?? (num(raw.sell_price) !== null && num(raw.buy_price) !== null ? money(num(raw.sell_price)! - num(raw.buy_price)!) : null),
+                      num(raw.buy_price) ?? 0,
+                      orderAmount(limit.stop_loss),
+                      orderAmount(limit.take_profit)
+                  ),
+              }
+            : {}),
     };
 }
 
@@ -185,6 +208,7 @@ export function mergePosition(prev: Position | undefined, next: Position): Posit
         ...(next.stopLossAt ?? prev.stopLossAt) !== undefined ? { stopLossAt: (next.stopLossAt ?? prev.stopLossAt) as number } : {},
         ...(next.takeProfitAt ?? prev.takeProfitAt) !== undefined ? { takeProfitAt: (next.takeProfitAt ?? prev.takeProfitAt) as number } : {},
         currency: next.currency || prev.currency,
+        ...(next.closeReason ?? prev.closeReason ? { closeReason: (next.closeReason ?? prev.closeReason) as string } : {}),
     };
 }
 

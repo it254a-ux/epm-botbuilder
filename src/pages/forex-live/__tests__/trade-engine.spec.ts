@@ -283,3 +283,26 @@ describe('amountsFromPlan', () => {
         expect(amountsFromPlan({ side: 'BUY', entry: 1, stopLoss: 1.01, takeProfit: 1.02 }, 'BUY', 10, 100)).toBeNull();
     });
 });
+
+
+describe('why a trade closed', () => {
+    const base = { contract_type: 'MULTUP', contract_id: 7, underlying_symbol: 'R_100', buy_price: 10, multiplier: 100 };
+
+    it('says take profit, stop loss, stop out or plain closed from the final numbers', () => {
+        const tp = toPosition({ ...base, is_sold: 1, profit: 5, limit_order: { take_profit: { order_amount: 5 } } });
+        expect(tp?.closeReason).toBe('Take profit reached');
+        const sl = toPosition({ ...base, is_sold: 1, profit: -3, limit_order: { stop_loss: { order_amount: -3 } } });
+        expect(sl?.closeReason).toBe('Stop loss reached');
+        const out = toPosition({ ...base, is_sold: 1, profit: -10 });
+        expect(out?.closeReason).toBe('Stopped out: the whole stake was lost');
+        const plain = toPosition({ ...base, is_sold: 1, profit: 1.2 });
+        expect(plain?.closeReason).toBe('Closed');
+    });
+
+    it('an open trade has no close reason, and a later message keeps the reason it was given', () => {
+        expect(toPosition({ ...base, is_sold: 0, profit: 1 })?.closeReason).toBeUndefined();
+        const closed = toPosition({ ...base, is_sold: 1, profit: -10 })!;
+        const merged = mergePosition(closed, { ...closed, closeReason: undefined });
+        expect(merged.closeReason).toBe('Stopped out: the whole stake was lost');
+    });
+});

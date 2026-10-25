@@ -133,7 +133,7 @@ const PositionsPanel = ({ positions, currency, symbol, onClose }: Props) => {
                                         <span className='forex-live__side'>{p.side === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
                                         <span className='forex-live__sym'>
                                             {p.symbol.replace(/^frx/, '')}
-                                            <small>{p.stake.toFixed(2)} · x{p.multiplier ?? '?'}</small>
+                                            <small>{p.stake.toFixed(2)} · x{p.multiplier ?? '?'}{p.closeReason ? ` · ${p.closeReason}` : ''}</small>
                                         </span>
                                         <span className={`forex-live__result${sign(pl)}`}>{pl === null ? '—' : pl > 0 ? 'WIN' : pl < 0 ? 'LOSS' : 'EVEN'}</span>
                                         <span className={`forex-live__rowpl${sign(pl)}`}>{formatMoney(pl)}</span>

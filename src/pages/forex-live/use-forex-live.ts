@@ -5,6 +5,7 @@ import {
     buildSellRequest,
     errorText,
     explainRefusal,
+    formatMoney,
     mergePosition,
     parseMinStake,
     readMultipliers,
@@ -56,10 +57,23 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         setLog(prev => [{ id: ++logId.current, at: Date.now(), kind, text }, ...prev].slice(0, KEEP_LOG));
     }, []);
 
-    const upsert = useCallback((p: Position) => {
-        book.current.set(p.id, mergePosition(book.current.get(p.id), p));
-        dirty.current = true;
-    }, []);
+    const upsert = useCallback(
+        (p: Position) => {
+            const before = book.current.get(p.id);
+            const merged = mergePosition(before, p);
+            book.current.set(p.id, merged);
+            dirty.current = true;
+            // Deriv closed it on its own (stop loss, take profit, stop out): say so, so a trade never just vanishes
+            if (before && !before.closed && merged.closed && !closing.current.has(p.id) && !merged.closeReason?.startsWith('Closed by you')) {
+                const pl = merged.result ?? merged.profit;
+                note(
+                    pl !== null && pl < 0 ? 'err' : 'ok',
+                    `${merged.side} ${merged.symbol.replace(/^frx/, '')} closed: ${merged.closeReason ?? 'Closed'}${pl !== null ? ` · ${formatMoney(pl)} ${merged.currency}` : ''}`
+                );
+            }
+        },
+        [note]
+    );
 
     // Show updates in batches, so many live trades never make the page stutter. Closing calls this straight away.
     const flush = useCallback(() => {
@@ -88,26 +102,73 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         dirty.current = true;
     }, [loginid]);
 
+    // The connection object can be replaced (a reconnect): listen again on the new one.
+    const apiObj = api_base.api;
+
     // Live stream of every open trade on the account, plus the ones that were already open.
     useEffect(() => {
-        if (!isAuthorized || !api_base.api) return;
+        if (!isAuthorized || !apiObj) return undefined;
         const sub = api().onMessage().subscribe(({ data }: { data: any }) => {
             if (data?.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
                 const p = toPosition(data.proposal_open_contract);
                 if (p) upsert(p);
             }
         });
-        Promise.resolve(api().send({ portfolio: 1 }))
-            .then((res: any) => {
+
+        // Compare with what Deriv says is open right now: add trades we have not seen, and find out what happened to
+        // any trade we think is open but Deriv no longer lists (it was closed on Deriv's side).
+        const syncOnce = async () => {
+            try {
+                const res: any = await Promise.resolve(api().send({ portfolio: 1 }));
                 const rows: any[] = res?.portfolio?.contracts ?? [];
+                const openIds = new Set<number>();
                 rows.forEach(r => {
                     const p = toPosition(r);
-                    if (p && !book.current.has(p.id)) upsert(p);
+                    if (!p) return;
+                    openIds.add(p.id);
+                    if (!book.current.has(p.id)) upsert(p);
                 });
-            })
-            .catch(() => {});
-        return () => sub?.unsubscribe?.();
-    }, [isAuthorized, loginid, upsert]);
+                const gone = [...book.current.values()].filter(p => !p.closed && !openIds.has(p.id) && !closing.current.has(p.id));
+                await Promise.all(
+                    gone.map(async p => {
+                        const check: any = await Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: p.id })).catch(() => null);
+                        const pos = toPosition(check?.proposal_open_contract);
+                        if (pos) upsert(pos);
+                    })
+                );
+            } catch {
+                /* the next round tries again */
+            }
+        };
+
+        // Trades that were already closed (earlier today, yesterday...) are listed too, so history is still there after a refresh.
+        const loadHistory = async () => {
+            try {
+                const res: any = await Promise.resolve(
+                    api().send({ profit_table: 1, description: 0, limit: 25, sort: 'DESC', contract_type: ['MULTUP', 'MULTDOWN'] })
+                );
+                const ids: number[] = (res?.profit_table?.transactions ?? [])
+                    .map((t: any) => Number(t.contract_id))
+                    .filter((id: number) => Number.isFinite(id) && !book.current.has(id));
+                await Promise.all(
+                    ids.map(async id => {
+                        const check: any = await Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: id })).catch(() => null);
+                        const pos = toPosition(check?.proposal_open_contract);
+                        if (pos) upsert(pos);
+                    })
+                );
+            } catch {
+                /* history is a bonus: the open trades still work without it */
+            }
+        };
+
+        void syncOnce().then(loadHistory);
+        const timer = window.setInterval(() => void syncOnce(), 20000);
+        return () => {
+            sub?.unsubscribe?.();
+            window.clearInterval(timer);
+        };
+    }, [isAuthorized, loginid, upsert, apiObj]);
 
     const openTrade = useCallback(
         async (input: TradeInput): Promise<boolean> => {
@@ -183,7 +244,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                         const soldFor = Number(res?.sell?.sold_for);
                         if (Number.isFinite(soldFor)) {
                             const pl = Math.round((soldFor - p.stake) * 100) / 100;
-                            upsert({ ...p, closed: true, canClose: false, result: pl, profit: pl });
+                            upsert({ ...p, closed: true, canClose: false, result: pl, profit: pl, closeReason: 'Closed by you' });
                         }
                         return p;
                     } catch (e) {
