@@ -85,7 +85,8 @@ function TradingViewPageComponent() {
         // below the body would otherwise push the chart's bottom toolbar out
         // of view.
         const body_el = el.closest('.main-body');
-        const bottom = body_el ? body_el.getBoundingClientRect().bottom : window.innerHeight;
+        const visible = window.visualViewport?.height ?? window.innerHeight;
+        const bottom = body_el ? Math.min(body_el.getBoundingClientRect().bottom, Math.max(visible, top + 300)) : visible;
         setHeight(Math.max(300, bottom - top));
     };
 
@@ -95,10 +96,14 @@ function TradingViewPageComponent() {
 
     useEffect(() => {
         window.addEventListener('resize', update);
+        window.addEventListener('orientationchange', update);
+        window.visualViewport?.addEventListener('resize', update);
         // Layout above (header, nav) can settle a moment after mount.
         const timers = [setTimeout(update, 100), setTimeout(update, 500)];
         return () => {
             window.removeEventListener('resize', update);
+            window.removeEventListener('orientationchange', update);
+            window.visualViewport?.removeEventListener('resize', update);
             timers.forEach(clearTimeout);
         };
     }, []);

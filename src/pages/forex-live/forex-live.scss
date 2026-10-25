@@ -66,9 +66,11 @@
         }
 
         @media (max-width: 900px) {
+            // the chart fills the whole phone screen, so every button and line on it is in view
             flex: none;
-            height: 84vh;
-            min-height: 520px;
+            height: calc(var(--tab-content-height-mobile) - 16px);
+            height: calc(100dvh - 6.4rem);
+            min-height: 440px;
         }
     }
 
@@ -513,6 +515,51 @@
         font-size: 11px;
         line-height: 1.5;
         color: var(--text-less-prominent);
+    }
+
+    // phones: smaller type in the trade panel so everything fits without crowding
+    @media (max-width: 900px) {
+        &__trade {
+            .forex-live__card-head h3 {
+                font-size: 11px;
+            }
+
+            .forex-live__pill {
+                padding: 3px 8px;
+                font-size: 10px;
+            }
+
+            .forex-live__go {
+                min-height: 42px;
+                font-size: 12px;
+            }
+
+            .forex-live__grid {
+                padding: 10px;
+                gap: 10px 8px;
+
+                label span {
+                    font-size: 9px;
+                }
+            }
+
+            input[type='number'],
+            select {
+                height: 34px;
+                font-size: 12px;
+                line-height: 32px;
+            }
+
+            .forex-live__chips > button {
+                height: 26px;
+                font-size: 11px;
+            }
+
+            .forex-live__hint,
+            .forex-live__auto {
+                font-size: 10px;
+            }
+        }
     }
 
     // ---- open trades
