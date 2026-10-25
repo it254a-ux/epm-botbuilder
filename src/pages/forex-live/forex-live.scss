@@ -11,7 +11,7 @@
     position: relative;
     height: var(--tab-content-height);
     display: block;
-    padding: 8px 10px;
+    padding: 8px 0 8px 10px;
     // the chart and trading controls fill the screen; the analysis sits below them, reached by scrolling
     overflow-x: hidden;
     overflow-y: auto;
@@ -27,17 +27,24 @@
     @media (max-width: 900px) {
         height: var(--tab-content-height-mobile);
         -webkit-overflow-scrolling: touch;
+        padding: 8px 10px;
+    }
+
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
     }
 
     &__top {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 580px;
+        grid-template-columns: minmax(0, 1fr) 435px;
         gap: 10px;
         height: 100%;
         min-height: 0;
 
         @media (max-width: 1100px) {
-            grid-template-columns: minmax(0, 1fr) 500px;
+            grid-template-columns: minmax(0, 1fr) 375px;
         }
 
         @media (max-width: 900px) {
@@ -135,8 +142,16 @@
         gap: 10px;
         overflow-y: auto;
         overscroll-behavior-y: contain;
-        padding: 0 2px 2px 0;
-        scrollbar-width: thin;
+        padding: 0;
+        // still scrolls with wheel, touch and keys, but no scrollbar is drawn
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
+        }
 
         @media (max-width: 900px) {
             flex: none;
