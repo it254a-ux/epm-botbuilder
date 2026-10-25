@@ -48,6 +48,11 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     const closing = useRef<Set<number>>(new Set());
     // trades that Deriv is already streaming to this page one by one (tick by tick, until they close)
     const watched = useRef<Set<number>>(new Set());
+    // when each open trade last got a live message, and when anything last arrived (to show that the stream is alive)
+    const seen = useRef<Map<number, number>>(new Map());
+    const polled = useRef<Map<number, number>>(new Map());
+    const lastMsg = useRef(0);
+    const [streamAt, setStreamAt] = useState(0);
     // the smallest stake each market accepts (learned from Deriv), keyed by "market|multiplier"
     const [minStakes, setMinStakes] = useState<Record<string, number>>({});
     const probed = useRef<Set<string>>(new Set());
@@ -65,7 +70,13 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
             const merged = mergePosition(before, p);
             book.current.set(p.id, merged);
             dirty.current = true;
-            if (merged.closed) watched.current.delete(p.id);
+            if (merged.closed) {
+                watched.current.delete(p.id);
+                seen.current.delete(p.id);
+            } else {
+                seen.current.set(p.id, Date.now());
+            }
+            lastMsg.current = Date.now();
             // Deriv closed it on its own (stop loss, take profit, stop out): say so, so a trade never just vanishes
             if (before && !before.closed && merged.closed && !closing.current.has(p.id) && !merged.closeReason?.startsWith('Closed by you')) {
                 const pl = merged.result ?? merged.profit;
@@ -81,6 +92,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     // Show updates in batches, so many live trades never make the page stutter. Closing calls this straight away.
     const flush = useCallback(() => {
         dirty.current = false;
+        setStreamAt(lastMsg.current);
         const all = [...book.current.values()];
         // forget the oldest closed trades
         const closed = all.filter(p => p.closed).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
@@ -117,6 +129,33 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         },
         [upsert]
     );
+
+    // Safety net for a stream that goes quiet while trades are open: ask Deriv for the trade directly, and start its
+    // stream again. Normal live messages never need this, so it stays idle while the stream is healthy.
+    useEffect(() => {
+        if (!isAuthorized) return undefined;
+        const t = window.setInterval(() => {
+            if (!api_base.api) return;
+            const now = Date.now();
+            let budget = 10;
+            book.current.forEach(p => {
+                if (p.closed || closing.current.has(p.id) || budget <= 0) return;
+                const quiet = now - (seen.current.get(p.id) ?? 0);
+                if (quiet < 8000 || now - (polled.current.get(p.id) ?? 0) < 5000) return;
+                budget -= 1;
+                polled.current.set(p.id, now);
+                if (quiet > 20000) watched.current.delete(p.id);
+                Promise.resolve(api().send({ proposal_open_contract: 1, contract_id: p.id }))
+                    .then((res: any) => {
+                        const pos = toPosition(res?.proposal_open_contract);
+                        if (pos) upsert(pos);
+                    })
+                    .catch(() => {});
+                watch(p.id);
+            });
+        }, 3000);
+        return () => window.clearInterval(t);
+    }, [isAuthorized, upsert, watch]);
 
     // A different account has different trades.
     useEffect(() => {
@@ -339,7 +378,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
         }
     }, []);
 
-    return { positions, log, pending, openTrade, closeTrades, note, minStakes, probeMinStake };
+    return { positions, log, pending, openTrade, closeTrades, note, minStakes, probeMinStake, streamAt };
 }
 
 /** Multipliers Deriv allows for a symbol. Always returns something usable. */

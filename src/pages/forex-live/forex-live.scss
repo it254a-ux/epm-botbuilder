@@ -754,6 +754,58 @@
     }
 
     // ---- activity
+    &__stream {
+        margin-inline-start: auto;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: #10b981;
+        background: color-mix(in srgb, #10b981 14%, transparent);
+        animation: fl-stream-pulse 2s ease-in-out infinite;
+
+        &.is-quiet {
+            color: #f59e0b;
+            background: color-mix(in srgb, #f59e0b 14%, transparent);
+        }
+    }
+
+    &__livelist {
+        margin-bottom: 8px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid var(--fl-line);
+
+        li {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+        }
+
+        b {
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    &__livedot {
+        &.is-buy {
+            color: var(--fl-buy);
+        }
+
+        &.is-sell {
+            color: var(--fl-sell);
+        }
+    }
+
+    &__livesym {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     &__log ul {
         list-style: none;
         margin: 0;
@@ -823,4 +875,20 @@
     margin: 4px 0 0;
     font-size: 1.1rem;
     opacity: 0.75;
+}
+
+@keyframes fl-stream-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .forex-live__stream {
+        animation: none;
+    }
 }

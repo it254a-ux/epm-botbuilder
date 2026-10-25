@@ -91,6 +91,30 @@ describe('useForexLive: a trade never just disappears', () => {
         expect(result.current.log[0].text).toMatch(/closed: Stopped out/);
     });
 
+    it('a stream that goes quiet is caught: the trade is asked for directly and streamed again', async () => {
+        const asked: any[] = [];
+        let profit = 1;
+        mockState.answer = req => {
+            asked.push(req);
+            if (req.portfolio) return { portfolio: { contracts: [open] } };
+            if (req.proposal_open_contract) return { proposal_open_contract: { ...open, profit } };
+            return {};
+        };
+        const { result } = renderHook(() => useForexLive(true, 'CR1'));
+        await flushPromises();
+        act(() => void jest.advanceTimersByTime(200));
+        expect(result.current.positions[0].profit).toBe(1);
+
+        profit = 4.4; // moved on Deriv, but no stream message reached the page
+        await act(async () => {
+            jest.advanceTimersByTime(12000);
+        });
+        await flushPromises();
+        act(() => void jest.advanceTimersByTime(200));
+        expect(result.current.positions[0].profit).toBe(4.4);
+        expect(result.current.streamAt).toBeGreaterThan(0);
+    });
+
     it('past closed trades are loaded again after a refresh', async () => {
         mockState.answer = req => {
             if (req.portfolio) return { portfolio: { contracts: [] } };

@@ -5,6 +5,7 @@ import { useStore } from '@/hooks/useStore';
 import { useSharedPick } from '../forex-trader/shared-picks';
 import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
+import ActivityPanel from './activity-panel';
 import PositionsPanel from './positions-panel';
 import {
     BUY_COLOR,
@@ -62,7 +63,7 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake } = useForexLive(
+    const { positions, log, pending, openTrade, closeTrades, minStakes, probeMinStake, streamAt } = useForexLive(
         isAuthorized,
         activeLoginid
     );
@@ -175,20 +176,7 @@ const ForexLive = observer(() => {
                         onClose={list => void closeTrades(list)}
                     />
 
-                    {log.length > 0 && (
-                        <section className='forex-live__card forex-live__log' aria-live='polite'>
-                            <header className='forex-live__card-head'>
-                                <h3>Activity</h3>
-                            </header>
-                            <ul>
-                                {log.slice(0, 8).map(l => (
-                                    <li key={l.id} className={`is-${l.kind}`}>
-                                        {l.text}
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
+                    <ActivityPanel positions={positions} log={log} currency={currency} streamAt={streamAt} />
 
                     {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
                     <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
