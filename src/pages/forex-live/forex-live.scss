@@ -272,6 +272,25 @@
         color: var(--text-less-prominent);
     }
 
+    // the wrapper adds no box of its own; the BUY/SELL bar inside it sticks to the top of the scrolling column
+    &__tradewrap {
+        display: contents;
+    }
+
+    &__buttons--pinned {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        margin: 0 0 8px;
+        padding: 6px;
+        border-radius: 14px;
+        background: rgba(12, 14, 20, 0.92);
+        border: 1px solid var(--fl-line);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.8);
+    }
+
     &__buttons {
         display: grid;
         grid-template-columns: 1fr 1fr;

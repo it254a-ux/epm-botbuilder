@@ -124,6 +124,19 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
     const name = marketName || symbol.replace(/^frx/, '');
 
     return (
+        <div className='forex-live__tradewrap'>
+            {/* BUY and SELL stay pinned at the top while the side column scrolls, so a trade is always one tap away */}
+            <div className='forex-live__buttons forex-live__buttons--pinned'>
+                <button type='button' className='forex-live__go forex-live__go--buy' disabled={disabled} onClick={() => fire('BUY')}>
+                    BUY <span>▲</span>
+                    {prefs.count > 1 && <small>×{prefs.count}</small>}
+                </button>
+                <button type='button' className='forex-live__go forex-live__go--sell' disabled={disabled} onClick={() => fire('SELL')}>
+                    SELL <span>▼</span>
+                    {prefs.count > 1 && <small>×{prefs.count}</small>}
+                </button>
+            </div>
+
         <section className='forex-live__card forex-live__trade'>
             <header className='forex-live__card-head'>
                 <h3>Trade {name}</h3>
@@ -144,17 +157,6 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                         ? `${openHere.count} open here · ▲${openHere.buys} ▼${openHere.sells} · ${openHere.profit > 0 ? '+' : ''}${openHere.profit.toFixed(2)}`
                         : 'No contracts open here'}
                 </span>
-            </div>
-
-            <div className='forex-live__buttons'>
-                <button type='button' className='forex-live__go forex-live__go--buy' disabled={disabled} onClick={() => fire('BUY')}>
-                    BUY <span>▲</span>
-                    {prefs.count > 1 && <small>×{prefs.count}</small>}
-                </button>
-                <button type='button' className='forex-live__go forex-live__go--sell' disabled={disabled} onClick={() => fire('SELL')}>
-                    SELL <span>▼</span>
-                    {prefs.count > 1 && <small>×{prefs.count}</small>}
-                </button>
             </div>
 
             <div className='forex-live__grid'>
@@ -248,6 +250,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                 Stays open until you close it or its stop loss / take profit is reached. You can never lose more than the stake.
             </p>
         </section>
+        </div>
     );
 };
 
