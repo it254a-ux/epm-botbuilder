@@ -266,8 +266,8 @@
     &__buttons {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-bottom: 12px;
+        gap: 10px;
+        margin-bottom: 14px;
     }
 
     &__go {
@@ -275,13 +275,13 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-        min-height: 38px;
-        padding: 0 10px;
+        min-height: 48px;
+        padding: 0 12px;
         border: 0;
-        border-radius: 12px;
-        font-size: 13px;
+        border-radius: 14px;
+        font-size: 14px;
         font-weight: 800;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.14em;
         color: #fff;
         cursor: pointer;
         touch-action: manipulation; // no double-tap zoom delay on phones: taps register at once
@@ -325,7 +325,11 @@
     &__grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px 8px;
+        gap: 12px 10px;
+        padding: 12px;
+        border-radius: 14px;
+        background: color-mix(in srgb, #000 22%, transparent);
+        border: 1px solid var(--fl-line);
 
         label,
         .forex-live__count {
@@ -336,10 +340,13 @@
 
             span {
                 font-size: 10px;
-                font-weight: 600;
-                letter-spacing: 0.06em;
+                font-weight: 700;
+                letter-spacing: 0.08em;
                 text-transform: uppercase;
-                color: var(--text-less-prominent);
+                color: var(--fl-gold);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
         }
     }
@@ -350,13 +357,13 @@
         display: block;
         width: 100%;
         min-width: 0;
-        height: 34px;
+        height: 38px;
         margin: 0;
-        padding: 0 10px;
+        padding: 0 12px;
         border-radius: 10px;
         font-size: 13px;
         font-weight: 600;
-        line-height: 32px;
+        line-height: 36px;
         text-align: left;
         vertical-align: middle;
         color: var(--text-general);
@@ -455,7 +462,9 @@
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--fl-line);
     }
 
     &__pill {
@@ -498,9 +507,11 @@
     }
 
     &__hint {
-        margin: 10px 0 0;
+        margin: 12px 0 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--fl-line);
         font-size: 11px;
-        line-height: 1.45;
+        line-height: 1.5;
         color: var(--text-less-prominent);
     }
 
@@ -867,8 +878,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 8px;
-    font-size: 1.2rem;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-less-prominent);
     cursor: pointer;
 }
 

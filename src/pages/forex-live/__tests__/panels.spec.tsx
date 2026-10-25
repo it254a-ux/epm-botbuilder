@@ -99,11 +99,11 @@ describe('TradePanel: market info, minimum stake and market-change notice', () =
         expect(screen.getByText('Min stake 1.64 USD')).toBeInTheDocument();
     });
 
-    it('fills the stake box with the smallest stake Deriv accepts and says so, so the click is not refused', () => {
+    it('fills the stake box with the smallest stake Deriv accepts, quietly, so the click is not refused', () => {
         const onTrade = jest.fn();
         render(<TradePanel {...base} onTrade={onTrade} marketName='Vol 75' minStake={1.64} />);
         expect(screen.getByLabelText(/^Stake/)).toHaveValue(1.64);
-        expect(screen.getByRole('alert')).toHaveTextContent(/Stake set to 1.64/);
+        expect(screen.queryByRole('alert')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: /BUY/ }));
         expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stake).toBe(1.64);
     });

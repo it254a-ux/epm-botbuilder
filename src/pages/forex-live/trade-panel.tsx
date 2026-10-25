@@ -77,11 +77,9 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             if (mine !== prefs.stake) set({ stake: mine });
             if (minStake && Number(mine) + 1e-9 < minStake) {
                 set({ stake: String(minStake) });
-                setStakeNote(`Stake set to ${minStake}: the smallest Deriv accepts on this market.`);
             }
         } else if (minStake) {
             set({ stake: String(minStake) });
-            setStakeNote(`Stake set to ${minStake}: the smallest Deriv accepts on this market. Change it to any amount you want.`);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [minStake, symbol]);
@@ -182,25 +180,25 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     </select>
                 </label>
                 <label>
-                    <span>Stop loss, optional ({currency || '…'})</span>
+                    <span>Stop loss ({currency || '…'})</span>
                     <input
                         type='number'
                         min='0'
                         step='any'
                         inputMode='decimal'
-                        placeholder='none'
+                        placeholder='Optional'
                         value={prefs.stopLoss}
                         onChange={e => set({ stopLoss: e.target.value })}
                     />
                 </label>
                 <label>
-                    <span>Take profit, optional ({currency || '…'})</span>
+                    <span>Take profit ({currency || '…'})</span>
                     <input
                         type='number'
                         min='0'
                         step='any'
                         inputMode='decimal'
-                        placeholder='none'
+                        placeholder='Optional'
                         value={prefs.takeProfit}
                         onChange={e => set({ takeProfit: e.target.value })}
                     />
@@ -222,7 +220,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             )}
 
             {stakeNote && (
-                <p className={/^(Stake set to|Stop loss ignored)/.test(stakeNote) ? 'forex-live__note' : 'forex-live__warn'} role='alert'>
+                <p className={/^Stop loss ignored/.test(stakeNote) ? 'forex-live__note' : 'forex-live__warn'} role='alert'>
                     {stakeNote}
                 </p>
             )}
@@ -247,7 +245,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             </label>
 
             <p className='forex-live__hint'>
-                No time limit: a trade stays open until you close it, or until its stop loss / take profit is reached. You can never lose more than the stake.
+                Stays open until you close it or its stop loss / take profit is reached. You can never lose more than the stake.
             </p>
         </section>
     );

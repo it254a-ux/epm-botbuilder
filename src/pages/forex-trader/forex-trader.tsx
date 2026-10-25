@@ -1051,11 +1051,6 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                                 ⚠ {w}
                             </p>
                         ))}
-                        {outcome.aiError && (
-                            <p className='forex-trader__warn'>
-                                AI review unavailable: {outcome.aiError} Showing the code-calculated result only.
-                            </p>
-                        )}
                         <p className='forex-trader__muted'>
                             Live: recalculated {new Date(outcome.at).toISOString().slice(11, 19)} GMT from the real candles. Signals only: no strategy wins every time.
                         </p>
