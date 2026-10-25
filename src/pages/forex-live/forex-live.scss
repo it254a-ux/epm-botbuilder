@@ -31,13 +31,13 @@
 
     &__top {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 300px;
+        grid-template-columns: minmax(0, 1fr) 580px;
         gap: 10px;
         height: 100%;
         min-height: 0;
 
         @media (max-width: 1100px) {
-            grid-template-columns: minmax(0, 1fr) 280px;
+            grid-template-columns: minmax(0, 1fr) 500px;
         }
 
         @media (max-width: 900px) {
@@ -167,11 +167,20 @@
         }
     }
 
-    // every card in the side column uses the one small text size
+    // every card in the side column uses the one small text size, and a word never breaks onto a second line
     &__card,
     &__card * {
-        font-size: 9px !important;
+        font-size: 10px !important;
         letter-spacing: 0.03em !important;
+        white-space: nowrap;
+    }
+
+    &__card &__hint,
+    &__card &__note,
+    &__card &__warn,
+    &__card &__flash,
+    &__card &__empty {
+        white-space: normal;
     }
 
     &__card-head {
@@ -350,9 +359,33 @@
         }
     }
 
+    // quick stakes and trades-per-click share one row
+    &__quick {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+
+        .forex-live__chips {
+            margin-top: 0;
+        }
+
+        .forex-live__count {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 0;
+
+            select {
+                width: 64px;
+            }
+        }
+    }
+
     &__grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 8px;
         padding: 8px;
         border-radius: 10px;
@@ -549,7 +582,7 @@
         // one text size through the whole panel, headings and body alike
         &,
         * {
-            font-size: 9px !important;
+            font-size: 10px !important;
             line-height: 1.35;
             letter-spacing: 0.03em !important;
         }
@@ -568,6 +601,16 @@
         }
     }
 
+    @media (max-width: 560px) {
+        &__grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        &__summary {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
     // ---- open trades
     &__switch {
         display: flex;
@@ -580,7 +623,7 @@
 
     &__summary {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 6px;
         margin-bottom: 10px;
 
@@ -593,6 +636,12 @@
             border-radius: 12px;
             background: var(--fl-field);
             border: 1px solid var(--fl-line);
+            overflow: hidden;
+
+            > * {
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
         }
 
         small {
@@ -604,7 +653,6 @@
         }
 
         b {
-            font-size: 15px;
             font-weight: 700;
             font-variant-numeric: tabular-nums;
         }

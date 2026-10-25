@@ -73,6 +73,16 @@ const PositionsPanel = ({ positions, currency, symbol, onClose, onClear }: Props
                     <b>{formatMoney(sum.profit)}</b>
                     <em>{currency}</em>
                 </div>
+                <div>
+                    <small>Winning</small>
+                    <b>{sum.winning}</b>
+                    <em>trades</em>
+                </div>
+                <div>
+                    <small>Losing</small>
+                    <b>{sum.losing}</b>
+                    <em>trades</em>
+                </div>
             </div>
 
             <div className='forex-live__filters' role='group' aria-label='Show open trades'>

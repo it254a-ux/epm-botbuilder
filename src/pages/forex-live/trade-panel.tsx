@@ -227,6 +227,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                 </p>
             )}
 
+            <div className='forex-live__quick'>
             <div className='forex-live__chips' aria-label='Quick stakes'>
                 {STAKES.map(s => (
                     <button key={s} type='button' className={Number(prefs.stake) === s ? 'is-on' : ''} onClick={() => setStake(String(s))}>
@@ -245,6 +246,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     ))}
                 </select>
             </label>
+            </div>
 
             <p className='forex-live__hint'>
                 Stays open until you close it or its stop loss / take profit is reached. You can never lose more than the stake.
