@@ -749,6 +749,9 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                                                         setCategory(c);
                                                         setStrategyId(st.id);
                                                         if (mode !== 'h1') setMode('h1');
+                                                        // done choosing: fold the list, and tuck the floating setup card away
+                                                        setOpenCat(null);
+                                                        if (resultHost) setSetupOpen(false);
                                                     }}
                                                 >
                                                     <span>{st.name}</span>
