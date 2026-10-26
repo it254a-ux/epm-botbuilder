@@ -71,6 +71,76 @@
     color: #cbd5e1;
 }
 
+// minimised: just one round button; open: the toggle is a slim arrow row at the top
+.fx-bar.is-min {
+    padding: 4px;
+    border-radius: 999px;
+    max-height: none;
+}
+
+.fx-bar__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    color: #f6d36b;
+    background: transparent;
+    border: 0;
+    border-radius: 12px;
+    transition: background 0.2s, transform 0.2s;
+
+    &:hover {
+        background: rgba(246, 211, 107, 0.12);
+    }
+
+    svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+.fx-bar.is-min .fx-bar__toggle {
+    width: 32px;
+    border-radius: 50%;
+}
+
+// the tools glide out from the button and glide back in
+.fx-bar__body {
+    display: contents;
+
+    > * {
+        animation: fx-bar-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    &.is-leaving > * {
+        animation: fx-bar-out 0.22s ease-in both;
+    }
+}
+
+@keyframes fx-bar-in {
+    from {
+        opacity: 0;
+        transform: translateX(-10px) scale(0.92);
+    }
+}
+
+@keyframes fx-bar-out {
+    to {
+        opacity: 0;
+        transform: translateX(-10px) scale(0.92);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fx-bar__body > * {
+        animation: none !important;
+    }
+}
+
 .fx-sep {
     display: block;
     width: 22px;

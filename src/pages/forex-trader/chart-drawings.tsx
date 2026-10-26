@@ -248,6 +248,19 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const [color, setColor] = useState('#facc15');
     const [selected, setSelected] = useState<number | null>(null);
     const [menu, setMenu] = useState<string | null>(null);
+    // The toolbar stays tucked away until it is wanted: a single round button opens it, the arrow closes it again.
+    const [barOpen, setBarOpen] = useState(false);
+    const [barLeaving, setBarLeaving] = useState(false);
+    const toggleBar = () => {
+        if (barOpen) {
+            setBarLeaving(true);
+            setMenu(null);
+            window.setTimeout(() => {
+                setBarOpen(false);
+                setBarLeaving(false);
+            }, 220);
+        } else setBarOpen(true);
+    };
     const [, redraw] = useState(0);
     const nextId = useRef(1);
     const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -732,7 +745,27 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
 
             {tool !== 'cursor' && <div className='fx-hint'>{HINTS[tool]} · Esc to cancel</div>}
 
-            <div className='fx-bar' onPointerDown={e => e.stopPropagation()}>
+            <div className={`fx-bar${barOpen ? ' is-open' : ' is-min'}`} onPointerDown={e => e.stopPropagation()}>
+                <button
+                    type='button'
+                    className='fx-bar__toggle'
+                    data-tip={barOpen ? 'Hide tools' : 'Chart tools'}
+                    aria-label={barOpen ? 'Hide chart tools' : 'Open chart tools'}
+                    aria-expanded={barOpen}
+                    onClick={toggleBar}
+                >
+                    {barOpen ? (
+                        <Svg>
+                            <path d='M15 6l-6 6 6 6' />
+                        </Svg>
+                    ) : (
+                        <Svg>
+                            <path d='M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3' />
+                        </Svg>
+                    )}
+                </button>
+                {barOpen && (
+                <div className={`fx-bar__body${barLeaving ? ' is-leaving' : ''}`}>
                 {extra}
                 <button
                     type='button'
@@ -868,6 +901,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                         </div>
                     )}
                 </div>
+                </div>
+                )}
             </div>
         </>
     );
