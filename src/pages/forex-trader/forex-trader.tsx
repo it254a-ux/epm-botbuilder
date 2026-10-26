@@ -189,7 +189,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const rootRef = useRef<HTMLDivElement>(null);
     const [fitHeight, setFitHeight] = useState<number | null>(null);
     // on Forex Live the trade setup floats over the chart; this opens and closes it
-    const [setupOpen, setSetupOpen] = useState(true);
+    const [setupOpen, setSetupOpen] = useState(!resultHost);
 
     // ---- keep the page exactly as tall as the visible area (same approach as the Analysis Tool)
     useEffect(() => {
@@ -686,18 +686,23 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
             className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
-            {resultHost && (
+            <div className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
                 <button
                     type='button'
-                    className='forex-trader__setup-toggle'
-                    onClick={() => setSetupOpen(o => !o)}
+                    className='forex-trader__head'
                     aria-expanded={setupOpen}
-                    title={setupOpen ? 'Hide the trade setup' : 'Show the trade setup'}
+                    onClick={() => setSetupOpen(o => !o)}
+                    title={setupOpen ? 'Minimise the trade setup' : 'Open the trade setup'}
                 >
-                    {setupOpen ? '×' : 'Setup'}
+                    <b>Trade setup</b>
+                    <small>
+                        {info?.underlying_symbol_name ?? symbol} · {TIMEFRAMES.find(t => t.sec === tf)?.label}
+                        {mode === 'h1' && STRATEGIES.find(st => st.id === strategyId) ? ` · ${STRATEGIES.find(st => st.id === strategyId)?.name}` : ''}
+                    </small>
+                    <i aria-hidden='true' />
                 </button>
-            )}
-            <div className='forex-trader__controls'>
+                <div className='forex-trader__body' aria-hidden={!setupOpen}>
+                    <div className='forex-trader__body-in'>
                 <div className='forex-trader__row'>
                     <MarketPicker
                         symbols={symbols}
@@ -769,6 +774,8 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
                     {aiBusy ? 'Reviewing…' : 'Re-analyse'}
                 </button>
+                    </div>
+                </div>
             </div>
 
             <div
