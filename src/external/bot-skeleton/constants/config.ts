@@ -281,7 +281,9 @@ export const config = () => ({
         // prevented users from loading their existing XML strategy files.
         // This broader scope enables users to access and load any XML files
         // from their Google Drive for importing strategies.
-        SCOPE: 'https://www.googleapis.com/auth/drive',
+        // drive.file = only files this app creates or the user picks in the Picker. It is a non-sensitive permission, so Google shows no
+        // "hasn't verified this app" warning and needs no review (the old full-Drive scope did).
+        SCOPE: 'https://www.googleapis.com/auth/drive.file',
         DISCOVERY_DOCS: 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
     },
     workspaces: {
