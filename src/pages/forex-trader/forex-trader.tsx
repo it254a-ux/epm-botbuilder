@@ -168,6 +168,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const lastMsgAt = useRef(Date.now());
     const [live, setLive] = useState(true);
     const [aiBusy, setAiBusy] = useState(false);
+    const [openCat, setOpenCat] = useState<string | null>(null);
     // 'h1' = the existing strategies exactly as before; 'mtf' = M15 direction + M5 entry (additional mode)
     const [rawMode, setMode] = useSharedPick('mode', initialMode ?? 'h1', shared);
     // with a charts pop-up on hand, the M15 + M5 mode lives in the pop-up and never switches this tool
@@ -437,7 +438,6 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         };
     }, [ws, isConnected, symbol, mode]);
 
-    const categoryStrategies = STRATEGIES.filter(s => s.category === category);
     const strategy = STRATEGIES.find(s => s.id === strategyId);
     const canAnalyse = !!strategy?.ready && !loading && !loadError && !closed && !aiBusy && isConnected;
 
@@ -698,72 +698,81 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 </button>
             )}
             <div className='forex-trader__controls'>
-                <MarketPicker
-                    symbols={symbols}
-                    value={symbol}
-                    onChange={s => {
-                        setSymbol(s);
-                        onSymbolChange?.(s);
-                    }}
-                />
-                <label>
-                    <span>Mode</span>
-                    <select
-                        value={mode}
-                        onChange={e => {
-                            if (e.target.value === 'mtf' && onOpenCompare) onOpenCompare();
-                            else setMode(e.target.value as 'h1' | 'mtf');
+                <div className='forex-trader__row'>
+                    <MarketPicker
+                        symbols={symbols}
+                        value={symbol}
+                        onChange={s => {
+                            setSymbol(s);
+                            onSymbolChange?.(s);
                         }}
-                    >
-                        <option value='h1'>H1 strategies (existing)</option>
-                        <option value='mtf'>M15 analysis + M5 entry{onOpenCompare ? ' (opens charts)' : ''}</option>
-                    </select>
-                </label>
-                {mode === 'h1' && (
-                <>
-                <label className='forex-trader__tf'>
-                    <span>Timeframe</span>
-                    <select value={tf} onChange={e => setTf(Number(e.target.value))}>
-                        {TIMEFRAMES.map(t => (
-                            <option key={t.sec} value={t.sec}>
-                                {t.label}
-                            </option>
+                    />
+                    <label className='forex-trader__tf'>
+                        <span>Timeframe</span>
+                        <select
+                            value={tf}
+                            onChange={e => {
+                                setTf(Number(e.target.value));
+                                if (mode !== 'h1') setMode('h1');
+                            }}
+                        >
+                            {TIMEFRAMES.map(t => (
+                                <option key={t.sec} value={t.sec}>
+                                    {t.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                <div className='forex-trader__cats' role='group' aria-label='Strategy categories'>
+                    {STRATEGY_CATEGORIES.map(c => {
+                        const chosen = mode === 'h1' && category === c;
+                        const name = STRATEGIES.find(st => st.id === strategyId)?.name;
+                        return (
+                            <button
+                                key={c}
+                                type='button'
+                                className={`forex-trader__cat${openCat === c ? ' is-open' : ''}${chosen ? ' is-chosen' : ''}`}
+                                aria-expanded={openCat === c}
+                                title={c}
+                                onClick={() => setOpenCat(o => (o === c ? null : c))}
+                            >
+                                <b>{c}</b>
+                                <small>{chosen && name ? name : `${STRATEGIES.filter(st => st.category === c).length} strategies`}</small>
+                                <i aria-hidden='true'>{openCat === c ? '▴' : '▾'}</i>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {openCat && (
+                    <ul className='forex-trader__strats' aria-label={`${openCat} strategies`}>
+                        {STRATEGIES.filter(st => st.category === openCat).map(st => (
+                            <li key={st.id}>
+                                <button
+                                    type='button'
+                                    disabled={!st.ready}
+                                    className={mode === 'h1' && strategyId === st.id ? 'is-on' : ''}
+                                    onClick={() => {
+                                        setCategory(openCat);
+                                        setStrategyId(st.id);
+                                        if (mode !== 'h1') setMode('h1');
+                                    }}
+                                >
+                                    <span>
+                                        {st.id}. {st.name}
+                                    </span>
+                                    {!st.ready && <em>soon</em>}
+                                </button>
+                            </li>
                         ))}
-                    </select>
-                </label>
-                <label>
-                    <span>Category</span>
-                    <select
-                        value={category}
-                        onChange={e => {
-                            setCategory(e.target.value);
-                            const first = STRATEGIES.find(s => s.category === e.target.value && s.ready);
-                            setStrategyId((first ?? STRATEGIES.find(s => s.category === e.target.value))!.id);
-                        }}
-                    >
-                        {STRATEGY_CATEGORIES.map(c => (
-                            <option key={c} value={c}>
-                                {c}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <label>
-                    <span>Strategy</span>
-                    <select value={strategyId} onChange={e => setStrategyId(Number(e.target.value))}>
-                        {categoryStrategies.map(s => (
-                            <option key={s.id} value={s.id} disabled={!s.ready}>
-                                {s.id}. {s.name}
-                                {s.ready ? '' : ' — coming soon'}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                    </ul>
+                )}
+
                 <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
                     {aiBusy ? 'Reviewing…' : 'Re-analyse'}
                 </button>
-                </>
-                )}
             </div>
 
             <div
