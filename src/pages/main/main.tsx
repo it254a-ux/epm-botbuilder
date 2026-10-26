@@ -54,7 +54,6 @@ const EpmAnalysisTool = lazy(() => import('../epm-analysis-tool'));
 const ForexPanel = lazy(() => import('../forex-trader/forex-panel'));
 const DtraderPage = lazy(() => import('../dtrader'));
 const TradingViewPage = lazy(() => import('../trading-view'));
-const ForexTraderPage = lazy(() => import('../forex-trader'));
 const ForexLivePage = lazy(() => import('../forex-live'));
 
 const AppWrapper = observer(() => {
@@ -728,7 +727,8 @@ const AppWrapper = observer(() => {
                                 <Suspense
                                     fallback={<ChunkLoader message={localize('Please wait, loading Forex Trader...')} />}
                                 >
-                                    <ForexTraderPage />
+                                    {/* The standalone Forex Trader page is retired: an old link lands on Forex Live, which contains the same tool. */}
+                                    <ForexLivePage />
                                 </Suspense>
                             </div>
                             <div
