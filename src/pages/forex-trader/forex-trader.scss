@@ -860,96 +860,137 @@
 }
 
 .forex-trader__cats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 6px;
+}
+
+// each category is a full-width bar; its strategies slide open directly underneath it
+.forex-trader__acc {
+    border-radius: 12px;
+    background: linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent), color-mix(in srgb, #000 24%, transparent));
+    border: 1px solid color-mix(in srgb, var(--text-prominent) 13%, transparent);
+    transition: border-color 0.25s, box-shadow 0.25s;
+
+    &.is-open {
+        border-color: color-mix(in srgb, #c9a227 65%, transparent);
+        box-shadow: 0 10px 24px -16px #c9a227;
+    }
 }
 
 .forex-trader__cat {
     position: relative;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
     min-width: 0;
-    padding: 8px 24px 8px 10px;
+    height: 36px;
+    padding: 0 34px 0 12px;
     text-align: left;
     cursor: pointer;
     color: var(--text-general);
-    background: color-mix(in srgb, #000 22%, transparent);
-    border: 1px solid color-mix(in srgb, var(--text-prominent) 14%, transparent);
-    border-radius: 10px;
-    transition: border-color 0.15s, background 0.15s;
+    background: transparent;
+    border: 0;
 
-    b,
-    small {
-        display: block;
-        overflow: hidden;
+    b {
+        flex: none;
         white-space: nowrap;
-        text-overflow: ellipsis;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 500;
     }
 
     small {
-        font-size: 10px;
-        color: var(--text-less-prominent);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        text-align: right;
+        font-size: 11px;
+        color: #e6c65a;
     }
 
+    // a small chevron that turns when the list opens
     i {
         position: absolute;
-        right: 9px;
+        right: 14px;
         top: 50%;
-        transform: translateY(-50%);
-        font-style: normal;
-        font-size: 10px;
-        color: var(--text-less-prominent);
+        width: 7px;
+        height: 7px;
+        margin-top: -5px;
+        border-right: 1.5px solid var(--text-less-prominent);
+        border-bottom: 1.5px solid var(--text-less-prominent);
+        transform: rotate(45deg);
+        transition: transform 0.3s ease, border-color 0.2s;
     }
 
-    &:hover {
-        border-color: #c9a227;
-    }
-
-    &.is-open {
-        border-color: #c9a227;
-        background: color-mix(in srgb, #c9a227 10%, transparent);
-    }
-
-    &.is-chosen small {
-        color: #e6c65a;
+    &:hover i {
+        border-color: #e6c65a;
     }
 }
 
-.forex-trader__strats {
+.forex-trader__acc.is-open .forex-trader__cat i {
+    margin-top: -2px;
+    transform: rotate(-135deg);
+    border-color: #e6c65a;
+}
+
+// smooth open and close: the row height animates from 0 to its natural height
+.forex-trader__drop {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+
+    > .forex-trader__strats {
+        overflow: hidden;
+        min-height: 0;
+    }
+}
+
+.forex-trader__acc.is-open .forex-trader__drop {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+.forex-trader__strats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     margin: 0;
-    padding: 8px;
+    padding: 0 6px;
     list-style: none;
-    border-radius: 10px;
-    background: color-mix(in srgb, #000 28%, transparent);
-    border: 1px solid color-mix(in srgb, #c9a227 35%, transparent);
 
     li {
         min-width: 0;
+    }
+
+    li:first-child {
+        margin-top: 2px;
+    }
+
+    li:last-child {
+        margin-bottom: 6px;
     }
 
     button {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 6px;
+        gap: 8px;
         width: 100%;
         min-width: 0;
-        height: 28px;
-        padding: 0 9px;
+        height: 30px;
+        padding: 0 10px;
         text-align: left;
         font-size: 11px;
         cursor: pointer;
         color: var(--text-general);
         background: transparent;
-        border: 1px solid transparent;
+        border: 0;
         border-radius: 8px;
+        transition: background 0.15s;
 
         span {
             overflow: hidden;
@@ -965,11 +1006,12 @@
         }
 
         &:hover:not(:disabled) {
-            background: color-mix(in srgb, #c9a227 14%, transparent);
+            background: color-mix(in srgb, #c9a227 16%, transparent);
         }
 
         &.is-on {
             color: #1a1405;
+            font-weight: 600;
             background: linear-gradient(135deg, #f3e2a0, #c9a227);
         }
 
@@ -980,9 +1022,9 @@
     }
 }
 
-@media (max-width: 480px) {
-    .forex-trader__cats,
-    .forex-trader__strats {
-        grid-template-columns: 1fr;
+@media (prefers-reduced-motion: reduce) {
+    .forex-trader__drop,
+    .forex-trader__cat i {
+        transition: none;
     }
 }

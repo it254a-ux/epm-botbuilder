@@ -727,48 +727,41 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
 
                 <div className='forex-trader__cats' role='group' aria-label='Strategy categories'>
                     {STRATEGY_CATEGORIES.map(c => {
-                        const chosen = mode === 'h1' && category === c;
-                        const name = STRATEGIES.find(st => st.id === strategyId)?.name;
+                        const open = openCat === c;
+                        const chosen = mode === 'h1' && category === c ? STRATEGIES.find(st => st.id === strategyId)?.name : undefined;
                         return (
-                            <button
-                                key={c}
-                                type='button'
-                                className={`forex-trader__cat${openCat === c ? ' is-open' : ''}${chosen ? ' is-chosen' : ''}`}
-                                aria-expanded={openCat === c}
-                                title={c}
-                                onClick={() => setOpenCat(o => (o === c ? null : c))}
-                            >
-                                <b>{c}</b>
-                                <small>{chosen && name ? name : `${STRATEGIES.filter(st => st.category === c).length} strategies`}</small>
-                                <i aria-hidden='true'>{openCat === c ? '▴' : '▾'}</i>
-                            </button>
+                            <div key={c} className={`forex-trader__acc${open ? ' is-open' : ''}${chosen ? ' is-chosen' : ''}`}>
+                                <button type='button' className='forex-trader__cat' aria-expanded={open} onClick={() => setOpenCat(o => (o === c ? null : c))}>
+                                    <b>{c}</b>
+                                    {chosen && <small>{chosen}</small>}
+                                    <i aria-hidden='true' />
+                                </button>
+                                <div className='forex-trader__drop' aria-hidden={!open}>
+                                    <ul className='forex-trader__strats'>
+                                        {STRATEGIES.filter(st => st.category === c).map(st => (
+                                            <li key={st.id}>
+                                                <button
+                                                    type='button'
+                                                    tabIndex={open ? 0 : -1}
+                                                    disabled={!st.ready}
+                                                    className={mode === 'h1' && strategyId === st.id ? 'is-on' : ''}
+                                                    onClick={() => {
+                                                        setCategory(c);
+                                                        setStrategyId(st.id);
+                                                        if (mode !== 'h1') setMode('h1');
+                                                    }}
+                                                >
+                                                    <span>{st.name}</span>
+                                                    {!st.ready && <em>soon</em>}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
                         );
                     })}
                 </div>
-
-                {openCat && (
-                    <ul className='forex-trader__strats' aria-label={`${openCat} strategies`}>
-                        {STRATEGIES.filter(st => st.category === openCat).map(st => (
-                            <li key={st.id}>
-                                <button
-                                    type='button'
-                                    disabled={!st.ready}
-                                    className={mode === 'h1' && strategyId === st.id ? 'is-on' : ''}
-                                    onClick={() => {
-                                        setCategory(openCat);
-                                        setStrategyId(st.id);
-                                        if (mode !== 'h1') setMode('h1');
-                                    }}
-                                >
-                                    <span>
-                                        {st.id}. {st.name}
-                                    </span>
-                                    {!st.ready && <em>soon</em>}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
 
                 <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
                     {aiBusy ? 'Reviewing…' : 'Re-analyse'}
