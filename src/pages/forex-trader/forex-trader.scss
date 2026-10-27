@@ -582,46 +582,34 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 50%;
-    background: rgba(12, 14, 20, 0.6);
-    backdrop-filter: blur(6px);
-    cursor: pointer;
+    min-width: 58px;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid rgba(34, 197, 94, 0.45);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(20, 28, 24, 0.82), rgba(10, 14, 12, 0.82));
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    cursor: default;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 
-    // one small dot, no words: green while prices update, grey when paused, amber while reconnecting
-    i {
-        display: block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #6b7280;
+    // the time left on the forming candle; the box colour shows the feed: green live, amber reconnecting, grey paused
+    .forex-trader__clock {
+        font: 500 11px/1 'Segoe UI', system-ui, sans-serif;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        color: #86efac;
+        white-space: nowrap;
     }
 
-    &.is-on i {
-        background: #22c55e;
-        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
-        animation: fx-live-ring 2.4s ease-out infinite;
+    &.is-wait {
+        border-color: rgba(245, 158, 11, 0.5);
+        .forex-trader__clock { color: #fcd34d; }
     }
 
-    &.is-wait i {
-        background: #f59e0b;
-        animation: fx-live-blink 1s ease-in-out infinite;
-    }
-
-    &.is-paused i {
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
-        background: #9ca3af;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        i {
-            animation: none !important;
-        }
+    &.is-paused {
+        border-color: rgba(156, 163, 175, 0.4);
+        .forex-trader__clock { color: #9ca3af; }
     }
 }
 
@@ -756,7 +744,7 @@
     }
 }
 
-/* The live dot sits clear of the price scale when the page makes the chart wide. */
+/* The candle clock sits clear of the price scale when the page makes the chart wide. */
 .forex-trader--result-out .forex-trader__live {
     right: 106px;
 }

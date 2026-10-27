@@ -151,6 +151,23 @@ interface ForexTraderProps {
     onOpenCompare?: () => void;
 }
 
+/** Time left on the forming candle (candles start on exact multiples of their length), counting down every second. */
+function CandleClock({ seconds }: { seconds: number }) {
+    const calc = () => seconds - (Math.floor(Date.now() / 1000) % seconds);
+    const [left, setLeft] = useState(calc);
+    useEffect(() => {
+        setLeft(calc());
+        const id = window.setInterval(() => setLeft(calc()), 1000);
+        return () => window.clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [seconds]);
+    const h = Math.floor(left / 3600);
+    const m = Math.floor((left % 3600) / 60);
+    const sec = left % 60;
+    const two = (n: number) => String(n).padStart(2, '0');
+    return <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>;
+}
+
 const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare }: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
@@ -699,7 +716,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         {info?.underlying_symbol_name ?? symbol} · {TIMEFRAMES.find(t => t.sec === tf)?.label}
                         {mode === 'h1' && STRATEGIES.find(st => st.id === strategyId) ? ` · ${STRATEGIES.find(st => st.id === strategyId)?.name}` : ''}
                     </small>
-                    <i aria-hidden='true' />
+                    <CandleClock seconds={mode === 'mtf' ? 300 : tf} />
                 </button>
                 <div className='forex-trader__body' aria-hidden={!setupOpen}>
                     <div className='forex-trader__body-in'>
