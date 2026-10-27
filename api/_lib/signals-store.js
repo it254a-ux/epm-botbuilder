@@ -199,6 +199,12 @@ async function claimAlert(sql, key) {
     return rows.length > 0;
 }
 
+/** True when an alert whose key starts with the prefix was claimed in the last N minutes (used for cool-downs). */
+async function hasRecentAlert(sql, prefix, minutes) {
+    const rows = await sql`SELECT 1 FROM signal_alerts WHERE key LIKE ${prefix + '%'} AND created_at > now() - (${minutes} * interval '1 minute') LIMIT 1`;
+    return rows.length > 0;
+}
+
 /** Give a claimed alert back (Telegram refused it), so the next run can send it. */
 async function releaseAlert(sql, key) {
     await sql`DELETE FROM signal_alerts WHERE key = ${key}`;
@@ -380,4 +386,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { claimAlert, releaseAlert, getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { hasRecentAlert, claimAlert, releaseAlert, getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };

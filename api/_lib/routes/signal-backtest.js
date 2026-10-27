@@ -14,12 +14,15 @@
 //        &trades=1                      also list the latest 100 trades
 //        &mode=mtf                      test the M15 direction + M5 entry mode instead of the H1 strategies (default 30 days, up to 90)
 //        &mode=ict                      test the ICT strategy (sweep + structure shift + fair value gap), same data and rules as mode=mtf
+//        &mode=grab                     test the Liquidity Grab Reversal (stop-hunt) strategy on M5: wins at 2x the stake, stop-outs at -1x stake (&mult=100 &tp=2 &days=30)
 //        &cooldown=30                   (mode=mtf) minutes before the same market can signal again (default: MTF_COOLDOWN_MIN, 30)
 const { getDb } = require('../db');
 const deriv = require('../deriv');
 const core = require('../signals-core');
 const store = require('../signals-store');
 const bt = require('../backtest');
+const btGrab = require('../backtest-grab');
+const { readGrabConfig } = require('../grab-telegram');
 const { readResultConfig } = require('../signal-outcome');
 const { authorised } = require('../signals-auth');
 
@@ -38,7 +41,9 @@ module.exports = async function handler(req, res) {
     const q = req.query || {};
     const live = core.readConfig();
     const ictMode = q.mode === 'ict';
-    const mtfMode = q.mode === 'mtf' || ictMode; // both use M5 candles with the M15 direction
+    const grabMode = q.mode === 'grab';
+    const grabCfg = { ...readGrabConfig(), multiplier: Math.max(1, numOr(q.mult, readGrabConfig().multiplier)), tpMultiple: Math.max(0.1, numOr(q.tp, readGrabConfig().tpMultiple)) };
+    const mtfMode = q.mode === 'mtf' || ictMode || grabMode; // both use M5 candles with the M15 direction
     const timeframe = mtfMode ? 300 : Math.max(60, numOr(q.tf, live.timeframe));
     const days = mtfMode ? Math.min(90, Math.max(5, numOr(q.days, 30))) : Math.min(730, Math.max(5, numOr(q.days, 180)));
     const strategies = q.strategies ? String(q.strategies).split(',').map(Number).filter(n => n >= 1 && n <= 5) : live.strategies;
@@ -56,7 +61,7 @@ module.exports = async function handler(req, res) {
         return;
     }
 
-    const out = { ok: true, mode: ictMode ? 'ict (sweep + shift + gap)' : mtfMode ? 'mtf (M15 direction + M5 entry)' : 'h1 strategies', timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
+    const out = { ok: true, mode: grabMode ? 'grab (Liquidity Grab Reversal)' : ictMode ? 'ict (sweep + shift + gap)' : mtfMode ? 'mtf (M15 direction + M5 entry)' : 'h1 strategies', timeframe, daysRequested: days, strategies, settings: { minRr: cfg.minRr, maxAgeCandles: cfg.maxAgeCandles, minStopAtr: cfg.minStopAtr, maxRr: cfg.maxRr }, symbolsTested: 0, skipped: [], unfinished: [], coverage: [] };
     const trades = [];
     try {
         const active = await deriv.getActiveSymbols(client);
@@ -81,6 +86,16 @@ module.exports = async function handler(req, res) {
         }
 
         const window = bt.historyCandles(timeframe);
+        const oneGrab = async (symbol, meta) => {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const stats = {};
+            const m5 = (await deriv.getCandlesBack(client, symbol, 300, 4 + days, stats)).filter(c => c.time + 300 <= nowSec);
+            out.coverage.push({ symbol, candles: m5.length, requested: stats.wanted, pages: stats.pages, from: m5.length ? core.gmtStamp(m5[0].time) : null, to: m5.length ? core.gmtStamp(m5[m5.length - 1].time + 300) : null });
+            if (m5.length < btGrab.FIRST + 1) { out.skipped.push({ symbol, reason: `Only ${m5.length} M5 candles available` }); return; }
+            // the first 3 days are only history for the previous-day level; they are not scored
+            trades.push(...btGrab.runGrabBacktest({ symbol, symbolName: meta.underlying_symbol_name, market: meta.market, m5, cfg: grabCfg, expirySeconds, cooldownMinutes: Math.max(0, numOr(q.cooldown, grabCfg.cooldownMin)) }));
+            out.symbolsTested++;
+        };
         const oneMtf = async (symbol, meta) => {
             const nowSec = Math.floor(Date.now() / 1000);
             const stats = {};
@@ -100,6 +115,7 @@ module.exports = async function handler(req, res) {
         const one = async symbol => {
             const meta = info.get(symbol);
             if (!meta) { out.skipped.push({ symbol, reason: 'Not in the Deriv market list' }); return; }
+            if (grabMode) return oneGrab(symbol, meta);
             if (mtfMode) return oneMtf(symbol, meta);
             const nowSec = Math.floor(Date.now() / 1000);
             const stats = {};
@@ -134,6 +150,16 @@ module.exports = async function handler(req, res) {
         client.close();
     }
 
+    if (grabMode) {
+        out.settings = { multiplier: grabCfg.multiplier, takeProfitStakes: grabCfg.tpMultiple, stopLoss: 'none (Deriv closes at a loss of the whole stake)', sameCandleBothReached: 'counted as a stop-out' };
+        out.summary = btGrab.summariseGrab(trades, grabCfg);
+        out.notes = ['Replays real M5 history through the same strategy code as the live watcher. Open/expired trades are not counted as wins or losses.', 'Spread, commission and slippage are not included.'];
+        if (out.unfinished.length) out.notes.push(`Time ran out: ${out.unfinished.length} markets were not tested. Run again with &symbols=${out.unfinished.slice(0, 12).join(',')}`);
+        if (q.trades === '1') out.latestTrades = trades.sort((a, b) => b.time - a.time).slice(0, 100).map(t => ({ ...t, time: core.gmtStamp(t.time), bestPct: Math.round(t.bestPct * 100) / 100, worstPct: Math.round(t.worstPct * 100) / 100 }));
+        out.elapsedMs = Date.now() - started;
+        res.status(out.ok ? 200 : 500).json(out);
+        return;
+    }
     Object.assign(out, bt.buildReport(trades));
     if (out.unfinished.length) out.notes.push(`Time ran out: ${out.unfinished.length} markets were not tested. Run again with &symbols=${out.unfinished.slice(0, 12).join(',')}`);
     if (q.trades === '1') out.latestTrades = trades.sort((a, b) => b.time - a.time).slice(0, 100).map(t => ({ ...t, stopAtr: t.stopAtr === null ? null : Math.round(t.stopAtr * 100) / 100, rr: Math.round(t.rr * 100) / 100 }));

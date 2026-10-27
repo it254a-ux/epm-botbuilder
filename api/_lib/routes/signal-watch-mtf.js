@@ -14,6 +14,8 @@
 //   - MTF_ENABLED=off switches this mode off completely
 //   - Previous Day High/Low rejection (api/_lib/pdh.js): a WATCH alert when price touches yesterday's high/low after an Institutional
 //     Footprint (once per level per market per day: "do not enter yet"), then the entry when the Rejection Candle forms. MTF_PDH=off switches it off.
+//   - Liquidity Grab Reversal (api/_lib/grab.js): OFF unless GRAB_ENABLED=on. A WATCH alert when a day extreme is taken with an Institutional Footprint,
+//     then the signal when an M5 candle touches the stop-hunt line and closes back inside. No stop loss; take profit = GRAB_TP_STAKES x the stake.
 //   - the ICT strategy (sweep + structure shift + fair value gap, api/_lib/ict.js) runs on the same candles in the same run, with its own
 //     open-trade and cool-down checks. ICT_ENABLED=off switches only ICT off.
 //
@@ -27,6 +29,8 @@ const { deliverSignal } = require('../signal-deliver');
 const mtf = require('../mtf');
 const ict = require('../ict');
 const pdhMod = require('../pdh');
+const grabMod = require('../grab');
+const grabTg = require('../grab-telegram');
 const core = require('../signals-core');
 const store = require('../signals-store');
 const news = require('../news');
@@ -96,9 +100,12 @@ module.exports = async function handler(req, res) {
     const ictEnabled = String(process.env.ICT_ENABLED || 'on').toLowerCase() !== 'off';
     // Previous Day High/Low rejection: a WATCH alert at the touch, then the entry at the Rejection Candle. MTF_PDH=off switches only this off.
     const pdhEnabled = String(process.env.MTF_PDH || 'on').toLowerCase() !== 'off';
+    const grabEnabled = String(process.env.GRAB_ENABLED || 'off').toLowerCase() === 'on';
+    const grabCfg = grabTg.readGrabConfig();
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
     if (pdhEnabled) summary.pdh = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, alerts: 0 };
+    if (grabEnabled) summary.grab = { waiting: 0, signals: 0, alerts: 0, newsHeld: 0 };
     const report = { ok: true, dry, mode: 'M15 direction + M5 entry', summary, markets: [] };
 
     let client;
@@ -214,6 +221,50 @@ module.exports = async function handler(req, res) {
                                 entry.pdh.alert = 'already sent today for this level';
                             }
                         }
+                    }
+                }
+                if (grabEnabled) {
+                    entry.grab = {};
+                    try {
+                        const g5 = (await deriv.getCandles(client, symbol, 300, 3)).filter(c => c.time + MTF_TF <= now);
+                        const gr = grabMod.analyseGrab(g5, now, require('../engine').marketKind(info.market));
+                        entry.grab = { stage: gr.stage, headline: gr.headline };
+                        if (gr.stage === 'none') summary.grab.waiting++;
+                        else {
+                            const gc = news.currenciesFor(symbol, info.market);
+                            const gn = gc.length && newsData.events.length ? news.check(gc, newsData.events, now, newsCfg) : {};
+                            const newsNote = gn.upcoming ? news.newsNote(gn.upcoming, now) : null;
+                            const isSignal = gr.stage === 'signal';
+                            const tp = isSignal ? grabTg.targets(gr.side, gr.entry, grabCfg) : null;
+                            const text = isSignal ? grabTg.formatGrabSignal(gr, info.underlying_symbol_name, grabCfg, { siteUrl: core.signalsPageUrl(), newsNote }) : grabTg.formatGrabWatch(gr, info.underlying_symbol_name, { siteUrl: core.signalsPageUrl(), newsNote });
+                            const input = { candles: g5, result: gr, symbolName: info.underlying_symbol_name, cfg: grabCfg, tp };
+                            const alertKey = `${symbol}|grab-${isSignal ? 'signal' : 'watch'}|${isSignal ? gr.setupId : gr.alertKey}`;
+                            if (isSignal && gn.blackout) {
+                                entry.grab.skipped = `News blackout: ${news.describe(gn.blackout, now)}`;
+                                summary.grab.newsHeld++;
+                            } else if (!write) {
+                                entry.grab.wouldSend = text;
+                                if (isSignal) { try { entry.grab.picture = `ok (${require('../signal-chart-grab').renderGrabPng(input).length} bytes)`; } catch (err) { entry.grab.picture = `would fail: ${err.message}`; } }
+                            } else if (isSignal && grabCfg.cooldownMin > 0 && (await store.hasRecentAlert(sql, `${symbol}|grab-signal|`, grabCfg.cooldownMin))) {
+                                entry.grab.skipped = `Cool-down: a stop-hunt signal was already sent for this market in the last ${grabCfg.cooldownMin} minutes`;
+                            } else if (await store.claimAlert(sql, alertKey)) {
+                                try {
+                                    if (isSignal) await send(() => grabTg.deliverGrab(text, input));
+                                    else await send(() => sendTelegram(text));
+                                    entry.grab.sent = true;
+                                    if (isSignal) summary.grab.signals++; else summary.grab.alerts++;
+                                } catch (err) {
+                                    await store.releaseAlert(sql, alertKey);
+                                    entry.grab.sent = `failed: ${err.message}`;
+                                    console.error('signal-watch-mtf: grab send failed:', err.message);
+                                }
+                            } else {
+                                entry.grab.skipped = 'Already sent before';
+                            }
+                        }
+                    } catch (err) {
+                        entry.grab.error = err.message;
+                        console.error(`signal-watch-mtf: grab ${symbol} failed:`, err.message);
                     }
                 }
                 for (const run of runs) {
