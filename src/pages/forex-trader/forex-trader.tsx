@@ -716,7 +716,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         {info?.underlying_symbol_name ?? symbol} · {TIMEFRAMES.find(t => t.sec === tf)?.label}
                         {mode === 'h1' && STRATEGIES.find(st => st.id === strategyId) ? ` · ${STRATEGIES.find(st => st.id === strategyId)?.name}` : ''}
                     </small>
-                    <CandleClock seconds={mode === 'mtf' ? 300 : tf} />
+                    <i aria-hidden='true' />
                 </button>
                 <div className='forex-trader__body' aria-hidden={!setupOpen}>
                     <div className='forex-trader__body-in'>
@@ -822,7 +822,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     aria-label={!isConnected ? 'Reconnecting' : live ? 'Prices updating. Click to pause.' : 'Paused. Click to resume.'}
                     title={!isConnected ? 'Reconnecting to the price feed…' : live ? 'Prices are updating. Click to pause.' : 'Paused. Click to resume.'}
                 >
-                    <i aria-hidden='true' />
+                    <CandleClock seconds={mode === 'mtf' ? 300 : tf} />
                 </button>
                 {loading && !loadError && <div className='forex-trader__overlay'>Loading chart…</div>}
                 {loadError && <div className='forex-trader__overlay forex-trader__overlay--error'>{loadError}</div>}
