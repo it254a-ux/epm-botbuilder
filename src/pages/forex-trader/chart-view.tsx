@@ -333,6 +333,33 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [studies, apis]);
 
+    // time left on the forming candle, shown on the live price label (counts down every second; follows the chart's timeframe)
+    useEffect(() => {
+        if (!apis || !showStudies) return;
+        const fmt = (sec: number) => {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            const two = (n: number) => String(n).padStart(2, '0');
+            return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${two(m)}:${two(s)}`;
+        };
+        const tick = () => {
+            const list = candlesRef.current;
+            if (list.length < 2) return;
+            const last = list[list.length - 1].time;
+            const tf = last - list[list.length - 2].time;
+            if (!(tf > 0)) return;
+            const left = Math.max(0, last + tf - Math.floor(Date.now() / 1000));
+            apis.series.applyOptions({ title: fmt(left) });
+        };
+        tick();
+        const id = window.setInterval(tick, 1000);
+        return () => {
+            window.clearInterval(id);
+            apis.series.applyOptions({ title: '' });
+        };
+    }, [apis, showStudies]);
+
     useEffect(() => {
         const minMove = Math.pow(10, -pipSize);
         seriesRef.current?.applyOptions({ priceFormat: { type: 'price', precision: pipSize, minMove } });
