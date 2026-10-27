@@ -14,7 +14,7 @@
 //   - MTF_ENABLED=off switches this mode off completely
 //   - Previous Day High/Low rejection (api/_lib/pdh.js): a WATCH alert when price touches yesterday's high/low after an Institutional
 //     Footprint (once per level per market per day: "do not enter yet"), then the entry when the Rejection Candle forms. MTF_PDH=off switches it off.
-//   - Liquidity Grab Reversal (api/_lib/grab.js): OFF unless GRAB_ENABLED=on. A WATCH alert when a day extreme is taken with an Institutional Footprint,
+//   - Liquidity Grab Reversal (api/_lib/grab.js): ON unless GRAB_ENABLED=off. A WATCH alert when a day extreme is taken with an Institutional Footprint,
 //     then the signal when an M5 candle touches the stop-hunt line and closes back inside. No stop loss; take profit = GRAB_TP_STAKES x the stake.
 //   - the ICT strategy (sweep + structure shift + fair value gap, api/_lib/ict.js) runs on the same candles in the same run, with its own
 //     open-trade and cool-down checks. ICT_ENABLED=off switches only ICT off.
@@ -100,7 +100,7 @@ module.exports = async function handler(req, res) {
     const ictEnabled = String(process.env.ICT_ENABLED || 'on').toLowerCase() !== 'off';
     // Previous Day High/Low rejection: a WATCH alert at the touch, then the entry at the Rejection Candle. MTF_PDH=off switches only this off.
     const pdhEnabled = String(process.env.MTF_PDH || 'on').toLowerCase() !== 'off';
-    const grabEnabled = String(process.env.GRAB_ENABLED || 'off').toLowerCase() === 'on';
+    const grabEnabled = String(process.env.GRAB_ENABLED || 'on').toLowerCase() === 'on';
     const grabCfg = grabTg.readGrabConfig();
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
