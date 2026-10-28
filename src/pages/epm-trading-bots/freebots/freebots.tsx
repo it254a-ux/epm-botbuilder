@@ -218,9 +218,6 @@ const Freebots = observer(() => {
         <div className='freebots'>
             <header className='freebots__hero'>
                 <div className='freebots__hero-text'>
-                    <span className='freebots__eyebrow'>
-                        <Localize i18n_default_text='Executive Prime Markets' />
-                    </span>
                     <h1 className='freebots__title'>
                         <Localize i18n_default_text='Free Bots' />
                     </h1>

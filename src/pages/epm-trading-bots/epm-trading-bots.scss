@@ -2,6 +2,12 @@
 
 .epm-trading-bots {
     @include page-wallpaper;
+    // fill the whole page: without this the page shrank to the width of its content (the other tabs stopped at about 700px)
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    align-self: stretch;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -23,6 +29,7 @@
  * `overflow-y: auto` actually have something to scroll within.
  */
 .dc-tabs--epm-trading-bots__tabs {
+    width: 100%;
     height: 100%;
     min-height: 0;
 }
