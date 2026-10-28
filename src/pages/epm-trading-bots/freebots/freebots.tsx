@@ -216,37 +216,6 @@ const Freebots = observer(() => {
 
     return (
         <div className='freebots'>
-            <header className='freebots__hero'>
-                <div className='freebots__hero-text'>
-                    <h1 className='freebots__title'>
-                        <Localize i18n_default_text='Free Bots' />
-                    </h1>
-                    <p className='freebots__subtitle'>
-                        <Localize i18n_default_text='Ready-made trading bots. Pick one, load it into Bot Builder and run it in a click.' />
-                    </p>
-                </div>
-                <div className='freebots__stats'>
-                    <div className='freebots__stat'>
-                        <b>{bots.length}</b>
-                        <span>
-                            <Localize i18n_default_text='Bots' />
-                        </span>
-                    </div>
-                    <div className='freebots__stat'>
-                        <b>{availableTypes.length}</b>
-                        <span>
-                            <Localize i18n_default_text='Strategies' />
-                        </span>
-                    </div>
-                    <div className='freebots__stat'>
-                        <b>{localize('Free')}</b>
-                        <span>
-                            <Localize i18n_default_text='Always' />
-                        </span>
-                    </div>
-                </div>
-            </header>
-
             {hasBots && (
                 <div className='freebots__toolbar'>
                     <label className='freebots__search'>
