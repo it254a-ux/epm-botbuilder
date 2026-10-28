@@ -477,6 +477,7 @@ const ROUTES = {
     admin: () => require('./_lib/routes/signal-admin'),
     backtest: () => require('./_lib/routes/signal-backtest'),
     'watch-mtf': () => require('./_lib/routes/signal-watch-mtf'),
+    'migrate-neon': () => require('./_lib/routes/migrate-neon'),
 };
 
 module.exports = async function handler(req, res) {

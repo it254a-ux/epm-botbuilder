@@ -31,6 +31,10 @@
             "destination": "/api/signal-watch?route=backtest"
         },
         {
+            "source": "/api/migrate-neon",
+            "destination": "/api/signal-watch?route=migrate-neon"
+        },
+        {
             "source": "/api/signal-watch-mtf",
             "destination": "/api/signal-watch?route=watch-mtf"
         },
