@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import RiskDisclaimer, { resetRiskDisclaimerForTests } from '../index';
 
-// The card appears half a second after the page is ready, and closes by itself after 10 seconds or on any touch / click.
+// The card appears half a second after the page is ready, and closes by itself after 3 seconds or on any touch / click.
 const setup = () => {
     render(<RiskDisclaimer />);
 };
@@ -21,11 +21,11 @@ test('shows after half a second', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
 });
 
-test('closes by itself 10 seconds after it appears', () => {
+test('closes by itself 3 seconds after it appears', () => {
     setup();
     act(() => jest.advanceTimersByTime(800));
     expect(screen.getByRole('dialog')).toBeTruthy();
-    act(() => jest.advanceTimersByTime(9000));
+    act(() => jest.advanceTimersByTime(2000));
     expect(screen.getByRole('dialog')).toBeTruthy();
     act(() => jest.advanceTimersByTime(1500));
     expect(screen.queryByRole('dialog')).toBeNull();

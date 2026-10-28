@@ -7,11 +7,11 @@ import './risk-disclaimer.scss';
 let dismissed = false;
 
 /** The card closes by itself after this long. */
-const AUTO_CLOSE_MS = 10000;
+const AUTO_CLOSE_MS = 3000;
 
 /**
  * Risk disclaimer shown on every page load/refresh, half a second after the dashboard is fully loaded and stable.
- * It closes by itself after 10 seconds, or at once when the person touches, clicks or types anywhere.
+ * It closes by itself after 3 seconds, or at once when the person touches, clicks or types anywhere.
  * Not shown on the OAuth callback page, and not again after "Okay"
  * until the page is refreshed.
  */
@@ -47,7 +47,7 @@ const RiskDisclaimer = () => {
             if (e.key === 'Enter' || e.key === 'Escape') close();
         };
         window.addEventListener('keydown', onKey);
-        // closes by itself after 10 seconds, or as soon as the person touches, clicks or types anywhere
+        // closes by itself after 3 seconds, or as soon as the person touches, clicks or types anywhere
         const timer = window.setTimeout(close, AUTO_CLOSE_MS);
         const any = () => close();
         // a short moment first, so the tap that was already in progress when the card appeared does not close it unseen
