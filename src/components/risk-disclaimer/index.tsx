@@ -6,8 +6,12 @@ import './risk-disclaimer.scss';
 // dismissed while the person navigates inside the app.
 let dismissed = false;
 
+/** The card closes by itself after this long. */
+const AUTO_CLOSE_MS = 10000;
+
 /**
- * Risk disclaimer shown on every page load/refresh, 2s after the dashboard is fully loaded and stable.
+ * Risk disclaimer shown on every page load/refresh, half a second after the dashboard is fully loaded and stable.
+ * It closes by itself after 10 seconds, or at once when the person touches, clicks or types anywhere.
  * Not shown on the OAuth callback page, and not again after "Okay"
  * until the page is refreshed.
  */
@@ -15,10 +19,10 @@ const RiskDisclaimer = () => {
     const [open, setOpen] = useState(false);
 
     // Wait until the app has fully loaded and the page has been visible and
-    // stable (no loading screen anywhere) for 2 seconds, then show the popup.
+    // stable (no loading screen anywhere) for half a second, then show the popup.
     useEffect(() => {
         if (dismissed || window.location.pathname === '/callback') return;
-        const STABLE_MS = 2000;
+        const STABLE_MS = 500;
         const TICK_MS = 200;
         const MAX_WAIT_MS = 25000;
         const isLoading = () =>
@@ -43,7 +47,23 @@ const RiskDisclaimer = () => {
             if (e.key === 'Enter' || e.key === 'Escape') close();
         };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        // closes by itself after 10 seconds, or as soon as the person touches, clicks or types anywhere
+        const timer = window.setTimeout(close, AUTO_CLOSE_MS);
+        const any = () => close();
+        // a short moment first, so the tap that was already in progress when the card appeared does not close it unseen
+        const arm = window.setTimeout(() => {
+            window.addEventListener('pointerdown', any, true);
+            window.addEventListener('touchstart', any, true);
+            window.addEventListener('keydown', any, true);
+        }, 300);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            window.clearTimeout(timer);
+            window.clearTimeout(arm);
+            window.removeEventListener('pointerdown', any, true);
+            window.removeEventListener('touchstart', any, true);
+            window.removeEventListener('keydown', any, true);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -82,6 +102,11 @@ const RiskDisclaimer = () => {
         </div>,
         document.body
     );
+};
+
+/** For tests only: forget that the card was closed. */
+export const resetRiskDisclaimerForTests = () => {
+    dismissed = false;
 };
 
 export default RiskDisclaimer;
