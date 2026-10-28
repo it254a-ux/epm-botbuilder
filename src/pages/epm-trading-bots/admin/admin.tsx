@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { Localize, localize } from '@deriv-com/translations';
 import './admin.scss';
@@ -104,6 +104,8 @@ const AdminBots = () => {
     // Non-null while editing an existing bot instead of creating a new one —
     // drives both the form's submit behavior (PUT vs POST) and its labels.
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
 
     const fetchBots = async () => {
         setIsLoadingList(true);
@@ -161,7 +163,7 @@ const AdminBots = () => {
         setXmlFileName('');
         // So the admin immediately sees the form they're about to edit,
         // rather than needing to scroll up themselves.
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -242,181 +244,175 @@ const AdminBots = () => {
         }
     };
 
+    const riskSlug = (r: string) => (/low/i.test(r) ? 'low' : /medium/i.test(r) ? 'medium' : /high/i.test(r) ? 'high' : 'neutral');
+    const isEditing = editingId !== null;
+
     return (
         <div className='admin-bots'>
-            <div className='admin-bots__header'>
-                <h1 className='admin-bots__title'>
-                    <Localize i18n_default_text='Manage Free Bots' />
-                </h1>
-                <p className='admin-bots__subtitle'>
-                    <Localize i18n_default_text='Add a new bot below, edit an existing one, or remove one from the list.' />
-                </p>
-            </div>
-
-            <div className='admin-bots__password-field'>
-                <label htmlFor='admin-password'>
-                    <Localize i18n_default_text='Admin password' />
-                </label>
-                <input
-                    id='admin-password'
-                    type='password'
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder={localize('Required to add or delete bots')}
-                />
-            </div>
-
-            <form className='admin-bots__form' onSubmit={handleSubmit}>
-                {editingId !== null && (
-                    <div className='admin-bots__editing-banner'>
-                        <Localize i18n_default_text='Editing an existing bot' />
-                        <button type='button' className='admin-bots__cancel-edit-btn' onClick={resetForm}>
-                            <Localize i18n_default_text='Cancel' />
-                        </button>
-                    </div>
-                )}
-
-                <label>
-                    <Localize i18n_default_text='Bot name' />
+            <header className='admin-bots__top'>
+                <div>
+                    <h1 className='admin-bots__title'>
+                        <Localize i18n_default_text='Manage Free Bots' />
+                    </h1>
+                    <p className='admin-bots__subtitle'>
+                        <Localize i18n_default_text='Add a new bot, edit an existing one, or remove one from the list.' />
+                    </p>
+                </div>
+                <div className='admin-bots__password-field'>
+                    <svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.7' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                        <rect x='4' y='10' width='16' height='10' rx='2.5' />
+                        <path d='M8 10V7a4 4 0 018 0v3' />
+                    </svg>
                     <input
-                        type='text'
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        maxLength={200}
-                        required
+                        id='admin-password'
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder={localize('Admin password')}
+                        aria-label={localize('Admin password')}
+                        autoComplete='off'
                     />
-                </label>
-
-                <label>
-                    <Localize i18n_default_text='Description' />
-                    <textarea
-                        value={description}
-                        onChange={e => setDescription(e.target.value)}
-                        rows={4}
-                        maxLength={5000}
-                        required
-                    />
-                </label>
-
-                <div className='admin-bots__form-row'>
-                    <label>
-                        <Localize i18n_default_text='Market' />
-                        <select value={market} onChange={e => setMarket(e.target.value)}>
-                            {MARKET_GROUPS.map(group => (
-                                <optgroup key={group.label} label={group.label}>
-                                    {group.options.map(option => (
-                                        <option key={option} value={option}>
-                                            {option}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label>
-                        <Localize i18n_default_text='Risk level' />
-                        <select value={riskLevel} onChange={e => setRiskLevel(e.target.value)}>
-                            {RISK_OPTIONS.map(option => (
-                                <option key={option} value={option}>
-                                    {option}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                </div>
-
-                <label>
-                    <Localize i18n_default_text='Contract type' />
-                    <select value={contractType} onChange={e => setContractType(e.target.value)}>
-                        {CONTRACT_TYPE_OPTIONS.map(option => (
-                            <option key={option} value={option}>
-                                {option}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label>
-                    {editingId !== null ? (
-                        <Localize i18n_default_text='Bot XML file (leave empty to keep the current one)' />
-                    ) : (
-                        <Localize i18n_default_text='Bot XML file' />
-                    )}
-                    <input type='file' accept='application/xml, text/xml' onChange={handleXmlFile} />
-                    {xmlFileName && <span className='admin-bots__file-name'>{xmlFileName}</span>}
-                </label>
-
-                <div className='admin-bots__form-actions'>
-                    <button type='submit' className='admin-bots__submit-btn' disabled={isSubmitting}>
-                        {isSubmitting ? (
-                            <Localize i18n_default_text='Saving...' />
-                        ) : editingId !== null ? (
-                            <Localize i18n_default_text='Update bot' />
-                        ) : (
-                            <Localize i18n_default_text='Add bot' />
-                        )}
+                    <button
+                        type='button'
+                        className='admin-bots__eye'
+                        onClick={() => setShowPassword(v => !v)}
+                        aria-label={showPassword ? localize('Hide password') : localize('Show password')}
+                    >
+                        {showPassword ? localize('Hide') : localize('Show')}
                     </button>
-                    {editingId !== null && (
-                        <button
-                            type='button'
-                            className='admin-bots__cancel-btn'
-                            onClick={resetForm}
-                            disabled={isSubmitting}
-                        >
-                            <Localize i18n_default_text='Cancel' />
-                        </button>
-                    )}
                 </div>
-            </form>
+            </header>
 
-            <div className='admin-bots__list'>
-                <h2>
-                    <Localize i18n_default_text='Existing bots' />
-                </h2>
-                {isLoadingList && (
-                    <p>
-                        <Localize i18n_default_text='Loading...' />
-                    </p>
-                )}
-                {!isLoadingList && bots.length === 0 && (
-                    <p>
-                        <Localize i18n_default_text='No bots yet.' />
-                    </p>
-                )}
-                {bots.map(bot => (
-                    <div key={bot.id} className='admin-bots__list-item'>
-                        <div>
-                            <strong>{bot.name}</strong>
-                            <span className='admin-bots__list-tags'>
-                                {bot.contract_type ? `${bot.contract_type} · ` : ''}
-                                {bot.market} · {bot.risk_level}
+            <div className='admin-bots__layout'>
+                <form ref={formRef} className={`admin-bots__card admin-bots__form${isEditing ? ' is-editing' : ''}`} onSubmit={handleSubmit}>
+                    <div className='admin-bots__card-head'>
+                        <h2>{isEditing ? <Localize i18n_default_text='Edit bot' /> : <Localize i18n_default_text='Add a new bot' />}</h2>
+                        {isEditing && (
+                            <span className='admin-bots__editing-pill'>
+                                <Localize i18n_default_text='Editing' />
                             </span>
-                        </div>
-                        <div className='admin-bots__list-item-actions'>
-                            <button
-                                type='button'
-                                className='admin-bots__edit-btn'
-                                disabled={deletingId === bot.id}
-                                onClick={() => handleEdit(bot)}
-                            >
-                                <Localize i18n_default_text='Edit' />
-                            </button>
-                            <button
-                                type='button'
-                                className='admin-bots__delete-btn'
-                                disabled={deletingId === bot.id}
-                                onClick={() => handleDelete(bot)}
-                            >
-                                {deletingId === bot.id ? (
-                                    <Localize i18n_default_text='Deleting...' />
-                                ) : (
-                                    <Localize i18n_default_text='Delete' />
-                                )}
-                            </button>
-                        </div>
+                        )}
                     </div>
-                ))}
+
+                    <div className='admin-bots__grid'>
+                        <label className='admin-bots__field admin-bots__field--wide'>
+                            <span><Localize i18n_default_text='Bot name' /></span>
+                            <input type='text' value={name} onChange={e => setName(e.target.value)} maxLength={200} required />
+                        </label>
+
+                        <label className='admin-bots__field'>
+                            <span><Localize i18n_default_text='Contract type' /></span>
+                            <select value={contractType} onChange={e => setContractType(e.target.value)}>
+                                {CONTRACT_TYPE_OPTIONS.map(option => (
+                                    <option key={option} value={option}>{option}</option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label className='admin-bots__field admin-bots__field--wide'>
+                            <span><Localize i18n_default_text='Market' /></span>
+                            <select value={market} onChange={e => setMarket(e.target.value)}>
+                                {MARKET_GROUPS.map(group => (
+                                    <optgroup key={group.label} label={group.label}>
+                                        {group.options.map(option => (
+                                            <option key={option} value={option}>{option}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                        </label>
+
+                        <div className='admin-bots__field'>
+                            <span><Localize i18n_default_text='Risk level' /></span>
+                            <div className='admin-bots__segment' role='radiogroup'>
+                                {RISK_OPTIONS.map(option => (
+                                    <button
+                                        key={option}
+                                        type='button'
+                                        role='radio'
+                                        aria-checked={riskLevel === option}
+                                        className={`admin-bots__seg admin-bots__seg--${riskSlug(option)}${riskLevel === option ? ' is-on' : ''}`}
+                                        onClick={() => setRiskLevel(option)}
+                                    >
+                                        {option.replace(' risk', '')}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <label className='admin-bots__field admin-bots__field--wide admin-bots__field--tall'>
+                            <span><Localize i18n_default_text='Description' /></span>
+                            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={5} maxLength={5000} required />
+                        </label>
+
+                        <label className={`admin-bots__drop${xmlFileName ? ' has-file' : ''}`}>
+                            <input type='file' accept='application/xml, text/xml' onChange={handleXmlFile} />
+                            <svg viewBox='0 0 24 24' width='26' height='26' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                                <path d='M12 16V5M7.5 9.5L12 5l4.5 4.5' />
+                                <path d='M4 16v2.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V16' />
+                            </svg>
+                            <strong>{xmlFileName || (isEditing ? localize('Choose a new XML file') : localize('Choose the bot XML file'))}</strong>
+                            <em>{isEditing ? localize('Leave empty to keep the current file') : localize('Required for a new bot')}</em>
+                        </label>
+                    </div>
+
+                    <div className='admin-bots__actions'>
+                        <button type='submit' className='admin-bots__submit-btn' disabled={isSubmitting}>
+                            {isSubmitting ? <Localize i18n_default_text='Saving...' /> : isEditing ? <Localize i18n_default_text='Update bot' /> : <Localize i18n_default_text='Add bot' />}
+                        </button>
+                        {(isEditing || name || description || xmlFileName) && (
+                            <button type='button' className='admin-bots__cancel-btn' onClick={resetForm} disabled={isSubmitting}>
+                                {isEditing ? <Localize i18n_default_text='Cancel' /> : <Localize i18n_default_text='Clear' />}
+                            </button>
+                        )}
+                    </div>
+                </form>
+
+                <section className='admin-bots__card admin-bots__list'>
+                    <div className='admin-bots__card-head'>
+                        <h2><Localize i18n_default_text='Existing bots' /></h2>
+                        <span className='admin-bots__count'>{bots.length}</span>
+                    </div>
+                    <div className='admin-bots__list-scroll'>
+                        {isLoadingList && (
+                            <>
+                                <div className='admin-bots__skeleton' />
+                                <div className='admin-bots__skeleton' />
+                            </>
+                        )}
+                        {!isLoadingList && bots.length === 0 && (
+                            <p className='admin-bots__empty'><Localize i18n_default_text='No bots yet. Add the first one on the left.' /></p>
+                        )}
+                        {bots.map(bot => (
+                            <div key={bot.id} className={`admin-bots__item${editingId === bot.id ? ' is-active' : ''}`}>
+                                <span className={`admin-bots__dot admin-bots__dot--${riskSlug(bot.risk_level)}`} aria-hidden='true' />
+                                <div className='admin-bots__item-main'>
+                                    <strong>{bot.name}</strong>
+                                    <span>
+                                        {bot.contract_type ? `${bot.contract_type} · ` : ''}
+                                        {bot.market} · {bot.risk_level}
+                                    </span>
+                                </div>
+                                <div className='admin-bots__item-actions'>
+                                    <button type='button' className='admin-bots__icon-btn admin-bots__icon-btn--edit' disabled={deletingId === bot.id} onClick={() => handleEdit(bot)} title={localize('Edit')} aria-label={localize('Edit')}>
+                                        <svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                                            <path d='M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z' />
+                                        </svg>
+                                    </button>
+                                    <button type='button' className='admin-bots__icon-btn admin-bots__icon-btn--delete' disabled={deletingId === bot.id} onClick={() => handleDelete(bot)} title={localize('Delete')} aria-label={localize('Delete')}>
+                                        {deletingId === bot.id ? (
+                                            <span className='admin-bots__spin' aria-hidden='true' />
+                                        ) : (
+                                            <svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                                                <path d='M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12' />
+                                            </svg>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
             </div>
         </div>
     );
