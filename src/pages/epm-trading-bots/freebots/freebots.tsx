@@ -82,6 +82,8 @@ const Freebots = observer(() => {
     // description in place, pushing the whole card and everything below it
     // taller) with this instead -- the card itself never changes size now.
     const [detailsBot, setDetailsBot] = useState<TBotSummary | null>(null);
+    const [query, setQuery] = useState('');
+    const [activeType, setActiveType] = useState<string>('All');
 
     useEffect(() => {
         let cancelled = false;
@@ -108,17 +110,28 @@ const Freebots = observer(() => {
         };
     }, []);
 
+    const typeOf = (bot: TBotSummary) => (CONTRACT_TYPE_ORDER.includes(bot.contract_type) ? bot.contract_type : 'Other');
+
+    // the contract types that actually have bots, in the fixed order, for the filter chips
+    const availableTypes = useMemo(
+        () => CONTRACT_TYPE_ORDER.filter(type => bots.some(bot => typeOf(bot) === type)),
+        [bots]
+    );
+
     const sections = useMemo(() => {
+        const q = query.trim().toLowerCase();
         const groups: Record<string, TBotSummary[]> = {};
         bots.forEach(bot => {
-            const key = CONTRACT_TYPE_ORDER.includes(bot.contract_type) ? bot.contract_type : 'Other';
+            const key = typeOf(bot);
+            if (activeType !== 'All' && key !== activeType) return;
+            if (q && !`${bot.name} ${bot.description} ${bot.market} ${bot.risk_level}`.toLowerCase().includes(q)) return;
             if (!groups[key]) groups[key] = [];
             groups[key].push(bot);
         });
         return CONTRACT_TYPE_ORDER.map(type => ({ type, bots: groups[type] || [] })).filter(
             section => section.bots.length > 0
         );
-    }, [bots]);
+    }, [bots, query, activeType]);
 
     const handleLoadBot = async (bot: TBotSummary) => {
         setDetailsBot(null);
@@ -152,67 +165,171 @@ const Freebots = observer(() => {
 
     const renderCard = (bot: TBotSummary) => {
         const isLong = bot.description.length > DESCRIPTION_PREVIEW_LENGTH;
+        const risk = riskLevelSlug(bot.risk_level);
+        const busy = loadingBotId === bot.id;
         return (
-            <div key={bot.id} className='freebots__card'>
-                <h2 className='freebots__card-title'>{bot.name}</h2>
+            <article key={bot.id} className={`freebots__card freebots__card--${risk}`}>
+                <div className='freebots__card-top'>
+                    <span className='freebots__badge' aria-hidden='true'>
+                        <svg viewBox='0 0 24 24' width='20' height='20' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round'>
+                            <rect x='4' y='8' width='16' height='11' rx='3' />
+                            <path d='M12 8V5' />
+                            <circle cx='12' cy='4' r='1' />
+                            <circle cx='9' cy='13.5' r='1.1' />
+                            <circle cx='15' cy='13.5' r='1.1' />
+                            <path d='M9.5 16.5h5' />
+                        </svg>
+                    </span>
+                    <span className={`freebots__risk freebots__risk--${risk}`}>
+                        <i aria-hidden='true' />
+                        {bot.risk_level}
+                    </span>
+                </div>
+                <h3 className='freebots__card-title'>{bot.name}</h3>
                 <div className='freebots__card-tags'>
                     <span className='freebots__tag'>{bot.market}</span>
-                    <span className='freebots__tag'>{bot.risk_level}</span>
+                    {bot.contract_type && <span className='freebots__tag'>{bot.contract_type}</span>}
                 </div>
                 <p className='freebots__card-description'>{bot.description}</p>
-                {isLong && (
-                    <button type='button' className='freebots__learn-more' onClick={() => setDetailsBot(bot)}>
-                        <Localize i18n_default_text='Learn more' />
-                    </button>
-                )}
-                <button
-                    type='button'
-                    className='freebots__load-btn'
-                    disabled={loadingBotId === bot.id}
-                    onClick={() => handleLoadBot(bot)}
-                >
-                    {loadingBotId === bot.id ? (
-                        <Localize i18n_default_text='Loading...' />
+                <div className='freebots__card-actions'>
+                    {isLong ? (
+                        <button type='button' className='freebots__learn-more' onClick={() => setDetailsBot(bot)}>
+                            <Localize i18n_default_text='Details' />
+                        </button>
                     ) : (
-                        <Localize i18n_default_text='Load Bot' />
+                        <span />
                     )}
-                </button>
-            </div>
+                    <button type='button' className='freebots__load-btn' disabled={busy} onClick={() => handleLoadBot(bot)}>
+                        {busy ? <Localize i18n_default_text='Loading...' /> : <Localize i18n_default_text='Load bot' />}
+                        {!busy && (
+                            <svg viewBox='0 0 24 24' width='14' height='14' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                                <path d='M5 12h14M13 6l6 6-6 6' />
+                            </svg>
+                        )}
+                    </button>
+                </div>
+            </article>
         );
     };
 
+    const hasBots = !isLoading && !loadError && bots.length > 0;
+
     return (
         <div className='freebots'>
-            <div className='freebots__header'>
-                <h1 className='freebots__title'>
-                    <Localize i18n_default_text='Free Bots' />
-                </h1>
-                <p className='freebots__subtitle'>
-                    <Localize i18n_default_text='Browse and load pre-built trading bots to get started quickly.' />
-                </p>
-            </div>
+            <header className='freebots__hero'>
+                <div className='freebots__hero-text'>
+                    <span className='freebots__eyebrow'>
+                        <Localize i18n_default_text='Executive Prime Markets' />
+                    </span>
+                    <h1 className='freebots__title'>
+                        <Localize i18n_default_text='Free Bots' />
+                    </h1>
+                    <p className='freebots__subtitle'>
+                        <Localize i18n_default_text='Ready-made trading bots. Pick one, load it into Bot Builder and run it in a click.' />
+                    </p>
+                </div>
+                <div className='freebots__stats'>
+                    <div className='freebots__stat'>
+                        <b>{bots.length}</b>
+                        <span>
+                            <Localize i18n_default_text='Bots' />
+                        </span>
+                    </div>
+                    <div className='freebots__stat'>
+                        <b>{availableTypes.length}</b>
+                        <span>
+                            <Localize i18n_default_text='Strategies' />
+                        </span>
+                    </div>
+                    <div className='freebots__stat'>
+                        <b>{localize('Free')}</b>
+                        <span>
+                            <Localize i18n_default_text='Always' />
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            {hasBots && (
+                <div className='freebots__toolbar'>
+                    <label className='freebots__search'>
+                        <svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' aria-hidden='true'>
+                            <circle cx='11' cy='11' r='7' />
+                            <path d='M20 20l-3.5-3.5' />
+                        </svg>
+                        <input
+                            type='search'
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder={localize('Search bots')}
+                            aria-label={localize('Search bots')}
+                        />
+                    </label>
+                    <div className='freebots__chips' role='tablist'>
+                        {['All', ...availableTypes].map(type => (
+                            <button
+                                key={type}
+                                type='button'
+                                role='tab'
+                                aria-selected={activeType === type}
+                                className={`freebots__chip${activeType === type ? ' is-active' : ''}`}
+                                onClick={() => setActiveType(type)}
+                            >
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {isLoading && (
-                <div className='freebots__status'>
-                    <Localize i18n_default_text='Loading bots...' />
+                <div className='freebots__grid' aria-busy='true'>
+                    {[0, 1, 2].map(i => (
+                        <div key={i} className='freebots__card freebots__card--skeleton' />
+                    ))}
                 </div>
             )}
 
             {!isLoading && loadError && <div className='freebots__status freebots__status--error'>{loadError}</div>}
 
             {!isLoading && !loadError && bots.length === 0 && (
-                <div className='freebots__status'>
-                    <Localize i18n_default_text='No bots have been added yet. Check back soon.' />
+                <div className='freebots__empty'>
+                    <span className='freebots__empty-icon' aria-hidden='true'>
+                        <svg viewBox='0 0 24 24' width='34' height='34' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'>
+                            <rect x='4' y='8' width='16' height='11' rx='3' />
+                            <path d='M12 8V5' />
+                            <circle cx='12' cy='4' r='1' />
+                            <circle cx='9' cy='13.5' r='1.1' />
+                            <circle cx='15' cy='13.5' r='1.1' />
+                            <path d='M9.5 16.5h5' />
+                        </svg>
+                    </span>
+                    <h2>
+                        <Localize i18n_default_text='New bots are on the way' />
+                    </h2>
+                    <p>
+                        <Localize i18n_default_text='Our free bots are being prepared. Check back soon.' />
+                    </p>
                 </div>
             )}
 
-            {!isLoading &&
-                !loadError &&
+            {hasBots && sections.length === 0 && (
+                <div className='freebots__empty freebots__empty--small'>
+                    <p>
+                        <Localize i18n_default_text='No bots match your search.' />
+                    </p>
+                </div>
+            )}
+
+            {hasBots &&
                 sections.map(section => (
-                    <div key={section.type} className='freebots__section'>
-                        <h2 className='freebots__section-title'>{section.type}</h2>
+                    <section key={section.type} className='freebots__section'>
+                        <h2 className='freebots__section-title'>
+                            <span>{section.type}</span>
+                            <em>{section.bots.length}</em>
+                        </h2>
                         <div className='freebots__grid'>{section.bots.map(renderCard)}</div>
-                    </div>
+                    </section>
                 ))}
 
             <Modal
