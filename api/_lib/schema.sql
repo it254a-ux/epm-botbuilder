@@ -1,6 +1,6 @@
 -- Per-site settings. One row per operator domain.
--- Run once against your Neon database (SQL editor) before deploying the
--- site-settings endpoint. Safe to re-run.
+-- The server now creates all of this by itself on an empty Turso database (api/_lib/db.js).
+-- Keep api/_lib/schema-text.js identical to this file (a test checks it). Safe to re-run.
 CREATE TABLE IF NOT EXISTS sites (
     id            SERIAL PRIMARY KEY,
     domain        TEXT NOT NULL UNIQUE,          -- lowercase host, no port, e.g. trade.alice.com

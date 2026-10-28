@@ -61,7 +61,7 @@ async function ensureTable(sql) {
 async function takeSlot(ip, now = Date.now()) {
     const lim = limits();
     const id = who(ip);
-    if (!process.env.DATABASE_URL) return checkMemory(id, now, lim);
+    if (!(process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL)) return checkMemory(id, now, lim);
     try {
         const sql = getDb();
         await ensureTable(sql);

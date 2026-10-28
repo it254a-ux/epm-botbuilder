@@ -77,7 +77,7 @@ const ENV = { ...process.env };
 beforeEach(async () => {
     global.__sql = makeSql();
     await global.__sql.db.exec('DROP TABLE IF EXISTS signals, signal_watch_state, signal_watchlist, signal_news_cache, signal_alerts');
-    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MTF_COOLDOWN_MIN: '30' };
+    process.env = { ...ENV, SIGNALS_SECRET: 's3cret', WATCH_SYMBOLS: 'frxEURUSD', TELEGRAM_GAP_MS: '0', WATCH_BATCH_GAP_MS: '0', NEWS_FILTER: 'off', MTF_COOLDOWN_MIN: '30', GRAB_ENABLED: 'off' };
     deriv.connect.mockReset().mockResolvedValue({ close: jest.fn() });
     deriv.getActiveSymbols.mockReset().mockResolvedValue([
         { underlying_symbol: 'frxEURUSD', underlying_symbol_name: 'EUR/USD', market: 'forex', exchange_is_open: 1, is_trading_suspended: 0 },
@@ -150,6 +150,14 @@ describe('a confirmed signal', () => {
         const grans = deriv.getCandles.mock.calls.map(c => c[2]).sort((a, b) => b - a);
         expect(grans).toEqual([900, 300]);
         expect(mtf.analyseMtf).toHaveBeenCalledTimes(1);
+    });
+    test('the stop-hunt strategy (when on) loads 3 days of M5 and reports its stage without sending anything when there is no setup', async () => {
+        process.env.GRAB_ENABLED = 'on';
+        const out = await call();
+        const grans = deriv.getCandles.mock.calls.map(c => c[2]).sort((a, b) => b - a);
+        expect(grans).toEqual([900, 300, 300]);
+        expect(out.body.summary.grab).toBeDefined();
+        expect(sendTelegram.mock.calls.every(c => !String(c[0]).includes('Liquidity Grab'))).toBe(true);
     });
 });
 
