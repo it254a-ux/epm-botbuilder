@@ -162,3 +162,17 @@ CREATE TABLE IF NOT EXISTS signal_pending (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ===== Free Bots (Trading Bots -> Freebots tab) =====
+-- Was created by hand in Neon originally and never tracked: without it the Freebots tab says "Failed to load bots".
+-- Safe to re-run. Bots are added again from the Admin tab.
+CREATE TABLE IF NOT EXISTS free_bots (
+    id            SERIAL PRIMARY KEY,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL,
+    market        TEXT NOT NULL,
+    risk_level    TEXT NOT NULL,
+    contract_type TEXT,
+    xml_content   TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
