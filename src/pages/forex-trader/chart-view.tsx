@@ -682,7 +682,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             // Frame the range and the move after it, with room on the right for the boxes.
             if (r) {
                 const idx = candles.findIndex(c => c.time >= r.startTime);
-                const from = Math.max(0, (idx < 0 ? 0 : idx) - 8);
+                // never open tighter than about 190 candles: the zoom level people asked for (a short range used to zoom in too far)
+                const from = Math.max(0, Math.min((idx < 0 ? 0 : idx) - 8, candles.length - 190));
                 chart.timeScale().setVisibleLogicalRange({ from, to: candles.length + 10 });
             }
         },
