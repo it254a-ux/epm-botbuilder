@@ -5,6 +5,7 @@
 const { authorised } = require('../signals-auth');
 const { getDb } = require('../db');
 const { migrate, TABLES } = require('../migrate-neon');
+const store = require('../signals-store');
 
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
@@ -26,7 +27,9 @@ module.exports = async function handler(req, res) {
             strings.raw = [text];
             return neonSql(strings);
         };
-        const report = await migrate({ read, sql: getDb(), dry });
+        const sql = getDb();
+        await store.ensureTables(sql); // the signal tables (watchlist etc.) are created by the signal code
+        const report = await migrate({ read, sql, dry });
         res.status(200).json({ ok: !report.some(r => r.error), dry, tables: report });
     } catch (err) {
         console.error('migrate-neon failed:', err.message);

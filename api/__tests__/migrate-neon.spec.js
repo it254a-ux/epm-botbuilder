@@ -54,6 +54,26 @@ test('dry run copies nothing; the real run copies everything; a second run adds 
     expect(await sql`SELECT id FROM free_bots`).toHaveLength(1);
 });
 
+test('a column that exists only in Neon is added to Turso and its data is kept; the signal tables exist first', async () => {
+    const sql = db.getDb();
+    await require('../_lib/signals-store').ensureTables(sql);
+    const rows = { signal_watchlist: [{ symbol: '1HZ100V', enabled: true, updated_at: new Date('2026-02-01T00:00:00.000Z') }], sites: [{ id: 9, domain: 'y.com', name: 'Y', owner_id: null, markup_percent: '1.50', created_at: new Date(), updated_at: new Date() }] };
+    const rep = await migrate({ read: async t => rows[t] || [], sql });
+    expect(rep.find(r => r.table === 'signal_watchlist')).toMatchObject({ copied: 1 });
+    const sites = rep.find(r => r.table === 'sites');
+    expect(sites).toMatchObject({ copied: 1 });
+    expect(sites.error).toBeUndefined();
+    expect(sites.addedColumns).toEqual(['markup_percent']);
+    const [row] = await sql`SELECT markup_percent FROM sites WHERE id = 9`;
+    expect(Number(row.markup_percent)).toBe(1.5);
+});
+
+test('a row that a rule refuses is reported, not hidden', async () => {
+    const sql = db.getDb();
+    const rep = await migrate({ read: async t => (t === 'sites' ? [{ id: 12, domain: 'z.com', name: 'Z', owner_id: 3 }] : []), sql });
+    expect(rep.find(r => r.table === 'sites').refused).toEqual([12]);
+});
+
 test('a table Neon cannot read is reported and the others still copy', async () => {
     const sql = db.getDb();
     const rep = await migrate({ read: async t => { if (t === 'sites') throw new Error('quota'); return []; }, sql });
