@@ -19,6 +19,7 @@ import { setSmartChartsPublicPath } from '@deriv-com/smartcharts-champion';
 import { localize } from '@deriv-com/translations';
 import Audio from '../components/audio';
 import BlocklyLoading from '../components/blockly-loading';
+import BotNotice from '../components/bot-notice/bot-notice';
 import BotStopped from '../components/bot-stopped';
 import BotBuilder from '../pages/bot-builder';
 import Main from '../pages/main';
@@ -179,6 +180,7 @@ const AppContent = observer(() => {
                             <Main />
                             <BotBuilder />
                             <BotStopped />
+                            <BotNotice />
                             <TransactionDetailsModal />
                             <ToastContainer limit={3} draggable={false} />
                         </div>

@@ -1,0 +1,102 @@
+.bot-notice-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10, 14, 20, 0.55);
+    backdrop-filter: blur(2px);
+
+    @media (max-width: 900px) {
+        left: 0;
+        width: 100% !important;
+    }
+}
+
+.bot-notice-card {
+    width: 100%;
+    max-width: 320px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--general-section-1);
+    border: 1px solid var(--border-normal);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    animation: bot-notice-pop 0.18s ease-out;
+}
+
+.bot-notice-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: 0.3px;
+    color: #fff;
+    background: linear-gradient(135deg, #6d28d9 0%, #2563eb 55%, #0891b2 100%);
+}
+
+.bot-notice-icon {
+    font-size: 14px;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
+}
+
+.bot-notice-body {
+    padding: 18px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-prominent);
+    font-weight: 600;
+    text-align: center;
+}
+
+.bot-notice-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+.bot-notice-ok,
+.bot-notice-cancel {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+}
+
+.bot-notice-ok {
+    background: linear-gradient(135deg, #2563eb, #0891b2);
+    color: #fff;
+
+    &:hover {
+        filter: brightness(1.08);
+    }
+}
+
+.bot-notice-cancel {
+    background: transparent;
+    color: var(--text-loss-danger, #ef4444);
+    border: 1px solid var(--text-loss-danger, #ef4444);
+
+    &:hover {
+        background: rgba(239, 68, 68, 0.08);
+    }
+}
+
+@keyframes bot-notice-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
