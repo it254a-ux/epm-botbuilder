@@ -357,7 +357,15 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             refreshDerived();
-            chartRef.current?.timeScale().fitContent();
+            const ts = chartRef.current?.timeScale();
+            // a narrow phone chart shows the latest stretch, not the whole history squeezed into thin slivers
+            const w = ts?.width() ?? 0;
+            if (ts && w > 0 && w <= 700 && candles.length > 60) {
+                const wanted = Math.max(50, Math.round(w / 5));
+                ts.setVisibleLogicalRange({ from: candles.length - wanted, to: candles.length + 10 });
+            } else {
+                ts?.fitContent();
+            }
         },
         mergeCandles(candles) {
             const byTime = new Map<number, Candle>();
@@ -682,8 +690,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             // Frame the range and the move after it, with room on the right for the boxes.
             if (r) {
                 const idx = candles.findIndex(c => c.time >= r.startTime);
-                // never open tighter than about 190 candles: the zoom level people asked for (a short range used to zoom in too far)
-                const from = Math.max(0, Math.min((idx < 0 ? 0 : idx) - 8, candles.length - 190));
+                // never open tighter than about 190 candles on a wide chart (the zoom level people asked for; a short range
+                // used to zoom in too far). A narrow phone screen gets fewer, so the candles stay readable, not thin slivers.
+                const width = chart.timeScale().width();
+                const wanted = width > 0 ? Math.max(50, Math.min(190, Math.round(width / 5))) : 190;
+                const from = Math.max(0, Math.min((idx < 0 ? 0 : idx) - 8, candles.length - wanted));
                 chart.timeScale().setVisibleLogicalRange({ from, to: candles.length + 10 });
             }
         },
