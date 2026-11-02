@@ -207,6 +207,11 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [fitHeight, setFitHeight] = useState<number | null>(null);
     // on Forex Live the trade setup floats over the chart; this opens and closes it
     const [setupOpen, setSetupOpen] = useState(!resultHost);
+    // Forex Live on a phone: the chart takes the whole screen, so the setup starts minimised (one tap opens it)
+    const hostedHere = !!resultHost;
+    useEffect(() => {
+        if (hostedHere && window.matchMedia('(max-width: 700px)').matches) setSetupOpen(false);
+    }, [hostedHere]);
 
     // ---- keep the page exactly as tall as the visible area (same approach as the Analysis Tool)
     useEffect(() => {
