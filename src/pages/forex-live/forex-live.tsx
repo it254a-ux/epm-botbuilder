@@ -7,11 +7,14 @@ import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
 import PositionsPanel from './positions-panel';
+import QuickBar from './quick-bar';
+import QuotesPanel from './quotes-panel';
 import {
     BUY_COLOR,
     DEFAULT_SYMBOL,
     SELL_COLOR,
     positionLines,
+    type Side,
     type TradeInput,
 } from './trade-engine';
 import TradePanel from './trade-panel';
@@ -24,7 +27,46 @@ import './forex-live.scss';
  * confirm), and as many can be open together as you like, buys and sells at the same time.
  * The chart is the Forex Trader's own chart (all its strategies and drawings), with the open trades drawn on it.
  */
+// the markets of the phone's Quotes list (a market Deriv does not answer for just shows dashes)
+const QUOTE_SYMBOLS = [
+    'frxEURUSD',
+    'frxGBPUSD',
+    'frxUSDJPY',
+    'frxUSDCHF',
+    'frxAUDUSD',
+    'frxUSDCAD',
+    'frxNZDUSD',
+    'frxEURGBP',
+    'frxEURJPY',
+    'frxGBPJPY',
+    'frxAUDJPY',
+    'frxXAUUSD',
+];
+type PhoneTab = 'quotes' | 'chart' | 'trade' | 'history';
+const TABS: Array<{ key: PhoneTab; label: string; icon: string }> = [
+    { key: 'quotes', label: 'Quotes', icon: '⇅' },
+    { key: 'chart', label: 'Chart', icon: '▥' },
+    { key: 'trade', label: 'Trade', icon: '⌁' },
+    { key: 'history', label: 'History', icon: '◷' },
+];
+
+const usePhone = () => {
+    const query = '(max-width: 700px)';
+    const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+    useEffect(() => {
+        const mq = window.matchMedia(query);
+        const on = () => setPhone(mq.matches);
+        on();
+        mq.addEventListener('change', on);
+        return () => mq.removeEventListener('change', on);
+    }, []);
+    return phone;
+};
+
 const ForexLive = observer(() => {
+    const phone = usePhone();
+    const [tab, setTab] = useState<PhoneTab>('chart');
+    const fireRef = useRef<((side: Side) => void) | null>(null);
     const { client } = useStore();
     const { isAuthorized, activeLoginid, authData } = useApiBase();
 
@@ -123,9 +165,35 @@ const ForexLive = observer(() => {
     const onPlan = useCallback((p: ReportedPlan | null, s: string) => setPlan({ plan: p, symbol: s }), []);
 
     return (
-        <div className='forex-live' ref={rootRef} style={fitHeight ? { height: `${fitHeight}px` } : undefined}>
+        <div
+            className='forex-live'
+            ref={rootRef}
+            style={fitHeight ? { height: `${fitHeight}px` } : undefined}
+            data-phone={phone ? 'on' : undefined}
+            data-tab={phone ? tab : undefined}
+        >
+            {phone && tab === 'quotes' && (
+                <QuotesPanel
+                    symbols={QUOTE_SYMBOLS}
+                    names={names}
+                    current={symbol}
+                    onPick={s => {
+                        setSymbol(s);
+                        setTab('chart');
+                    }}
+                />
+            )}
             <div className='forex-live__top'>
                 <div className='forex-live__chartcol'>
+                    {phone && (
+                        <QuickBar
+                            symbol={symbol}
+                            marketName={marketName}
+                            disabled={!isAuthorized}
+                            pending={pending}
+                            onFire={side => fireRef.current?.(side)}
+                        />
+                    )}
                     <ForexTrader
                         variant='page'
                         controlledSymbol={symbol}
@@ -167,22 +235,40 @@ const ForexLive = observer(() => {
                         notice={marketNotice}
                         openHere={here}
                         plan={plan.symbol === symbol ? plan.plan : null}
+                        fireRef={fireRef}
                     />
 
-                    <PositionsPanel
-                        positions={positions}
-                        currency={currency}
-                        symbol={symbol}
-                        onClose={list => void closeTrades(list)}
-                        onClear={clearClosed}
-                    />
+                    <div className='forex-live__pane' data-pane='trade'>
+                        <PositionsPanel
+                            positions={positions}
+                            currency={currency}
+                            symbol={symbol}
+                            onClose={list => void closeTrades(list)}
+                            onClear={clearClosed}
+                        />
+                    </div>
 
-                    <ActivityPanel positions={positions} log={log} currency={currency} />
+                    <div className='forex-live__pane' data-pane='history'>
+                        <ActivityPanel positions={positions} log={log} currency={currency} />
+                    </div>
 
                     {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
-                    <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
+                    <div className='forex-live__pane' data-pane='chart'>
+                        <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
+                    </div>
                 </aside>
             </div>
+
+            {phone && (
+                <nav className='fl-tabs' aria-label='Forex Live sections'>
+                    {TABS.map(t => (
+                        <button key={t.key} type='button' className={tab === t.key ? 'is-on' : ''} onClick={() => setTab(t.key)}>
+                            <i aria-hidden>{t.icon}</i>
+                            <span>{t.label}</span>
+                        </button>
+                    ))}
+                </nav>
+            )}
 
             {compare && (
                 <CompareCharts

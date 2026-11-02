@@ -1022,3 +1022,295 @@
 .forex-live__go * {
     font-weight: 500 !important;
 }
+
+// =====================================================================================
+// Phone (700px and narrower): a trading-app layout. Quotes, Chart, Trade and History each get the whole
+// screen, picked from the bar at the bottom. Wider screens keep the page exactly as it was.
+// =====================================================================================
+.forex-live__pane {
+    display: contents;
+}
+
+.forex-live[data-phone] {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px 0;
+
+    .forex-live__top {
+        flex: 1 0 auto;
+        gap: 8px;
+    }
+
+    // one pane at a time
+    .forex-live__side > [data-pane] {
+        display: none;
+    }
+
+    &[data-tab='quotes'] .forex-live__top {
+        display: none;
+    }
+
+    &[data-tab='chart'] .forex-live__side > [data-pane='chart'],
+    &[data-tab='trade'] .forex-live__side > [data-pane='trade'],
+    &[data-tab='history'] .forex-live__side > [data-pane='history'] {
+        display: block;
+    }
+
+    &[data-tab='trade'] .forex-live__chartcol,
+    &[data-tab='history'] .forex-live__chartcol {
+        display: none;
+    }
+
+    // the chart keeps its room, and the SELL / BUY bar sits on top of it
+    .forex-live__chartcol {
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - 12.4rem);
+        min-height: 360px;
+
+        .forex-trader {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto !important;
+        }
+    }
+
+    &[data-tab='trade'] .forex-live__chartcol,
+    &[data-tab='history'] .forex-live__chartcol {
+        display: none;
+    }
+}
+
+.fl-quick {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px;
+    flex: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--text-prominent) 10%, transparent);
+    background: color-mix(in srgb, var(--general-main-1) 94%, transparent);
+
+    &__btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        min-height: 46px;
+        border: none;
+        border-radius: 10px;
+        color: #fff;
+        cursor: pointer;
+        transition: transform 0.12s ease, filter 0.2s ease;
+
+        small {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            opacity: 0.9;
+        }
+
+        b {
+            font-size: 17px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        &:active {
+            transform: scale(0.97);
+            filter: brightness(1.15);
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        &--sell {
+            background: linear-gradient(160deg, #ef4444, #b91c1c);
+        }
+
+        &--buy {
+            background: linear-gradient(160deg, #3b82f6, #1d4ed8);
+        }
+    }
+
+    &__mid {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 96px;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        color: var(--text-less-prominent);
+        overflow: hidden;
+
+        em {
+            font-style: normal;
+            font-weight: 400;
+            color: #d4af37;
+        }
+    }
+}
+
+.fl-quotes {
+    flex: 1 0 auto;
+
+    &__search {
+        width: 100%;
+        height: 36px;
+        margin: 2px 0 8px;
+        padding: 0 12px;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 14%, transparent);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--general-section-1) 92%, transparent);
+        color: var(--text-general);
+        font-size: 13px;
+    }
+
+    &__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+
+        li + li {
+            border-top: 1px solid color-mix(in srgb, var(--text-prominent) 9%, transparent);
+        }
+    }
+}
+
+.fl-quote {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-general);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:active,
+    &.is-current {
+        background: color-mix(in srgb, #d4af37 10%, transparent);
+    }
+
+    &__left,
+    &__prices {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+
+        small {
+            font-size: 11px;
+            color: var(--text-less-prominent);
+            white-space: pre;
+        }
+    }
+
+    &__left {
+        strong {
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        em {
+            min-height: 14px;
+            font-size: 11px;
+            font-style: normal;
+            font-weight: 600;
+
+            &.is-up {
+                color: #3b82f6;
+            }
+
+            &.is-down {
+                color: #ef4444;
+            }
+        }
+    }
+
+    &__prices {
+        align-items: flex-end;
+    }
+
+    &__pair {
+        display: flex;
+        gap: 14px;
+    }
+
+    &__price {
+        min-width: 70px;
+        text-align: right;
+        font-size: 15px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        color: var(--text-general);
+        transition: color 0.2s ease;
+
+        b {
+            font-size: 1.25em;
+            font-weight: 800;
+            vertical-align: -1px;
+        }
+
+        &.is-up {
+            color: #3b82f6;
+        }
+
+        &.is-down {
+            color: #ef4444;
+        }
+    }
+}
+
+.fl-tabs {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex: none;
+    margin: 6px -8px 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid color-mix(in srgb, var(--text-prominent) 12%, transparent);
+    background: color-mix(in srgb, var(--general-main-1) 96%, transparent);
+    backdrop-filter: blur(10px);
+
+    button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        padding: 4px 0;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-less-prominent);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: color 0.2s ease, background 0.2s ease;
+
+        i {
+            font-size: 17px;
+            font-style: normal;
+            line-height: 1.2;
+        }
+
+        &.is-on {
+            color: #d4af37;
+            background: color-mix(in srgb, #d4af37 10%, transparent);
+        }
+    }
+}

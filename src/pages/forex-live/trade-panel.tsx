@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MutableRefObject } from 'react';
 import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './trade-engine';
 
 interface Props {
@@ -22,6 +22,8 @@ interface Props {
     /** The analysis plan for this market, when there is one: its stop loss and take profit can be used for the trade. */
     plan?: PlanLevels | null;
     openHere?: { count: number; buys: number; sells: number; profit: number };
+    /** Lets the one-tap SELL / BUY bar on the phone chart open a trade with the settings chosen here. */
+    fireRef?: MutableRefObject<((side: Side) => void) | null>;
 }
 
 const PREFS_KEY = 'epm_forex_live_prefs';
@@ -55,7 +57,7 @@ const loadPrefs = (): Prefs => {
 const nearest = (list: number[], want: number): number =>
     list.length ? list.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a)) : want;
 
-const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan }: Props) => {
+const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan, fireRef }: Props) => {
     const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
     const set = (patch: Partial<Prefs>) => setPrefs(p => ({ ...p, ...patch }));
     // a stake the person types or picks is remembered for this market
@@ -121,10 +123,12 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         onTrade(Array.from({ length: prefs.count }, () => trade));
     };
 
+    if (fireRef) fireRef.current = fire;
+
     const name = marketName || symbol.replace(/^frx/, '');
 
     return (
-        <div className='forex-live__tradewrap'>
+        <div className='forex-live__tradewrap' data-pane='trade'>
             {/* BUY and SELL stay pinned at the top while the side column scrolls, so a trade is always one tap away */}
             <div className='forex-live__buttons forex-live__buttons--pinned'>
                 <button type='button' className='forex-live__go forex-live__go--buy' disabled={disabled} onClick={() => fire('BUY')}>
