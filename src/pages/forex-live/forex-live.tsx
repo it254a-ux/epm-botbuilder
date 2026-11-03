@@ -230,6 +230,7 @@ const ForexLive = observer(() => {
                         onOpenCompare={openCompare}
                         noAnalysis={phone}
                     />
+                    {!phone && (
                     <button
                         type='button'
                         className='forex-live__compare-btn'
@@ -238,6 +239,7 @@ const ForexLive = observer(() => {
                     >
                         Compare charts
                     </button>
+                    )}
                     {tradesDrawn && (
                         <div className='forex-live__legend'>
                             <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>

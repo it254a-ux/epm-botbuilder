@@ -1144,6 +1144,15 @@
             }
         }
 
+        // the candle timer sits further right, out of the way of the market name; "times in GMT" is left off on a phone
+        .forex-trader__live {
+            right: 58px;
+        }
+
+        .forex-trader__chart-info em {
+            display: none;
+        }
+
         // below the chart's own buttons, so it never covers the SELL / BUY bar
         .forex-live__compare-btn {
             top: auto;

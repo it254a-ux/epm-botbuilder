@@ -162,7 +162,8 @@
 
     &__balance-section {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     &__balance {
@@ -964,5 +965,22 @@
 
     &.is-down {
         color: #ef4444;
+    }
+}
+
+// phones: a smaller balance, so it fits next to the Transfer button
+@media (max-width: 767px) {
+    .acc-info__balance {
+        font-size: 1.2rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .acc-info__account-type {
+        font-size: 1rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .acc-info__live {
+        font-size: 9px;
     }
 }
