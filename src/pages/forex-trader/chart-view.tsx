@@ -353,6 +353,12 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         levelsRef.current = null;
     };
 
+    // how many candles to show when a chart opens: about 8 pixels each, so they are big enough to read
+    const openCount = () => {
+        const w = hostRef.current?.clientWidth || chartRef.current?.timeScale().width() || window.innerWidth;
+        return Math.max(30, Math.min(140, Math.round(w / 8)));
+    };
+
     useImperativeHandle(ref, () => {
       const impl: ChartViewHandle = {
         setCandles(candles) {
@@ -361,12 +367,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             refreshDerived();
+            // open on the latest stretch with big, readable candles (zoom out or in from there)
             const ts = chartRef.current?.timeScale();
-            // a narrow phone chart shows the latest stretch, not the whole history squeezed into thin slivers
-            const w = ts?.width() ?? 0;
-            if (ts && w > 0 && w <= 700 && candles.length > 60) {
-                const wanted = Math.max(50, Math.round(w / 5));
-                ts.setVisibleLogicalRange({ from: candles.length - wanted, to: candles.length + 10 });
+            if (ts && candles.length > 30) {
+                const wanted = openCount();
+                ts.setVisibleLogicalRange({ from: Math.max(0, candles.length - wanted), to: candles.length + 8 });
             } else {
                 ts?.fitContent();
             }
@@ -693,12 +698,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
 
             // Frame the range and the move after it, with room on the right for the boxes.
             if (r) {
-                const idx = candles.findIndex(c => c.time >= r.startTime);
-                // never open tighter than about 190 candles on a wide chart (the zoom level people asked for; a short range
-                // used to zoom in too far). A narrow phone screen gets fewer, so the candles stay readable, not thin slivers.
-                const width = chart.timeScale().width();
-                const wanted = width > 0 ? Math.max(50, Math.min(190, Math.round(width / 5))) : 190;
-                const from = Math.max(0, Math.min((idx < 0 ? 0 : idx) - 8, candles.length - wanted));
+                // open on the latest stretch with big candles, not the whole range squeezed in (zoom out for more)
+                const from = Math.max(0, candles.length - openCount());
                 chart.timeScale().setVisibleLogicalRange({ from, to: candles.length + 10 });
             }
         },
