@@ -953,3 +953,16 @@
         }
     }
 }
+
+// live profit of the open Forex Live trades, under the balance
+.acc-info__live {
+    margin: 0;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: #10b981;
+
+    &.is-down {
+        color: #ef4444;
+    }
+}

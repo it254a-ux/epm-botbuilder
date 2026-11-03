@@ -10,6 +10,7 @@ import { useLiveAccountBalances } from '@/hooks/useLiveAccountBalances';
 import { useStore } from '@/hooks/useStore';
 import { isDemoAccount } from '@/utils/account-helpers';
 import { useForcedRealEnabled } from '@/utils/forced-real-flag';
+import { useLiveEquity } from '@/utils/live-equity';
 import { Localize } from '@deriv-com/translations';
 import { TAccountSwitcher } from './common/types';
 import AccountInfoWrapper from './account-info-wrapper';
@@ -34,6 +35,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     // the Admin page can switch the forced "Real account" label off
     const forcedRealOn = useForcedRealEnabled();
     const liveBalances = useLiveAccountBalances();
+    const liveEquity = useLiveEquity();
     const isForcedReal = (loginid: string | undefined) => forcedRealOn && isForcedRealId(loginid);
     const [isOpen, setIsOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<'real' | 'demo'>('real');
@@ -121,6 +123,13 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     if (!activeAccount) return null;
 
     const { currency, balance } = activeAccount;
+    const tradesLive =
+        !!liveEquity && liveEquity.loginid === activeAccount.loginid && liveEquity.currency === currency && liveEquity.count > 0;
+    const plainBalance = Number(String(balance ?? '').replace(/,/g, ''));
+    const shownBalance =
+        tradesLive && Number.isFinite(plainBalance) && currency
+            ? `${addComma((plainBalance + liveEquity.value).toFixed(getDecimalPlaces(currency)))} ${getCurrencyDisplayCode(currency)}`
+            : `${balance} ${getCurrencyDisplayCode(currency)}`;
     const showChevron = !isSingleAccount && !is_bot_running;
 
     return (
@@ -192,9 +201,16 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                         // Re-parsing it with Number()/toFixed() (as formatBalance
                                         // does for the raw numeric values below) breaks on the comma
                                         // and produces "NaN". Use it as-is, same as before the merge.
-                                        `${balance} ${getCurrencyDisplayCode(currency)}`
+                                        // with Forex Live trades open, the balance moves with them: balance + stake + live profit
+                                        shownBalance
                                     )}
                                 </p>
+                                {tradesLive && (
+                                    <p className={classNames('acc-info__live', { 'is-down': liveEquity.profit < 0 })}>
+                                        {liveEquity.profit > 0 ? '+' : ''}
+                                        {liveEquity.profit.toFixed(2)} open · {liveEquity.count}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>

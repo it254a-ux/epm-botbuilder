@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
+import { setLiveEquity } from '@/utils/live-equity';
 import { useSharedPick } from '../forex-trader/shared-picks';
 import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
@@ -146,6 +147,24 @@ const ForexLive = observer(() => {
     }, [positions, symbol]);
 
     const allOpen = useMemo(() => summarize(positions), [positions]);
+
+    // the header balance moves with the open trades (balance + stake + live profit of every open trade)
+    useEffect(() => {
+        const open = positions.filter(p => !p.closed && (!currency || p.currency === currency));
+        if (!open.length || !activeLoginid) {
+            setLiveEquity(null);
+            return;
+        }
+        const round = (n: number) => Math.round(n * 100) / 100;
+        setLiveEquity({
+            loginid: activeLoginid,
+            currency,
+            count: open.length,
+            value: round(open.reduce((t, p) => t + p.stake + (p.profit ?? 0), 0)),
+            profit: round(open.reduce((t, p) => t + (p.profit ?? 0), 0)),
+        });
+    }, [positions, activeLoginid, currency]);
+    useEffect(() => () => setLiveEquity(null), []);
 
     const trade = useCallback(
         (list: TradeInput[]) => {
