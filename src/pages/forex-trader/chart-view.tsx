@@ -188,11 +188,15 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 const res = original();
                 const lv = levelsRef.current;
                 if (!res || !res.priceRange || !lv) return res;
+                // Levels near the candles stay in view, but a level far away (like yesterday's low) must not flatten the
+                // candles into a thin strip: it is left off-screen, and zooming out brings it back.
+                const span = Math.max(res.priceRange.maxValue - res.priceRange.minValue, Math.abs(res.priceRange.maxValue) * 1e-5);
+                const reach = span * 1.2;
                 return {
                     ...res,
                     priceRange: {
-                        minValue: Math.min(res.priceRange.minValue, lv.min),
-                        maxValue: Math.max(res.priceRange.maxValue, lv.max),
+                        minValue: Math.min(res.priceRange.minValue, Math.max(lv.min, res.priceRange.minValue - reach)),
+                        maxValue: Math.max(res.priceRange.maxValue, Math.min(lv.max, res.priceRange.maxValue + reach)),
                     },
                 };
             },

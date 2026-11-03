@@ -14,7 +14,8 @@ export interface Quote {
     at: number;
 }
 
-const FLUSH_MS = 400;
+// the list redraws a few times a second; a single market (the SELL / BUY bar) redraws on every tick it gets
+const LIST_FLUSH_MS = 150;
 
 /**
  * Live buy and sell prices for a few markets, like the Quotes list of a trading app.
@@ -22,6 +23,7 @@ const FLUSH_MS = 400;
  * The numbers only come from Deriv's answers: a market that does not answer stays empty (shown as a dash).
  */
 export function useQuotes(symbols: string[]): Record<string, Quote> {
+    const instant = symbols.length === 1;
     const { ws, isConnected } = useDerivWS();
     const [quotes, setQuotes] = useState<Record<string, Quote>>({});
     const key = symbols.join(',');
@@ -35,9 +37,11 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
             const cur = store.current[s] ?? { bid: null, ask: null, prev: null, open: null, high: null, low: null, pip: 5, at: 0 };
             store.current[s] = { ...cur, ...p };
         };
-        const timer = window.setInterval(() => {
-            if (!off) setQuotes({ ...store.current });
-        }, FLUSH_MS);
+        const timer = instant
+            ? 0
+            : window.setInterval(() => {
+                  if (!off) setQuotes({ ...store.current });
+              }, LIST_FLUSH_MS);
 
         symbols.forEach(s => {
             ws.subscribe({ ticks: s }, data => {
@@ -48,6 +52,7 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
                 const bid = Number(t.bid ?? t.quote);
                 const ask = Number(t.ask ?? t.quote);
                 patch(s, { bid, ask, prev: cur?.bid ?? null, pip: t.pip_size ?? cur?.pip ?? 5, at: (t.epoch ?? 0) * 1000 });
+                if (instant) setQuotes({ ...store.current });
             })
                 .then(sub => {
                     if (off) sub.unsubscribe();
@@ -71,7 +76,7 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
 
         return () => {
             off = true;
-            window.clearInterval(timer);
+            if (timer) window.clearInterval(timer);
             stops.forEach(f => f());
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
