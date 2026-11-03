@@ -1129,3 +1129,10 @@
     align-items: center;
     justify-content: center;
 }
+
+// The standalone Forex Trader tab is retired (its tool lives inside Forex Live): not shown in the phone / tablet tab row
+@media (max-width: 1023px) {
+    li#id-forex-trader {
+        display: none !important;
+    }
+}

@@ -42,10 +42,11 @@ const QUOTE_SYMBOLS = [
     'frxAUDJPY',
     'frxXAUUSD',
 ];
-type PhoneTab = 'quotes' | 'chart' | 'trade' | 'history';
+type PhoneTab = 'quotes' | 'chart' | 'analysis' | 'trade' | 'history';
 const TABS: Array<{ key: PhoneTab; label: string; icon: string }> = [
     { key: 'quotes', label: 'Quotes', icon: '⇅' },
     { key: 'chart', label: 'Chart', icon: '▥' },
+    { key: 'analysis', label: 'Analysis', icon: '◎' },
     { key: 'trade', label: 'Trade', icon: '⌁' },
     { key: 'history', label: 'History', icon: '◷' },
 ];
@@ -253,7 +254,7 @@ const ForexLive = observer(() => {
                     </div>
 
                     {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
-                    <div className='forex-live__pane' data-pane='chart'>
+                    <div className='forex-live__pane' data-pane='analysis'>
                         <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
                     </div>
                 </aside>

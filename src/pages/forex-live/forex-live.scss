@@ -1032,13 +1032,19 @@
 }
 
 .forex-live[data-phone] {
+    // a fixed frame: the content scrolls by itself and the bottom bar always stays at the bottom of the screen
     display: flex;
     flex-direction: column;
     padding: 6px 8px 0;
+    overflow: hidden;
 
     .forex-live__top {
-        flex: 1 0 auto;
+        flex: 1 1 0;
+        min-height: 0;
         gap: 8px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
     }
 
     // one pane at a time
@@ -1050,22 +1056,35 @@
         display: none;
     }
 
-    &[data-tab='chart'] .forex-live__side > [data-pane='chart'],
+    // Chart: only the chart, the whole screen (like a trading app). The analysis has its own tab.
+    &[data-tab='chart'] {
+        .forex-live__side {
+            display: none;
+        }
+
+        .forex-live__top {
+            overflow: hidden;
+        }
+    }
+
+    &[data-tab='analysis'] .forex-live__side > [data-pane='analysis'],
     &[data-tab='trade'] .forex-live__side > [data-pane='trade'],
     &[data-tab='history'] .forex-live__side > [data-pane='history'] {
         display: block;
     }
 
+    &[data-tab='analysis'] .forex-live__chartcol,
     &[data-tab='trade'] .forex-live__chartcol,
     &[data-tab='history'] .forex-live__chartcol {
         display: none;
     }
 
-    // the chart takes the whole screen (like a trading app); the SELL / BUY bar sits on top of it and the
-    // trade setup floats over the chart's top-left corner, minimised until it is tapped
+    // the SELL / BUY bar sits on top of the chart and the trade setup floats over the chart's top-left corner,
+    // minimised until it is tapped
     .forex-live__chartcol {
         display: flex;
         flex-direction: column;
+        flex: 1 1 0;
         height: auto;
         min-height: 0;
         border-radius: 12px;
@@ -1109,23 +1128,19 @@
                 overflow: hidden;
             }
         }
-    }
 
-    &[data-tab='chart'] {
-        .forex-live__top {
-            flex: 1 1 0;
-            min-height: 0;
+        // below the chart's own buttons, so it never covers the SELL / BUY bar
+        .forex-live__compare-btn {
+            top: auto;
+            right: auto;
+            bottom: 34px;
+            left: 54px;
         }
 
-        .forex-live__chartcol {
-            flex: 1 1 0;
-            min-height: 0;
+        .forex-live__legend {
+            bottom: 62px;
+            left: 54px;
         }
-    }
-
-    &[data-tab='trade'] .forex-live__chartcol,
-    &[data-tab='history'] .forex-live__chartcol {
-        display: none;
     }
 }
 
@@ -1206,7 +1221,10 @@
 }
 
 .fl-quotes {
-    flex: 1 0 auto;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 
     &__search {
         width: 100%;
@@ -1323,11 +1341,9 @@
 }
 
 .fl-tabs {
-    position: sticky;
-    bottom: 0;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     flex: none;
     margin: 6px -8px 0;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
