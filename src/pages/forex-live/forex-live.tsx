@@ -14,6 +14,7 @@ import {
     DEFAULT_SYMBOL,
     SELL_COLOR,
     positionLines,
+    summarize,
     type Side,
     type TradeInput,
 } from './trade-engine';
@@ -105,7 +106,7 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, clearClosed, minStakes, probeMinStake } = useForexLive(
+    const { positions, log, pending, openTrade, closeTrades, clearClosed, minStakes, probeMinStake, streamAt } = useForexLive(
         isAuthorized,
         activeLoginid
     );
@@ -143,6 +144,8 @@ const ForexLive = observer(() => {
             profit: Math.round(open.reduce((t, p) => t + (p.profit ?? 0), 0) * 100) / 100,
         };
     }, [positions, symbol]);
+
+    const allOpen = useMemo(() => summarize(positions), [positions]);
 
     const trade = useCallback(
         (list: TradeInput[]) => {
@@ -192,6 +195,9 @@ const ForexLive = observer(() => {
                             disabled={!isAuthorized}
                             pending={pending}
                             onFire={side => fireRef.current?.(side)}
+                            open={{ count: allOpen.open, profit: Math.round(allOpen.profit * 100) / 100, currency }}
+                            streamAt={streamAt}
+                            onOpenTrades={() => setTab('trade')}
                         />
                     )}
                     <ForexTrader
