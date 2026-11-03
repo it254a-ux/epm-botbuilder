@@ -577,26 +577,26 @@
 .forex-trader__live {
     position: absolute;
     right: 70px;
-    top: 10px;
+    top: 8px;
     z-index: 6;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 64px;
-    height: 26px;
-    padding: 0 12px;
+    min-width: 40px;
+    height: 17px;
+    padding: 0 6px;
     border: 1px solid rgba(187, 247, 208, 0.55);
-    border-radius: 8px;
+    border-radius: 6px;
     background: linear-gradient(180deg, #22c55e, #15803d);
-    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     cursor: default;
     transition: background 0.3s ease, box-shadow 0.3s ease;
 
     // the time left on the forming candle; green = live, amber = reconnecting, grey = paused
     .forex-trader__clock {
-        font: 600 12px/1 'Segoe UI', system-ui, sans-serif;
+        font: 600 10px/1 'Segoe UI', system-ui, sans-serif;
         font-variant-numeric: tabular-nums;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.03em;
         color: #fff;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
         white-space: nowrap;
@@ -752,7 +752,7 @@
 
 /* The candle clock sits clear of the price scale when the page makes the chart wide. */
 .forex-trader--result-out .forex-trader__live {
-    right: 106px;
+    right: 90px;
 }
 
 /* Slim scrollbars that match the dark pages (the plain white ones looked out of place). */
