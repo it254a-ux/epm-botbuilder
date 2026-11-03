@@ -1107,25 +1107,40 @@
             flex: none;
         }
 
-        .forex-trader__controls {
+        // phones show a plain chart: the analysis tools stay on the laptop page; only a small candle-size picker is kept
+        .forex-trader__controls,
+        .forex-trader__badge {
+            display: none !important;
+        }
+
+        .forex-trader__tfbar {
             position: absolute;
             z-index: 8;
-            top: 6px;
-            left: 54px; // right of the drawing tools
-            width: calc(100% - 64px);
-            max-height: calc(100% - 12px);
-            overflow-y: auto;
-            padding: 10px !important;
-            border: 1px solid rgba(148, 163, 184, 0.3) !important;
-            border-radius: 12px !important;
-            background: color-mix(in srgb, var(--general-main-1) 94%, transparent);
-            backdrop-filter: blur(14px);
-            box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.7);
-            transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            top: 36px;
+            left: 54px; // right of the drawing tools, under the market name
+            display: flex;
+            gap: 2px;
+            padding: 2px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--general-main-1) 90%, transparent);
+            backdrop-filter: blur(8px);
 
-            &.is-collapsed {
-                width: 150px;
-                overflow: hidden;
+            button {
+                padding: 3px 8px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+                color: var(--text-less-prominent);
+                font-size: 10.5px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: background 0.2s ease, color 0.2s ease;
+
+                &.is-on {
+                    color: #1a1405;
+                    background: #d4af37;
+                }
             }
         }
 

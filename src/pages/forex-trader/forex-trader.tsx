@@ -149,6 +149,8 @@ interface ForexTraderProps {
     resultHost?: HTMLElement | null;
     /** When given, choosing "M15 analysis + M5 entry" opens this (a charts pop-up) instead of switching the tool into that mode. */
     onOpenCompare?: () => void;
+    /** A plain price chart: no analysis lines, labels or signal badges, and only a small candle-size picker (phones). */
+    noAnalysis?: boolean;
 }
 
 /** Time left on the forming candle (candles start on exact multiples of their length), counting down every second. */
@@ -168,7 +170,7 @@ function CandleClock({ seconds }: { seconds: number }) {
     return <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
@@ -503,7 +505,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         ].join('|');
         if (sig !== drawKey.current) {
             drawKey.current = sig;
-            chartRef.current?.drawAnalysis(analysis, closedCandles);
+            if (!noAnalysis) chartRef.current?.drawAnalysis(analysis, closedCandles);
         }
     };
 
@@ -599,9 +601,9 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
 
     // Previous Day High / Low picture on the chart (levels, named arrows, trade plan); cleared by the chart whenever its candles reload
     useEffect(() => {
-        if (mode !== 'mtf' || loading) return;
+        if (noAnalysis || mode !== 'mtf' || loading) return;
         chartRef.current?.drawPdh(pdh);
-    }, [pdh, mode, loading]);
+    }, [pdh, mode, loading, noAnalysis]);
 
     // every price update from the feed (at most once a second)
     const lastTickAt = useRef(0);
@@ -705,9 +707,26 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}`}
+            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}${noAnalysis ? ' forex-trader--plain' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
+            {noAnalysis && (
+                <div className='forex-trader__tfbar' role='group' aria-label='Candle size'>
+                    {TIMEFRAMES.map(t => (
+                        <button
+                            key={t.sec}
+                            type='button'
+                            className={tf === t.sec && mode === 'h1' ? 'is-on' : ''}
+                            onClick={() => {
+                                setTf(t.sec);
+                                if (mode !== 'h1') setMode('h1');
+                            }}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
                 <button
                     type='button'
@@ -836,7 +855,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         Market closed — no live analysis. Pick an open market (Derived indices run all week).
                     </div>
                 )}
-                {mode === 'mtf' && mtf && !closed && !loadError && (
+                {mode === 'mtf' && mtf && !closed && !loadError && !noAnalysis && (
                     <div className={`forex-trader__badge forex-trader__badge--${mtf.signal === 'BUY' ? 'buy' : mtf.signal === 'SELL' ? 'sell' : 'wait'}`}>
                         {mtf.signal === 'WAIT' ? 'WAIT / NO SIGNAL' : `${mtf.signal} signal`}
                     </div>

@@ -46,7 +46,6 @@ type PhoneTab = 'quotes' | 'chart' | 'analysis' | 'trade' | 'history';
 const TABS: Array<{ key: PhoneTab; label: string; icon: string }> = [
     { key: 'quotes', label: 'Quotes', icon: '⇅' },
     { key: 'chart', label: 'Chart', icon: '▥' },
-    { key: 'analysis', label: 'Analysis', icon: '◎' },
     { key: 'trade', label: 'Trade', icon: '⌁' },
     { key: 'history', label: 'History', icon: '◷' },
 ];
@@ -204,6 +203,7 @@ const ForexLive = observer(() => {
                         onMarkets={setNames}
                         resultHost={resultHost}
                         onOpenCompare={openCompare}
+                        noAnalysis={phone}
                     />
                     <button
                         type='button'
