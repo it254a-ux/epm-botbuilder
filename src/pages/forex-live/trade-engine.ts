@@ -368,3 +368,15 @@ export const formatMoney = (n: number | null | undefined, currency = ''): string
     const sign = n > 0 ? '+' : n < 0 ? '-' : '';
     return `${sign}${Math.abs(n).toFixed(2)}${currency ? ` ${currency}` : ''}`;
 };
+
+/**
+ * Roughly what one multiplier trade would make (or lose) if the price moved from `entry` to `target`:
+ * stake x multiplier x (price change / entry price). A trade cannot lose more than its stake. It is an estimate:
+ * Deriv's own fee on a multiplier is not included.
+ */
+export function estimateProfit(side: Side, stake: number, multiplier: number, entry: number, target: number): number | null {
+    if (![stake, multiplier, entry, target].every(n => Number.isFinite(n) && n > 0)) return null;
+    const change = side === 'BUY' ? target - entry : entry - target;
+    const raw = (stake * multiplier * change) / entry;
+    return Math.max(-stake, Math.round(raw * 100) / 100);
+}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
+import { watchTicks } from './tick-feed';
 
 export interface Quote {
     bid: number | null;
@@ -44,7 +45,7 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
               }, LIST_FLUSH_MS);
 
         symbols.forEach(s => {
-            ws.subscribe({ ticks: s }, data => {
+            const stopTicks = watchTicks(ws, s, data => {
                 if (off) return;
                 const t = (data as { tick?: { bid?: number; ask?: number; quote?: number; pip_size?: number; epoch?: number } }).tick;
                 if (!t) return;
@@ -53,12 +54,8 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
                 const ask = Number(t.ask ?? t.quote);
                 patch(s, { bid, ask, prev: cur?.bid ?? null, pip: t.pip_size ?? cur?.pip ?? 5, at: (t.epoch ?? 0) * 1000 });
                 if (instant) setQuotes({ ...store.current });
-            })
-                .then(sub => {
-                    if (off) sub.unsubscribe();
-                    else stops.push(sub.unsubscribe);
-                })
-                .catch(() => {});
+            });
+            stops.push(stopTicks);
 
             ws.send<{ candles?: Array<{ open: number; high: number; low: number }> }>({
                 ticks_history: s,

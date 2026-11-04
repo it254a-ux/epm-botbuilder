@@ -1,3 +1,4 @@
+jest.mock('../profit-estimate', () => ({ __esModule: true, default: () => null }));
 import { fireEvent, render, screen } from '@testing-library/react';
 import PositionsPanel from '../positions-panel';
 import type { Position, TradeInput } from '../trade-engine';

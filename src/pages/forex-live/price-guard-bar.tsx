@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
+import { watchTicks } from './tick-feed';
 import { GUARD_COUNTS, armLevels, createBell, touched, type GuardLevels } from './price-guard';
 import type { Side } from './trade-engine';
 
@@ -46,20 +47,17 @@ const PriceGuard = ({ symbol, levels, onTrigger, disabled, status }: Props) => {
     useEffect(() => {
         if (!ws || !isConnected) return;
         let off = false;
-        let stop: (() => void) | null = null;
         price.current = null;
-        ws.subscribe({ ticks: symbol }, data => {
+        const stop = watchTicks(ws, symbol, data => {
             const t = (data as { tick?: { quote?: number; bid?: number } }).tick;
             const p = Number(t?.quote ?? t?.bid);
             if (off || !Number.isFinite(p)) return;
             price.current = p;
             setLast(p);
-        })
-            .then(sub => (off ? sub.unsubscribe() : (stop = sub.unsubscribe)))
-            .catch(() => {});
+        });
         return () => {
             off = true;
-            stop?.();
+            stop();
         };
     }, [ws, isConnected, symbol]);
 

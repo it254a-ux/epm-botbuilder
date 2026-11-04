@@ -1,4 +1,5 @@
 import { useEffect, useState, type MutableRefObject } from 'react';
+import ProfitEstimate from './profit-estimate';
 import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './trade-engine';
 
 /** Extra settings for one click: how many trades to open (instead of 'Trades per click') and who to tell about each trade's id. */
@@ -239,6 +240,8 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                     <input type='number' min='0' step='any' inputMode='decimal' placeholder='All trades of a click' value={prefs.groupSl} onChange={e => set({ groupSl: e.target.value })} />
                 </label>
             </div>
+
+            <ProfitEstimate symbol={symbol} currency={currency} stake={Number(prefs.stake)} multiplier={prefs.multiplier} count={prefs.count} />
 
             <label className='forex-live__auto'>
                 <input type='checkbox' checked={prefs.usePlan} onChange={e => set({ usePlan: e.target.checked })} />

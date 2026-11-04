@@ -306,3 +306,18 @@ describe('why a trade closed', () => {
         expect(merged.closeReason).toBe('Stopped out: the whole stake was lost');
     });
 });
+
+import { estimateProfit } from '../trade-engine';
+
+describe('estimateProfit', () => {
+    it('BUY gains when the price rises, SELL when it falls (stake x multiplier x change / entry)', () => {
+        expect(estimateProfit('BUY', 10, 100, 1.1, 1.111)).toBe(10);
+        expect(estimateProfit('SELL', 10, 100, 1.1, 1.089)).toBe(10);
+        expect(estimateProfit('BUY', 10, 100, 1.1, 1.089)).toBe(-10);
+    });
+    it('can never lose more than the stake, and gives nothing for a bad number', () => {
+        expect(estimateProfit('BUY', 10, 100, 1.1, 0.5)).toBe(-10);
+        expect(estimateProfit('BUY', 10, 100, 1.1, NaN)).toBeNull();
+        expect(estimateProfit('BUY', 0, 100, 1.1, 1.2)).toBeNull();
+    });
+});
