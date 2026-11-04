@@ -29,6 +29,8 @@ interface Props {
     plan?: PlanLevels | null;
     openHere?: { count: number; buys: number; sells: number; profit: number };
     /** Lets the one-tap SELL / BUY bar on the phone chart open a trade with the settings chosen here. */
+    /** Starts watching the trades of one click together: returns the function that is told each trade's id. */
+    makeGroup?: (side: Side, takeProfit: number | null, stopLoss: number | null) => (id: number) => void;
     fireRef?: MutableRefObject<((side: Side, opts?: FireOptions) => void) | null>;
 }
 
@@ -44,11 +46,14 @@ interface Prefs {
     /** Use the analysis plan's stop loss and take profit (when it has one for the side clicked). */
     usePlan: boolean;
     count: number;
+    /** Optional: when the trades of one click are together at this profit / loss, all of them close. */
+    groupTp: string;
+    groupSl: string;
     /** The stake the person chose on each market (so it comes back when they return to that market). */
     stakeBy: Record<string, string>;
 }
 
-const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', usePlan: false, count: 1, stakeBy: {} };
+const DEFAULTS: Prefs = { stake: '1', multiplier: 100, stopLoss: '', takeProfit: '', usePlan: false, count: 1, groupTp: '', groupSl: '', stakeBy: {} };
 
 const loadPrefs = (): Prefs => {
     try {
@@ -63,7 +68,7 @@ const loadPrefs = (): Prefs => {
 const nearest = (list: number[], want: number): number =>
     list.length ? list.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a)) : want;
 
-const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan, fireRef }: Props) => {
+const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade, marketName, minStake, onMultiplier, notice, openHere, plan, fireRef, makeGroup }: Props) => {
     const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
     const set = (patch: Partial<Prefs>) => setPrefs(p => ({ ...p, ...patch }));
     // a stake the person types or picks is remembered for this market
@@ -127,7 +132,12 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         };
         // every click is sent straight away; "trades per click" opens several at the same moment
         const list = Array.from({ length: opts?.count ?? prefs.count }, () => trade);
-        if (opts?.onOpened) onTrade(list, opts.onOpened);
+        // the trades of one click can be watched together: their combined profit / loss closes them all
+        const gTp = own(prefs.groupTp);
+        const gSl = own(prefs.groupSl);
+        const together = !opts?.onOpened && makeGroup && (gTp !== null || gSl !== null) ? makeGroup(side, gTp, gSl) : null;
+        const onOpened = opts?.onOpened ?? together;
+        if (onOpened) onTrade(list, onOpened);
         else onTrade(list);
     };
 
@@ -216,6 +226,17 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
                         value={prefs.takeProfit}
                         onChange={e => set({ takeProfit: e.target.value })}
                     />
+                </label>
+            </div>
+
+            <div className='forex-live__grid'>
+                <label title='Optional: when the trades of one click are together at this profit, all of them close'>
+                    <span>Total take profit ({currency || '…'})</span>
+                    <input type='number' min='0' step='any' inputMode='decimal' placeholder='All trades of a click' value={prefs.groupTp} onChange={e => set({ groupTp: e.target.value })} />
+                </label>
+                <label title='Optional: when the trades of one click are together at this loss, all of them close'>
+                    <span>Total stop loss ({currency || '…'})</span>
+                    <input type='number' min='0' step='any' inputMode='decimal' placeholder='All trades of a click' value={prefs.groupSl} onChange={e => set({ groupSl: e.target.value })} />
                 </label>
             </div>
 

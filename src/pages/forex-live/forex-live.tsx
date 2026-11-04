@@ -181,20 +181,20 @@ const ForexLive = observer(() => {
         [openTrade]
     );
 
-    // Price Guard: one touch of a line opens the chosen number of trades and remembers them as a group
+    // Trades opened together (a Price Guard touch or one click with a total take profit / stop loss): one touch of a line opens the chosen number of trades and remembers them as a group
+    const newGroup = useCallback((side: Side, takeProfit: number | null, stopLoss: number | null) => {
+        const group: GuardGroup = { side, ids: [], takeProfit, stopLoss, done: false };
+        groups.current = [...groups.current, group];
+        return (id: number) => {
+            group.ids.push(id);
+            setGroupsTick(n => n + 1);
+        };
+    }, []);
     const guardFire = useCallback(
         (side: Side, s: { count: number; takeProfit: number | null; stopLoss: number | null }) => {
-            const group: GuardGroup = { side, ids: [], takeProfit: s.takeProfit, stopLoss: s.stopLoss, done: false };
-            groups.current = [...groups.current, group];
-            fireRef.current?.(side, {
-                count: s.count,
-                onOpened: id => {
-                    group.ids.push(id);
-                    setGroupsTick(n => n + 1);
-                },
-            });
+            fireRef.current?.(side, { count: s.count, onOpened: newGroup(side, s.takeProfit, s.stopLoss) });
         },
-        []
+        [newGroup]
     );
 
     // ...and when their combined profit reaches the take profit (or the combined loss the stop loss), all of them close
@@ -316,6 +316,7 @@ const ForexLive = observer(() => {
                         openHere={here}
                         plan={plan.symbol === symbol ? plan.plan : null}
                         fireRef={fireRef}
+                        makeGroup={newGroup}
                     />
 
                     <div className='forex-live__pane' data-pane='trade'>
