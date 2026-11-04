@@ -353,10 +353,14 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         levelsRef.current = null;
     };
 
-    // how many candles to show when a chart opens: about 8 pixels each, so they are big enough to read
-    const openCount = () => {
-        const w = hostRef.current?.clientWidth || chartRef.current?.timeScale().width() || window.innerWidth;
-        return Math.max(30, Math.min(140, Math.round(w / 8)));
+    // How a chart opens: each candle about 8 pixels wide, sitting at the latest price (zoom out or in from there).
+    // This is set in pixels, not as "a number of candles", so it stays right when the chart box is resized afterwards
+    // (a chart that opened while its box was still small used to stay squeezed into thin slivers).
+    const openView = () => {
+        const ts = chartRef.current?.timeScale();
+        if (!ts) return;
+        ts.applyOptions({ barSpacing: 8, rightOffset: 8 });
+        ts.scrollToRealTime();
     };
 
     useImperativeHandle(ref, () => {
@@ -367,14 +371,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             setResetKey(k => k + 1);
             seriesRef.current?.setData(candles.map(toBar));
             refreshDerived();
-            // open on the latest stretch with big, readable candles (zoom out or in from there)
-            const ts = chartRef.current?.timeScale();
-            if (ts && candles.length > 30) {
-                const wanted = openCount();
-                ts.setVisibleLogicalRange({ from: Math.max(0, candles.length - wanted), to: candles.length + 8 });
-            } else {
-                ts?.fitContent();
-            }
+            // open on the latest candles, big enough to read (zoom out or in from there)
+            if (candles.length > 30) openView();
+            else chartRef.current?.timeScale().fitContent();
         },
         mergeCandles(candles) {
             const byTime = new Map<number, Candle>();
@@ -698,9 +697,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
 
             // Frame the range and the move after it, with room on the right for the boxes.
             if (r) {
-                // open on the latest stretch with big candles, not the whole range squeezed in (zoom out for more)
-                const from = Math.max(0, candles.length - openCount());
-                chart.timeScale().setVisibleLogicalRange({ from, to: candles.length + 10 });
+                // the latest candles, big enough to read (zoom out for more); keepView leaves a zoom the person already chose alone
+                openView();
             }
         },
         screenshot() {
