@@ -744,7 +744,7 @@
 
             // minimised: just the title and the arrow, as small as it can be
             &.is-collapsed {
-                width: 150px;
+                width: 104px;
             }
         }
     }
@@ -1109,4 +1109,27 @@
 .forex-trader--result-out .forex-trader__controls.is-collapsed {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
+}
+
+// the minimised Trade setup button: small box, small text
+.forex-trader.forex-trader--result-out .forex-trader__controls.is-collapsed,
+.forex-trader .forex-trader__controls.is-collapsed {
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+
+    .forex-trader__head {
+        height: 22px;
+        padding: 0 16px 0 0;
+
+        b {
+            font-size: 9px;
+            letter-spacing: 0.12em;
+        }
+
+        i {
+            right: 3px;
+            width: 5px;
+            height: 5px;
+        }
+    }
 }

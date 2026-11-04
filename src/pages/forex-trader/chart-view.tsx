@@ -353,13 +353,15 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         levelsRef.current = null;
     };
 
-    // How a chart opens: each candle about 8 pixels wide, sitting at the latest price (zoom out or in from there).
+    // How a chart opens: each candle about 9 pixels wide, sitting at the latest price (zoom out or in from there).
     // This is set in pixels, not as "a number of candles", so it stays right when the chart box is resized afterwards
     // (a chart that opened while its box was still small used to stay squeezed into thin slivers).
     const openView = () => {
         const ts = chartRef.current?.timeScale();
         if (!ts) return;
-        ts.applyOptions({ barSpacing: 8, rightOffset: 8 });
+        // about a third of the chart is left empty on the right, for the boxes and levels drawn after the last candle
+        const w = hostRef.current?.clientWidth || window.innerWidth;
+        ts.applyOptions({ barSpacing: 9, rightOffset: Math.max(6, Math.round((w * 0.35) / 9)) });
         ts.scrollToRealTime();
     };
 
