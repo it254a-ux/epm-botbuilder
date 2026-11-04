@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
-import { armLevels, createBell, touched, type GuardLevels } from './price-guard';
+import { GUARD_COUNTS, armLevels, createBell, touched, type GuardLevels } from './price-guard';
 import type { Side } from './trade-engine';
 
 interface Props {
@@ -8,7 +8,9 @@ interface Props {
     /** The "Sell SL (if High swept)" and "Buy SL (if Low swept)" prices from the chart's analysis. */
     levels: GuardLevels;
     /** Opens the trade (the Trade panel's own stake, multiplier and options are used). */
-    onTrigger: (side: Side) => void;
+    onTrigger: (side: Side, settings: { count: number; takeProfit: number | null; stopLoss: number | null }) => void;
+    /** Live line about the trades the guard opened, e.g. "3 open · total +2.40 / target 5". */
+    status?: string;
     disabled: boolean;
 }
 
@@ -17,7 +19,7 @@ interface Props {
  * counts the same as a full candle). When price reaches the "Sell SL" line it opens a SELL, and when it reaches
  * the "Buy SL" line it opens a BUY, then a bell rings until you stop it.
  */
-const PriceGuard = ({ symbol, levels, onTrigger, disabled }: Props) => {
+const PriceGuard = ({ symbol, levels, onTrigger, disabled, status }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [on, setOn] = useState(false);
     const [armed, setArmed] = useState<GuardLevels | null>(null);
@@ -32,6 +34,13 @@ const PriceGuard = ({ symbol, levels, onTrigger, disabled }: Props) => {
     const triggerRef = useRef(onTrigger);
     triggerRef.current = onTrigger;
     const price = useRef<number | null>(null);
+    // what one touch of a line does: how many trades, and the optional combined take profit / stop loss
+    const [count, setCount] = useState(1);
+    const [tp, setTp] = useState('');
+    const [sl, setSl] = useState('');
+    const settingsRef = useRef({ count: 1, takeProfit: null as number | null, stopLoss: null as number | null });
+    const num = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
+    settingsRef.current = { count, takeProfit: num(tp), stopLoss: num(sl) };
 
     // keep the last price handy so the levels can be checked when the guard is switched on
     useEffect(() => {
@@ -61,7 +70,7 @@ const PriceGuard = ({ symbol, levels, onTrigger, disabled }: Props) => {
         const side = touched(armed, last, done);
         if (!side) return;
         setFired(f => [...f, side]);
-        triggerRef.current(side);
+        triggerRef.current(side, settingsRef.current);
         bell.current!.start();
         setRinging(true);
     }, [last, on, armed, fired]);
@@ -127,10 +136,33 @@ const PriceGuard = ({ symbol, levels, onTrigger, disabled }: Props) => {
             >
                 {on ? 'Guard ON – tap to stop' : 'Price Guard'}
             </button>
+            {!on && (
+                <span className='fl-guard__set'>
+                    <label>
+                        Trades
+                        <select value={count} onChange={e => setCount(Number(e.target.value))}>
+                            {GUARD_COUNTS.map(c => (
+                                <option key={c} value={c}>
+                                    {c}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label title='Optional: when the trades together are at this profit, all of them close'>
+                        Take profit
+                        <input type='number' min='0' step='any' inputMode='decimal' placeholder='total' value={tp} onChange={e => setTp(e.target.value)} />
+                    </label>
+                    <label title='Optional: when the trades together are at this loss, all of them close'>
+                        Stop loss
+                        <input type='number' min='0' step='any' inputMode='decimal' placeholder='total' value={sl} onChange={e => setSl(e.target.value)} />
+                    </label>
+                </span>
+            )}
+            {status && <span className='fl-guard__info fl-guard__info--total'>{status}</span>}
             {on && armed && (
                 <span className='fl-guard__info'>
-                    SELL at {fmt(armed.sell)}
-                    {fired.includes('SELL') ? ' ✓' : ''} · BUY at {fmt(armed.buy)}
+                    {count}× SELL at {fmt(armed.sell)}
+                    {fired.includes('SELL') ? ' ✓' : ''} · {count}× BUY at {fmt(armed.buy)}
                     {fired.includes('BUY') ? ' ✓' : ''}
                 </span>
             )}

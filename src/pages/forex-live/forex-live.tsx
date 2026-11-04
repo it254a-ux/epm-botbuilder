@@ -7,7 +7,7 @@ import { useSharedPick } from '../forex-trader/shared-picks';
 import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
-import type { GuardLevels } from './price-guard';
+import { groupTotal, groupVerdict, type GuardGroup, type GuardLevels } from './price-guard';
 import PriceGuard from './price-guard-bar';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
@@ -21,7 +21,7 @@ import {
     type Side,
     type TradeInput,
 } from './trade-engine';
-import TradePanel from './trade-panel';
+import TradePanel, { type FireOptions } from './trade-panel';
 import { useForexLive, useMultipliers } from './use-forex-live';
 import './forex-live.scss';
 
@@ -70,7 +70,7 @@ const usePhone = () => {
 const ForexLive = observer(() => {
     const phone = usePhone();
     const [tab, setTab] = useState<PhoneTab>('chart');
-    const fireRef = useRef<((side: Side) => void) | null>(null);
+    const fireRef = useRef<((side: Side, opts?: FireOptions) => void) | null>(null);
     const { client } = useStore();
     const { isAuthorized, activeLoginid, authData } = useApiBase();
 
@@ -79,6 +79,9 @@ const ForexLive = observer(() => {
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
     const [guardLevels, setGuardLevels] = useState<{ levels: GuardLevels; symbol: string }>({ levels: { sell: null, buy: null }, symbol: '' });
     const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
+    // the trades each touch of a Price Guard line opened, watched together
+    const groups = useRef<GuardGroup[]>([]);
+    const [groupsTick, setGroupsTick] = useState(0);
     const [compare, setCompare] = useState(false);
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -171,12 +174,49 @@ const ForexLive = observer(() => {
     useEffect(() => () => setLiveEquity(null), []);
 
     const trade = useCallback(
-        (list: TradeInput[]) => {
+        (list: TradeInput[], onOpened?: (id: number) => void) => {
             // all sent at once; nothing waits for anything else
-            list.forEach(t => void openTrade(t));
+            list.forEach(t => void openTrade(t, onOpened));
         },
         [openTrade]
     );
+
+    // Price Guard: one touch of a line opens the chosen number of trades and remembers them as a group
+    const guardFire = useCallback(
+        (side: Side, s: { count: number; takeProfit: number | null; stopLoss: number | null }) => {
+            const group: GuardGroup = { side, ids: [], takeProfit: s.takeProfit, stopLoss: s.stopLoss, done: false };
+            groups.current = [...groups.current, group];
+            fireRef.current?.(side, {
+                count: s.count,
+                onOpened: id => {
+                    group.ids.push(id);
+                    setGroupsTick(n => n + 1);
+                },
+            });
+        },
+        []
+    );
+
+    // ...and when their combined profit reaches the take profit (or the combined loss the stop loss), all of them close
+    useEffect(() => {
+        groups.current.forEach(g => {
+            const verdict = groupVerdict(g, positions);
+            if (!verdict) return;
+            g.done = true;
+            void closeTrades(positions.filter(p => g.ids.includes(p.id) && !p.closed));
+        });
+    }, [positions, closeTrades]);
+
+    const guardStatus = useMemo(() => {
+        const live = groups.current.filter(g => !g.done && g.ids.length);
+        if (!live.length) return '';
+        const open = positions.filter(p => !p.closed && live.some(g => g.ids.includes(p.id))).length;
+        const total = live.reduce((t, g) => t + groupTotal(g, positions), 0);
+        const g = live[live.length - 1];
+        const target = g.takeProfit ? ` / target ${g.takeProfit}` : '';
+        return `${open} open · total ${total > 0 ? '+' : ''}${(Math.round(total * 100) / 100).toFixed(2)}${target}`;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [positions, groupsTick]);
 
     // the open trades on this market, drawn on the Forex Trader chart where they were entered
     // (the analysis plan and key levels are drawn by the Forex Trader chart itself)
@@ -238,7 +278,8 @@ const ForexLive = observer(() => {
                     <PriceGuard
                         symbol={symbol}
                         levels={guardLevels.symbol === symbol ? guardLevels.levels : { sell: null, buy: null }}
-                        onTrigger={side => fireRef.current?.(side)}
+                        onTrigger={guardFire}
+                        status={guardStatus}
                         disabled={!isAuthorized}
                     />
                     {!phone && (

@@ -262,7 +262,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
     }, [isAuthorized, loginid, upsert, apiObj, watch]);
 
     const openTrade = useCallback(
-        async (input: TradeInput): Promise<boolean> => {
+        async (input: TradeInput, onOpened?: (id: number) => void): Promise<boolean> => {
             const problem = validateTrade(input);
             if (problem) {
                 note('err', problem);
@@ -296,6 +296,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                     canClose: true,
                 });
                 watch(Number(b.contract_id));
+                onOpened?.(Number(b.contract_id));
                 note('ok', `${input.side} ${input.symbol.replace(/^frx/, '')} opened · stake ${input.stake} · x${input.multiplier}`);
                 return true;
             } catch (e) {

@@ -81,3 +81,44 @@ export function createBell() {
         },
     };
 }
+
+/** How many trades one touch of a line can open. */
+export const GUARD_COUNTS = [1, 2, 3, 4, 6, 10];
+
+/** The trades one touch of a line opened, watched together. */
+export interface GuardGroup {
+    side: Side;
+    ids: number[];
+    /** Close them all when their total profit reaches this (optional). */
+    takeProfit: number | null;
+    /** Close them all when their total loss reaches this (optional). */
+    stopLoss: number | null;
+    done: boolean;
+}
+
+interface Row {
+    id: number;
+    profit: number | null;
+    result: number | null;
+    closed: boolean;
+}
+
+/** Total profit of the group: open trades at their live profit, closed ones at their final result. */
+export function groupTotal(group: Pick<GuardGroup, 'ids'>, rows: Row[]): number {
+    const byId = new Map(rows.map(r => [r.id, r]));
+    const sum = group.ids.reduce((t, id) => {
+        const r = byId.get(id);
+        if (!r) return t;
+        return t + (r.closed ? r.result ?? r.profit ?? 0 : r.profit ?? 0);
+    }, 0);
+    return Math.round(sum * 100) / 100;
+}
+
+/** 'tp' when the combined profit reached the target, 'sl' when the combined loss reached the limit. */
+export function groupVerdict(group: GuardGroup, rows: Row[]): 'tp' | 'sl' | null {
+    if (group.done || !group.ids.length) return null;
+    const total = groupTotal(group, rows);
+    if (hasLevel(group.takeProfit) && total >= group.takeProfit) return 'tp';
+    if (hasLevel(group.stopLoss) && total <= -group.stopLoss) return 'sl';
+    return null;
+}

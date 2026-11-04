@@ -1,6 +1,12 @@
 import { useEffect, useState, type MutableRefObject } from 'react';
 import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './trade-engine';
 
+/** Extra settings for one click: how many trades to open (instead of 'Trades per click') and who to tell about each trade's id. */
+export interface FireOptions {
+    count?: number;
+    onOpened?: (id: number) => void;
+}
+
 interface Props {
     symbol: string;
     currency: string;
@@ -9,7 +15,7 @@ interface Props {
     disabled: boolean;
     /** How many requests are on their way to Deriv right now. */
     pending: number;
-    onTrade: (trades: TradeInput[]) => void;
+    onTrade: (trades: TradeInput[], onOpened?: (id: number) => void) => void;
     /** Readable name of the market (for example "Volatility 75 (1s) Index"). */
     marketName?: string;
     /** The smallest stake this market accepts, once known. */
@@ -23,7 +29,7 @@ interface Props {
     plan?: PlanLevels | null;
     openHere?: { count: number; buys: number; sells: number; profit: number };
     /** Lets the one-tap SELL / BUY bar on the phone chart open a trade with the settings chosen here. */
-    fireRef?: MutableRefObject<((side: Side) => void) | null>;
+    fireRef?: MutableRefObject<((side: Side, opts?: FireOptions) => void) | null>;
 }
 
 const PREFS_KEY = 'epm_forex_live_prefs';
@@ -92,7 +98,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [multipliers]);
 
-    const fire = (side: Side) => {
+    const fire = (side: Side, opts?: FireOptions) => {
         if (disabled) return;
         if (minStake && Number(prefs.stake) + 1e-9 < minStake) {
             setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
@@ -120,7 +126,9 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             takeProfit: own(prefs.takeProfit) ?? (fromPlan && fromPlan.takeProfit > 0 ? fromPlan.takeProfit : null),
         };
         // every click is sent straight away; "trades per click" opens several at the same moment
-        onTrade(Array.from({ length: prefs.count }, () => trade));
+        const list = Array.from({ length: opts?.count ?? prefs.count }, () => trade);
+        if (opts?.onOpened) onTrade(list, opts.onOpened);
+        else onTrade(list);
     };
 
     if (fireRef) fireRef.current = fire;
