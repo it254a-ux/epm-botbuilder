@@ -1,4 +1,5 @@
 import { useEffect, useState, type MutableRefObject } from 'react';
+import { setMeasureContext } from '../forex-trader/measure-context';
 import ProfitEstimate from './profit-estimate';
 import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './trade-engine';
 
@@ -141,6 +142,13 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         if (onOpened) onTrade(list, onOpened);
         else onTrade(list);
     };
+
+    // the chart's Measure tool turns a distance into money with these numbers
+    useEffect(() => {
+        const stake = Number(prefs.stake);
+        setMeasureContext(stake > 0 ? { stake, multiplier: prefs.multiplier, count: prefs.count, currency } : null);
+    }, [prefs.stake, prefs.multiplier, prefs.count, currency]);
+    useEffect(() => () => setMeasureContext(null), []);
 
     if (fireRef) fireRef.current = fire;
 

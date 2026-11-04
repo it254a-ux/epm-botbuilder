@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts';
 import type { Candle } from './engine';
+import { estimateProfit } from '../forex-live/trade-engine';
+import { useMeasureContext } from './measure-context';
 import './chart-drawings.scss';
 
 /**
@@ -104,6 +106,7 @@ const tint = (hex: string, alpha: number) => {
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 };
 
+const LEVEL_SNAP_PX = 12;
 const SNAP_PX = 14; // weak magnet: how close (in pixels) to a candle's O/H/L/C it must be
 const HIDDEN = 'rgba(0,0,0,0)';
 
@@ -232,11 +235,14 @@ interface Props {
     pipSize: number;
     /** Changes whenever new candles are loaded (market / timeframe change): drawings are cleared. */
     resetKey: number;
+    /** The prices of the lines on the chart (entry, stop loss, targets, key levels): the Measure tool snaps to them. */
+    getLevels?: () => number[];
     /** More buttons for the top of the toolbar (the chart style and indicators menus). */
     extra?: ReactNode;
 }
 
-export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey, extra }: Props) {
+export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey, extra, getLevels }: Props) {
+    const money = useMeasureContext();
     const svgRef = useRef<SVGSVGElement>(null);
     const [drawings, setDrawings] = useState<Drawing[]>([]);
     const [draft, setDraft] = useState<{ tool: DrawTool; pts: Pt[] } | null>(null);
@@ -322,6 +328,21 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         const py = series.coordinateToPrice(y);
         if (lx === null || py === null) return null;
         const pt = { x: lx as number, y: py as number };
+        // the Measure tool sticks to a line of the chart when the click is close to it, so a click "on the Sell SL line" lands exactly on it
+        if (snap && (tool === 'measure' || draft?.tool === 'measure') && getLevels) {
+            let best: number | null = null;
+            let bestDist = LEVEL_SNAP_PX;
+            getLevels().forEach(level => {
+                const ly = series.priceToCoordinate(level);
+                if (ly === null) return;
+                const dist = Math.abs((ly as number) - y);
+                if (dist <= bestDist) {
+                    bestDist = dist;
+                    best = level;
+                }
+            });
+            if (best !== null) return { x: Math.round(lx as number), y: best };
+        }
         return snap ? snapPt(pt, y) : pt;
     };
 
@@ -653,11 +674,19 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
             case 'measure': {
                 const [a, b] = d.pts;
                 const up = b.y >= a.y;
-                const col = up ? '#22c55e' : '#ef4444';
                 const diff = b.y - a.y;
                 const pct = a.y !== 0 ? (diff / a.y) * 100 : 0;
                 const bars = Math.round(Math.abs(b.x - a.x));
-                const label = `${diff >= 0 ? '+' : ''}${diff.toFixed(pipSize)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) · ${bars} candle${bars === 1 ? '' : 's'}`;
+                // with a stake chosen in the Trade panel: what a trade opened at the start price would make at the end price
+                // (drawn downwards it is a SELL, upwards a BUY)
+                const one = money && b.y !== a.y ? estimateProfit(b.y < a.y ? 'SELL' : 'BUY', money.stake, money.multiplier, a.y, b.y) : null;
+                // green when the trade would make money, red when it would lose (without a stake: green up, red down)
+                const col = one !== null ? (one >= 0 ? '#22c55e' : '#ef4444') : up ? '#22c55e' : '#ef4444';
+                const moneyText =
+                    one === null || !money
+                        ? ''
+                        : ` · ${b.y < a.y ? 'SELL' : 'BUY'} ${one >= 0 ? '+' : ''}${(Math.round(one * money.count * 100) / 100).toFixed(2)} ${money.currency}${money.count > 1 ? ` (${money.count} trades)` : ''}`;
+                const label = `${diff >= 0 ? '+' : ''}${diff.toFixed(pipSize)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) · ${bars} candle${bars === 1 ? '' : 's'}${moneyText}`;
                 const x = Math.min(P[0].x, P[1].x);
                 const y = Math.min(P[0].y, P[1].y);
                 const tw = label.length * 6.6 + 16;

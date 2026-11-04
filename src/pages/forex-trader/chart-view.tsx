@@ -742,6 +742,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                     getCandles={() => candlesRef.current}
                     pipSize={pipSize}
                     resetKey={resetKey}
+                    getLevels={() =>
+                        [...linesRef.current, ...parentLinesRef.current]
+                            .map(l => l.options().price)
+                            .filter(n => Number.isFinite(n))
+                    }
                     extra={showStudies ? <ChartStudies state={studies} onChange={setStudies} /> : undefined}
                 />
             )}
