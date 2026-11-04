@@ -18,6 +18,23 @@ import ChartStudies from './chart-studies';
 import { bollinger, ema, heikinAshi, loadStudies, macd, rsi, saveStudies, sma, type Series, type StudyState } from './indicators';
 import type { PdhResult } from './pdh';
 
+/** A small name over a shaded area: at a time (and, for a band, until t2), at a price or at the top of the chart. */
+interface ChartTag {
+    t: number;
+    t2?: number;
+    price: number | null;
+    text: string;
+    color: string;
+    above?: boolean;
+}
+interface PlacedTag {
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    above: boolean;
+}
+
 export interface ChartViewHandle {
     /** Replace all candles (initial load / market or timeframe change). */
     setCandles: (candles: Candle[]) => void;
@@ -152,6 +169,41 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     studiesRef.current = studies;
     const derivedRef = useRef<Derived[]>([]);
     const refreshTimer = useRef<number>(0);
+    // Small name tags over the shaded areas (sessions, risk and reward zones...), placed from the chart's own coordinates
+    const tagsRef = useRef<ChartTag[]>([]);
+    const [tagPos, setTagPos] = useState<PlacedTag[]>([]);
+    const placeRef = useRef<() => void>(() => {});
+    placeRef.current = () => {
+        const chart = chartRef.current;
+        const series = seriesRef.current;
+        if (!chart || !series) return;
+        const ts = chart.timeScale();
+        const out: PlacedTag[] = [];
+        tagsRef.current.forEach(g => {
+            let x = ts.timeToCoordinate(g.t as UTCTimestamp);
+            if (x === null) return;
+            if (g.t2 !== undefined) {
+                const x2 = ts.timeToCoordinate(g.t2 as UTCTimestamp);
+                if (x2 !== null && x2 < 0) return;
+                x = Math.max(x, 4);
+            }
+            const y = g.price === null ? 8 : series.priceToCoordinate(g.price);
+            if (y === null || x < -40) return;
+            out.push({ x: Math.round(x), y: Math.round(y), text: g.text, color: g.color, above: !!g.above });
+        });
+        setTagPos(prev => (JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
+    };
+    useEffect(() => {
+        if (!apis) return undefined;
+        const again = () => placeRef.current();
+        apis.chart.timeScale().subscribeVisibleLogicalRangeChange(again);
+        // the price side moves with every new price (the chart rescales), so the tags follow it a few times a second
+        const id = window.setInterval(again, 400);
+        return () => {
+            apis.chart.timeScale().unsubscribeVisibleLogicalRangeChange(again);
+            window.clearInterval(id);
+        };
+    }, [apis]);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -351,6 +403,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         extraRef.current = [];
         series?.setMarkers([]);
         levelsRef.current = null;
+        tagsRef.current = [];
+        window.requestAnimationFrame(() => placeRef.current());
     };
 
     // How a chart opens: each candle about 9 pixels wide, the latest ones in view, and about a third of the chart left
@@ -542,6 +596,26 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 );
                 extraRef.current.push(area);
             });
+            const tags: ChartTag[] = [];
+            const sessionName = { asian: 'Asian session', london: 'London session', ny: 'New York session' } as const;
+            {
+                let cur: ReturnType<typeof sessionOf> = null;
+                let start = 0;
+                let prevT = 0;
+                const flush = () => {
+                    if (cur) tags.push({ t: start, t2: prevT, price: null, text: sessionName[cur], color: 'rgba(203,213,225,0.7)' });
+                };
+                recent.forEach(c => {
+                    const nm = sessionOf(c.time);
+                    if (nm !== cur) {
+                        flush();
+                        cur = nm;
+                        start = c.time;
+                    }
+                    prevT = c.time;
+                });
+                flush();
+            }
 
             const markers: SeriesMarker<Time>[] = [];
             const plan = analysis.plan;
@@ -556,6 +630,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                     const t1 = inWindow[inWindow.length - 1].time;
                     addSegment(t0, t1, r.high, COLORS.range, 3);
                     addSegment(t0, t1, r.low, COLORS.range, 3);
+                    tags.push({ t: t0, price: r.high, text: 'Buy-side liquidity', color: COLORS.range, above: true });
+                    tags.push({ t: t0, price: r.low, text: 'Sell-side liquidity', color: COLORS.range });
                 }
                 if (analysis.watch) {
                     // Nothing has triggered yet: each range edge doubles as an entry for one
@@ -578,7 +654,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                     position: sw.side === 'high' ? 'aboveBar' : 'belowBar',
                     shape: sw.side === 'high' ? 'arrowDown' : 'arrowUp',
                     color: COLORS.sweep,
-                    text: 'Sweep',
+                    text: 'Liquidity sweep',
                 });
             }
 
@@ -603,7 +679,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                         position: 'inBar',
                         shape: 'square',
                         color: COLORS.fvg,
-                        text: 'FVG',
+                        text: 'Fair value gap',
                     });
                 }
                 // risk (red) and reward (green) boxes
@@ -611,6 +687,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 const planned = bos.bosTime === null;
                 addZone(t0, endT, plan.entry, plan.takeProfit, planned ? COLORS.rewardFaint : COLORS.rewardFill);
                 addZone(t0, endT, plan.entry, plan.stopLoss, planned ? COLORS.riskFaint : COLORS.riskFill);
+                tags.push({ t: t0, price: (plan.entry + plan.takeProfit) / 2, text: 'Reward zone (target)', color: COLORS.tp });
+                tags.push({ t: t0, price: (plan.entry + plan.stopLoss) / 2, text: 'Liquidation zone (stop loss)', color: COLORS.sl });
 
                 const entryTitle = planned
                     ? 'Entry (planned, after BOS)'
@@ -695,6 +773,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 });
             keep.sort((a, b) => (a.time as number) - (b.time as number));
             series.setMarkers(keep);
+            tagsRef.current = tags;
+            window.requestAnimationFrame(() => placeRef.current());
 
             // make autoscale include all levels
             const lv: number[] = [];
@@ -740,6 +820,17 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
+            <div className='forex-trader__tags' aria-hidden='true'>
+                {tagPos.map((g, i) => (
+                    <span
+                        key={`${g.text}-${i}`}
+                        className={`forex-trader__tag${g.above ? ' is-above' : ''}`}
+                        style={{ left: `${g.x}px`, top: `${g.y}px`, color: g.color }}
+                    >
+                        {g.text}
+                    </span>
+                ))}
+            </div>
             {apis && (
                 <ChartDrawings
                     chart={apis.chart}
