@@ -56,3 +56,12 @@ describe('Price Guard group', () => {
         expect(groupVerdict(group({ takeProfit: null }), rows([50, 50, 50, 50, 50]))).toBeNull();
     });
 });
+
+describe('Price Guard group switched off', () => {
+    it('a group switched off is not closed even when its target is reached, and watches again when switched on', () => {
+        const rows = [{ id: 1, profit: 9, result: null, closed: false }];
+        const g = { side: 'BUY' as const, ids: [1], takeProfit: 5, stopLoss: null, done: false, active: false };
+        expect(groupVerdict(g, rows)).toBeNull();
+        expect(groupVerdict({ ...g, active: true }, rows)).toBe('tp');
+    });
+});

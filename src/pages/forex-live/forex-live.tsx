@@ -8,6 +8,7 @@ import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
 import { groupTotal, groupVerdict, type GuardGroup, type GuardLevels } from './price-guard';
+import GroupsPanel, { type GroupRow } from './groups-panel';
 import PriceGuard from './price-guard-bar';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
@@ -81,6 +82,7 @@ const ForexLive = observer(() => {
     const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
     // the trades each touch of a Price Guard line opened, watched together
     const groups = useRef<GuardGroup[]>([]);
+    const groupUid = useRef(0);
     const [groupsTick, setGroupsTick] = useState(0);
     const [compare, setCompare] = useState(false);
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
@@ -183,7 +185,7 @@ const ForexLive = observer(() => {
 
     // Trades opened together (a Price Guard touch or one click with a total take profit / stop loss): one touch of a line opens the chosen number of trades and remembers them as a group
     const newGroup = useCallback((side: Side, takeProfit: number | null, stopLoss: number | null) => {
-        const group: GuardGroup = { side, ids: [], takeProfit, stopLoss, done: false };
+        const group: GuardGroup = { uid: ++groupUid.current, active: true, side, ids: [], takeProfit, stopLoss, done: false };
         groups.current = [...groups.current, group];
         return (id: number) => {
             group.ids.push(id);
@@ -205,7 +207,41 @@ const ForexLive = observer(() => {
             g.done = true;
             void closeTrades(positions.filter(p => g.ids.includes(p.id) && !p.closed));
         });
-    }, [positions, closeTrades]);
+    }, [positions, closeTrades, groupsTick]);
+
+    const groupRows = useMemo<GroupRow[]>(
+        () =>
+            groups.current
+                .filter(g => !g.done && g.ids.length)
+                .map(g => ({
+                    uid: g.uid as number,
+                    side: g.side,
+                    open: positions.filter(p => !p.closed && g.ids.includes(p.id)).length,
+                    total: groupTotal(g, positions),
+                    takeProfit: g.takeProfit,
+                    stopLoss: g.stopLoss,
+                    active: g.active !== false,
+                }))
+                .filter(r => r.open > 0),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [positions, groupsTick]
+    );
+    const changeGroup = useCallback((uid: number, patch: { takeProfit?: number | null; stopLoss?: number | null; active?: boolean }) => {
+        const g = groups.current.find(x => x.uid === uid);
+        if (!g) return;
+        Object.assign(g, patch);
+        setGroupsTick(n => n + 1);
+    }, []);
+    const closeGroup = useCallback(
+        (uid: number) => {
+            const g = groups.current.find(x => x.uid === uid);
+            if (!g) return;
+            g.done = true;
+            void closeTrades(positions.filter(p => g.ids.includes(p.id) && !p.closed));
+            setGroupsTick(n => n + 1);
+        },
+        [closeTrades, positions]
+    );
 
     const guardStatus = useMemo(() => {
         const live = groups.current.filter(g => !g.done && g.ids.length);
@@ -320,6 +356,7 @@ const ForexLive = observer(() => {
                     />
 
                     <div className='forex-live__pane' data-pane='trade'>
+                        <GroupsPanel rows={groupRows} currency={currency} onChange={changeGroup} onCloseAll={closeGroup} />
                         <PositionsPanel
                             positions={positions}
                             currency={currency}

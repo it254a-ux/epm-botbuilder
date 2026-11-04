@@ -87,6 +87,9 @@ export const GUARD_COUNTS = [1, 2, 3, 4, 6, 10];
 
 /** The trades one touch of a line opened, watched together. */
 export interface GuardGroup {
+    uid?: number;
+    /** False while the person has switched this group's watching off. */
+    active?: boolean;
     side: Side;
     ids: number[];
     /** Close them all when their total profit reaches this (optional). */
@@ -116,7 +119,7 @@ export function groupTotal(group: Pick<GuardGroup, 'ids'>, rows: Row[]): number 
 
 /** 'tp' when the combined profit reached the target, 'sl' when the combined loss reached the limit. */
 export function groupVerdict(group: GuardGroup, rows: Row[]): 'tp' | 'sl' | null {
-    if (group.done || !group.ids.length) return null;
+    if (group.done || group.active === false || !group.ids.length) return null;
     const total = groupTotal(group, rows);
     if (hasLevel(group.takeProfit) && total >= group.takeProfit) return 'tp';
     if (hasLevel(group.stopLoss) && total <= -group.stopLoss) return 'sl';
