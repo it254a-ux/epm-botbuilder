@@ -7,6 +7,8 @@ import { useSharedPick } from '../forex-trader/shared-picks';
 import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
+import type { GuardLevels } from './price-guard';
+import PriceGuard from './price-guard-bar';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
 import QuotesPanel from './quotes-panel';
@@ -75,6 +77,8 @@ const ForexLive = observer(() => {
     // the market is shared with the Forex Trader page (see shared-picks)
     const [symbol, setSymbol] = useSharedPick('symbol', DEFAULT_SYMBOL, true);
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
+    const [guardLevels, setGuardLevels] = useState<{ levels: GuardLevels; symbol: string }>({ levels: { sell: null, buy: null }, symbol: '' });
+    const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
     const [compare, setCompare] = useState(false);
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -224,11 +228,18 @@ const ForexLive = observer(() => {
                         controlledSymbol={symbol}
                         onSymbolChange={setSymbol}
                         onPlan={onPlan}
+                        onWatch={onWatch}
                         extraLines={lines}
                         onMarkets={setNames}
                         resultHost={resultHost}
                         onOpenCompare={openCompare}
                         noAnalysis={phone}
+                    />
+                    <PriceGuard
+                        symbol={symbol}
+                        levels={guardLevels.symbol === symbol ? guardLevels.levels : { sell: null, buy: null }}
+                        onTrigger={side => fireRef.current?.(side)}
+                        disabled={!isAuthorized}
                     />
                     {!phone && (
                     <button

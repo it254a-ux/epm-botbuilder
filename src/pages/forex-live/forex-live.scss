@@ -1444,3 +1444,70 @@
         }
     }
 }
+
+
+// Price Guard: a small bar at the bottom of the chart
+.fl-guard {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    z-index: 7;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 16px);
+
+    &__toggle {
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 24, 33, 0.85);
+        color: #fff;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+    }
+
+    &.is-on &__toggle {
+        background: #d99a00;
+        border-color: #d99a00;
+        color: #111;
+    }
+
+    &__info {
+        font-size: 10px;
+        padding: 3px 7px;
+        border-radius: 10px;
+        background: rgba(20, 24, 33, 0.85);
+        color: #fff;
+        white-space: nowrap;
+    }
+
+    &__silence {
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        border-radius: 14px;
+        border: 0;
+        background: #e5484d;
+        color: #fff;
+        cursor: pointer;
+        animation: fl-guard-pulse 0.8s ease-in-out infinite;
+    }
+}
+
+@keyframes fl-guard-pulse {
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+.forex-live[data-phone='on'] .fl-guard {
+    bottom: 40px;
+}

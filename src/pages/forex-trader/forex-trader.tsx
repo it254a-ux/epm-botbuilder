@@ -137,6 +137,8 @@ interface ForexTraderProps {
     onSymbolChange?: (symbol: string) => void;
     /** Called whenever the plan (entry, stop loss, take profit) changes; null when there is none. */
     onPlan?: (plan: ReportedPlan | null, symbol: string) => void;
+    /** The prices of the "Sell SL (if High swept)" and "Buy SL (if Low swept)" lines, for a parent page's Price Guard. */
+    onWatch?: (levels: { sell: number | null; buy: number | null }, symbol: string) => void;
     /** Start in the M15 analysis + M5 entry mode instead of the H1 strategies. */
     initialMode?: 'h1' | 'mtf';
     /** Keep the tool's own chart out of sight (it still runs, so the analysis is identical). */
@@ -170,7 +172,7 @@ function CandleClock({ seconds }: { seconds: number }) {
     return <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, onWatch, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
@@ -262,6 +264,16 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
             : [];
         onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, levels } : null, symbol);
     }, [mode, mtf, outcome, symbol]);
+
+    // ---- the Sell SL / Buy SL lines, for a parent page's Price Guard
+    const onWatchRef = useRef(onWatch);
+    onWatchRef.current = onWatch;
+    const watchSell = mode === 'mtf' ? null : outcome?.analysis.watch?.sell.stopLoss ?? null;
+    const watchBuy = mode === 'mtf' ? null : outcome?.analysis.watch?.buy.stopLoss ?? null;
+    useEffect(() => {
+        const ok = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
+        onWatchRef.current?.({ sell: ok(watchSell), buy: ok(watchBuy) }, symbol);
+    }, [watchSell, watchBuy, symbol]);
 
     // ---- lines from a parent page (open trades) go on this chart too
     const onMarketsRef = useRef(onMarkets);
