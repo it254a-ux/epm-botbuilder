@@ -353,26 +353,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         levelsRef.current = null;
     };
 
-    // How a chart opens: each candle about 9 pixels wide, the latest ones in view, and about a third of the chart left
-    // empty on the right (room for the boxes and levels drawn after the last candle). It is applied two frames after
-    // the data is set: the chart library puts its own default view in place on the first frame, and anything set
-    // before that is overwritten (this is why earlier attempts changed nothing). Zoom out or in from there.
-    const openFrame = useRef(0);
-    const openFlip = useRef(false);
+    // How a chart opens: each candle about 9 pixels wide, sitting at the latest price (zoom out or in from there).
+    // This is set in pixels, not as "a number of candles", so it stays right when the chart box is resized afterwards
+    // (a chart that opened while its box was still small used to stay squeezed into thin slivers).
     const openView = () => {
-        cancelAnimationFrame(openFrame.current);
-        openFrame.current = requestAnimationFrame(() => {
-            openFrame.current = requestAnimationFrame(() => {
-                const chart = chartRef.current;
-                const host = hostRef.current;
-                if (!chart || !host || !candlesRef.current.length) return;
-                const ts = chart.timeScale();
-                const plot = ts.width() || host.clientWidth - 75;
-                openFlip.current = !openFlip.current;
-                // the tiny alternating difference makes the chart take the values again after the person has zoomed
-                ts.applyOptions({ barSpacing: openFlip.current ? 9 : 9.001, rightOffset: Math.max(6, Math.round((plot * 0.35) / 9)) });
-            });
-        });
+        const ts = chartRef.current?.timeScale();
+        if (!ts) return;
+        // about a third of the chart is left empty on the right, for the boxes and levels drawn after the last candle
+        const w = hostRef.current?.clientWidth || window.innerWidth;
+        ts.applyOptions({ barSpacing: 9, rightOffset: Math.max(6, Math.round((w * 0.35) / 9)) });
+        ts.scrollToRealTime();
     };
 
     useImperativeHandle(ref, () => {
@@ -707,6 +697,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                 levelsRef.current = { min: Math.min(...lv) - span * 0.04, max: Math.max(...lv) + span * 0.04 };
             }
 
+            // Frame the range and the move after it, with room on the right for the boxes.
+            if (r) {
+                // the latest candles, big enough to read (zoom out for more); keepView leaves a zoom the person already chose alone
+                openView();
+            }
         },
         screenshot() {
             const chart = chartRef.current;
