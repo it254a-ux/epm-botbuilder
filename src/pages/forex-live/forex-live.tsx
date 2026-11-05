@@ -9,7 +9,7 @@ import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
 import { groupTotal, groupVerdict, type GuardGroup, type GuardLevels } from './price-guard';
 import GroupsPanel, { type GroupRow } from './groups-panel';
-import PriceGuard from './price-guard-bar';
+import SweepSniper from './sweep-sniper';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
 import QuotesPanel from './quotes-panel';
@@ -305,18 +305,21 @@ const ForexLive = observer(() => {
                         onSymbolChange={setSymbol}
                         onPlan={onPlan}
                         onWatch={onWatch}
+                        toolbarExtra={
+                            <SweepSniper
+                                symbol={symbol}
+                                currency={currency}
+                                levels={guardLevels.symbol === symbol ? guardLevels.levels : { sell: null, buy: null }}
+                                onTrigger={guardFire}
+                                status={guardStatus}
+                                disabled={!isAuthorized}
+                            />
+                        }
                         extraLines={lines}
                         onMarkets={setNames}
                         resultHost={resultHost}
                         onOpenCompare={openCompare}
                         noAnalysis={phone}
-                    />
-                    <PriceGuard
-                        symbol={symbol}
-                        levels={guardLevels.symbol === symbol ? guardLevels.levels : { sell: null, buy: null }}
-                        onTrigger={guardFire}
-                        status={guardStatus}
-                        disabled={!isAuthorized}
                     />
                     {!phone && (
                     <button

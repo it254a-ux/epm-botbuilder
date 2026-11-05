@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useSharedPick } from './shared-picks';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle } from './chart-view';
@@ -138,6 +138,8 @@ interface ForexTraderProps {
     /** Called whenever the plan (entry, stop loss, take profit) changes; null when there is none. */
     onPlan?: (plan: ReportedPlan | null, symbol: string) => void;
     /** The prices of the "Sell SL (if High swept)" and "Buy SL (if Low swept)" lines, for a parent page's Price Guard. */
+    /** A control a parent page wants beside the Trade setup button (for example the Sweep Sniper). */
+    toolbarExtra?: ReactNode;
     onWatch?: (levels: { sell: number | null; buy: number | null }, symbol: string) => void;
     /** Start in the M15 analysis + M5 entry mode instead of the H1 strategies. */
     initialMode?: 'h1' | 'mtf';
@@ -172,7 +174,7 @@ function CandleClock({ seconds }: { seconds: number }) {
     return <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>;
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, onWatch, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
+const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, onWatch, toolbarExtra, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
@@ -739,6 +741,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     ))}
                 </div>
             )}
+            {toolbarExtra && <div className={`forex-trader__extra${setupOpen ? ' is-setup-open' : ''}`}>{toolbarExtra}</div>}
             <div className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
                 <button
                     type='button'

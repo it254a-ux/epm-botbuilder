@@ -1133,3 +1133,24 @@
         }
     }
 }
+
+
+// A control a parent page puts beside the Trade setup button: it sits to the right of it and slides over when the setup opens.
+.forex-trader__extra {
+    position: absolute;
+    z-index: 9;
+    top: 8px;
+    left: 60px;
+    transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 1100px) {
+    .forex-trader--result-out .forex-trader__extra {
+        top: 44px;
+        left: 188px; // right of the minimised Trade setup (76px + 104px + gap)
+
+        &.is-setup-open {
+            left: 424px; // right of the opened Trade setup (76px + 340px + gap)
+        }
+    }
+}
