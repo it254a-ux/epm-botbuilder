@@ -102,6 +102,8 @@ export const GUARD_COUNTS = [1, 2, 3, 4, 6, 10];
 /** The trades one touch of a line opened, watched together. */
 export interface GuardGroup {
     uid?: number;
+    /** When the group was opened (so an old one is forgotten). */
+    at?: number;
     /** False while the person has switched this group's watching off. */
     active?: boolean;
     side: Side;

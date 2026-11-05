@@ -3,6 +3,7 @@ import { useDerivWS } from '@deriv/core';
 import { useMeasureContext } from '../forex-trader/measure-context';
 import { GUARD_COUNTS, armLevels, createBell, touched, type ArmedLevels } from './price-guard';
 import type { GuardLevels } from './price-guard';
+import { loadSniper, saveSniper, shouldResume } from './sniper-storage';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
 import type { Side } from './trade-engine';
@@ -47,11 +48,16 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [ringing, setRinging] = useState(false);
     const [last, setLast] = useState<number | null>(null);
     const [digits, setDigits] = useState<number | null>(null);
-    const [count, setCount] = useState(1);
-    const [stake, setStake] = useState('');
+    // what was set (and whether it was armed) before the page was refreshed
+    const saved = useRef(loadSniper());
+    const pendingResume = useRef(shouldResume(saved.current, symbol));
+    const [resumed, setResumed] = useState(false);
+    const [soundReady, setSoundReady] = useState(true);
+    const [count, setCount] = useState(saved.current?.count ?? 1);
+    const [stake, setStake] = useState(saved.current?.stake ?? '');
     const panel = useMeasureContext();
-    const [tp, setTp] = useState('');
-    const [sl, setSl] = useState('');
+    const [tp, setTp] = useState(saved.current?.tp ?? '');
+    const [sl, setSl] = useState(saved.current?.sl ?? '');
     const root = useRef<HTMLDivElement>(null);
     // the panel is never taller than the room under its button: it scrolls inside itself instead of running off the screen
     const [room, setRoom] = useState<number | null>(null);
@@ -128,7 +134,13 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     }, [levels.sell, levels.buy, on]);
 
     // the sniper belongs to one market: changing market disarms it
+    const firstSymbol = useRef(true);
     useEffect(() => {
+        if (firstSymbol.current) {
+            firstSymbol.current = false; // the first run is the page opening, not a market change
+            return;
+        }
+        pendingResume.current = false;
         onRef.current = false;
         firedRef.current = new Set();
         setOn(false);
@@ -137,6 +149,20 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         setLast(null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
+
+    // remember the settings and the armed state, for a refresh (an armed sniper waiting to come back counts as armed)
+    useEffect(() => {
+        saveSniper({
+            symbol,
+            count,
+            stake,
+            tp,
+            sl,
+            on: on || pendingResume.current,
+            fired: [...firedRef.current],
+            savedAt: Date.now(),
+        });
+    }, [symbol, count, stake, tp, sl, on, fired]);
 
     useEffect(
         () => () => {
@@ -172,11 +198,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, leaving]);
 
-    const arm = () => {
+    const arm = (restoredFired?: Side[]) => {
         bell.current!.unlock();
-        firedRef.current = new Set();
+        firedRef.current = new Set(restoredFired ?? []);
         applyArmed(armLevels(levelsRef.current, price.current));
-        setFired([]);
+        setFired([...firedRef.current]);
         onRef.current = true;
         setOn(true);
         try {
@@ -186,12 +212,34 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         }
     };
     const disarm = () => {
+        pendingResume.current = false;
         onRef.current = false;
         setOn(false);
         applyArmed(null);
         void wake.current?.release?.();
         wake.current = null;
     };
+    // after a refresh the sniper switches itself on again as soon as it is signed in, has a price and has its lines;
+    // it never trades at that moment (it only watches what the price does from there)
+    useEffect(() => {
+        if (!pendingResume.current || on || disabled || last === null) return;
+        if (levels.sell === null && levels.buy === null) return;
+        pendingResume.current = false;
+        arm(saved.current?.fired);
+        setResumed(true);
+        // the browser only allows the bell after a tap on the page: the first tap or key press turns it on
+        setSoundReady(false);
+        const ready = () => {
+            bell.current!.unlock();
+            setSoundReady(true);
+            window.removeEventListener('pointerdown', ready);
+            window.removeEventListener('keydown', ready);
+        };
+        window.addEventListener('pointerdown', ready);
+        window.addEventListener('keydown', ready);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [last, levels.sell, levels.buy, disabled, on]);
+
     const silence = () => {
         bell.current!.stop();
         setRinging(false);
@@ -242,7 +290,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                     <Crosshair />
                 </span>
                 <span className='sniper__name'>Sweep Sniper</span>
-                <span className='sniper__state'>{on ? (status ? status.split(' · ')[0] : 'ARMED') : 'OFF'}</span>
+                <span className='sniper__state'>{on ? `${status ? status.split(' · ')[0] : 'ARMED'}${soundReady ? '' : ' · tap for sound'}` : pendingResume.current ? 'RESUMING' : 'OFF'}</span>
                 <svg className='sniper__chev' viewBox='0 0 12 12' width='10' height='10' aria-hidden>
                     <path d='M2 4.2 6 8l4-3.8' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' />
                 </svg>
@@ -262,6 +310,12 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                             ×
                         </button>
                     </header>
+
+                    {resumed && (
+                        <div className='sn-resumed'>
+                            Switched back on after the page refreshed.{!soundReady ? ' Tap anywhere once to turn the bell on.' : ''}
+                        </div>
+                    )}
 
                     {ringing && (
                         <button type='button' className='sn-alert' onClick={silence}>
@@ -334,7 +388,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                         type='button'
                         className={`sn-go${on ? ' is-on' : ''}`}
                         disabled={disabled || (!on && !have)}
-                        onClick={on ? disarm : arm}
+                        onClick={on ? disarm : () => arm()}
                         style={{ ['--d' as string]: '0.24s' }}
                     >
                         <span className='sn-go__shine' />

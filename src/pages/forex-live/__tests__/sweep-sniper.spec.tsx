@@ -16,6 +16,8 @@ import SweepSniper from '../sweep-sniper';
 const tick = (quote: number) => act(() => tickHandler({ tick: { quote, pip_size: 2 } }));
 
 describe('Sweep Sniper', () => {
+    beforeEach(() => localStorage.clear());
+
     const setup = (levels = { sell: 4068.63, buy: 4000 }) => {
         const onTrigger = jest.fn();
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={levels} onTrigger={onTrigger} disabled={false} />);
@@ -85,5 +87,37 @@ describe('Sweep Sniper', () => {
         expect(onTrigger).not.toHaveBeenCalled();
         tick(4110.2); // the old locked price (4130) is far away, the new line is touched
         expect(onTrigger).toHaveBeenCalledWith('SELL', expect.anything());
+    });
+
+    it('after a page refresh it comes back with its settings and switches itself on again, without trading at that moment', () => {
+        localStorage.setItem(
+            'epm_sweep_sniper_v1',
+            JSON.stringify({ symbol: 'frxXAUUSD', count: 4, stake: '15', tp: '8', sl: '', on: true, fired: ['BUY'], savedAt: Date.now() - 60_000 })
+        );
+        const onTrigger = jest.fn();
+        render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={onTrigger} disabled={false} />);
+        tick(4100); // the first price after the refresh: it arms itself here
+        expect(screen.getByText('ARMED · tap for sound', { exact: false })).toBeTruthy();
+        fireEvent.click(screen.getByText('Sweep Sniper', { selector: '.sniper__name' }));
+        expect((screen.getByDisplayValue('15') as HTMLInputElement).value).toBe('15');
+        expect(screen.getByText(/Switched back on after the page refreshed/)).toBeTruthy();
+        expect(screen.getByText('Disarm Sniper')).toBeTruthy();
+        expect(onTrigger).not.toHaveBeenCalled();
+        tick(3990); // the BUY side had already fired before the refresh: it must not fire again
+        expect(onTrigger).not.toHaveBeenCalled();
+        tick(4131); // the SELL side is still live
+        expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 4, stake: 15, takeProfit: 8, stopLoss: null });
+    });
+
+    it('a sniper that was switched off stays off after a refresh, and so does one saved for another market', () => {
+        localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxXAUUSD', count: 2, stake: '', tp: '', sl: '', on: false, fired: [], savedAt: Date.now() }));
+        const a = render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
+        tick(4100);
+        expect(screen.queryByText(/ARMED/)).toBeNull();
+        a.unmount();
+        localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxEURUSD', count: 2, stake: '', tp: '', sl: '', on: true, fired: [], savedAt: Date.now() }));
+        render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
+        tick(4100);
+        expect(screen.queryByText(/ARMED/)).toBeNull();
     });
 });

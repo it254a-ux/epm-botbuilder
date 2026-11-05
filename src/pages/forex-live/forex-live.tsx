@@ -10,6 +10,7 @@ import ActivityPanel from './activity-panel';
 import { groupTotal, groupVerdict, type GuardGroup, type GuardLevels } from './price-guard';
 import GroupsPanel, { type GroupRow } from './groups-panel';
 import SweepSniper from './sweep-sniper';
+import { loadGroups, saveGroups } from './sniper-storage';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
 import QuotesPanel from './quotes-panel';
@@ -81,8 +82,8 @@ const ForexLive = observer(() => {
     const [guardLevels, setGuardLevels] = useState<{ levels: GuardLevels; symbol: string }>({ levels: { sell: null, buy: null }, symbol: '' });
     const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
     // the trades each touch of a Price Guard line opened, watched together
-    const groups = useRef<GuardGroup[]>([]);
-    const groupUid = useRef(0);
+    const groups = useRef<GuardGroup[]>(loadGroups());
+    const groupUid = useRef(groups.current.reduce((m, g) => Math.max(m, g.uid ?? 0), 0));
     const [groupsTick, setGroupsTick] = useState(0);
     const [compare, setCompare] = useState(false);
     const [resultHost, setResultHost] = useState<HTMLElement | null>(null);
@@ -185,7 +186,7 @@ const ForexLive = observer(() => {
 
     // Trades opened together (a Price Guard touch or one click with a total take profit / stop loss): one touch of a line opens the chosen number of trades and remembers them as a group
     const newGroup = useCallback((side: Side, takeProfit: number | null, stopLoss: number | null) => {
-        const group: GuardGroup = { uid: ++groupUid.current, active: true, side, ids: [], takeProfit, stopLoss, done: false };
+        const group: GuardGroup = { uid: ++groupUid.current, at: Date.now(), active: true, side, ids: [], takeProfit, stopLoss, done: false };
         groups.current = [...groups.current, group];
         return (id: number) => {
             group.ids.push(id);
@@ -242,6 +243,11 @@ const ForexLive = observer(() => {
         },
         [closeTrades, positions]
     );
+
+    // the groups are remembered, so after a refresh their total take profit / stop loss keeps watching the same trades
+    useEffect(() => {
+        saveGroups(groups.current);
+    }, [positions, groupsTick]);
 
     const guardStatus = useMemo(() => {
         const live = groups.current.filter(g => !g.done && g.ids.length);
