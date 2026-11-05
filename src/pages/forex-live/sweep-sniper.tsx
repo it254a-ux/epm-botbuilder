@@ -77,6 +77,15 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const triggerRef = useRef(onTrigger);
     triggerRef.current = onTrigger;
     const price = useRef<number | null>(null);
+    // the check runs straight inside the price feed's callback (through these refs), not after a screen redraw,
+    // so a touch is acted on the instant the tick arrives
+    const armedRef = useRef<ArmedLevels | null>(null);
+    const firedRef = useRef<Set<Side>>(new Set());
+    const onRef = useRef(false);
+    const applyArmed = (a: ArmedLevels | null) => {
+        armedRef.current = a;
+        setArmed(a);
+    };
     const num = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
     const settingsRef = useRef({ count: 1, stake: null as number | null, takeProfit: null as number | null, stopLoss: null as number | null });
     settingsRef.current = { count, stake: num(stake), takeProfit: num(tp), stopLoss: num(sl) };
@@ -91,6 +100,16 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             const p = Number(t?.quote ?? t?.bid);
             if (off || !Number.isFinite(p)) return;
             price.current = p;
+            if (onRef.current && armedRef.current) {
+                const side = touched(armedRef.current, p, firedRef.current);
+                if (side) {
+                    firedRef.current.add(side);
+                    setFired([...firedRef.current]);
+                    triggerRef.current(side, settingsRef.current);
+                    bell.current!.start();
+                    setRinging(true);
+                }
+            }
             setLast(p);
             if (typeof t?.pip_size === 'number') setDigits(t.pip_size);
         });
@@ -100,31 +119,23 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         };
     }, [ws, isConnected, symbol]);
 
-    // the check itself: every price received while the sniper is armed
-    useEffect(() => {
-        if (!on || !armed || last === null) return;
-        const side = touched(armed, last, new Set(fired));
-        if (!side) return;
-        setFired(f => [...f, side]);
-        triggerRef.current(side, settingsRef.current);
-        bell.current!.start();
-        setRinging(true);
-    }, [last, on, armed, fired]);
-
     // the chart's lines move as the analysis updates: while armed, the sniper follows them, so it always watches
     // the price of the line you see (a side that already fired stays done)
     useEffect(() => {
         if (!on) return;
-        setArmed(armLevels(levels, price.current));
+        applyArmed(armLevels(levels, price.current));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [levels.sell, levels.buy, on]);
 
     // the sniper belongs to one market: changing market disarms it
     useEffect(() => {
+        onRef.current = false;
+        firedRef.current = new Set();
         setOn(false);
-        setArmed(null);
+        applyArmed(null);
         setFired([]);
         setLast(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
 
     useEffect(
@@ -163,8 +174,10 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
 
     const arm = () => {
         bell.current!.unlock();
-        setArmed(armLevels(levelsRef.current, price.current));
+        firedRef.current = new Set();
+        applyArmed(armLevels(levelsRef.current, price.current));
         setFired([]);
+        onRef.current = true;
         setOn(true);
         try {
             void navigator.wakeLock?.request('screen').then(l => (wake.current = l)).catch(() => {});
@@ -173,8 +186,9 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         }
     };
     const disarm = () => {
+        onRef.current = false;
         setOn(false);
-        setArmed(null);
+        applyArmed(null);
         void wake.current?.release?.();
         wake.current = null;
     };
