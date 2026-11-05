@@ -45,6 +45,269 @@
     pointer-events: none;
 }
 
+// ---- Position marker: the stake pop-up and the Done / Cancel buttons --------------------------------
+.fx-ask {
+    position: absolute;
+    left: 50%;
+    top: 56px;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 230px;
+    padding: 12px 14px;
+    border: 1px solid rgba(246, 211, 107, 0.3);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(34, 39, 52, 0.96), rgba(15, 17, 24, 0.97));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+    color: #e2e8f0;
+    font-size: 12px;
+    animation: fx-ask-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+    &.is-leaving {
+        animation: fx-ask-out 0.17s ease-in both;
+        pointer-events: none;
+    }
+
+    &__title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #f6d36b;
+    }
+
+    &__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+
+        input {
+            width: 96px;
+            height: 30px;
+            padding: 0 8px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            font-size: 14px;
+            text-align: right;
+
+            &:focus {
+                outline: none;
+                border-color: #f6d36b;
+            }
+        }
+    }
+
+    small {
+        color: #94a3b8;
+        font-size: 11px;
+    }
+
+    &__buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    &__ok,
+    &__cancel {
+        flex: 1;
+        height: 30px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+            transform 0.15s ease,
+            filter 0.15s ease,
+            background 0.2s ease;
+
+        &:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+        }
+
+        &:active {
+            transform: scale(0.97);
+        }
+    }
+
+    &__ok {
+        background: #f6d36b;
+        color: #1a1405;
+    }
+
+    &__cancel {
+        background: rgba(148, 163, 184, 0.18);
+        color: #cbd5e1;
+    }
+
+    input {
+        transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+
+        &:focus {
+            box-shadow: 0 0 0 3px rgba(246, 211, 107, 0.18);
+        }
+    }
+}
+
+@keyframes fx-ask-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -10px) scale(0.96);
+    }
+}
+
+@keyframes fx-ask-out {
+    to {
+        opacity: 0;
+        transform: translate(-50%, -8px) scale(0.97);
+    }
+}
+
+// BUY | SELL choice: a thumb slides under the chosen side and takes its colour
+.fx-seg {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+
+    &__thumb {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        left: 3px;
+        width: calc(50% - 3px);
+        border-radius: 7px;
+        background: #3b82f6;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.45);
+        transition:
+            transform 0.32s cubic-bezier(0.34, 1.3, 0.5, 1),
+            background 0.25s ease,
+            box-shadow 0.25s ease;
+    }
+
+    &.is-sell &__thumb {
+        transform: translateX(100%);
+        background: #f97316;
+        box-shadow: 0 4px 14px rgba(249, 115, 22, 0.45);
+    }
+
+    &__opt {
+        position: relative;
+        z-index: 1;
+        height: 28px;
+        border: 0;
+        background: transparent;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: color 0.25s ease;
+
+        &:hover {
+            color: #e2e8f0;
+        }
+
+        &.is-on {
+            color: #fff;
+        }
+    }
+}
+
+// dots and labels pop in softly when they are placed
+.fx-pop {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fx-pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes fx-pop-in {
+    from {
+        opacity: 0;
+        transform: scale(0.4);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fx-ask,
+    .fx-actions,
+    .fx-pop,
+    .fx-seg__thumb {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+.fx-actions {
+    position: absolute;
+    left: 50%;
+    bottom: 62px;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: flex;
+    gap: 8px;
+    animation: fx-actions-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+    &__done,
+    &__cancel {
+        transition:
+            transform 0.15s ease,
+            filter 0.15s ease,
+            opacity 0.2s ease;
+
+        &:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.12);
+        }
+
+        &:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+    }
+
+    &__done,
+    &__cancel {
+        height: 28px;
+        padding: 0 16px;
+        border: 0;
+        border-radius: 14px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    &__done {
+        background: #f6d36b;
+        color: #1a1405;
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+    }
+
+    &__cancel {
+        background: rgba(0, 0, 0, 0.7);
+        color: #e2e8f0;
+    }
+}
+
+@keyframes fx-actions-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 12px);
+    }
+}
+
 // ---- the toolbar ------------------------------------------------------------------------------
 // Dark glass rail with a fine gold edge. When the chart is short, the buttons flow into a second
 // column instead of running off the bottom, so none of them is ever hidden.

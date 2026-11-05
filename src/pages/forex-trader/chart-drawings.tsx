@@ -3,6 +3,7 @@ import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts';
 import type { Candle } from './engine';
 import { estimateProfit } from '../forex-live/trade-engine';
 import { useMeasureContext } from './measure-context';
+import { positionProfits, type PositionSide } from './position-marker';
 import './chart-drawings.scss';
 
 /**
@@ -13,7 +14,7 @@ import './chart-drawings.scss';
  * { x: candle index, y: price }, so drawings follow the chart when it is zoomed or scrolled.
  */
 
-export type Tool = 'cursor' | 'trend' | 'ray' | 'extended' | 'hline' | 'hray' | 'vline' | 'cross' | 'text' | 'callout' | 'pricelabel' | 'rect' | 'fib' | 'measure';
+export type Tool = 'cursor' | 'trend' | 'ray' | 'extended' | 'hline' | 'hray' | 'vline' | 'cross' | 'text' | 'callout' | 'pricelabel' | 'rect' | 'fib' | 'measure' | 'position';
 type DrawTool = Exclude<Tool, 'cursor'>;
 type Magnet = 'off' | 'weak' | 'strong';
 
@@ -31,6 +32,9 @@ interface Drawing {
     pts: Pt[];
     text: string;
     color: string;
+    /** Position marker only: the stake typed and the side (BUY or SELL) chosen when the tool was picked. */
+    stake?: number;
+    side?: PositionSide;
 }
 
 /** How many clicks each tool needs. */
@@ -48,6 +52,7 @@ const NEEDS: Record<DrawTool, number> = {
     rect: 2,
     fib: 2,
     measure: 2,
+    position: 1, // not used: the Position marker takes any number of clicks (see onDown)
 };
 
 const HINTS: Record<DrawTool, string> = {
@@ -64,6 +69,7 @@ const HINTS: Record<DrawTool, string> = {
     rect: 'Click one corner, then the opposite corner',
     fib: 'Click the start of the move, then its end',
     measure: 'Click the start, then the end to measure price, percent and candles',
+    position: 'Click your entry, then each exit point · Enter or double-click to finish',
 };
 
 const LINE_TOOLS: Array<{ tool: DrawTool; label: string }> = [
@@ -85,6 +91,7 @@ const SHAPE_TOOLS: Array<{ tool: DrawTool; label: string }> = [
     { tool: 'rect', label: 'Rectangle' },
     { tool: 'fib', label: 'Fib Retracement' },
     { tool: 'measure', label: 'Measure' },
+    { tool: 'position', label: 'Position marker' },
 ];
 
 /** The Fibonacci levels drawn, with the colour of each line. */
@@ -215,6 +222,13 @@ const ICONS: Record<Tool | 'magnet' | 'trash', ReactNode> = {
             <path d='M4 17L20 7M4 17v-4M4 17h4M20 7v4M20 7h-4' />
         </Svg>
     ),
+    position: (
+        <Svg>
+            <circle cx='5' cy='6' r='2' />
+            <path d='M6.5 7.5L11 14l3-3 4 6' />
+            <path d='M15 17h3v-3' />
+        </Svg>
+    ),
     magnet: (
         <Svg>
             <path d='M6 3v8a6 6 0 0012 0V3h-4v8a2 2 0 01-4 0V3z' />
@@ -272,6 +286,19 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const downAt = useRef<{ x: number; y: number } | null>(null);
     const drag = useRef<{ id: number; idx: number | null; start: Pt; orig: Pt[] } | null>(null);
     const clipId = useRef(`fx-clip-${Math.random().toString(36).slice(2)}`);
+
+    // ---- the Position marker: stake pop-up, then entry dot and exit dots -----------------------------
+    const mult = money?.multiplier ?? 100;
+    const cur = money?.currency ?? 'USD';
+    const [ask, setAsk] = useState(false);
+    const [askLeaving, setAskLeaving] = useState(false);
+    const [stakeText, setStakeText] = useState('10');
+    const [askSide, setAskSide] = useState<PositionSide>('BUY');
+    const [posStake, setPosStake] = useState(10);
+    const [posSide, setPosSide] = useState<PositionSide>('BUY');
+    const [posPts, setPosPts] = useState<Pt[]>([]);
+    const [posHover, setPosHover] = useState<Pt | null>(null);
+    const lastAdd = useRef<{ t: number; x: number; y: number } | null>(null);
 
     // ---- measuring -------------------------------------------------------------------------
     const size = () => {
@@ -410,6 +437,9 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         setDraft(null);
         setSelected(null);
         setTool('cursor');
+        setPosPts([]);
+        setPosHover(null);
+        setAsk(false);
     }, [resetKey]);
 
     // keyboard: Esc cancels, Delete removes the selected drawing
@@ -417,11 +447,16 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         const onKey = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null;
             if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-            if (e.key === 'Escape' && (tool !== 'cursor' || draft || selected !== null)) {
+            if (e.key === 'Escape' && (tool !== 'cursor' || draft || selected !== null || ask)) {
                 setDraft(null);
                 setTool('cursor');
                 setSelected(null);
                 setMenu(null);
+                setPosPts([]);
+                setPosHover(null);
+                setAsk(false);
+            } else if (e.key === 'Enter' && tool === 'position') {
+                finishPosition();
             } else if (e.key === 'Delete' && selected !== null) {
                 setDrawings(d => d.filter(x => x.id !== selected));
                 setSelected(null);
@@ -429,7 +464,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [tool, draft, selected]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tool, draft, selected, ask, posPts, posStake, color]);
 
     // ---- creating ---------------------------------------------------------------------------
     const commit = (t: DrawTool, pts: Pt[]) => {
@@ -450,8 +486,77 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         downAt.current = null;
     };
 
+    /** Position marker: keep the dots placed so far as one drawing and go back to the cursor. */
+    const finishPosition = () => {
+        if (posPts.length === 0) {
+            setTool('cursor');
+            return;
+        }
+        const id = nextId.current++;
+        setDrawings(d => [...d, { id, tool: 'position', pts: posPts, text: '', color, stake: posStake, side: posSide }]);
+        setSelected(id);
+        setPosPts([]);
+        setPosHover(null);
+        setTool('cursor');
+        lastAdd.current = null;
+    };
+
+    const cancelPosition = () => {
+        setPosPts([]);
+        setPosHover(null);
+        setAsk(false);
+        setTool('cursor');
+        lastAdd.current = null;
+    };
+
+    /** Position marker, step 1: the pop-up that asks for BUY or SELL and the stake. */
+    const openAsk = () => {
+        setStakeText(String(money?.stake ?? posStake));
+        setAskSide(posSide);
+        setAskLeaving(false);
+        setAsk(true);
+    };
+
+    /** Closes the pop-up with a short fade, so it does not just vanish. */
+    const closeAsk = () => {
+        setAskLeaving(true);
+        window.setTimeout(() => {
+            setAsk(false);
+            setAskLeaving(false);
+        }, 170);
+    };
+
+    /** Position marker, step 2: OK on the pop-up. The cursor now places the dots. */
+    const confirmAsk = () => {
+        const n = Number(stakeText);
+        if (!Number.isFinite(n) || n <= 0) return;
+        setPosStake(n);
+        setPosSide(askSide);
+        closeAsk();
+        setPosPts([]);
+        setPosHover(null);
+        lastAdd.current = null;
+        setTool('position');
+    };
+
     const onDown = (e: RPointerEvent<SVGSVGElement>) => {
         if (tool === 'cursor') return;
+        if (tool === 'position') {
+            const p = toPt(e.clientX, e.clientY, true, true);
+            if (!p) return;
+            e.preventDefault();
+            setMenu(null);
+            const now = Date.now();
+            const prev = lastAdd.current;
+            // a double-click: the first click already placed the dot, so the second one just finishes
+            if (prev && now - prev.t < 400 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 8) {
+                finishPosition();
+                return;
+            }
+            lastAdd.current = { t: now, x: e.clientX, y: e.clientY };
+            setPosPts(list => [...list, p]);
+            return;
+        }
         const pt = toPt(e.clientX, e.clientY, true, true);
         if (!pt) return;
         e.preventDefault();
@@ -487,6 +592,10 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                     return { ...d, pts: dr.orig.map(p => ({ x: p.x + dx, y: p.y + dy })) };
                 })
             );
+            return;
+        }
+        if (tool === 'position' && posPts.length > 0) {
+            setPosHover(toPt(e.clientX, e.clientY, true));
             return;
         }
         if (draft) {
@@ -705,6 +814,56 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 );
                 break;
             }
+            case 'position': {
+                // entry dot first, then a straight arrow to every exit dot; each dot shows what the position makes if closed there
+                const stake = d.stake ?? posStake;
+                const side: PositionSide = d.side ?? posSide;
+                const profits = positionProfits(d.pts.map(p => p.y), stake, mult, side);
+                const entryCol = side === 'SELL' ? '#f97316' : '#3b82f6';
+                const pill = (cx: number, ty: number, text: string, fill: string, key: string) => {
+                    const tw = text.length * 6.6 + 14;
+                    return (
+                        <g key={key} className='fx-pop' pointerEvents='none'>
+                            <rect x={cx - tw / 2} y={ty - 14} width={tw} height={19} rx={4} fill={fill} />
+                            <text x={cx} y={ty} fontSize={11} fontWeight={600} textAnchor='middle' fill='#fff'>
+                                {text}
+                            </text>
+                        </g>
+                    );
+                };
+                const parts: ReactNode[] = [];
+                for (let i = 1; i < P.length; i++) {
+                    const a = P[i - 1];
+                    const b = P[i];
+                    const profit = profits[i];
+                    const col = profit === null ? '#94a3b8' : profit >= 0 ? '#22c55e' : '#ef4444';
+                    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+                    const cos = Math.cos(ang);
+                    const sin = Math.sin(ang);
+                    const tipX = b.x - cos * 6;
+                    const tipY = b.y - sin * 6;
+                    const head = `${tipX},${tipY} ${tipX - cos * 10 - sin * 5},${tipY - sin * 10 + cos * 5} ${tipX - cos * 10 + sin * 5},${tipY - sin * 10 - cos * 5}`;
+                    parts.push(
+                        <g key={`seg${i}`}>
+                            <line x1={a.x} y1={a.y} x2={tipX} y2={tipY} stroke={col} strokeWidth={sel ? 3 : 2.2} />
+                            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={HIDDEN} strokeWidth={14} />
+                            <polygon points={head} fill={col} />
+                            <circle className='fx-pop' cx={b.x} cy={b.y} r={4.5} fill={col} stroke='#fff' strokeWidth={1.5} />
+                        </g>
+                    );
+                    if (profit !== null) {
+                        const text = `${profit >= 0 ? '+' : ''}${profit.toFixed(2)} ${cur}`;
+                        parts.push(pill(b.x, b.y + (b.y <= a.y ? -12 : 26), text, col, `p${i}`));
+                    }
+                }
+                const entry = P[0];
+                parts.push(
+                    <circle key='entry' className='fx-pop' cx={entry.x} cy={entry.y} r={6.5} fill={entryCol} stroke='#fff' strokeWidth={2} />,
+                    pill(entry.x, entry.y + (side === 'BUY' ? 28 : -12), `${side ?? 'ENTRY'} ${stake} ${cur}`, entryCol, 'entry-label')
+                );
+                body = <g>{parts}</g>;
+                break;
+            }
         }
 
         return (
@@ -738,10 +897,19 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         if (group === 'lines') setLastLine(t);
         else if (group === 'shapes') setLastShape(t);
         else setLastText(t);
-        setTool(t);
         setDraft(null);
         setSelected(null);
         setMenu(null);
+        setPosPts([]);
+        setPosHover(null);
+        // the Position marker asks for the stake first; the cursor only turns into the marker after OK
+        if (t === 'position') {
+            setTool('cursor');
+            openAsk();
+            return;
+        }
+        setAsk(false);
+        setTool(t);
     };
     const toggle = (name: string) => {
         window.dispatchEvent(new Event('fx-close-menus-from-rail'));
@@ -768,11 +936,76 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 <g clipPath={`url(#${clipId.current})`}>
                     {drawings.map(d => renderShape(d, false))}
                     {draft && renderShape({ id: -1, tool: draft.tool, pts: draft.pts, text: '', color }, true)}
+                    {tool === 'position' &&
+                        posPts.length > 0 &&
+                        renderShape({ id: -1, tool: 'position', pts: posHover ? [...posPts, posHover] : posPts, text: '', color, stake: posStake, side: posSide }, true)}
                 </g>
                 {/* handles and price tags sit outside the clip so they stay visible at the edges */}
             </svg>
 
             {tool !== 'cursor' && <div className='fx-hint'>{HINTS[tool]} · Esc to cancel</div>}
+
+            {tool === 'position' && (
+                <div className='fx-actions' onPointerDown={e => e.stopPropagation()}>
+                    <button type='button' className='fx-actions__done' disabled={posPts.length === 0} onClick={finishPosition}>
+                        Done
+                    </button>
+                    <button type='button' className='fx-actions__cancel' onClick={cancelPosition}>
+                        Cancel
+                    </button>
+                </div>
+            )}
+
+            {ask && (
+                <div
+                    className={`fx-ask${askLeaving ? ' is-leaving' : ''}`}
+                    role='dialog'
+                    aria-label='Position marker'
+                    onPointerDown={e => e.stopPropagation()}
+                >
+                    <div className='fx-ask__title'>Position marker</div>
+                    <div className={`fx-seg is-${askSide.toLowerCase()}`} role='radiogroup' aria-label='Buy or sell'>
+                        <span className='fx-seg__thumb' />
+                        {(['BUY', 'SELL'] as PositionSide[]).map(s => (
+                            <button
+                                key={s}
+                                type='button'
+                                role='radio'
+                                aria-checked={askSide === s}
+                                className={`fx-seg__opt${askSide === s ? ' is-on' : ''}`}
+                                onClick={() => setAskSide(s)}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                    <label className='fx-ask__row'>
+                        <span>Stake ({cur})</span>
+                        <input
+                            type='number'
+                            min='0'
+                            step='any'
+                            inputMode='decimal'
+                            autoFocus
+                            value={stakeText}
+                            onChange={e => setStakeText(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') confirmAsk();
+                                else if (e.key === 'Escape') closeAsk();
+                            }}
+                        />
+                    </label>
+                    <small>Multiplier x{mult}{money ? ' (from the Trade panel)' : ''}</small>
+                    <div className='fx-ask__buttons'>
+                        <button type='button' className='fx-ask__ok' onClick={confirmAsk}>
+                            OK
+                        </button>
+                        <button type='button' className='fx-ask__cancel' onClick={closeAsk}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className={`fx-bar${barOpen ? ' is-open' : ' is-min'}`} onPointerDown={e => e.stopPropagation()}>
                 <button
