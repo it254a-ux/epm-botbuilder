@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useSharedPick } from './shared-picks';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle } from './chart-view';
@@ -213,6 +213,25 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const [fitHeight, setFitHeight] = useState<number | null>(null);
     // on Forex Live the trade setup floats over the chart; this opens and closes it
     const [setupOpen, setSetupOpen] = useState(!resultHost);
+    // the control beside the Trade setup button copies its exact top and height, so the two sit on one line
+    const controlsRef = useRef<HTMLDivElement>(null);
+    const [extraBox, setExtraBox] = useState<{ top: number; height: number } | null>(null);
+    const collapsedHeight = useRef(0);
+    useLayoutEffect(() => {
+        const el = controlsRef.current;
+        if (!el || !toolbarExtra) return;
+        const measure = () => {
+            if (!el.offsetHeight || getComputedStyle(el).position !== 'absolute') return setExtraBox(null);
+            if (el.classList.contains('is-collapsed')) collapsedHeight.current = el.offsetHeight;
+            const height = collapsedHeight.current || el.offsetHeight;
+            setExtraBox(b => (b && b.top === el.offsetTop && b.height === height ? b : { top: el.offsetTop, height }));
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [setupOpen, !!toolbarExtra]);
     // Forex Live (phone and laptop): the chart gets the room, so the setup starts minimised (one tap opens it)
     const hostedHere = !!resultHost;
     useEffect(() => {
@@ -741,8 +760,12 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     ))}
                 </div>
             )}
-            {toolbarExtra && <div className={`forex-trader__extra${setupOpen ? ' is-setup-open' : ''}`}>{toolbarExtra}</div>}
-            <div className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
+            {toolbarExtra && (
+                <div className={`forex-trader__extra${setupOpen ? ' is-setup-open' : ''}`} style={extraBox ? { top: extraBox.top, height: extraBox.height } : undefined}>
+                    {toolbarExtra}
+                </div>
+            )}
+            <div ref={controlsRef} className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
                 <button
                     type='button'
                     className='forex-trader__head'
