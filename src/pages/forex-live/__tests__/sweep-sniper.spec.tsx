@@ -50,12 +50,14 @@ describe('Sweep Sniper', () => {
         expect(onTrigger).toHaveBeenCalledTimes(1);
     });
 
-    it('opens BUY trades when price falls to the Buy SL line, and a level the price had already passed is not watched', () => {
-        const onTrigger = setup({ sell: 4050, buy: 4000 }); // the Sell level is already below the price
+    it('a Sell line the price is already above is touched on the way back down; a BUY line on the way down', () => {
+        const onTrigger = setup({ sell: 4050, buy: 4000 }); // the Sell line is already below the price
         tick(4060);
         fireEvent.click(screen.getByText(/Arm Sniper/));
-        tick(4070); // above the passed Sell level: nothing
+        tick(4070); // moving away from both lines: nothing
         expect(onTrigger).not.toHaveBeenCalled();
+        tick(4049.9); // back down through the Sell line
+        expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 1, stake: null, takeProfit: null, stopLoss: null });
         tick(3999.9);
         expect(onTrigger).toHaveBeenCalledWith('BUY', { count: 1, stake: null, takeProfit: null, stopLoss: null });
     });
@@ -67,5 +69,21 @@ describe('Sweep Sniper', () => {
         fireEvent.click(screen.getByText('Disarm Sniper'));
         tick(4100);
         expect(onTrigger).not.toHaveBeenCalled();
+    });
+
+    it('follows the chart line while armed: when the analysis moves the line, the new price is the one watched', () => {
+        const onTrigger = jest.fn();
+        const el = (levels: { sell: number | null; buy: number | null }) => (
+            <SweepSniper symbol='frxXAUUSD' currency='USD' levels={levels} onTrigger={onTrigger} disabled={false} />
+        );
+        const { rerender } = render(el({ sell: 4130, buy: null }));
+        fireEvent.click(screen.getByText('Sweep Sniper', { selector: '.sniper__name' }));
+        tick(4100);
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        rerender(el({ sell: 4110, buy: null })); // the line moved down to 4110
+        tick(4105);
+        expect(onTrigger).not.toHaveBeenCalled();
+        tick(4110.2); // the old locked price (4130) is far away, the new line is touched
+        expect(onTrigger).toHaveBeenCalledWith('SELL', expect.anything());
     });
 });

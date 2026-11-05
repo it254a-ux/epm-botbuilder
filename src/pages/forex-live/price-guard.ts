@@ -1,32 +1,46 @@
 import type { Side } from './trade-engine';
 
-/** The two prices the Price Guard watches: a SELL when price rises to `sell`, a BUY when it falls to `buy`. */
+/** The two prices the Sweep Sniper watches: the "Sell SL" line (a SELL when price touches it) and the "Buy SL" line (a BUY). */
 export interface GuardLevels {
     sell: number | null;
     buy: number | null;
 }
 
+/** The levels being watched, with the side of each that the price was on when it was set. */
+export interface ArmedLevels extends GuardLevels {
+    sellFrom?: 'below' | 'above';
+    buyFrom?: 'below' | 'above';
+}
+
 export const hasLevel = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
 
 /**
- * Locks the levels when the guard is switched on. A level price has already passed is left out, so switching the
- * guard on can never open a trade straight away: only a level still ahead of the price is watched.
+ * Sets the levels to watch. A level is "touched" when price reaches it from the side it is on now, whichever
+ * direction that is: a line above the price is touched on the way up, a line below it on the way down. A price
+ * exactly on a line is left out (nothing to wait for), so switching on can never open a trade straight away.
  */
-export function armLevels(levels: GuardLevels, price: number | null): GuardLevels {
-    return {
-        sell: hasLevel(levels.sell) && (price === null || levels.sell > price) ? levels.sell : null,
-        buy: hasLevel(levels.buy) && (price === null || levels.buy < price) ? levels.buy : null,
+export function armLevels(levels: GuardLevels, price: number | null): ArmedLevels {
+    const one = (level: number | null, fallback: 'below' | 'above') => {
+        if (!hasLevel(level)) return { level: null, from: undefined };
+        if (price === null) return { level, from: fallback };
+        if (level === price) return { level: null, from: undefined };
+        return { level, from: price < level ? ('below' as const) : ('above' as const) };
     };
+    const sell = one(levels.sell, 'below');
+    const buy = one(levels.buy, 'above');
+    return { sell: sell.level, buy: buy.level, sellFrom: sell.from, buyFrom: buy.from };
 }
 
 /**
- * Which side (if any) the price has just reached. A tick is every price move, so a thin wick counts exactly like
+ * Which side (if any) the price has just touched. A tick is every price move, so a thin wick counts exactly like
  * a full candle. Each side fires once (`done` holds the sides already used).
  */
-export function touched(armed: GuardLevels, price: number, done: ReadonlySet<Side>): Side | null {
+export function touched(armed: ArmedLevels, price: number, done: ReadonlySet<Side>): Side | null {
     if (!Number.isFinite(price)) return null;
-    if (hasLevel(armed.sell) && !done.has('SELL') && price >= armed.sell) return 'SELL';
-    if (hasLevel(armed.buy) && !done.has('BUY') && price <= armed.buy) return 'BUY';
+    const hit = (level: number | null, from: 'below' | 'above' | undefined) =>
+        hasLevel(level) && from !== undefined && (from === 'below' ? price >= level : price <= level);
+    if (!done.has('SELL') && hit(armed.sell, armed.sellFrom)) return 'SELL';
+    if (!done.has('BUY') && hit(armed.buy, armed.buyFrom)) return 'BUY';
     return null;
 }
 

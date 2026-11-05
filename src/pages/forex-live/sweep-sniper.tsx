@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import { useMeasureContext } from '../forex-trader/measure-context';
-import { GUARD_COUNTS, armLevels, createBell, touched, type GuardLevels } from './price-guard';
+import { GUARD_COUNTS, armLevels, createBell, touched, type ArmedLevels } from './price-guard';
+import type { GuardLevels } from './price-guard';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
 import type { Side } from './trade-engine';
@@ -41,7 +42,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [on, setOn] = useState(false);
-    const [armed, setArmed] = useState<GuardLevels | null>(null);
+    const [armed, setArmed] = useState<ArmedLevels | null>(null);
     const [fired, setFired] = useState<Side[]>([]);
     const [ringing, setRinging] = useState(false);
     const [last, setLast] = useState<number | null>(null);
@@ -93,6 +94,14 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         bell.current!.start();
         setRinging(true);
     }, [last, on, armed, fired]);
+
+    // the chart's lines move as the analysis updates: while armed, the sniper follows them, so it always watches
+    // the price of the line you see (a side that already fired stays done)
+    useEffect(() => {
+        if (!on) return;
+        setArmed(armLevels(levels, price.current));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [levels.sell, levels.buy, on]);
 
     // the sniper belongs to one market: changing market disarms it
     useEffect(() => {
@@ -164,26 +173,32 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
 
     const card = (side: Side, delay: number) => {
         const level = side === 'SELL' ? shown.sell : shown.buy;
-        const live = side === 'SELL' ? levels.sell : levels.buy;
-        const done = fired.includes(side);
-        // before arming a level the price already passed will not be watched; after arming only the locked levels are
-        const passed = !on && live !== null && last !== null && (side === 'SELL' ? live <= last : live >= last);
+            const done = fired.includes(side);
+        const from = side === 'SELL' ? armed?.sellFrom : armed?.buyFrom;
         const none = level === null;
         const away = level !== null && last !== null ? (Math.abs(level - last) / last) * 100 : null;
         const meter = done ? 1 : away === null ? 0 : Math.max(0.04, 1 - away / METER_RANGE_PCT);
-        const cls = `sn-lvl sn-lvl--${side === 'SELL' ? 'sell' : 'buy'}${done ? ' is-fired' : ''}${none || passed ? ' is-off' : ''}`;
+        const cls = `sn-lvl sn-lvl--${side === 'SELL' ? 'sell' : 'buy'}${done ? ' is-fired' : ''}${none ? ' is-off' : ''}`;
         return (
             <div className={cls} style={{ ['--d' as string]: `${delay}s` }}>
                 <div className='sn-lvl__top'>
                     <b>{side}</b>
-                    <span>{side === 'SELL' ? 'when price rises to' : 'when price falls to'}</span>
+                    <span>when price touches</span>
                 </div>
                 <div className='sn-lvl__price'>{fmt(level)}</div>
                 <div className='sn-lvl__meter'>
                     <i style={{ transform: `scaleX(${meter})` }} />
                 </div>
                 <div className='sn-lvl__foot'>
-                    {done ? '✓ Fired' : none ? (on ? 'Not watched' : 'Waiting for the analysis') : passed ? 'Price already past it' : away !== null ? `${away.toFixed(2)}% away` : '…'}
+                    {done
+                        ? '✓ Fired'
+                        : none
+                          ? on
+                              ? 'No line on the chart'
+                              : 'Waiting for the analysis'
+                          : away !== null
+                            ? `${away.toFixed(2)}% away${on && from ? (from === 'above' ? ' · on the way down' : ' · on the way up') : ''}`
+                            : '…'}
                 </div>
             </div>
         );

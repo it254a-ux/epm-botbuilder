@@ -1,21 +1,28 @@
 import { armLevels, touched } from '../price-guard';
 
-describe('Price Guard', () => {
-    const levels = { sell: 1.1050, buy: 1.0950 };
+describe('Sweep Sniper levels', () => {
+    const levels = { sell: 1.105, buy: 1.095 };
 
-    it('only watches levels that are still ahead of the price (never trades the moment it is switched on)', () => {
-        expect(armLevels(levels, 1.1)).toEqual({ sell: 1.105, buy: 1.095 });
-        expect(armLevels(levels, 1.106)).toEqual({ sell: null, buy: 1.095 });
-        expect(armLevels(levels, 1.09)).toEqual({ sell: 1.105, buy: null });
-        expect(armLevels({ sell: null, buy: 0 }, 1.1)).toEqual({ sell: null, buy: null });
+    it('remembers which side of each line the price was on, and leaves out a price exactly on a line', () => {
+        expect(armLevels(levels, 1.1)).toEqual({ sell: 1.105, buy: 1.095, sellFrom: 'below', buyFrom: 'above' });
+        expect(armLevels(levels, 1.106)).toEqual({ sell: 1.105, buy: 1.095, sellFrom: 'above', buyFrom: 'above' });
+        expect(armLevels(levels, 1.09)).toEqual({ sell: 1.105, buy: 1.095, sellFrom: 'below', buyFrom: 'below' });
+        expect(armLevels({ sell: 1.1, buy: 0 }, 1.1)).toEqual({ sell: null, buy: null, sellFrom: undefined, buyFrom: undefined });
     });
 
-    it('SELL when price rises to the Sell SL line, BUY when it falls to the Buy SL line', () => {
+    it('a line above the price is touched on the way up, a line below it on the way down', () => {
         const armed = armLevels(levels, 1.1);
         expect(touched(armed, 1.1049, new Set())).toBeNull();
         expect(touched(armed, 1.105, new Set())).toBe('SELL');
         expect(touched(armed, 1.0951, new Set())).toBeNull();
         expect(touched(armed, 1.095, new Set())).toBe('BUY');
+    });
+
+    it('a Sell line the price was already above when armed is touched when price comes back down to it (the Gold case)', () => {
+        const armed = armLevels({ sell: 4127.32, buy: 4091.58 }, 4128.62);
+        expect(touched(armed, 4128, new Set())).toBeNull();
+        expect(touched(armed, 4127.4, new Set())).toBeNull();
+        expect(touched(armed, 4127.3, new Set())).toBe('SELL');
     });
 
     it('a side that already fired does not fire again', () => {
