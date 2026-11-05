@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import { useMeasureContext } from '../forex-trader/measure-context';
 import { GUARD_COUNTS, armLevels, createBell, touched, type ArmedLevels } from './price-guard';
@@ -53,6 +53,22 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [tp, setTp] = useState('');
     const [sl, setSl] = useState('');
     const root = useRef<HTMLDivElement>(null);
+    // the panel is never taller than the room under its button: it scrolls inside itself instead of running off the screen
+    const [room, setRoom] = useState<number | null>(null);
+    useLayoutEffect(() => {
+        if (!open) return;
+        const fit = () => {
+            const r = root.current?.getBoundingClientRect();
+            if (r) setRoom(Math.max(220, Math.floor(window.innerHeight - r.bottom - 22)));
+        };
+        fit();
+        window.addEventListener('resize', fit);
+        window.addEventListener('scroll', fit, true);
+        return () => {
+            window.removeEventListener('resize', fit);
+            window.removeEventListener('scroll', fit, true);
+        };
+    }, [open]);
     const bell = useRef<ReturnType<typeof createBell> | null>(null);
     if (!bell.current) bell.current = createBell();
     const wake = useRef<WakeLockSentinel | null>(null);
@@ -219,7 +235,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             </button>
 
             {open && (
-                <div className={`sniper__pop${leaving ? ' is-leaving' : ''}`} role='dialog' aria-label='Sweep Sniper'>
+                <div className={`sniper__pop${leaving ? ' is-leaving' : ''}`} role='dialog' aria-label='Sweep Sniper' style={room ? { maxHeight: room } : undefined}>
                     <header className='sn-head'>
                         <span className='sn-head__icon'>
                             <Crosshair />
