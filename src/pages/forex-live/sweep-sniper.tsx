@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
+import { useMeasureContext } from '../forex-trader/measure-context';
 import { GUARD_COUNTS, armLevels, createBell, touched, type GuardLevels } from './price-guard';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
@@ -11,7 +12,7 @@ interface Props {
     /** The "Sell SL (if High swept)" and "Buy SL (if Low swept)" prices from the chart's analysis. */
     levels: GuardLevels;
     /** Opens the trades (the Trade panel's own stake, multiplier and options are used). */
-    onTrigger: (side: Side, settings: { count: number; takeProfit: number | null; stopLoss: number | null }) => void;
+    onTrigger: (side: Side, settings: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }) => void;
     /** Live line about the trades the sniper opened, e.g. "3 open · total +2.40 / target 5". */
     status?: string;
     disabled: boolean;
@@ -46,6 +47,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [last, setLast] = useState<number | null>(null);
     const [digits, setDigits] = useState<number | null>(null);
     const [count, setCount] = useState(1);
+    const [stake, setStake] = useState('');
+    const panel = useMeasureContext();
     const [tp, setTp] = useState('');
     const [sl, setSl] = useState('');
     const root = useRef<HTMLDivElement>(null);
@@ -58,8 +61,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     triggerRef.current = onTrigger;
     const price = useRef<number | null>(null);
     const num = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
-    const settingsRef = useRef({ count: 1, takeProfit: null as number | null, stopLoss: null as number | null });
-    settingsRef.current = { count, takeProfit: num(tp), stopLoss: num(sl) };
+    const settingsRef = useRef({ count: 1, stake: null as number | null, takeProfit: null as number | null, stopLoss: null as number | null });
+    settingsRef.current = { count, stake: num(stake), takeProfit: num(tp), stopLoss: num(sl) };
 
     // the live price of this market (one stream shared with the rest of the page)
     useEffect(() => {
@@ -243,6 +246,27 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                                 ))}
                             </div>
                         </div>
+                        <label className='sn-stake' title='The amount put into each trade. Leave it empty to use the stake of the Trade panel.'>
+                            <span>Stake per trade</span>
+                            <div>
+                                <em>{currency || '$'}</em>
+                                <input
+                                    type='number'
+                                    min='0'
+                                    step='any'
+                                    inputMode='decimal'
+                                    placeholder={panel ? `${panel.stake} (Trade panel)` : 'Trade panel stake'}
+                                    value={stake}
+                                    disabled={on}
+                                    onChange={e => setStake(e.target.value)}
+                                />
+                                {(num(stake) ?? panel?.stake) ? (
+                                    <b>
+                                        {count} × {num(stake) ?? panel?.stake} = {Math.round(count * (num(stake) ?? panel?.stake ?? 0) * 100) / 100}
+                                    </b>
+                                ) : null}
+                            </div>
+                        </label>
                         <div className='sn-set__pair'>
                             <label title='Optional: when all the trades together are at this profit, every one of them closes'>
                                 <span>Total take profit</span>

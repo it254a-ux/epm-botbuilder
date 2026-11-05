@@ -193,8 +193,8 @@ const ForexLive = observer(() => {
         };
     }, []);
     const guardFire = useCallback(
-        (side: Side, s: { count: number; takeProfit: number | null; stopLoss: number | null }) => {
-            fireRef.current?.(side, { count: s.count, onOpened: newGroup(side, s.takeProfit, s.stopLoss) });
+        (side: Side, s: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }) => {
+            fireRef.current?.(side, { count: s.count, stake: s.stake ?? undefined, onOpened: newGroup(side, s.takeProfit, s.stopLoss) });
         },
         [newGroup]
     );

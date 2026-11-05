@@ -34,6 +34,7 @@ describe('Sweep Sniper', () => {
         tick(4060.5);
         fireEvent.click(screen.getByText('3'));
         fireEvent.change(screen.getAllByPlaceholderText('Off')[0], { target: { value: '5' } });
+        fireEvent.change(screen.getByPlaceholderText('Trade panel stake'), { target: { value: '12' } });
         tick(4069); // above the line, but the sniper is not armed yet
         expect(onTrigger).not.toHaveBeenCalled();
 
@@ -43,7 +44,7 @@ describe('Sweep Sniper', () => {
         expect(onTrigger).not.toHaveBeenCalled();
         tick(4068.7); // a wick through the line
         expect(onTrigger).toHaveBeenCalledTimes(1);
-        expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 3, takeProfit: 5, stopLoss: null });
+        expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 3, stake: 12, takeProfit: 5, stopLoss: null });
         expect(screen.getByText('✓ Fired')).toBeTruthy();
         tick(4070); // each side fires once
         expect(onTrigger).toHaveBeenCalledTimes(1);
@@ -56,7 +57,7 @@ describe('Sweep Sniper', () => {
         tick(4070); // above the passed Sell level: nothing
         expect(onTrigger).not.toHaveBeenCalled();
         tick(3999.9);
-        expect(onTrigger).toHaveBeenCalledWith('BUY', { count: 1, takeProfit: null, stopLoss: null });
+        expect(onTrigger).toHaveBeenCalledWith('BUY', { count: 1, stake: null, takeProfit: null, stopLoss: null });
     });
 
     it('can be disarmed', () => {

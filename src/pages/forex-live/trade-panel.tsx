@@ -6,6 +6,8 @@ import { amountsFromPlan, type PlanLevels, type Side, type TradeInput } from './
 /** Extra settings for one click: how many trades to open (instead of 'Trades per click') and who to tell about each trade's id. */
 export interface FireOptions {
     count?: number;
+    /** A stake for these trades only (instead of the Stake box). */
+    stake?: number;
     onOpened?: (id: number) => void;
 }
 
@@ -107,15 +109,16 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
 
     const fire = (side: Side, opts?: FireOptions) => {
         if (disabled) return;
-        if (minStake && Number(prefs.stake) + 1e-9 < minStake) {
+        const useStake = opts?.stake && opts.stake > 0 ? opts.stake : Number(prefs.stake);
+        if (minStake && useStake + 1e-9 < minStake) {
             setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
             return;
         }
         // Stop loss and take profit are both optional. What you type in the boxes is used as it is; the analysis
         // plan only fills a box you left empty, and only when you switched that option on (it is off by default).
-        const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, Number(prefs.stake), prefs.multiplier) : null;
+        const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, useStake, prefs.multiplier) : null;
         const own = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
-        const stake = Number(prefs.stake);
+        const stake = useStake;
         let stopLoss = own(prefs.stopLoss) ?? (fromPlan && fromPlan.stopLoss > 0 ? fromPlan.stopLoss : null);
         // A stop loss at or above the stake can never trigger (a multiplier cannot lose more than its stake), and a
         // missing stop loss is allowed anyway: so the trade goes ahead without it instead of being refused.
