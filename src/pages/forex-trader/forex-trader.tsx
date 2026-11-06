@@ -289,8 +289,12 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     // ---- the Sell SL / Buy SL lines, for a parent page's Price Guard
     const onWatchRef = useRef(onWatch);
     onWatchRef.current = onWatch;
-    const watchSell = mode === 'mtf' ? null : outcome?.analysis.watch?.sell.stopLoss ?? null;
-    const watchBuy = mode === 'mtf' ? null : outcome?.analysis.watch?.buy.stopLoss ?? null;
+    // While the analysis is only watching, it draws both "if swept" stops. Once it has a plan it
+    // draws one SL, which is used for its own side (a sell plan's SL is above, a buy plan's below).
+    const watched = mode === 'mtf' ? null : outcome?.analysis.watch ?? null;
+    const planned = mode === 'mtf' ? null : outcome?.analysis.plan ?? null;
+    const watchSell = watched?.sell.stopLoss ?? (planned?.side === 'SELL' ? planned.stopLoss : null);
+    const watchBuy = watched?.buy.stopLoss ?? (planned?.side === 'BUY' ? planned.stopLoss : null);
     useEffect(() => {
         const ok = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
         onWatchRef.current?.({ sell: ok(watchSell), buy: ok(watchBuy) }, symbol);
