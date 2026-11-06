@@ -34,7 +34,7 @@ const TIMEFRAMES = [
     { sec: 3600, label: '1 hour' },
 ];
 const HORIZONS = [24, 48, 96]; // candles ahead
-const PATHS = 6;
+const PATHS = 4;
 const HISTORY = 420;
 
 interface CandleMsg {

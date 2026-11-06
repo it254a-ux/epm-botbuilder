@@ -73,6 +73,13 @@ test('a tunnel page that is not JSON counts as offline', async () => {
     expect((await call({ candles }, { ip: '5.5.5.5' })).body.code).toBe('offline');
 });
 
+test('a busy service is reported as busy, not offline', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ detail: 'busy' }) });
+    const r = await call({ candles }, { ip: '8.8.8.8' });
+    expect(r.status).toBe(429);
+    expect(r.body.code).toBe('busy');
+});
+
 test('a call that takes too long says the model is warming up', async () => {
     const abort = Object.assign(new Error('aborted'), { name: 'AbortError' });
     global.fetch = jest.fn().mockRejectedValue(abort);

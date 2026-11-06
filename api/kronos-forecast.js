@@ -105,6 +105,11 @@ module.exports = async function handler(req, res) {
         } catch {
             data = null; // not JSON: the tunnel answered with its own "nothing here" page
         }
+        if (r.status === 429) {
+            // the service only runs one forecast at a time; it is still busy with an earlier one
+            res.status(429).json({ error: 'The model is still busy with another forecast. Please wait a minute and try again.', code: 'busy' });
+            return;
+        }
         if (!r.ok || !data || !Array.isArray(data.paths)) {
             console.error('kronos-forecast: service answered', r.status);
             res.status(502).json({ error: 'The forecast service is offline right now.', code: 'offline' });
