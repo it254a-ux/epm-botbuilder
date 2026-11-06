@@ -6,6 +6,15 @@ export interface GuardLevels {
     buy: number | null;
 }
 
+/**
+ * What the sniper does at a line. 'reverse': trade back from the line (a SELL at the Sell SL line, a BUY at the Buy SL line).
+ * 'breakout': trade through the line (a BUY when price breaks the Sell SL line, a SELL when it breaks the Buy SL line).
+ */
+export type SniperMode = 'reverse' | 'breakout';
+
+/** The side of the trade for a touched line. */
+export const tradeFor = (line: Side, mode: SniperMode): Side => (mode === 'breakout' ? (line === 'SELL' ? 'BUY' : 'SELL') : line);
+
 /** The levels being watched, with the side of each that the price was on when it was set. */
 export interface ArmedLevels extends GuardLevels {
     sellFrom?: 'below' | 'above';

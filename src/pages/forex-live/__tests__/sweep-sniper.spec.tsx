@@ -21,7 +21,7 @@ describe('Sweep Sniper', () => {
     const setup = (levels = { sell: 4068.63, buy: 4000 }) => {
         const onTrigger = jest.fn();
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={levels} onTrigger={onTrigger} disabled={false} />);
-        fireEvent.click(screen.getByText('Sweep Sniper', { selector: '.sniper__name' }));
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
         return onTrigger;
     };
 
@@ -79,7 +79,7 @@ describe('Sweep Sniper', () => {
             <SweepSniper symbol='frxXAUUSD' currency='USD' levels={levels} onTrigger={onTrigger} disabled={false} />
         );
         const { rerender } = render(el({ sell: 4130, buy: null }));
-        fireEvent.click(screen.getByText('Sweep Sniper', { selector: '.sniper__name' }));
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
         tick(4100);
         fireEvent.click(screen.getByText(/Arm Sniper/));
         rerender(el({ sell: 4110, buy: null })); // the line moved down to 4110
@@ -97,8 +97,8 @@ describe('Sweep Sniper', () => {
         const onTrigger = jest.fn();
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={onTrigger} disabled={false} />);
         tick(4100); // the first price after the refresh: it arms itself here
-        expect(screen.getByText('ARMED · tap for sound', { exact: false })).toBeTruthy();
-        fireEvent.click(screen.getByText('Sweep Sniper', { selector: '.sniper__name' }));
+        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('armed');
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
         expect((screen.getByDisplayValue('15') as HTMLInputElement).value).toBe('15');
         expect(screen.getByText(/Switched back on after the page refreshed/)).toBeTruthy();
         expect(screen.getByText('Disarm Sniper')).toBeTruthy();
@@ -113,11 +113,32 @@ describe('Sweep Sniper', () => {
         localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxXAUUSD', count: 2, stake: '', tp: '', sl: '', on: false, fired: [], savedAt: Date.now() }));
         const a = render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
         tick(4100);
-        expect(screen.queryByText(/ARMED/)).toBeNull();
+        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
         a.unmount();
         localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxEURUSD', count: 2, stake: '', tp: '', sl: '', on: true, fired: [], savedAt: Date.now() }));
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
         tick(4100);
-        expect(screen.queryByText(/ARMED/)).toBeNull();
+        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
+    });
+
+    it('Breakout mode trades through the line: BUY when the Sell SL breaks, SELL when the Buy SL breaks', () => {
+        const onTrigger = setup({ sell: 4130, buy: 4090 });
+        tick(4100);
+        fireEvent.click(screen.getByText('Breakout'));
+        expect(screen.getByText(/Trades through the line/)).toBeTruthy();
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4130.5); // the Sell SL line breaks upward
+        expect(onTrigger).toHaveBeenCalledTimes(1);
+        expect(onTrigger).toHaveBeenLastCalledWith('BUY', { count: 1, stake: null, takeProfit: null, stopLoss: null });
+        tick(4089.5); // the Buy SL line breaks downward
+        expect(onTrigger).toHaveBeenLastCalledWith('SELL', { count: 1, stake: null, takeProfit: null, stopLoss: null });
+        expect(onTrigger).toHaveBeenCalledTimes(2);
+    });
+
+    it('the mode is remembered across a refresh', () => {
+        localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxXAUUSD', count: 1, stake: '', tp: '', sl: '', on: false, mode: 'breakout', fired: [], savedAt: Date.now() }));
+        render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
+        expect(screen.getByText('Breakout').getAttribute('aria-checked')).toBe('true');
     });
 });

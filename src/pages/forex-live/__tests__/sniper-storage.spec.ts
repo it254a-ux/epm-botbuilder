@@ -8,8 +8,8 @@ const memory = () => {
 describe('Sweep Sniper memory', () => {
     it('remembers the settings and whether it was armed', () => {
         const st = memory();
-        saveSniper({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, fired: ['SELL'], savedAt: 1000 }, st);
-        expect(loadSniper(st)).toEqual({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, fired: ['SELL'], savedAt: 1000 });
+        saveSniper({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 }, st);
+        expect(loadSniper(st)).toEqual({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 });
     });
 
     it('survives broken or missing saved data', () => {
@@ -19,7 +19,7 @@ describe('Sweep Sniper memory', () => {
     });
 
     it('comes back armed only on the same market and within a day', () => {
-        const saved = { symbol: 'frxXAUUSD', count: 1, stake: '', tp: '', sl: '', on: true, fired: [], savedAt: 1_000_000 };
+        const saved = { symbol: 'frxXAUUSD', count: 1, stake: '', tp: '', sl: '', on: true, mode: 'reverse' as const, fired: [], savedAt: 1_000_000 };
         expect(shouldResume(saved, 'frxXAUUSD', 1_000_000 + 60_000)).toBe(true);
         expect(shouldResume(saved, 'frxEURUSD', 1_000_000 + 60_000)).toBe(false);
         expect(shouldResume(saved, 'frxXAUUSD', 1_000_000 + RESUME_WINDOW_MS + 1)).toBe(false);

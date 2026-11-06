@@ -1,4 +1,4 @@
-import type { GuardGroup } from './price-guard';
+import type { GuardGroup, SniperMode } from './price-guard';
 import type { Side } from './trade-engine';
 
 /**
@@ -13,6 +13,7 @@ export interface SavedSniper {
     tp: string;
     sl: string;
     on: boolean;
+    mode: SniperMode;
     fired: Side[];
     savedAt: number;
 }
@@ -36,6 +37,7 @@ export function loadSniper(storage: Pick<Storage, 'getItem'> = localStorage): Sa
             tp: typeof v.tp === 'string' ? v.tp : '',
             sl: typeof v.sl === 'string' ? v.sl : '',
             on: v.on === true,
+            mode: v.mode === 'breakout' ? 'breakout' : 'reverse',
             fired: Array.isArray(v.fired) ? v.fired.filter((s): s is Side => s === 'BUY' || s === 'SELL') : [],
             savedAt: Number.isFinite(v.savedAt) ? (v.savedAt as number) : 0,
         };

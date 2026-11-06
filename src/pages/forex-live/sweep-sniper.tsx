@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
 import { useMeasureContext } from '../forex-trader/measure-context';
-import { GUARD_COUNTS, armLevels, createBell, touched, type ArmedLevels } from './price-guard';
+import { GUARD_COUNTS, armLevels, createBell, touched, tradeFor, type ArmedLevels, type SniperMode } from './price-guard';
 import type { GuardLevels } from './price-guard';
 import { loadSniper, saveSniper, shouldResume } from './sniper-storage';
 import { watchTicks } from './tick-feed';
@@ -51,6 +51,9 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     // what was set (and whether it was armed) before the page was refreshed
     const saved = useRef(loadSniper());
     const pendingResume = useRef(shouldResume(saved.current, symbol));
+    const [mode, setMode] = useState<SniperMode>(saved.current?.mode ?? 'reverse');
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
     const [resumed, setResumed] = useState(false);
     const [soundReady, setSoundReady] = useState(true);
     const [count, setCount] = useState(saved.current?.count ?? 1);
@@ -107,11 +110,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             if (off || !Number.isFinite(p)) return;
             price.current = p;
             if (onRef.current && armedRef.current) {
-                const side = touched(armedRef.current, p, firedRef.current);
-                if (side) {
-                    firedRef.current.add(side);
+                const line = touched(armedRef.current, p, firedRef.current);
+                if (line) {
+                    firedRef.current.add(line);
                     setFired([...firedRef.current]);
-                    triggerRef.current(side, settingsRef.current);
+                    triggerRef.current(tradeFor(line, modeRef.current), settingsRef.current);
                     bell.current!.start();
                     setRinging(true);
                 }
@@ -159,10 +162,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             tp,
             sl,
             on: on || pendingResume.current,
+            mode,
             fired: [...firedRef.current],
             savedAt: Date.now(),
         });
-    }, [symbol, count, stake, tp, sl, on, fired]);
+    }, [symbol, count, stake, tp, sl, on, mode, fired]);
 
     useEffect(
         () => () => {
@@ -249,34 +253,37 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const shown = armed ?? levels;
     const have = levels.sell !== null || levels.buy !== null;
 
-    const card = (side: Side, delay: number) => {
-        const level = side === 'SELL' ? shown.sell : shown.buy;
-            const done = fired.includes(side);
-        const from = side === 'SELL' ? armed?.sellFrom : armed?.buyFrom;
+    // one small box per line: what it will trade, the line's price, and how close price is
+    const card = (line: Side, delay: number) => {
+        const side = tradeFor(line, mode);
+        const level = line === 'SELL' ? shown.sell : shown.buy;
+        const done = fired.includes(line);
+        const from = line === 'SELL' ? armed?.sellFrom : armed?.buyFrom;
         const none = level === null;
         const away = level !== null && last !== null ? (Math.abs(level - last) / last) * 100 : null;
         const meter = done ? 1 : away === null ? 0 : Math.max(0.04, 1 - away / METER_RANGE_PCT);
         const cls = `sn-lvl sn-lvl--${side === 'SELL' ? 'sell' : 'buy'}${done ? ' is-fired' : ''}${none ? ' is-off' : ''}`;
+        const foot = done
+            ? '✓ Fired'
+            : none
+              ? on
+                  ? 'No line'
+                  : 'Waiting…'
+              : away !== null
+                ? `${away.toFixed(2)}%${on && from ? (from === 'above' ? ' ↓' : ' ↑') : ''}`
+                : '…';
         return (
-            <div className={cls} style={{ ['--d' as string]: `${delay}s` }}>
-                <div className='sn-lvl__top'>
+            <div className={cls} style={{ ['--d' as string]: `${delay}s` }} title={`${side} when price touches the ${line === 'SELL' ? 'Sell' : 'Buy'} SL line`}>
+                <div className='sn-lvl__row'>
                     <b>{side}</b>
-                    <span>when price touches</span>
+                    <span className='sn-lvl__price'>{fmt(level)}</span>
                 </div>
-                <div className='sn-lvl__price'>{fmt(level)}</div>
                 <div className='sn-lvl__meter'>
                     <i style={{ transform: `scaleX(${meter})` }} />
                 </div>
                 <div className='sn-lvl__foot'>
-                    {done
-                        ? '✓ Fired'
-                        : none
-                          ? on
-                              ? 'No line on the chart'
-                              : 'Waiting for the analysis'
-                          : away !== null
-                            ? `${away.toFixed(2)}% away${on && from ? (from === 'above' ? ' · on the way down' : ' · on the way up') : ''}`
-                            : '…'}
+                    <span>{line === 'SELL' ? 'Sell SL' : 'Buy SL'}</span>
+                    <span>{foot}</span>
                 </div>
             </div>
         );
@@ -284,27 +291,33 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
 
     return (
         <div ref={root} className={`sniper${on ? ' is-armed' : ''}${ringing ? ' is-ringing' : ''}${open ? ' is-open' : ''}`}>
-            <button type='button' className='sniper__trigger' onClick={toggle} aria-expanded={open} title='Sweep Sniper: automatic entry when price reaches the sweep levels'>
+            <button
+                type='button'
+                className='sniper__trigger'
+                onClick={toggle}
+                aria-expanded={open}
+                data-state={on ? 'armed' : pendingResume.current ? 'resuming' : 'off'}
+                title={`Sniper: ${on ? 'armed' : pendingResume.current ? 'switching back on' : 'off'}${on && status ? ` · ${status}` : ''}${on && !soundReady ? ' · tap the page once for sound' : ''}`}
+            >
                 <span className='sniper__led' />
                 <span className='sniper__icon'>
                     <Crosshair />
                 </span>
-                <span className='sniper__name'>Sweep Sniper</span>
-                <span className='sniper__state'>{on ? `${status ? status.split(' · ')[0] : 'ARMED'}${soundReady ? '' : ' · tap for sound'}` : pendingResume.current ? 'RESUMING' : 'OFF'}</span>
+                <span className='sniper__name'>Sniper</span>
                 <svg className='sniper__chev' viewBox='0 0 12 12' width='10' height='10' aria-hidden>
                     <path d='M2 4.2 6 8l4-3.8' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' />
                 </svg>
             </button>
 
             {open && (
-                <div className={`sniper__pop${leaving ? ' is-leaving' : ''}`} role='dialog' aria-label='Sweep Sniper' style={room ? { maxHeight: room } : undefined}>
+                <div className={`sniper__pop${leaving ? ' is-leaving' : ''}`} role='dialog' aria-label='Sniper' style={room ? { maxHeight: room } : undefined}>
                     <header className='sn-head'>
                         <span className='sn-head__icon'>
                             <Crosshair />
                         </span>
                         <div>
-                            <h4>Sweep Sniper</h4>
-                            <p>Automatic entry the moment price reaches a sweep level</p>
+                            <h4>Sniper</h4>
+                            <p>Auto-entry when price touches a sweep line</p>
                         </div>
                         <button type='button' className='sn-head__x' onClick={close} aria-label='Close'>
                             ×
@@ -322,6 +335,18 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                             <span>🔔</span> Trades opened — tap to silence the bell
                         </button>
                     )}
+
+                    <div className='sn-mode' role='radiogroup' aria-label='What to trade at a line'>
+                        <button type='button' role='radio' aria-checked={mode === 'reverse'} className={mode === 'reverse' ? 'is-on' : ''} disabled={on} onClick={() => setMode('reverse')}>
+                            Reversal
+                        </button>
+                        <button type='button' role='radio' aria-checked={mode === 'breakout'} className={mode === 'breakout' ? 'is-on' : ''} disabled={on} onClick={() => setMode('breakout')}>
+                            Breakout
+                        </button>
+                    </div>
+                    <p className='sn-mode__hint'>
+                        {mode === 'reverse' ? 'Trades back from the line: SELL at the Sell SL, BUY at the Buy SL.' : 'Trades through the line: BUY when the Sell SL breaks, SELL when the Buy SL breaks.'}
+                    </p>
 
                     <div className='sn-levels'>
                         {card('SELL', 0.06)}
