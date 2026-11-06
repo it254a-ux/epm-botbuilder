@@ -76,6 +76,11 @@ const EXTRA_NAV_ITEMS = [
         label: <Localize i18n_default_text='Forex Live' />,
     },
     {
+        tab: DBOT_TABS.MARKET_FORECAST,
+        icon: <span className='app-header__menu-item-emoji'>🔮</span>,
+        label: <Localize i18n_default_text='Market Forecast' />,
+    },
+    {
         tab: DBOT_TABS.TUTORIAL,
         icon: <LegacyGuide1pxIcon height='12px' width='12px' fill='currentColor' />,
         label: <Localize i18n_default_text='Tutorials' />,

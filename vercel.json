@@ -4,6 +4,9 @@
         "api/site-settings.js": {
             "maxDuration": 60
         },
+        "api/kronos-forecast.js": {
+            "maxDuration": 60
+        },
         "api/signal-watch.js": {
             "includeFiles": "api/_lib/fonts/**",
             "maxDuration": 60

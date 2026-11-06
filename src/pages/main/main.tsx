@@ -55,6 +55,7 @@ const ForexPanel = lazy(() => import('../forex-trader/forex-panel'));
 const DtraderPage = lazy(() => import('../dtrader'));
 const TradingViewPage = lazy(() => import('../trading-view'));
 const ForexLivePage = lazy(() => import('../forex-live'));
+const MarketForecastPage = lazy(() => import('../market-forecast'));
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -99,6 +100,7 @@ const AppWrapper = observer(() => {
         'tutorial',
         'forex_trader',
         'forex_live',
+        'market_forecast',
     ];
     const { isDesktop } = useDevice();
     const location = useLocation();
@@ -744,6 +746,21 @@ const AppWrapper = observer(() => {
                                     fallback={<ChunkLoader message={localize('Please wait, loading Forex Live...')} />}
                                 >
                                     <ForexLivePage />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <span style={{ fontSize: '15px', lineHeight: 1 }}>🔮</span>
+                                        <Localize i18n_default_text='Market Forecast' />
+                                    </>
+                                }
+                                id='id-market-forecast'
+                            >
+                                <Suspense
+                                    fallback={<ChunkLoader message={localize('Please wait, loading Market Forecast...')} />}
+                                >
+                                    <MarketForecastPage />
                                 </Suspense>
                             </div>
                         </Tabs>
