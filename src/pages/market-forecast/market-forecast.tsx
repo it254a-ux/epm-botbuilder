@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createChart, LineStyle, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
-import { useDerivWS } from '@deriv/core';
+import { DerivWS } from '@deriv/core';
 import {
     closedOnly,
     decimalsOf,
@@ -37,47 +37,45 @@ const HORIZONS = [24, 48, 96]; // candles ahead
 const PATHS = 6;
 const HISTORY = 420;
 
-interface Subscribable {
-    subscribe: (
-        payload: Record<string, unknown>,
-        handler: (data: unknown) => void
-    ) => Promise<{ unsubscribe: () => void }>;
-}
 interface CandleMsg {
-    error?: { message?: string };
     candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
 }
 
-/** The newest candles of a market, once (the stream is closed as soon as the first answer arrives). */
-function loadCandles(ws: Subscribable, symbol: string, sec: number): Promise<Bar[]> {
-    return new Promise((resolve, reject) => {
-        let done = false;
-        let unsub: (() => void) | null = null;
-        const timer = setTimeout(() => finish(() => reject(new Error('Loading candles took too long. Please try again.'))), 15000);
-        function finish(fn: () => void) {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            unsub?.();
-            fn();
-        }
-        ws.subscribe(
-            { ticks_history: symbol, style: 'candles', granularity: sec, end: 'latest', count: HISTORY, adjust_start_time: 1 },
-            data => {
-                const d = data as CandleMsg;
-                if (d.error) finish(() => reject(new Error(d.error?.message ?? 'Could not load candles')));
-                else if (d.candles)
-                    finish(() =>
-                        resolve(d.candles!.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) })))
-                    );
+/** Rejects with `message` if the promise has not finished in `ms` milliseconds. */
+function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        promise.then(
+            value => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            err => {
+                clearTimeout(timer);
+                reject(err);
             }
-        )
-            .then(sub => {
-                if (done) sub.unsubscribe();
-                else unsub = sub.unsubscribe;
-            })
-            .catch(err => finish(() => reject(err instanceof Error ? err : new Error('Connection error'))));
+        );
     });
+}
+
+/**
+ * The newest candles of a market. Each call opens its own short connection to Deriv's public data feed and
+ * closes it again, so it never depends on a shared connection that might have dropped in between.
+ */
+async function loadCandles(symbol: string, sec: number): Promise<Bar[]> {
+    const socket = new DerivWS();
+    try {
+        await within(socket.connect(), 12000, 'Could not reach the market data. Please check your internet and try again.');
+        const d = await within(
+            socket.send<CandleMsg>({ ticks_history: symbol, style: 'candles', granularity: sec, end: 'latest', count: HISTORY, adjust_start_time: 1 }),
+            15000,
+            'Loading candles took too long. Please try again.'
+        );
+        if (!d.candles?.length) throw new Error('No candles came back for this market.');
+        return d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+    } finally {
+        socket.disconnect();
+    }
 }
 
 const spanText = (seconds: number) =>
@@ -86,7 +84,6 @@ const spanText = (seconds: number) =>
 const toPoint = (b: Bar) => ({ time: b.time as UTCTimestamp, open: b.open, high: b.high, low: b.low, close: b.close });
 
 const MarketForecast = () => {
-    const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbol, setSymbol] = useState('frxXAUUSD');
     const [sec, setSec] = useState(300);
     const [horizon, setHorizon] = useState(48);
@@ -149,12 +146,11 @@ const MarketForecast = () => {
 
     // show the market's latest candles whenever the market or candle size changes
     useEffect(() => {
-        if (!ws || !isConnected) return undefined;
         let off = false;
         clearForecast();
         setMessage('');
         setIsError(false);
-        loadCandles(ws as unknown as Subscribable, symbol, sec)
+        loadCandles(symbol, sec)
             .then(bars => {
                 if (off) return;
                 realRef.current?.setData(bars.map(toPoint));
@@ -168,15 +164,10 @@ const MarketForecast = () => {
         return () => {
             off = true;
         };
-    }, [ws, isConnected, symbol, sec, clearForecast]);
+    }, [symbol, sec, clearForecast]);
 
     const run = useCallback(async () => {
         if (busyRef.current) return;
-        if (!ws || !isConnected) {
-            setIsError(true);
-            setMessage('Waiting for the market connection. Please try again in a moment.');
-            return;
-        }
         const read = readLevels(side, tp, sl);
         if ('error' in read) {
             setIsError(true);
@@ -188,7 +179,7 @@ const MarketForecast = () => {
         setIsError(false);
         try {
             setMessage('Loading the latest candles…');
-            const all = await loadCandles(ws as unknown as Subscribable, symbol, sec);
+            const all = await loadCandles(symbol, sec);
             const closed = closedOnly(all, sec, Math.floor(Date.now() / 1000));
             if (closed.length < 64) throw new Error('Not enough candles for this market right now.');
             clearForecast();
@@ -229,7 +220,7 @@ const MarketForecast = () => {
             busyRef.current = false;
             setBusy(false);
         }
-    }, [ws, isConnected, side, tp, sl, symbol, sec, horizon, clearForecast]);
+    }, [side, tp, sl, symbol, sec, horizon, clearForecast]);
 
     const dec = result ? decimalsOf(result.last_close) : 2;
     const endLow = result ? result.p10_close[result.p10_close.length - 1] : 0;
