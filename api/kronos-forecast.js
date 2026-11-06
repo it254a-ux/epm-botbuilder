@@ -1,4 +1,5 @@
-// Market Forecast: passes candles to the Kronos forecast service and returns its answer unchanged.
+// Market Forecast: starts a forecast on the Kronos service (POST) and lets the page check on it (GET ?id=...).
+// A forecast can take minutes on a normal laptop, longer than a Vercel function may wait, so it works in two short steps.
 //
 // Kronos (https://github.com/shiyu-coder/Kronos) is a Python/PyTorch model, so it cannot run inside a Vercel
 // function. It runs as its own small service (Kronos fork, forecast_service/app.py) and this file is the only
@@ -12,7 +13,7 @@
 
 const MIN_CANDLES = 64;
 const MAX_CANDLES = 512;
-const TIMEOUT_MS = 55_000; // the function itself is limited to 60 s in vercel.json
+const TIMEOUT_MS = 20_000; // each step is short; the long work happens on the service
 
 // ---- small per-instance limits so the public cannot hammer the machine the model runs on
 const PER_MINUTE = Number(process.env.KRONOS_PER_MINUTE) > 0 ? Number(process.env.KRONOS_PER_MINUTE) : 4;
@@ -26,6 +27,15 @@ function takeSlot(ip, now = Date.now()) {
     if (hits.length >= PER_DAY) return 'day';
     hits.push({ ip, t: now });
     return null;
+}
+
+const POLL_PER_MINUTE = 40;
+const polls = [];
+function takePoll(ip, now = Date.now()) {
+    while (polls.length && now - polls[0].t > MINUTE) polls.shift();
+    if (polls.filter(h => h.ip === ip).length >= POLL_PER_MINUTE) return false;
+    polls.push({ ip, t: now });
+    return true;
 }
 
 const finite = v => typeof v === 'number' && Number.isFinite(v);
@@ -57,19 +67,82 @@ function cleanLevels(levels) {
 
 const whole = (v, fallback, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : v === undefined ? fallback : null);
 
+const JOB_ID = /^[0-9a-f]{32}$/;
+
+function headersFor() {
+    const headers = { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
+    if (process.env.KRONOS_SECRET) headers['X-API-Key'] = process.env.KRONOS_SECRET;
+    return headers;
+}
+
+/** Calls the service with a short time limit. Returns { r, data } or { offline: true } / { slow: true }. */
+async function callService(path, init) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+        const base = process.env.KRONOS_URL.replace(/\/+$/, '');
+        const r = await fetch(`${base}${path}`, { ...init, signal: controller.signal, headers: headersFor() });
+        let data = null;
+        try {
+            data = await r.json();
+        } catch {
+            data = null; // not JSON: the tunnel answered with its own "nothing here" page
+        }
+        return { r, data };
+    } catch (err) {
+        if (err && err.name === 'AbortError') return { slow: true };
+        console.error('kronos-forecast: could not reach the service');
+        return { offline: true };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+const offline = res => res.status(502).json({ error: 'The forecast service is offline right now.', code: 'offline' });
+const slow = res => res.status(504).json({ error: 'The forecast service is slow to answer. Please try again in a minute.', code: 'slow' });
+
 module.exports = async function handler(req, res) {
-    if (req.method !== 'POST') {
+    if (req.method !== 'POST' && req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
     }
-    const base = process.env.KRONOS_URL;
-    if (!base) {
+    if (!process.env.KRONOS_URL) {
         // Visitors get a plain message; the real reason goes to the server log only.
         console.error('kronos-forecast: KRONOS_URL is not set');
         res.status(503).json({ error: 'The forecast is not available right now.', code: 'offline' });
         return;
     }
     const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+
+    // ---- GET ?id=...  : how is the forecast doing?
+    if (req.method === 'GET') {
+        const id = String((req.query && req.query.id) || '');
+        if (!JOB_ID.test(id)) {
+            res.status(400).json({ error: 'Bad forecast request' });
+            return;
+        }
+        if (!takePoll(ip)) {
+            res.status(429).json({ error: 'Checking too often. Please wait a moment.' });
+            return;
+        }
+        const out = await callService(`/jobs/${id}`, { method: 'GET' });
+        if (out.offline) return offline(res);
+        if (out.slow) return slow(res);
+        const { r, data } = out;
+        if (r.status === 404 && data && data.detail === 'unknown job') {
+            // the service was restarted while the forecast was running
+            res.status(410).json({ error: 'The forecast was lost because the service restarted. Please run it again.', code: 'lost' });
+            return;
+        }
+        if (!r.ok || !data || !['running', 'done', 'error'].includes(data.status)) return offline(res);
+        const body = { status: data.status, elapsed: data.elapsed };
+        if (data.status === 'done') body.result = data.result;
+        if (data.status === 'error') body.error = data.error;
+        res.status(200).json(body);
+        return;
+    }
+
+    // ---- POST : start a forecast
     const refused = takeSlot(ip);
     if (refused) {
         res.status(429).json({
@@ -77,7 +150,6 @@ module.exports = async function handler(req, res) {
         });
         return;
     }
-
     const body = req.body || {};
     const candles = cleanCandles(body.candles);
     const predLen = whole(body.pred_len, 48, 1, 120);
@@ -87,45 +159,23 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'Bad forecast request' });
         return;
     }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    try {
-        const headers = { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
-        if (process.env.KRONOS_SECRET) headers['X-API-Key'] = process.env.KRONOS_SECRET;
-        const r = await fetch(`${base.replace(/\/+$/, '')}/forecast`, {
-            method: 'POST',
-            signal: controller.signal,
-            headers,
-            body: JSON.stringify({ candles, pred_len: predLen, paths, levels: levels.value }),
-        });
-        let data = null;
-        try {
-            data = await r.json();
-        } catch {
-            data = null; // not JSON: the tunnel answered with its own "nothing here" page
-        }
-        if (r.status === 429) {
-            // the service only runs one forecast at a time; it is still busy with an earlier one
-            res.status(429).json({ error: 'The model is still busy with another forecast. Please wait a minute and try again.', code: 'busy' });
-            return;
-        }
-        if (!r.ok || !data || !Array.isArray(data.paths)) {
-            console.error('kronos-forecast: service answered', r.status);
-            res.status(502).json({ error: 'The forecast service is offline right now.', code: 'offline' });
-            return;
-        }
-        res.status(200).json(data);
-    } catch (err) {
-        if (err && err.name === 'AbortError') {
-            // the model is probably still loading (it downloads the first time); the service keeps working on it
-            res.status(504).json({ error: 'The model is still warming up. Please try again in a minute.', code: 'slow' });
-        } else {
-            console.error('kronos-forecast: could not reach the service');
-            res.status(502).json({ error: 'The forecast service is offline right now.', code: 'offline' });
-        }
-    } finally {
-        clearTimeout(timer);
+    const out = await callService('/jobs', {
+        method: 'POST',
+        body: JSON.stringify({ candles, pred_len: predLen, paths, levels: levels.value }),
+    });
+    if (out.offline) return offline(res);
+    if (out.slow) return slow(res);
+    const { r, data } = out;
+    if (r.status === 429) {
+        // the service only runs one forecast at a time; it is still busy with an earlier one
+        res.status(429).json({ error: 'The model is still busy with another forecast. Please wait a minute and try again.', code: 'busy' });
+        return;
     }
+    if (!r.ok || !data || typeof data.job !== 'string' || !JOB_ID.test(data.job)) {
+        console.error('kronos-forecast: service answered', r.status);
+        return offline(res);
+    }
+    res.status(200).json({ job: data.job });
 };
 module.exports.takeSlot = takeSlot;
+module.exports.takePoll = takePoll;

@@ -36,6 +36,8 @@ const TIMEFRAMES = [
 const HORIZONS = [24, 48, 96]; // candles ahead
 const PATHS = 4;
 const HISTORY = 420;
+const MAX_WAIT_MS = 8 * 60 * 1000;
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 interface CandleMsg {
     candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
@@ -103,6 +105,13 @@ const MarketForecast = () => {
     const highRef = useRef<ISeriesApi<'Line'> | null>(null);
     const linesRef = useRef<IPriceLine[]>([]);
     const busyRef = useRef(false);
+    const aliveRef = useRef(true);
+    useEffect(() => {
+        aliveRef.current = true;
+        return () => {
+            aliveRef.current = false;
+        };
+    }, []);
 
     // the chart, created once
     useEffect(() => {
@@ -185,8 +194,8 @@ const MarketForecast = () => {
             clearForecast();
             realRef.current?.setData(closed.map(toPoint));
 
-            setMessage('Kronos is working… this can take up to a minute.');
-            const r = await fetch('/api/kronos-forecast', {
+            setMessage('Starting Kronos…');
+            const started = await fetch('/api/kronos-forecast', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -196,22 +205,52 @@ const MarketForecast = () => {
                     levels: read.levels ?? undefined,
                 }),
             });
-            const data = (await r.json().catch(() => null)) as (ForecastResult & { error?: string }) | null;
-            if (!r.ok || !data || !Array.isArray(data.paths)) {
-                throw new Error(data?.error ?? 'The forecast service is offline right now. Please try again later.');
+            const job = (await started.json().catch(() => null)) as { job?: string; error?: string } | null;
+            if (!started.ok || !job?.job) throw new Error(job?.error ?? 'The forecast service is offline right now. Please try again later.');
+
+            // a slow computer can need a few minutes, so check back every few seconds instead of waiting on one request
+            const t0 = Date.now();
+            let failures = 0;
+            let data: ForecastResult | null = null;
+            while (!data) {
+                await sleep(3000);
+                if (!aliveRef.current) return;
+                if (Date.now() - t0 > MAX_WAIT_MS) throw new Error('The forecast is taking much longer than expected. Please try again later.');
+                setMessage(`Kronos is working… ${Math.round((Date.now() - t0) / 1000)} s (it can take a few minutes on a slow computer).`);
+                try {
+                    const pr = await fetch(`/api/kronos-forecast?id=${job.job}`);
+                    const p = (await pr.json().catch(() => null)) as { status?: string; result?: ForecastResult; error?: string } | null;
+                    if (!pr.ok || !p) {
+                        const fatal = pr.status === 410 || pr.status === 429 || pr.status === 400;
+                        failures += 1;
+                        if (fatal || failures >= 3) throw new Error(p?.error ?? 'The forecast service is offline right now. Please try again later.');
+                    } else if (p.status === 'error') {
+                        throw new Error(p.error ?? 'The model hit a problem. Please try again.');
+                    } else if (p.status === 'done' && p.result && Array.isArray(p.result.paths)) {
+                        data = p.result;
+                    } else {
+                        failures = 0;
+                    }
+                } catch (err) {
+                    if (err instanceof TypeError) {
+                        failures += 1; // a network blip: try again, give up after three in a row
+                        if (failures >= 3) throw new Error('Lost the connection while waiting. Please try again.');
+                    } else throw err;
+                }
             }
 
-            ghostRef.current?.setData(medianBars(data.paths).map(toPoint));
-            const times = data.paths[0].map(c => c.t as UTCTimestamp);
-            lowRef.current?.setData(times.map((time, i) => ({ time, value: data.p10_close[i] })));
-            highRef.current?.setData(times.map((time, i) => ({ time, value: data.p90_close[i] })));
+            const forecast: ForecastResult = data;
+            ghostRef.current?.setData(medianBars(forecast.paths).map(toPoint));
+            const times = forecast.paths[0].map(c => c.t as UTCTimestamp);
+            lowRef.current?.setData(times.map((time, i) => ({ time, value: forecast.p10_close[i] })));
+            highRef.current?.setData(times.map((time, i) => ({ time, value: forecast.p90_close[i] })));
             if (read.levels) {
                 const line = (price: number, title: string, color: string) =>
                     realRef.current?.createPriceLine({ price, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title });
                 [line(read.levels.tp, 'TP', '#26a69a'), line(read.levels.sl, 'SL', '#ef5350')].forEach(l => l && linesRef.current.push(l));
             }
             chartRef.current?.timeScale().fitContent();
-            setResult(data);
+            setResult(forecast);
             setMessage('');
         } catch (err) {
             setIsError(true);
