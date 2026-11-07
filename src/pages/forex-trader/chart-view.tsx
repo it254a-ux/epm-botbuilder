@@ -21,6 +21,8 @@ import type { PdhResult } from './pdh';
 export interface ChartViewHandle {
     /** Replace all candles (initial load / market or timeframe change). */
     setCandles: (candles: Candle[]) => void;
+    /** Put earlier candles on the left of the ones shown, keeping the same candles in view. */
+    prependCandles: (candles: Candle[]) => void;
     /** Fold candles into the ones already shown (after a reconnect): fills any gap and keeps the drawings and the zoom. */
     mergeCandles: (candles: Candle[]) => void;
     /** Add or update the newest candle (live stream). */
@@ -39,6 +41,8 @@ interface Props {
     pipSize: number;
     /** Show the chart style and indicators buttons (on by default; the small compare charts switch them off). */
     studies?: boolean;
+    /** Asked for earlier candles when the chart is dragged back to its oldest one: gives the ones before `before` (epoch seconds), or none when there are no more. */
+    loadOlder?: (before: number) => Promise<Candle[]>;
 }
 
 const COLORS = {
@@ -133,7 +137,7 @@ interface Derived {
     compute: (candles: Candle[]) => unknown[];
 }
 
-const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSize, studies: showStudies = true }, ref) {
+const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSize, studies: showStudies = true, loadOlder }, ref) {
     const hostRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -144,6 +148,13 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const levelsRef = useRef<{ min: number; max: number } | null>(null);
     // candles kept here so the drawing tools' magnet can snap to them
     const candlesRef = useRef<Candle[]>([]);
+    // earlier history: loaded as the chart is dragged back, so it never runs out like TradingView
+    const loadOlderRef = useRef(loadOlder);
+    loadOlderRef.current = loadOlder;
+    const olderBusy = useRef(false);
+    const noOlder = useRef(false);
+    const prependRef = useRef<(c: Candle[]) => void>(() => undefined);
+    const generation = useRef(0); // bumped whenever a new market / timeframe replaces the candles
     const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null);
     const [resetKey, setResetKey] = useState(0);
     // chart style + indicators the person switched on (remembered in the browser, shared by every chart)
@@ -205,6 +216,25 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         seriesRef.current = series;
         setApis({ chart, series });
 
+        const onRange = (range: { from: number; to: number } | null) => {
+            const first = candlesRef.current[0];
+            if (!range || range.from > 30 || !first || olderBusy.current || noOlder.current || !loadOlderRef.current) return;
+            const gen = generation.current;
+            olderBusy.current = true;
+            loadOlderRef.current(first.time)
+                .then(older => {
+                    if (gen !== generation.current) return;
+                    const fresh = older.filter(c => c.time < (candlesRef.current[0]?.time ?? Infinity));
+                    if (fresh.length === 0) noOlder.current = true;
+                    else prependRef.current(fresh);
+                })
+                .catch(() => undefined) // tried again on the next drag
+                .finally(() => {
+                    olderBusy.current = false;
+                });
+        };
+        chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
+
         const ro = new ResizeObserver(() => {
             if (host.clientWidth > 0 && host.clientHeight > 0) {
                 chart.applyOptions({ width: host.clientWidth, height: host.clientHeight });
@@ -212,6 +242,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         });
         ro.observe(host);
         return () => {
+            chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
             themeWatch.disconnect();
             ro.disconnect();
             chart.remove();
@@ -365,9 +396,25 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         ts.scrollToRealTime();
     };
 
+    const prepend = (candles: Candle[]) => {
+        const have = candlesRef.current;
+        const fresh = candles.filter(c => !have.length || c.time < have[0].time);
+        if (!fresh.length) return;
+        const ts = chartRef.current?.timeScale();
+        const range = ts?.getVisibleLogicalRange() ?? null;
+        candlesRef.current = fresh.concat(have);
+        seriesRef.current?.setData(candlesRef.current.map(toBar));
+        refreshDerived();
+        // the new candles sit on the left, so shift the view by their number to keep the same ones on screen
+        if (ts && range) ts.setVisibleLogicalRange({ from: range.from + fresh.length, to: range.to + fresh.length });
+    };
+    prependRef.current = prepend;
+
     useImperativeHandle(ref, () => {
       const impl: ChartViewHandle = {
         setCandles(candles) {
+            generation.current += 1;
+            noOlder.current = false;
             clearDrawing();
             candlesRef.current = candles.slice();
             setResetKey(k => k + 1);
@@ -377,6 +424,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
             if (candles.length > 30) openView();
             else chartRef.current?.timeScale().fitContent();
         },
+        prependCandles: prepend,
         mergeCandles(candles) {
             const byTime = new Map<number, Candle>();
             candlesRef.current.forEach(c => byTime.set(c.time, c));

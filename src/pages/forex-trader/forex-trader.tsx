@@ -206,6 +206,20 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const m15StreamRef = useRef('');
 
     const chartRef = useRef<ChartViewHandle>(null);
+    // earlier candles for the chart, asked for when it is dragged back to its oldest one (only the chart gets them: the analysis keeps its own recent candles)
+    const olderCtx = useRef({ symbol, sec: 0 });
+    olderCtx.current = { symbol, sec: mode === 'mtf' ? M5_SEC : tf };
+    const loadOlder = useCallback(
+        async (before: number): Promise<Candle[]> => {
+            if (!ws) return [];
+            const { symbol: sym, sec } = olderCtx.current;
+            const d = await ws.send<{ candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }> }>({
+                ticks_history: sym, style: 'candles', granularity: sec, end: before - 1, count: 1000, adjust_start_time: 1,
+            });
+            return (d.candles ?? []).map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+        },
+        [ws]
+    );
     const candlesRef = useRef<Candle[]>([]);
     const streamRef = useRef('');
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -874,7 +888,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         : undefined
                 }
             >
-                <ChartView ref={chartRef} pipSize={pipSize} />
+                <ChartView ref={chartRef} pipSize={pipSize} loadOlder={loadOlder} />
                 <div className='forex-trader__chart-info'>
                     <b>{info?.underlying_symbol_name ?? symbol}</b>
                     <span>{mode === 'mtf' ? 'M15 + M5' : TIMEFRAMES.find(t => t.sec === tf)?.label}</span>
