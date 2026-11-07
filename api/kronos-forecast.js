@@ -13,7 +13,7 @@
 
 const MIN_CANDLES = 64;
 const MAX_CANDLES = 512;
-const TIMEOUT_MS = 20_000; // each step is short; the long work happens on the service
+const TIMEOUT_MS = 50_000; // each step is short; this leaves room for a sleeping service (e.g. on Modal) to wake up
 
 // ---- small per-instance limits so the public cannot hammer the machine the model runs on
 const PER_MINUTE = Number(process.env.KRONOS_PER_MINUTE) > 0 ? Number(process.env.KRONOS_PER_MINUTE) : 4;
