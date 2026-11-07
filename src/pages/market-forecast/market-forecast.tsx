@@ -158,11 +158,9 @@ const MarketForecast = () => {
                         noOlderRef.current = true;
                         return;
                     }
-                    const before = chart.timeScale().getVisibleLogicalRange();
                     barsRef.current = fresh.concat(barsRef.current);
+                    // the chart keeps the same candles in view when earlier ones are added on the left
                     realRef.current?.setData(barsRef.current.map(toPoint));
-                    // keep the same candles on screen after the new ones are added on the left
-                    if (before) chart.timeScale().setVisibleLogicalRange({ from: before.from + fresh.length, to: before.to + fresh.length });
                 })
                 .catch(() => undefined) // a failed attempt is simply tried again on the next drag
                 .finally(() => {

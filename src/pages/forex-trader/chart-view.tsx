@@ -400,13 +400,10 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         const have = candlesRef.current;
         const fresh = candles.filter(c => !have.length || c.time < have[0].time);
         if (!fresh.length) return;
-        const ts = chartRef.current?.timeScale();
-        const range = ts?.getVisibleLogicalRange() ?? null;
         candlesRef.current = fresh.concat(have);
+        // the chart keeps the same candles in view when earlier ones are added on the left, so the view is left alone
         seriesRef.current?.setData(candlesRef.current.map(toBar));
         refreshDerived();
-        // the new candles sit on the left, so shift the view by their number to keep the same ones on screen
-        if (ts && range) ts.setVisibleLogicalRange({ from: range.from + fresh.length, to: range.to + fresh.length });
     };
     prependRef.current = prepend;
 
