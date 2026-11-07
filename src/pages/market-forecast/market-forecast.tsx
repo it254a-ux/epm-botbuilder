@@ -36,6 +36,7 @@ const TIMEFRAMES = [
 const HORIZONS = [24, 48, 96]; // candles ahead
 const PATHS = 4;
 const HISTORY = 420;
+const OLDER_PAGE = 1000; // candles fetched each time the chart is dragged back to its oldest candle
 const MAX_WAIT_MS = 8 * 60 * 1000;
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
@@ -64,16 +65,19 @@ function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T>
  * The newest candles of a market. Each call opens its own short connection to Deriv's public data feed and
  * closes it again, so it never depends on a shared connection that might have dropped in between.
  */
-async function loadCandles(symbol: string, sec: number): Promise<Bar[]> {
+async function loadCandles(symbol: string, sec: number, end: number | 'latest' = 'latest', count = HISTORY): Promise<Bar[]> {
     const socket = new DerivWS();
     try {
         await within(socket.connect(), 12000, 'Could not reach the market data. Please check your internet and try again.');
         const d = await within(
-            socket.send<CandleMsg>({ ticks_history: symbol, style: 'candles', granularity: sec, end: 'latest', count: HISTORY, adjust_start_time: 1 }),
+            socket.send<CandleMsg>({ ticks_history: symbol, style: 'candles', granularity: sec, end, count, adjust_start_time: 1 }),
             15000,
             'Loading candles took too long. Please try again.'
         );
-        if (!d.candles?.length) throw new Error('No candles came back for this market.');
+        if (!d.candles?.length) {
+            if (end !== 'latest') return [];
+            throw new Error('No candles came back for this market.');
+        }
         return d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
     } finally {
         socket.disconnect();
@@ -105,6 +109,10 @@ const MarketForecast = () => {
     const highRef = useRef<ISeriesApi<'Line'> | null>(null);
     const linesRef = useRef<IPriceLine[]>([]);
     const busyRef = useRef(false);
+    const olderKeyRef = useRef({ symbol: '', sec: 0 }); // identifies which market/size the loaded candles belong to
+    const barsRef = useRef<Bar[]>([]); // every real candle on the chart, oldest first
+    const olderBusyRef = useRef(false);
+    const noOlderRef = useRef(false); // true once the market has no earlier candles
     const aliveRef = useRef(true);
     useEffect(() => {
         aliveRef.current = true;
@@ -135,9 +143,37 @@ const MarketForecast = () => {
         lowRef.current = chart.addLineSeries({ color: 'rgba(66,133,244,0.8)', lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
         highRef.current = chart.addLineSeries({ color: 'rgba(66,133,244,0.8)', lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
         chartRef.current = chart;
+        // dragging back near the oldest candle loads earlier ones, so the history never runs out
+        const onRange = (range: { from: number; to: number } | null) => {
+            const bars = barsRef.current;
+            if (!range || range.from > 30 || bars.length === 0 || olderBusyRef.current || noOlderRef.current) return;
+            const key = olderKeyRef.current;
+            olderBusyRef.current = true;
+            loadCandles(key.symbol, key.sec, bars[0].time - 1, OLDER_PAGE)
+                .then(older => {
+                    if (!aliveRef.current || key !== olderKeyRef.current) return;
+                    const have = barsRef.current[0]?.time ?? Infinity;
+                    const fresh = older.filter(b => b.time < have);
+                    if (fresh.length === 0) {
+                        noOlderRef.current = true;
+                        return;
+                    }
+                    const before = chart.timeScale().getVisibleLogicalRange();
+                    barsRef.current = fresh.concat(barsRef.current);
+                    realRef.current?.setData(barsRef.current.map(toPoint));
+                    // keep the same candles on screen after the new ones are added on the left
+                    if (before) chart.timeScale().setVisibleLogicalRange({ from: before.from + fresh.length, to: before.to + fresh.length });
+                })
+                .catch(() => undefined) // a failed attempt is simply tried again on the next drag
+                .finally(() => {
+                    olderBusyRef.current = false;
+                });
+        };
+        chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
         const resize = new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth, height: el.clientHeight }));
         resize.observe(el);
         return () => {
+            chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
             resize.disconnect();
             chart.remove();
             chartRef.current = null;
@@ -159,9 +195,14 @@ const MarketForecast = () => {
         clearForecast();
         setMessage('');
         setIsError(false);
+        const key = { symbol, sec };
+        olderKeyRef.current = key;
+        barsRef.current = [];
+        noOlderRef.current = false;
         loadCandles(symbol, sec)
             .then(bars => {
                 if (off) return;
+                barsRef.current = bars;
                 realRef.current?.setData(bars.map(toPoint));
                 chartRef.current?.timeScale().fitContent();
             })
@@ -192,7 +233,10 @@ const MarketForecast = () => {
             const closed = closedOnly(all, sec, Math.floor(Date.now() / 1000));
             if (closed.length < 64) throw new Error('Not enough candles for this market right now.');
             clearForecast();
-            realRef.current?.setData(closed.map(toPoint));
+            // keep any older candles already loaded, only the newest part is replaced
+            const keep = barsRef.current.filter(b => b.time < closed[0].time);
+            barsRef.current = keep.concat(closed);
+            realRef.current?.setData(barsRef.current.map(toPoint));
 
             setMessage('Starting Kronos…');
             const started = await fetch('/api/kronos-forecast', {
@@ -249,7 +293,9 @@ const MarketForecast = () => {
                     realRef.current?.createPriceLine({ price, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title });
                 [line(read.levels.tp, 'TP', '#26a69a'), line(read.levels.sl, 'SL', '#ef5350')].forEach(l => l && linesRef.current.push(l));
             }
-            chartRef.current?.timeScale().fitContent();
+            // frame the recent candles and the forecast, even when much older history has been loaded
+            const last = barsRef.current.length - 1 + times.length;
+            chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, barsRef.current.length - 160), to: last + 3 });
             setResult(forecast);
             setMessage('');
         } catch (err) {
