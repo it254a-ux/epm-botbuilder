@@ -89,36 +89,34 @@ describe('Sweep Sniper', () => {
         expect(onTrigger).toHaveBeenCalledWith('SELL', expect.anything());
     });
 
-    it('after a page refresh it comes back with its settings and switches itself on again, without trading at that moment', () => {
+    it('after a page refresh it keeps its settings but stays OFF and never trades until you arm it', () => {
+        // even a sniper that was left armed (an old save, or armed when the page closed) must not switch itself on
         localStorage.setItem(
             'epm_sweep_sniper_v1',
-            JSON.stringify({ symbol: 'frxXAUUSD', count: 4, stake: '15', tp: '8', sl: '', on: true, fired: ['BUY'], savedAt: Date.now() - 60_000 })
+            JSON.stringify({ symbol: 'frxXAUUSD', count: 4, stake: '15', tp: '8', sl: '', on: true, fired: [], savedAt: Date.now() - 60_000 })
         );
         const onTrigger = jest.fn();
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={onTrigger} disabled={false} />);
-        tick(4100); // the first price after the refresh: it arms itself here
-        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('armed');
+        tick(4100);
+        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
         fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
-        expect((screen.getByDisplayValue('15') as HTMLInputElement).value).toBe('15');
-        expect(screen.getByText(/Switched back on after the page refreshed/)).toBeTruthy();
-        expect(screen.getByText('Disarm Sniper')).toBeTruthy();
+        expect((screen.getByDisplayValue('15') as HTMLInputElement).value).toBe('15'); // the settings are still remembered
+        expect(screen.getByText(/Arm Sniper/)).toBeTruthy();
+        tick(4131); // price touches the Sell SL line, but the sniper was never turned on
+        tick(3990);
         expect(onTrigger).not.toHaveBeenCalled();
-        tick(3990); // the BUY side had already fired before the refresh: it must not fire again
-        expect(onTrigger).not.toHaveBeenCalled();
-        tick(4131); // the SELL side is still live
+        // and once you do arm it, it works as normal
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4131);
         expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 4, stake: 15, takeProfit: 8, stopLoss: null });
     });
 
-    it('a sniper that was switched off stays off after a refresh, and so does one saved for another market', () => {
-        localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxXAUUSD', count: 2, stake: '', tp: '', sl: '', on: false, fired: [], savedAt: Date.now() }));
-        const a = render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
+    it('never saves the armed state, so a refresh can not switch it on', () => {
+        const onTrigger = setup({ sell: 4130, buy: 4000 });
         tick(4100);
-        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
-        a.unmount();
-        localStorage.setItem('epm_sweep_sniper_v1', JSON.stringify({ symbol: 'frxEURUSD', count: 2, stake: '', tp: '', sl: '', on: true, fired: [], savedAt: Date.now() }));
-        render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
-        tick(4100);
-        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        expect(JSON.parse(localStorage.getItem('epm_sweep_sniper_v1') ?? '{}').on).toBe(false);
+        expect(onTrigger).not.toHaveBeenCalled();
     });
 
     it('Breakout mode trades through the line: BUY when the Sell SL breaks, SELL when the Buy SL breaks', () => {

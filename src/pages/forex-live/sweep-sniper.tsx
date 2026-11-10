@@ -3,7 +3,7 @@ import { useDerivWS } from '@deriv/core';
 import { useMeasureContext } from '../forex-trader/measure-context';
 import { GUARD_COUNTS, armLevels, createBell, touched, tradeFor, type ArmedLevels, type SniperMode } from './price-guard';
 import type { GuardLevels } from './price-guard';
-import { loadSniper, saveSniper, shouldResume } from './sniper-storage';
+import { loadSniper, saveSniper } from './sniper-storage';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
 import type { Side } from './trade-engine';
@@ -48,14 +48,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [ringing, setRinging] = useState(false);
     const [last, setLast] = useState<number | null>(null);
     const [digits, setDigits] = useState<number | null>(null);
-    // what was set (and whether it was armed) before the page was refreshed
+    // the settings from before the page was refreshed. The sniper itself always starts OFF: it only switches on when you press Arm.
     const saved = useRef(loadSniper());
-    const pendingResume = useRef(shouldResume(saved.current, symbol));
     const [mode, setMode] = useState<SniperMode>(saved.current?.mode ?? 'reverse');
     const modeRef = useRef(mode);
     modeRef.current = mode;
-    const [resumed, setResumed] = useState(false);
-    const [soundReady, setSoundReady] = useState(true);
     const [count, setCount] = useState(saved.current?.count ?? 1);
     const [stake, setStake] = useState(saved.current?.stake ?? '');
     const panel = useMeasureContext();
@@ -143,7 +140,6 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             firstSymbol.current = false; // the first run is the page opening, not a market change
             return;
         }
-        pendingResume.current = false;
         onRef.current = false;
         firedRef.current = new Set();
         setOn(false);
@@ -153,7 +149,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
 
-    // remember the settings and the armed state, for a refresh (an armed sniper waiting to come back counts as armed)
+    // remember the settings for a refresh (never the armed state: the sniper stays off until you turn it on)
     useEffect(() => {
         saveSniper({
             symbol,
@@ -161,7 +157,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             stake,
             tp,
             sl,
-            on: on || pendingResume.current,
+            on: false,
             mode,
             fired: [...firedRef.current],
             savedAt: Date.now(),
@@ -216,34 +212,12 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         }
     };
     const disarm = () => {
-        pendingResume.current = false;
         onRef.current = false;
         setOn(false);
         applyArmed(null);
         void wake.current?.release?.();
         wake.current = null;
     };
-    // after a refresh the sniper switches itself on again as soon as it is signed in, has a price and has its lines;
-    // it never trades at that moment (it only watches what the price does from there)
-    useEffect(() => {
-        if (!pendingResume.current || on || disabled || last === null) return;
-        if (levels.sell === null && levels.buy === null) return;
-        pendingResume.current = false;
-        arm(saved.current?.fired);
-        setResumed(true);
-        // the browser only allows the bell after a tap on the page: the first tap or key press turns it on
-        setSoundReady(false);
-        const ready = () => {
-            bell.current!.unlock();
-            setSoundReady(true);
-            window.removeEventListener('pointerdown', ready);
-            window.removeEventListener('keydown', ready);
-        };
-        window.addEventListener('pointerdown', ready);
-        window.addEventListener('keydown', ready);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [last, levels.sell, levels.buy, disabled, on]);
-
     const silence = () => {
         bell.current!.stop();
         setRinging(false);
@@ -296,8 +270,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                 className='sniper__trigger'
                 onClick={toggle}
                 aria-expanded={open}
-                data-state={on ? 'armed' : pendingResume.current ? 'resuming' : 'off'}
-                title={`Sniper: ${on ? 'armed' : pendingResume.current ? 'switching back on' : 'off'}${on && status ? ` · ${status}` : ''}${on && !soundReady ? ' · tap the page once for sound' : ''}`}
+                data-state={on ? 'armed' : 'off'}
+                title={`Sniper: ${on ? 'armed' : 'off'}${on && status ? ` · ${status}` : ''}`}
             >
                 <span className='sniper__led' />
                 <span className='sniper__icon'>
@@ -323,12 +297,6 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                             ×
                         </button>
                     </header>
-
-                    {resumed && (
-                        <div className='sn-resumed'>
-                            Switched back on after the page refreshed.{!soundReady ? ' Tap anywhere once to turn the bell on.' : ''}
-                        </div>
-                    )}
 
                     {ringing && (
                         <button type='button' className='sn-alert' onClick={silence}>

@@ -2,9 +2,8 @@ import type { GuardGroup, SniperMode } from './price-guard';
 import type { Side } from './trade-engine';
 
 /**
- * What the Sweep Sniper remembers across a page refresh: the settings, and whether it was armed.
- * A sniper that was armed comes back armed (on the same market, within a day), so a refresh does not leave a
- * trade unwatched. The trades it already opened are remembered too, so their total take profit / stop loss keeps working.
+ * What the Sniper remembers across a page refresh: its settings only. It never switches itself back on: it stays off
+ * until the person presses Arm. The trades it already opened are remembered, so their total take profit / stop loss keeps working.
  */
 export interface SavedSniper {
     symbol: string;
@@ -20,8 +19,6 @@ export interface SavedSniper {
 
 const SNIPER_KEY = 'epm_sweep_sniper_v1';
 const GROUPS_KEY = 'epm_sweep_sniper_groups_v1';
-/** A sniper left armed longer ago than this is not switched on again by itself. */
-export const RESUME_WINDOW_MS = 24 * 60 * 60 * 1000;
 const GROUP_KEEP_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function loadSniper(storage: Pick<Storage, 'getItem'> = localStorage): SavedSniper | null {
@@ -52,11 +49,6 @@ export function saveSniper(s: SavedSniper, storage: Pick<Storage, 'setItem'> = l
     } catch {
         /* private mode or blocked storage: the sniper simply does not remember */
     }
-}
-
-/** Should a saved sniper switch itself on again? Only if it was armed, on this market, and recently. */
-export function shouldResume(saved: SavedSniper | null, symbol: string, now = Date.now()): boolean {
-    return !!saved && saved.on && saved.symbol === symbol && now - saved.savedAt < RESUME_WINDOW_MS;
 }
 
 export function loadGroups(now = Date.now(), storage: Pick<Storage, 'getItem'> = localStorage): GuardGroup[] {
