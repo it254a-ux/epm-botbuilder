@@ -31,6 +31,7 @@ const ict = require('../ict');
 const pdhMod = require('../pdh');
 const grabMod = require('../grab');
 const grabTg = require('../grab-telegram');
+const approachMod = require('../approach');
 const core = require('../signals-core');
 const store = require('../signals-store');
 const news = require('../news');
@@ -102,10 +103,13 @@ module.exports = async function handler(req, res) {
     const pdhEnabled = String(process.env.MTF_PDH || 'on').toLowerCase() !== 'off';
     const grabEnabled = String(process.env.GRAB_ENABLED || 'on').toLowerCase() === 'on';
     const grabCfg = grabTg.readGrabConfig();
+    // Heads-up when price nears the chart's Sell SL / Buy SL lines (APPROACH_ALERT=off switches it off). Never trades.
+    const approachCfg = approachMod.readApproachConfig();
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
     if (pdhEnabled) summary.pdh = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, alerts: 0 };
     if (grabEnabled) summary.grab = { waiting: 0, signals: 0, alerts: 0, newsHeld: 0 };
+    if (approachCfg.enabled) summary.approach = { alerts: 0 };
     const report = { ok: true, dry, mode: 'M15 direction + M5 entry', summary, markets: [] };
 
     let client;
@@ -180,6 +184,18 @@ module.exports = async function handler(req, res) {
                 const a = mtf.analyseMtf(c15, c5, now);
                 const closed5 = c5.filter(c => c.time + MTF_TF <= now);
                 summary.analysed++;
+                if (approachCfg.enabled) {
+                    try {
+                        entry.approach = await approachMod.runApproach({
+                            symbol, symbolName: info.underlying_symbol_name, kind: require('../engine').marketKind(info.market), c5, now, cfg: approachCfg,
+                            deps: { sql, write, send, deliver: deliverSignal, store, siteUrl: core.signalsPageUrl() },
+                        });
+                        summary.approach.alerts += (entry.approach.sent || []).filter(x => !String(x).includes('failed')).length;
+                    } catch (err) {
+                        entry.approach = { error: err.message };
+                        console.error(`signal-watch-mtf: approach ${symbol} failed:`, err.message);
+                    }
+                }
                 entry.signal = a.signal;
                 entry.bias = a.bias;
                 entry.m15 = a.m15Text;
