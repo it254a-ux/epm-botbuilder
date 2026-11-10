@@ -4,6 +4,8 @@ import {
     buildBuyRequest,
     buildSellRequest,
     errorText,
+    isRateLimit,
+    RATE_LIMIT_RETRY_MS,
     explainRefusal,
     formatMoney,
     mergePosition,
@@ -274,8 +276,15 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
             }
             setPending(n => n + 1);
             try {
-                const res = await api().send(buildBuyRequest(input));
+                const sentAt = Date.now();
+                let res = await api().send(buildBuyRequest(input));
+                // a burst of trades (several per trigger) can hit Deriv's rate limit: the refused ones are sent again at once, never dropped
+                for (let i = 0; res?.error && isRateLimit(res) && i < RATE_LIMIT_RETRY_MS.length; i++) {
+                    await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS[i]));
+                    res = await api().send(buildBuyRequest(input));
+                }
                 if (res?.error) throw res;
+                const confirmedMs = Date.now() - sentAt;
                 const b = res?.buy;
                 if (!b?.contract_id) throw new Error('Deriv did not confirm the trade.');
                 upsert({
@@ -297,7 +306,7 @@ export function useForexLive(isAuthorized: boolean, loginid: string) {
                 });
                 watch(Number(b.contract_id));
                 onOpened?.(Number(b.contract_id));
-                note('ok', `${input.side} ${input.symbol.replace(/^frx/, '')} opened · stake ${input.stake} · x${input.multiplier}`);
+                note('ok', `${input.side} ${input.symbol.replace(/^frx/, '')} opened · stake ${input.stake} · x${input.multiplier} · Deriv confirmed in ${confirmedMs} ms`);
                 return true;
             } catch (e) {
                 const why = errorText(e);

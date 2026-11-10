@@ -284,6 +284,16 @@ export function errorText(e: unknown): string {
     return typeof msg === 'string' && msg ? msg : 'Something went wrong. Please try again.';
 }
 
+/** Deriv answers a burst of requests with a "rate limit" error: the same request goes through a moment later. */
+export function isRateLimit(e: unknown): boolean {
+    const any = e as Raw | null;
+    const code = (any?.error as { code?: unknown } | undefined)?.code ?? (any as { code?: unknown } | null)?.code;
+    return code === 'RateLimit' || /rate ?limit|too many requests/i.test(errorText(e));
+}
+
+/** Waits before the 2nd, 3rd... try of a trade Deriv refused because of its rate limit (milliseconds). */
+export const RATE_LIMIT_RETRY_MS = [150, 350, 700];
+
 export interface PlanLevels {
     side: Side;
     entry: number;

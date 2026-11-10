@@ -130,4 +130,47 @@ describe('useForexLive: a trade never just disappears', () => {
         // old trades loaded from history do not spam the Activity list
         expect(result.current.log).toHaveLength(0);
     });
+    it('a trade Deriv refuses because of its rate limit is sent again until it goes through, so a burst never loses trades', async () => {
+        let buys = 0;
+        mockState.answer = req => {
+            if (req.buy) {
+                buys += 1;
+                return buys <= 2 ? { error: { code: 'RateLimit', message: 'You have reached the rate limit for buy.' } } : { buy: { contract_id: 77, buy_price: 10, purchase_time: 1 } };
+            }
+            if (req.portfolio) return { portfolio: { contracts: [] } };
+            return {};
+        };
+        const { result } = renderHook(() => useForexLive(true, 'CR1'));
+        await flushPromises();
+        let ok: boolean | undefined;
+        await act(async () => {
+            const p = result.current.openTrade({ side: 'BUY', symbol: 'frxXAUUSD', currency: 'USD', stake: 10, multiplier: 100, stopLoss: null, takeProfit: null });
+            await jest.advanceTimersByTimeAsync(2000);
+            ok = await p;
+        });
+        expect(buys).toBe(3);
+        expect(ok).toBe(true);
+    });
+
+    it('a refusal that is not a rate limit is not retried', async () => {
+        let buys = 0;
+        mockState.answer = req => {
+            if (req.buy) {
+                buys += 1;
+                return { error: { code: 'InvalidContractProposal', message: 'Minimum stake of 1 USD' } };
+            }
+            if (req.portfolio) return { portfolio: { contracts: [] } };
+            return {};
+        };
+        const { result } = renderHook(() => useForexLive(true, 'CR1'));
+        await flushPromises();
+        let ok: boolean | undefined;
+        await act(async () => {
+            const p = result.current.openTrade({ side: 'BUY', symbol: 'frxXAUUSD', currency: 'USD', stake: 10, multiplier: 100, stopLoss: null, takeProfit: null });
+            await jest.advanceTimersByTimeAsync(2000);
+            ok = await p;
+        });
+        expect(buys).toBe(1);
+        expect(ok).toBe(false);
+    });
 });

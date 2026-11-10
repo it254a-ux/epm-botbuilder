@@ -28,13 +28,35 @@ const fakeStore = () => {
 
 describe('approaching the SL lines', () => {
     it('finds the same two SL lines the chart draws, and says which one price is near', () => {
-        const far = approach.findApproach(candles(), 'forex', NOW, { atrFraction: 4 });
+        const far = approach.findApproach(candles(), 'forex', NOW, { atrFraction: 0 });
         expect(far.lines.map(l => l.side)).toEqual(['SELL', 'BUY']);
         expect(far.lines[0].level).toBeGreaterThan(far.price); // Sell SL is above price
         expect(far.lines[1].level).toBeLessThan(far.price); // Buy SL is below price
-        expect(far.lines.every(l => !l.near)).toBe(true); // about 7 and 13 candles' worth away: not yet
+        expect(far.lines.every(l => !l.near)).toBe(true); // price has not touched the Previous Day High or Low yet
         const close = approach.findApproach(candles(), 'forex', NOW, { atrFraction: 8 });
-        expect(close.lines.map(l => l.near)).toEqual([true, false]); // the Sell SL is within 8 candles' worth, the Buy SL is not
+        expect(close.lines.map(l => l.near)).toEqual([true, false]); // asked to warn 8 candles' worth early: only the High is that close
+    });
+
+    it('alerts the moment price touches the Previous Day High or Low, even if only a thin wick did, and not before', () => {
+        const base = candles();
+        const found0 = approach.findApproach(base, 'forex', NOW, { atrFraction: 0 });
+        const high = found0.lines[0].edge;
+        const low = found0.lines[1].edge;
+        const last = base[base.length - 1];
+        // a wick that just reaches the Previous Day High
+        const wick = base.slice(0, -1).concat([{ ...last, high: high + 0.01 }]);
+        const up = approach.findApproach(wick, 'forex', NOW, { atrFraction: 0 });
+        expect(up.lines.map(l => l.near)).toEqual([true, false]);
+        expect(up.lines[0].distance).toBeGreaterThan(0); // still short of the SL line itself
+        // a wick that only gets close does not count
+        const shy = base.slice(0, -1).concat([{ ...last, high: high - 0.5 }]);
+        expect(approach.findApproach(shy, 'forex', NOW, { atrFraction: 0 }).lines.map(l => l.near)).toEqual([false, false]);
+        // the Previous Day Low
+        const down = base.slice(0, -1).concat([{ ...last, low: low - 0.01 }]);
+        expect(approach.findApproach(down, 'forex', NOW, { atrFraction: 0 }).lines.map(l => l.near)).toEqual([false, true]);
+        // a touch a couple of candles ago (between two runs) still counts
+        const earlier = base.slice(0, -3).concat([{ ...base[base.length - 3], high: high + 0.01 }], base.slice(-2));
+        expect(approach.findApproach(earlier, 'forex', NOW, { atrFraction: 0 }).lines[0].near).toBe(true);
     });
 
     it('does nothing when there are too few candles', () => {
@@ -44,13 +66,14 @@ describe('approaching the SL lines', () => {
     it('the message names the line, the price and the distance, and says nothing was traded', () => {
         const found = approach.findApproach(candles(), 'forex', NOW, { atrFraction: 8 });
         const text = approach.formatApproach(found, found.lines[0], 'Gold/USD', { siteUrl: 'https://example.test/' });
-        expect(text).toContain('APPROACHING THE SELL SL LINE');
+        expect(text).toContain('touched the Prev Day High');
+        expect(text).toContain('about to reach the <b>Sell SL line');
         expect(text).toContain('Gold/USD');
         expect(text).toContain('Sniper');
         expect(text).toContain('nothing has been traded');
         expect(text).toContain('https://example.test/');
         const reached = { ...found.lines[0], distance: -0.4 };
-        expect(approach.formatApproach(found, reached, 'Gold/USD')).toContain('REACHED THE SELL SL LINE');
+        expect(approach.formatApproach(found, reached, 'Gold/USD')).toContain('has reached the <b>Sell SL line');
     });
 
     it('the chart picture can be drawn from the plan that goes with a line', () => {
@@ -89,6 +112,7 @@ describe('approaching the SL lines', () => {
     it('can be switched off', () => {
         expect(approach.readApproachConfig({ APPROACH_ALERT: 'off' }).enabled).toBe(false);
         expect(approach.readApproachConfig({}).enabled).toBe(true);
+        expect(approach.readApproachConfig({}).atrFraction).toBe(0);
         expect(approach.readApproachConfig({ APPROACH_ATR: '2' }).atrFraction).toBe(2);
     });
 });
