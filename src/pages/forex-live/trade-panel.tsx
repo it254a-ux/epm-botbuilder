@@ -85,21 +85,14 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefs.multiplier]);
 
-    // On a market, the stake box fills itself with the smallest stake Deriv accepts there. It is only a starting point:
-    // the person can clear it and type any amount (at or above that minimum), and that amount is remembered for the market.
+    // The stake box keeps what the person typed for each market. It is never raised on its own: Deriv decides what is
+    // allowed and its answer is shown in the Activity box.
     useEffect(() => {
         setStakeNote('');
         const mine = prefs.stakeBy?.[symbol];
-        if (mine !== undefined && mine !== '') {
-            if (mine !== prefs.stake) set({ stake: mine });
-            if (minStake && Number(mine) + 1e-9 < minStake) {
-                set({ stake: String(minStake) });
-            }
-        } else if (minStake) {
-            set({ stake: String(minStake) });
-        }
+        if (mine !== undefined && mine !== '' && mine !== prefs.stake) set({ stake: mine });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [minStake, symbol]);
+    }, [symbol]);
 
     // a market with different allowed multipliers: move to the closest one
     useEffect(() => {
@@ -110,10 +103,6 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
     const fire = (side: Side, opts?: FireOptions) => {
         if (disabled) return;
         const useStake = opts?.stake && opts.stake > 0 ? opts.stake : Number(prefs.stake);
-        if (minStake && useStake + 1e-9 < minStake) {
-            setStakeNote(`The smallest stake on this market is ${minStake}. Raise your stake to ${minStake} or more.`);
-            return;
-        }
         // Stop loss and take profit are both optional. What you type in the boxes is used as it is; the analysis
         // plan only fills a box you left empty, and only when you switched that option on (it is off by default).
         const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, useStake, prefs.multiplier) : null;

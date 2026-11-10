@@ -100,13 +100,12 @@ describe('TradePanel: market info, minimum stake and market-change notice', () =
         expect(screen.getByText('Min stake 1.64 USD')).toBeInTheDocument();
     });
 
-    it('fills the stake box with the smallest stake Deriv accepts, quietly, so the click is not refused', () => {
+    it('never raises the stake on its own: the typed stake is sent and Deriv decides', () => {
         const onTrade = jest.fn();
-        render(<TradePanel {...base} onTrade={onTrade} marketName='Vol 75' minStake={1.64} />);
-        expect(screen.getByLabelText(/^Stake/)).toHaveValue(1.64);
-        expect(screen.queryByRole('alert')).toBeNull();
+        render(<TradePanel {...base} onTrade={onTrade} marketName='Gold' minStake={50} />);
+        expect(screen.getByLabelText(/^Stake/)).toHaveValue(1);
         fireEvent.click(screen.getByRole('button', { name: /BUY/ }));
-        expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stake).toBe(1.64);
+        expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stake).toBe(1);
     });
 
     it('the person can clear the box and type any amount, and it is not overwritten', () => {
@@ -121,22 +120,20 @@ describe('TradePanel: market info, minimum stake and market-change notice', () =
         expect((onTrade.mock.calls[0][0] as TradeInput[])[0].stake).toBe(25);
     });
 
-    it('a stake chosen on a market comes back when returning to it; a new market starts at its own minimum', () => {
-        const { rerender } = render(<TradePanel {...base} onTrade={jest.fn()} minStake={1.64} />);
+    it('a stake chosen on a market comes back when returning to it', () => {
+        const { rerender } = render(<TradePanel {...base} onTrade={jest.fn()} />);
         fireEvent.change(screen.getByLabelText(/^Stake/), { target: { value: '25' } });
-        rerender(<TradePanel {...base} symbol='R_100' onTrade={jest.fn()} minStake={0.35} />);
-        expect(screen.getByLabelText(/^Stake/)).toHaveValue(0.35);
-        rerender(<TradePanel {...base} onTrade={jest.fn()} minStake={1.64} />);
+        rerender(<TradePanel {...base} symbol='R_100' onTrade={jest.fn()} />);
+        rerender(<TradePanel {...base} onTrade={jest.fn()} />);
         expect(screen.getByLabelText(/^Stake/)).toHaveValue(25);
     });
 
-    it('does not send a trade whose typed stake is below the minimum', () => {
+    it('sends a stake below the shown minimum instead of blocking it', () => {
         const onTrade = jest.fn();
         render(<TradePanel {...base} onTrade={onTrade} minStake={1.64} />);
         fireEvent.change(screen.getByLabelText(/^Stake/), { target: { value: '0.5' } });
         fireEvent.click(screen.getByRole('button', { name: /SELL/ }));
-        expect(onTrade).not.toHaveBeenCalled();
-        expect(screen.getByRole('alert')).toHaveTextContent(/smallest stake on this market is 1.64/);
+        expect(onTrade).toHaveBeenCalled();
     });
 
     it('shows the notice when the market changed', () => {
