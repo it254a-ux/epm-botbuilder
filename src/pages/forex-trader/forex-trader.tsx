@@ -43,12 +43,23 @@ interface Outcome {
     at: number;
 }
 
+// every candle size Deriv offers; the toolbar shows the QUICK ones and keeps the rest in a menu
 const TIMEFRAMES = [
-    { label: '1m', sec: 60 },
-    { label: '5m', sec: 300 },
-    { label: '15m', sec: 900 },
-    { label: '1h', sec: 3600 },
+    { label: '1m', sec: 60, group: 'Minutes' },
+    { label: '2m', sec: 120, group: 'Minutes' },
+    { label: '3m', sec: 180, group: 'Minutes' },
+    { label: '5m', sec: 300, group: 'Minutes' },
+    { label: '10m', sec: 600, group: 'Minutes' },
+    { label: '15m', sec: 900, group: 'Minutes' },
+    { label: '30m', sec: 1800, group: 'Minutes' },
+    { label: '1h', sec: 3600, group: 'Hours' },
+    { label: '2h', sec: 7200, group: 'Hours' },
+    { label: '4h', sec: 14400, group: 'Hours' },
+    { label: '8h', sec: 28800, group: 'Hours' },
+    { label: '1D', sec: 86400, group: 'Days' },
 ];
+const QUICK_TF = [60, 300, 900, 3600];
+const TF_GROUPS = ['Minutes', 'Hours', 'Days'];
 
 const STATUS_TEXT: Record<AiResult['status'], string> = {
     waiting_for_market: 'Waiting for the market to be good',
@@ -108,7 +119,10 @@ function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
             state: ['invalidated', 'target_reached', 'expired'].includes(a.state) ? 'no' : 'yes',
         });
     } else {
-        items.push({ label: 'Entry, stop loss and take profit (they appear after the sweep and the BOS)', state: 'wait' });
+        items.push({
+            label: 'Entry, stop loss and take profit (they appear after the sweep and the BOS)',
+            state: 'wait',
+        });
     }
     return items;
 }
@@ -171,10 +185,92 @@ function CandleClock({ seconds }: { seconds: number }) {
     const m = Math.floor((left % 3600) / 60);
     const sec = left % 60;
     const two = (n: number) => String(n).padStart(2, '0');
-    return <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>;
+    return (
+        <span className='forex-trader__clock'>{h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${two(m)}:${two(sec)}`}</span>
+    );
 }
 
-const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolChange, onPlan, onWatch, toolbarExtra, initialMode, hideChart, extraLines, onMarkets, resultHost, onOpenCompare, noAnalysis }: ForexTraderProps) => {
+/** TradingView-style candle size choice: the usual sizes as buttons, every size in a menu. */
+const TfBar = ({ tf, mode, onPick }: { tf: number; mode: 'h1' | 'mtf'; onPick: (sec: number) => void }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!open) return undefined;
+        const away = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+        document.addEventListener('mousedown', away);
+        document.addEventListener('keydown', esc);
+        return () => {
+            document.removeEventListener('mousedown', away);
+            document.removeEventListener('keydown', esc);
+        };
+    }, [open]);
+    const shown = TIMEFRAMES.filter(t => QUICK_TF.includes(t.sec) || t.sec === tf);
+    return (
+        <div className='forex-trader__tfs' ref={ref} role='group' aria-label='Candle size'>
+            {shown.map(t => (
+                <button
+                    key={t.sec}
+                    type='button'
+                    className={tf === t.sec && mode === 'h1' ? 'is-on' : ''}
+                    onClick={() => onPick(t.sec)}
+                >
+                    {t.label}
+                </button>
+            ))}
+            <button
+                type='button'
+                className={`forex-trader__tfs-more${open ? ' is-open' : ''}`}
+                aria-label='More candle sizes'
+                aria-expanded={open}
+                onClick={() => setOpen(o => !o)}
+            >
+                <i aria-hidden='true' />
+            </button>
+            {open && (
+                <div className='forex-trader__tfs-menu'>
+                    {TF_GROUPS.map(g => (
+                        <div key={g} className='forex-trader__tfs-group'>
+                            <span>{g}</span>
+                            {TIMEFRAMES.filter(t => t.group === g).map(t => (
+                                <button
+                                    key={t.sec}
+                                    type='button'
+                                    className={tf === t.sec && mode === 'h1' ? 'is-on' : ''}
+                                    onClick={() => {
+                                        onPick(t.sec);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ForexTrader = ({
+    variant = 'page',
+    panelWidth,
+    controlledSymbol,
+    onSymbolChange,
+    onPlan,
+    onWatch,
+    toolbarExtra,
+    initialMode,
+    hideChart,
+    extraLines,
+    onMarkets,
+    resultHost,
+    onOpenCompare,
+    noAnalysis,
+}: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
     const [symbols, setSymbols] = useState<SymbolInfo[]>([]);
@@ -213,10 +309,23 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         async (before: number): Promise<Candle[]> => {
             if (!ws) return [];
             const { symbol: sym, sec } = olderCtx.current;
-            const d = await ws.send<{ candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }> }>({
-                ticks_history: sym, style: 'candles', granularity: sec, end: before - 1, count: 1000, adjust_start_time: 1,
+            const d = await ws.send<{
+                candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
+            }>({
+                ticks_history: sym,
+                style: 'candles',
+                granularity: sec,
+                end: before - 1,
+                count: 1000,
+                adjust_start_time: 1,
             });
-            return (d.candles ?? []).map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+            return (d.candles ?? []).map(c => ({
+                time: c.epoch,
+                open: Number(c.open),
+                high: Number(c.high),
+                low: Number(c.low),
+                close: Number(c.close),
+            }));
         },
         [ws]
     );
@@ -288,16 +397,21 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         const usable = p && Number.isFinite(p.entry) && Number.isFinite(p.stopLoss) && Number.isFinite(p.takeProfit);
         const lv = mode === 'mtf' ? mtf?.levels : null;
         const levels = lv
-            ? ([
-                  ['Resistance', lv.resistance],
-                  ['Support', lv.support],
-                  ['Prev day high', lv.prevDayHigh],
-                  ['Prev day low', lv.prevDayLow],
-              ] as [string, number | null][])
+            ? (
+                  [
+                      ['Resistance', lv.resistance],
+                      ['Support', lv.support],
+                      ['Prev day high', lv.prevDayHigh],
+                      ['Prev day low', lv.prevDayLow],
+                  ] as [string, number | null][]
+              )
                   .filter(([, v]) => v !== null && Number.isFinite(v))
                   .map(([label, price]) => ({ label, price: price as number }))
             : [];
-        onPlanRef.current(usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, levels } : null, symbol);
+        onPlanRef.current(
+            usable ? { side: p.side, entry: p.entry, stopLoss: p.stopLoss, takeProfit: p.takeProfit, levels } : null,
+            symbol
+        );
     }, [mode, mtf, outcome, symbol]);
 
     // ---- the Sell SL / Buy SL lines, for a parent page's Price Guard
@@ -305,8 +419,8 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     onWatchRef.current = onWatch;
     // While the analysis is only watching, it draws both "if swept" stops. Once it has a plan it
     // draws one SL, which is used for its own side (a sell plan's SL is above, a buy plan's below).
-    const watched = mode === 'mtf' ? null : outcome?.analysis.watch ?? null;
-    const planned = mode === 'mtf' ? null : outcome?.analysis.plan ?? null;
+    const watched = mode === 'mtf' ? null : (outcome?.analysis.watch ?? null);
+    const planned = mode === 'mtf' ? null : (outcome?.analysis.plan ?? null);
     const watchSell = watched?.sell.stopLoss ?? (planned?.side === 'SELL' ? planned.stopLoss : null);
     const watchBuy = watched?.buy.stopLoss ?? (planned?.side === 'BUY' ? planned.stopLoss : null);
     useEffect(() => {
@@ -323,7 +437,6 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [extraKey, loading]);
 
-
     // ---- markets list
     useEffect(() => {
         if (!ws || !isConnected) return;
@@ -336,7 +449,8 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 if (onMarketsRef.current) {
                     const names: Record<string, string> = {};
                     list.forEach(a => {
-                        if (a.underlying_symbol && a.underlying_symbol_name) names[a.underlying_symbol] = a.underlying_symbol_name;
+                        if (a.underlying_symbol && a.underlying_symbol_name)
+                            names[a.underlying_symbol] = a.underlying_symbol_name;
                     });
                     onMarketsRef.current(names);
                 }
@@ -377,7 +491,10 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
             chartRef.current?.drawAnalysis(null, []);
             candlesRef.current = [];
         }
-        const count = Math.min(5000, Math.ceil(((mode === 'mtf' ? 2 : 15) * 86400) / effTf));
+        const count = Math.min(
+            5000,
+            Math.max(mode === 'mtf' ? 0 : 300, Math.ceil(((mode === 'mtf' ? 2 : 15) * 86400) / effTf))
+        );
 
         ws.subscribe(
             { ticks_history: symbol, style: 'candles', granularity: effTf, end: 'latest', count, adjust_start_time: 1 },
@@ -386,7 +503,13 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                 const d = data as {
                     error?: { message?: string };
                     candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
-                    ohlc?: { open_time: number; open: string | number; high: string | number; low: string | number; close: string | number };
+                    ohlc?: {
+                        open_time: number;
+                        open: string | number;
+                        high: string | number;
+                        low: string | number;
+                        close: string | number;
+                    };
                 };
                 if (d.error) {
                     setLoadError(d.error.message ?? 'Could not load candles');
@@ -413,8 +536,17 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                         chartRef.current?.setCandles(list);
                         drawKey.current = '';
                     }
-                    setDataDp(Math.max(2, ...candlesRef.current.slice(-50).map(c => Math.min(6, (String(c.close).split('.')[1] ?? '').length))));
-                    setLastPrice(candlesRef.current.length ? candlesRef.current[candlesRef.current.length - 1].close : null);
+                    setDataDp(
+                        Math.max(
+                            2,
+                            ...candlesRef.current
+                                .slice(-50)
+                                .map(c => Math.min(6, (String(c.close).split('.')[1] ?? '').length))
+                        )
+                    );
+                    setLastPrice(
+                        candlesRef.current.length ? candlesRef.current[candlesRef.current.length - 1].close : null
+                    );
                     setLoading(false);
                 } else if (d.ohlc) {
                     const c: Candle = {
@@ -467,20 +599,39 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         }
         setM15Error(null);
         ws.subscribe(
-            { ticks_history: symbol, style: 'candles', granularity: M15_SEC, end: 'latest', count: 400, adjust_start_time: 1 },
+            {
+                ticks_history: symbol,
+                style: 'candles',
+                granularity: M15_SEC,
+                end: 'latest',
+                count: 400,
+                adjust_start_time: 1,
+            },
             data => {
                 if (off) return;
                 const d = data as {
                     error?: { message?: string };
                     candles?: Array<{ epoch: number; open: number; high: number; low: number; close: number }>;
-                    ohlc?: { open_time: number; open: string | number; high: string | number; low: string | number; close: string | number };
+                    ohlc?: {
+                        open_time: number;
+                        open: string | number;
+                        high: string | number;
+                        low: string | number;
+                        close: string | number;
+                    };
                 };
                 if (d.error) {
                     setM15Error(d.error.message ?? 'Could not load M15 candles');
                     return;
                 }
                 if (d.candles) {
-                    const fresh = d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+                    const fresh = d.candles.map(c => ({
+                        time: c.epoch,
+                        open: Number(c.open),
+                        high: Number(c.high),
+                        low: Number(c.low),
+                        close: Number(c.close),
+                    }));
                     if (sameM15) {
                         const byTime = new Map<number, Candle>();
                         m15Ref.current.forEach(c => byTime.set(c.time, c));
@@ -492,7 +643,13 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     setM15Ready(true);
                     liveTick.current();
                 } else if (d.ohlc) {
-                    const c: Candle = { time: Number(d.ohlc.open_time), open: Number(d.ohlc.open), high: Number(d.ohlc.high), low: Number(d.ohlc.low), close: Number(d.ohlc.close) };
+                    const c: Candle = {
+                        time: Number(d.ohlc.open_time),
+                        open: Number(d.ohlc.open),
+                        high: Number(d.ohlc.high),
+                        low: Number(d.ohlc.low),
+                        close: Number(d.ohlc.close),
+                    };
                     const arr = m15Ref.current;
                     const last = arr[arr.length - 1];
                     if (last && last.time === c.time) arr[arr.length - 1] = c;
@@ -524,7 +681,11 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
     const outcomeRef = useRef<Outcome | null>(null);
     outcomeRef.current = outcome;
     const drawKey = useRef('');
-    const aiRun = useRef<{ lastCall: number; timer: number | null; lastKey: string }>({ lastCall: 0, timer: null, lastKey: '' });
+    const aiRun = useRef<{ lastCall: number; timer: number | null; lastKey: string }>({
+        lastCall: 0,
+        timer: null,
+        lastKey: '',
+    });
     const liveTick = useRef<() => void>(() => {});
 
     const compute = () => {
@@ -665,7 +826,19 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         setMtf(analyseMtf(m15Ref.current, candlesRef.current, nowSec));
         // only update (and redraw the chart) when something about the Previous Day setup really changed
         const r = analysePreviousDay(m15Ref.current, candlesRef.current, nowSec);
-        const key = [r.stage, r.side, r.levelPrice, r.footprint.count, r.sweep?.time, r.sweep?.price, r.rejection?.time, r.plan?.entry, r.plan?.stopLoss, r.signalTime, r.dataProblem].join('|');
+        const key = [
+            r.stage,
+            r.side,
+            r.levelPrice,
+            r.footprint.count,
+            r.sweep?.time,
+            r.sweep?.price,
+            r.rejection?.time,
+            r.plan?.entry,
+            r.plan?.stopLoss,
+            r.signalTime,
+            r.dataProblem,
+        ].join('|');
         if (key !== pdhKey.current) {
             pdhKey.current = key;
             setPdh(r);
@@ -750,10 +923,146 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
             : null;
     const plan = outcome?.analysis.plan;
     const fmt = (n: number) => n.toFixed(pipSize);
-    const tone = status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
+    const tone =
+        status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
 
     // the results card can live in a parent page's side column; it then has to carry the tool's own class so its styles still apply
     const renderResult = (node: JSX.Element) => (resultHost ? createPortal(node, resultHost) : node);
+
+    // the Trade setup button and its panel; on Forex Live it sits in the toolbar row above the chart
+    const inBar = hostedHere && !noAnalysis && variant !== 'panel';
+    const controlsBlock = (
+        <div ref={controlsRef} className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
+            <button
+                type='button'
+                className='forex-trader__head'
+                aria-expanded={setupOpen}
+                onClick={() => setSetupOpen(o => !o)}
+                title={setupOpen ? 'Minimise the trade setup' : 'Open the trade setup'}
+            >
+                <b>Trade setup</b>
+                <small>
+                    {info?.underlying_symbol_name ?? symbol} · {TIMEFRAMES.find(t => t.sec === tf)?.label}
+                    {mode === 'h1' && STRATEGIES.find(st => st.id === strategyId)
+                        ? ` · ${STRATEGIES.find(st => st.id === strategyId)?.name}`
+                        : ''}
+                </small>
+                <i aria-hidden='true' />
+            </button>
+            <div className='forex-trader__body' aria-hidden={!setupOpen}>
+                <div className='forex-trader__body-in'>
+                    <div className='forex-trader__row'>
+                        <MarketPicker
+                            symbols={symbols}
+                            value={symbol}
+                            onChange={s => {
+                                setSymbol(s);
+                                onSymbolChange?.(s);
+                            }}
+                        />
+                        <label className='forex-trader__tf'>
+                            <span>Timeframe</span>
+                            <select
+                                value={tf}
+                                onChange={e => {
+                                    setTf(Number(e.target.value));
+                                    if (mode !== 'h1') setMode('h1');
+                                }}
+                            >
+                                {TIMEFRAMES.map(t => (
+                                    <option key={t.sec} value={t.sec}>
+                                        {t.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className='forex-trader__cats' role='group' aria-label='Strategy categories'>
+                        {STRATEGY_CATEGORIES.map(c => {
+                            const open = openCat === c;
+                            const chosen =
+                                mode === 'h1' && category === c
+                                    ? STRATEGIES.find(st => st.id === strategyId)?.name
+                                    : undefined;
+                            return (
+                                <div
+                                    key={c}
+                                    className={`forex-trader__acc${open ? ' is-open' : ''}${chosen ? ' is-chosen' : ''}`}
+                                >
+                                    <button
+                                        type='button'
+                                        className='forex-trader__cat'
+                                        aria-expanded={open}
+                                        onClick={() => setOpenCat(o => (o === c ? null : c))}
+                                    >
+                                        <b>{c}</b>
+                                        {chosen && <small>{chosen}</small>}
+                                        <i aria-hidden='true' />
+                                    </button>
+                                    <div className='forex-trader__drop' aria-hidden={!open}>
+                                        <ul className='forex-trader__strats'>
+                                            {STRATEGIES.filter(st => st.category === c).map(st => (
+                                                <li key={st.id}>
+                                                    <button
+                                                        type='button'
+                                                        tabIndex={open ? 0 : -1}
+                                                        disabled={!st.ready}
+                                                        className={mode === 'h1' && strategyId === st.id ? 'is-on' : ''}
+                                                        onClick={() => {
+                                                            setCategory(c);
+                                                            setStrategyId(st.id);
+                                                            if (mode !== 'h1') setMode('h1');
+                                                            // done choosing: fold the list, and tuck the floating setup card away
+                                                            setOpenCat(null);
+                                                            if (resultHost) setSetupOpen(false);
+                                                        }}
+                                                    >
+                                                        <span>{st.name}</span>
+                                                        {!st.ready && <em>soon</em>}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <button
+                        type='button'
+                        className='forex-trader__analyse-btn'
+                        disabled={!canAnalyse}
+                        onClick={runAnalysis}
+                    >
+                        {aiBusy ? 'Reviewing…' : 'Re-analyse'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // the candle timer: on Forex Live it sits at the right end of the toolbar row, elsewhere over the chart's top-right corner
+    const liveButton = (
+        <button
+            type='button'
+            className={`forex-trader__live${!isConnected ? ' is-wait' : live ? ' is-on' : ' is-paused'}`}
+            onClick={() => setLive(l => !l)}
+            aria-label={
+                !isConnected ? 'Reconnecting' : live ? 'Prices updating. Click to pause.' : 'Paused. Click to resume.'
+            }
+            title={
+                !isConnected
+                    ? 'Reconnecting to the price feed…'
+                    : live
+                      ? 'Prices are updating. Click to pause.'
+                      : 'Paused. Click to resume.'
+            }
+        >
+            <CandleClock seconds={mode === 'mtf' ? 300 : tf} />
+        </button>
+    );
 
     return (
         <div
@@ -763,7 +1072,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
         >
             {noAnalysis && (
                 <div className='forex-trader__tfbar' role='group' aria-label='Candle size'>
-                    {TIMEFRAMES.map(t => (
+                    {TIMEFRAMES.filter(t => QUICK_TF.includes(t.sec) || t.sec === tf).map(t => (
                         <button
                             key={t.sec}
                             type='button'
@@ -778,102 +1087,31 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     ))}
                 </div>
             )}
+            {inBar && (
+                <div className='forex-trader__bar'>
+                    <TfBar
+                        tf={tf}
+                        mode={mode}
+                        onPick={sec => {
+                            setTf(sec);
+                            if (mode !== 'h1') setMode('h1');
+                        }}
+                    />
+                    <span className='forex-trader__bar-sep' aria-hidden='true' />
+                    <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
+                    <span className='forex-trader__bar-grow' aria-hidden='true' />
+                    {liveButton}
+                </div>
+            )}
             {toolbarExtra && (
-                <div className={`forex-trader__extra${setupOpen ? ' is-setup-open' : ''}`} style={extraBox ? { top: extraBox.top, height: extraBox.height } : undefined}>
+                <div
+                    className={`forex-trader__extra${inBar ? ' forex-trader__extra--below' : setupOpen ? ' is-setup-open' : ''}`}
+                    style={!inBar && extraBox ? { top: extraBox.top, height: extraBox.height } : undefined}
+                >
                     {toolbarExtra}
                 </div>
             )}
-            <div ref={controlsRef} className={`forex-trader__controls${setupOpen ? '' : ' is-collapsed'}`}>
-                <button
-                    type='button'
-                    className='forex-trader__head'
-                    aria-expanded={setupOpen}
-                    onClick={() => setSetupOpen(o => !o)}
-                    title={setupOpen ? 'Minimise the trade setup' : 'Open the trade setup'}
-                >
-                    <b>Trade setup</b>
-                    <small>
-                        {info?.underlying_symbol_name ?? symbol} · {TIMEFRAMES.find(t => t.sec === tf)?.label}
-                        {mode === 'h1' && STRATEGIES.find(st => st.id === strategyId) ? ` · ${STRATEGIES.find(st => st.id === strategyId)?.name}` : ''}
-                    </small>
-                    <i aria-hidden='true' />
-                </button>
-                <div className='forex-trader__body' aria-hidden={!setupOpen}>
-                    <div className='forex-trader__body-in'>
-                <div className='forex-trader__row'>
-                    <MarketPicker
-                        symbols={symbols}
-                        value={symbol}
-                        onChange={s => {
-                            setSymbol(s);
-                            onSymbolChange?.(s);
-                        }}
-                    />
-                    <label className='forex-trader__tf'>
-                        <span>Timeframe</span>
-                        <select
-                            value={tf}
-                            onChange={e => {
-                                setTf(Number(e.target.value));
-                                if (mode !== 'h1') setMode('h1');
-                            }}
-                        >
-                            {TIMEFRAMES.map(t => (
-                                <option key={t.sec} value={t.sec}>
-                                    {t.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                </div>
-
-                <div className='forex-trader__cats' role='group' aria-label='Strategy categories'>
-                    {STRATEGY_CATEGORIES.map(c => {
-                        const open = openCat === c;
-                        const chosen = mode === 'h1' && category === c ? STRATEGIES.find(st => st.id === strategyId)?.name : undefined;
-                        return (
-                            <div key={c} className={`forex-trader__acc${open ? ' is-open' : ''}${chosen ? ' is-chosen' : ''}`}>
-                                <button type='button' className='forex-trader__cat' aria-expanded={open} onClick={() => setOpenCat(o => (o === c ? null : c))}>
-                                    <b>{c}</b>
-                                    {chosen && <small>{chosen}</small>}
-                                    <i aria-hidden='true' />
-                                </button>
-                                <div className='forex-trader__drop' aria-hidden={!open}>
-                                    <ul className='forex-trader__strats'>
-                                        {STRATEGIES.filter(st => st.category === c).map(st => (
-                                            <li key={st.id}>
-                                                <button
-                                                    type='button'
-                                                    tabIndex={open ? 0 : -1}
-                                                    disabled={!st.ready}
-                                                    className={mode === 'h1' && strategyId === st.id ? 'is-on' : ''}
-                                                    onClick={() => {
-                                                        setCategory(c);
-                                                        setStrategyId(st.id);
-                                                        if (mode !== 'h1') setMode('h1');
-                                                        // done choosing: fold the list, and tuck the floating setup card away
-                                                        setOpenCat(null);
-                                                        if (resultHost) setSetupOpen(false);
-                                                    }}
-                                                >
-                                                    <span>{st.name}</span>
-                                                    {!st.ready && <em>soon</em>}
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                <button type='button' className='forex-trader__analyse-btn' disabled={!canAnalyse} onClick={runAnalysis}>
-                    {aiBusy ? 'Reviewing…' : 'Re-analyse'}
-                </button>
-                    </div>
-                </div>
-            </div>
+            {!inBar && controlsBlock}
 
             <div
                 className='forex-trader__chart-wrap'
@@ -882,7 +1120,10 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     panelWidth && panelWidth > 380
                         ? (() => {
                               // a wider panel gets a taller chart too (never taller than 62% of the screen)
-                              const h = Math.max(290, Math.min(Math.round(panelWidth * 0.62), Math.round(window.innerHeight * 0.62)));
+                              const h = Math.max(
+                                  290,
+                                  Math.min(Math.round(panelWidth * 0.62), Math.round(window.innerHeight * 0.62))
+                              );
                               return { height: `${h}px`, minHeight: `${h}px` };
                           })()
                         : undefined
@@ -895,15 +1136,7 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     {lastPrice !== null && <span>{fmt(lastPrice)}</span>}
                     <em>times in GMT</em>
                 </div>
-                <button
-                    type='button'
-                    className={`forex-trader__live${!isConnected ? ' is-wait' : live ? ' is-on' : ' is-paused'}`}
-                    onClick={() => setLive(l => !l)}
-                    aria-label={!isConnected ? 'Reconnecting' : live ? 'Prices updating. Click to pause.' : 'Paused. Click to resume.'}
-                    title={!isConnected ? 'Reconnecting to the price feed…' : live ? 'Prices are updating. Click to pause.' : 'Paused. Click to resume.'}
-                >
-                    <CandleClock seconds={mode === 'mtf' ? 300 : tf} />
-                </button>
+                {!inBar && liveButton}
                 {loading && !loadError && <div className='forex-trader__overlay'>Loading chart…</div>}
                 {loadError && <div className='forex-trader__overlay forex-trader__overlay--error'>{loadError}</div>}
                 {closed && !loadError && (
@@ -912,260 +1145,286 @@ const ForexTrader = ({ variant = 'page', panelWidth, controlledSymbol, onSymbolC
                     </div>
                 )}
                 {mode === 'mtf' && mtf && !closed && !loadError && !noAnalysis && (
-                    <div className={`forex-trader__badge forex-trader__badge--${mtf.signal === 'BUY' ? 'buy' : mtf.signal === 'SELL' ? 'sell' : 'wait'}`}>
+                    <div
+                        className={`forex-trader__badge forex-trader__badge--${mtf.signal === 'BUY' ? 'buy' : mtf.signal === 'SELL' ? 'sell' : 'wait'}`}
+                    >
                         {mtf.signal === 'WAIT' ? 'WAIT / NO SIGNAL' : `${mtf.signal} signal`}
                     </div>
                 )}
             </div>
 
             {renderResult(
-            <div className='forex-trader__result'>
-                {mode === 'mtf' && (
-                    <>
-                        <MtfPanel
-                            result={mtf}
-                            market={info?.underlying_symbol_name ?? symbol}
-                            fmt={fmt}
-                            loading={loading || !m15Ready}
-                            error={loadError ?? m15Error}
-                            marketClosed={closed}
-                        />
-                        <PdhPanel result={pdh} fmt={fmt} marketClosed={closed} />
-                    </>
-                )}
-                {mode === 'h1' && !outcome && (
-                    <p className='forex-trader__hint'>
-                        Choose a market and a strategy, then tap <b>Analyse</b>. The tool calculates the exact levels with
-                        code, draws them on the chart, and asks Gemini whether the setup looks clean. Signals only — it
-                        never trades, and no strategy wins every time.
-                    </p>
-                )}
-                {mode === 'h1' && outcome && (
-                    <>
-                        <div className='forex-trader__result-head'>
-                            <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
-                                {status && outcome && statusLabel(status, outcome.analysis)}
-                            </span>
-                            {aiCurrent && <span className='forex-trader__conf'>Confidence {outcome.ai!.confidence}%</span>}
-                            {!aiCurrent && !outcome.aiError && (
-                                <span className='forex-trader__muted'>AI review {aiBusy ? 'refreshing…' : 'queued…'}</span>
-                            )}
-                        </div>
-                        {conflict && codeSt && aiSt ? (
-                            <div className={`forex-trader__conflict forex-trader__conflict--${conflict}`}>
-                                <b>The code and the AI do not agree</b>
-                                <p>
-                                    <span>Code (exact rules):</span> {outcome.analysis.statusText.startsWith(statusLabel(codeSt, outcome.analysis))
-                                        ? outcome.analysis.statusText
-                                        : `${statusLabel(codeSt, outcome.analysis)} — ${outcome.analysis.statusText}`}
-                                </p>
-                                <p>
-                                    <span>AI (chart review):</span> {STATUS_TEXT[aiSt]}
-                                </p>
-                                <p className='forex-trader__conflict-verdict'>
-                                    {conflict === 'careful'
-                                        ? 'Do not enter yet. The rules are met, but the AI sees a problem (its reasoning is below). Wait until both agree.'
-                                        : conflict === 'eager'
-                                          ? 'The code decides: its rules are not met, so this is not a trade yet. The AI note below is advice only.'
-                                          : 'The code decides the status. The AI sees the market differently (reasoning below).'}
-                                </p>
-                            </div>
-                        ) : (
-                            status &&
-                            statusLabel(status, outcome.analysis) !== outcome.analysis.statusText && (
-                                <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
-                            )
-                        )}
-
-                        <h4 className='forex-trader__h'>Setup details</h4>
-                        <dl className='forex-trader__facts'>
-                            <dt>Strategy</dt>
-                            <dd>{outcome.analysis.strategyName}</dd>
-                            <dt>Market</dt>
-                            <dd>{info?.underlying_symbol_name ?? symbol}</dd>
-                            <dt>Trade timeframe</dt>
-                            <dd>
-                                {TIMEFRAMES.find(t => t.sec === tf)?.label} candles (enter on a candle close)
-                            </dd>
-                            <dt>Session now</dt>
-                            <dd>
-                                {outcome.analysis.sessionNow}
-                                {outcome.analysis.lastCandleTime ? ` · ${fmtTime(outcome.analysis.lastCandleTime)}` : ''}
-                            </dd>
-                            {outcome.analysis.lastPrice !== null && (
-                                <>
-                                    <dt>Price now</dt>
-                                    <dd>{fmt(outcome.analysis.lastPrice)}</dd>
-                                </>
-                            )}
-                            {outcome.analysis.range && (
-                                <>
-                                    <dt>Reference range</dt>
-                                    <dd>
-                                        {outcome.analysis.range.label} High {fmt(outcome.analysis.range.high)} · Low{' '}
-                                        {fmt(outcome.analysis.range.low)}
-                                    </dd>
-                                    <dt>Range measured</dt>
-                                    <dd>
-                                        {fmtTime(outcome.analysis.range.startTime)} →{' '}
-                                        {fmtTime(outcome.analysis.range.endTime)}
-                                        {outcome.analysis.range.note ? ` (${outcome.analysis.range.note})` : ''}
-                                    </dd>
-                                </>
-                            )}
-                            {outcome.analysis.sweep && (
-                                <>
-                                    <dt>Sweep</dt>
-                                    <dd>
-                                        {outcome.analysis.sweep.side === 'high' ? 'High' : 'Low'} swept to{' '}
-                                        {fmt(outcome.analysis.sweep.extreme)}, closed back inside{' '}
-                                        {fmtTime(outcome.analysis.sweep.confirmTime)}
-                                    </dd>
-                                </>
-                            )}
-                            {outcome.analysis.bos && (
-                                <>
-                                    <dt>Break of structure</dt>
-                                    <dd>
-                                        level {fmt(outcome.analysis.bos.level)}
-                                        {outcome.analysis.bos.bosTime
-                                            ? `, confirmed ${fmtTime(outcome.analysis.bos.bosTime)}`
-                                            : ', not confirmed yet'}
-                                    </dd>
-                                </>
-                            )}
-                            {outcome.analysis.fvg && (
-                                <>
-                                    <dt>Fair value gap</dt>
-                                    <dd>
-                                        {fmt(outcome.analysis.fvg.bottom)} to {fmt(outcome.analysis.fvg.top)}
-                                    </dd>
-                                </>
-                            )}
-                            {outcome.analysis.entryTime && (
-                                <>
-                                    <dt>Entry reached</dt>
-                                    <dd>{fmtTime(outcome.analysis.entryTime)}</dd>
-                                </>
-                            )}
-                            {outcome.analysis.candlesLeft !== null && outcome.analysis.state === 'ready' && (
-                                <>
-                                    <dt>Valid for</dt>
-                                    <dd>
-                                        about {outcome.analysis.candlesLeft} more candles (
-                                        {Math.round((outcome.analysis.candlesLeft * tf) / 60)} min)
-                                    </dd>
-                                </>
-                            )}
-                        </dl>
-
-                        {plan && (
-                            <>
-                                <h4 className='forex-trader__h'>{plan.planned ? 'Planned trade' : 'Trade plan'} ({plan.side})</h4>
-                                <div className='forex-trader__grid'>
-                                    <div className='is-entry'>
-                                        <span>
-                                            Entry {outcome.analysis.entryTime ? '(reached)' : '(pullback to BOS level)'}
-                                        </span>
-                                        <b>{fmt(plan.entry)}</b>
-                                    </div>
-                                    <div className='is-sl'>
-                                        <span>Stop loss</span>
-                                        <b>{fmt(plan.stopLoss)}</b>
-                                    </div>
-                                    <div className='is-tp'>
-                                        <span>Take profit</span>
-                                        <b>{fmt(plan.takeProfit)}</b>
-                                    </div>
-                                    <div>
-                                        <span>Risk : Reward</span>
-                                        <b>1 : {plan.rr.toFixed(2)}</b>
-                                    </div>
-                                    <div>
-                                        <span>Risk (price)</span>
-                                        <b>{fmt(plan.risk)}</b>
-                                    </div>
-                                    <div>
-                                        <span>Midpoint</span>
-                                        <b>{fmt(plan.midpoint)}</b>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {outcome.analysis.watch && outcome.analysis.range && (
-                            <>
-                                <h4 className='forex-trader__h'>Planned trades (dashed lines, not active yet)</h4>
-                                <p className='forex-trader__muted'>
-                                    Price is closer to the {outcome.analysis.watch.nearest === 'sell' ? 'HIGH' : 'LOW'}, so
-                                    that side is the one to watch first.
-                                </p>
-                                {([outcome.analysis.watch.sell, outcome.analysis.watch.buy] as const).map(sc => (
-                                    <div
-                                        key={sc.side}
-                                        className={`forex-trader__scenario forex-trader__scenario--${sc.side === 'SELL' ? 'sell' : 'buy'}${
-                                            (sc.side === 'SELL') === (outcome.analysis.watch!.nearest === 'sell') ? ' is-near' : ''
-                                        }`}
-                                    >
-                                        <b>
-                                            If the {sc.side === 'SELL' ? 'HIGH' : 'LOW'} is swept → {sc.side}
-                                        </b>
-                                        <ol>
-                                            <li>
-                                                Price pushes {sc.side === 'SELL' ? 'above' : 'below'} {fmt(sc.trigger)}
-                                            </li>
-                                            <li>A {TIMEFRAMES.find(t => t.sec === tf)?.label} candle closes back inside the range</li>
-                                            <li>
-                                                Enter {sc.side} at {fmt(sc.entry)}, stop loss {fmt(sc.stopLoss)}
-                                                {sc.slBasis === 'sweep'
-                                                    ? ' (real sweep extreme + room)'
-                                                    : ` (rule: ${sc.side === 'SELL' ? 'high' : 'low'} ${sc.side === 'SELL' ? '+' : '−'} 1 × ATR + ¼ ATR; moves to the real sweep extreme once price sweeps)`}
-                                                , take profit {fmt(sc.takeProfit)}
-                                            </li>
-                                        </ol>
-                                        <span className='forex-trader__muted'>
-                                            RR 1 : {sc.rr.toFixed(2)} · price is {fmt(sc.distance)} away
-                                            {sc.distanceAtr !== null ? ` (${sc.distanceAtr.toFixed(1)} × ATR)` : ''}
-                                        </span>
-                                    </div>
-                                ))}
-                            </>
-                        )}
-
-                        {outcome.analysis.stages.length > 0 && (
-                            <>
-                                <h4 className='forex-trader__h'>Setup stages</h4>
-                                <ol className='forex-trader__stages'>
-                                    {outcome.analysis.stages.map(st => (
-                                        <li key={st.label} className={`is-${st.state}`}>
-                                            <span>{st.state === 'done' ? '✔' : st.state === 'now' ? '●' : '○'}</span> {st.label}
-                                        </li>
-                                    ))}
-                                </ol>
-                            </>
-                        )}
-
-                        <h4 className='forex-trader__h'>Before you enter</h4>
-                        <ul className='forex-trader__check'>
-                            {checklist(outcome.analysis, closed).map(c => (
-                                <li key={c.label} className={`is-${c.state}`}>
-                                    <span>{c.state === 'yes' ? '✔' : c.state === 'no' ? '✖' : '○'}</span> {c.label}
-                                </li>
-                            ))}
-                        </ul>
-
-                        {aiCurrent && outcome.ai?.reasoning && <p className='forex-trader__reasoning'>{outcome.ai.reasoning}</p>}
-                        {[...(outcome.analysis.warnings ?? []), ...(aiCurrent ? outcome.ai?.warnings ?? [] : [])].map((w, i) => (
-                            <p key={i} className='forex-trader__warn'>
-                                ⚠ {w}
-                            </p>
-                        ))}
-                        <p className='forex-trader__muted'>
-                            Live: recalculated {new Date(outcome.at).toISOString().slice(11, 19)} GMT from the real candles. Signals only: no strategy wins every time.
+                <div className='forex-trader__result'>
+                    {mode === 'mtf' && (
+                        <>
+                            <MtfPanel
+                                result={mtf}
+                                market={info?.underlying_symbol_name ?? symbol}
+                                fmt={fmt}
+                                loading={loading || !m15Ready}
+                                error={loadError ?? m15Error}
+                                marketClosed={closed}
+                            />
+                            <PdhPanel result={pdh} fmt={fmt} marketClosed={closed} />
+                        </>
+                    )}
+                    {mode === 'h1' && !outcome && (
+                        <p className='forex-trader__hint'>
+                            Choose a market and a strategy, then tap <b>Analyse</b>. The tool calculates the exact
+                            levels with code, draws them on the chart, and asks Gemini whether the setup looks clean.
+                            Signals only — it never trades, and no strategy wins every time.
                         </p>
-                    </>
-                )}
-            </div>
+                    )}
+                    {mode === 'h1' && outcome && (
+                        <>
+                            <div className='forex-trader__result-head'>
+                                <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
+                                    {status && outcome && statusLabel(status, outcome.analysis)}
+                                </span>
+                                {aiCurrent && (
+                                    <span className='forex-trader__conf'>Confidence {outcome.ai!.confidence}%</span>
+                                )}
+                                {!aiCurrent && !outcome.aiError && (
+                                    <span className='forex-trader__muted'>
+                                        AI review {aiBusy ? 'refreshing…' : 'queued…'}
+                                    </span>
+                                )}
+                            </div>
+                            {conflict && codeSt && aiSt ? (
+                                <div className={`forex-trader__conflict forex-trader__conflict--${conflict}`}>
+                                    <b>The code and the AI do not agree</b>
+                                    <p>
+                                        <span>Code (exact rules):</span>{' '}
+                                        {outcome.analysis.statusText.startsWith(statusLabel(codeSt, outcome.analysis))
+                                            ? outcome.analysis.statusText
+                                            : `${statusLabel(codeSt, outcome.analysis)} — ${outcome.analysis.statusText}`}
+                                    </p>
+                                    <p>
+                                        <span>AI (chart review):</span> {STATUS_TEXT[aiSt]}
+                                    </p>
+                                    <p className='forex-trader__conflict-verdict'>
+                                        {conflict === 'careful'
+                                            ? 'Do not enter yet. The rules are met, but the AI sees a problem (its reasoning is below). Wait until both agree.'
+                                            : conflict === 'eager'
+                                              ? 'The code decides: its rules are not met, so this is not a trade yet. The AI note below is advice only.'
+                                              : 'The code decides the status. The AI sees the market differently (reasoning below).'}
+                                    </p>
+                                </div>
+                            ) : (
+                                status &&
+                                statusLabel(status, outcome.analysis) !== outcome.analysis.statusText && (
+                                    <p className='forex-trader__code-status'>{outcome.analysis.statusText}</p>
+                                )
+                            )}
+
+                            <h4 className='forex-trader__h'>Setup details</h4>
+                            <dl className='forex-trader__facts'>
+                                <dt>Strategy</dt>
+                                <dd>{outcome.analysis.strategyName}</dd>
+                                <dt>Market</dt>
+                                <dd>{info?.underlying_symbol_name ?? symbol}</dd>
+                                <dt>Trade timeframe</dt>
+                                <dd>{TIMEFRAMES.find(t => t.sec === tf)?.label} candles (enter on a candle close)</dd>
+                                <dt>Session now</dt>
+                                <dd>
+                                    {outcome.analysis.sessionNow}
+                                    {outcome.analysis.lastCandleTime
+                                        ? ` · ${fmtTime(outcome.analysis.lastCandleTime)}`
+                                        : ''}
+                                </dd>
+                                {outcome.analysis.lastPrice !== null && (
+                                    <>
+                                        <dt>Price now</dt>
+                                        <dd>{fmt(outcome.analysis.lastPrice)}</dd>
+                                    </>
+                                )}
+                                {outcome.analysis.range && (
+                                    <>
+                                        <dt>Reference range</dt>
+                                        <dd>
+                                            {outcome.analysis.range.label} High {fmt(outcome.analysis.range.high)} · Low{' '}
+                                            {fmt(outcome.analysis.range.low)}
+                                        </dd>
+                                        <dt>Range measured</dt>
+                                        <dd>
+                                            {fmtTime(outcome.analysis.range.startTime)} →{' '}
+                                            {fmtTime(outcome.analysis.range.endTime)}
+                                            {outcome.analysis.range.note ? ` (${outcome.analysis.range.note})` : ''}
+                                        </dd>
+                                    </>
+                                )}
+                                {outcome.analysis.sweep && (
+                                    <>
+                                        <dt>Sweep</dt>
+                                        <dd>
+                                            {outcome.analysis.sweep.side === 'high' ? 'High' : 'Low'} swept to{' '}
+                                            {fmt(outcome.analysis.sweep.extreme)}, closed back inside{' '}
+                                            {fmtTime(outcome.analysis.sweep.confirmTime)}
+                                        </dd>
+                                    </>
+                                )}
+                                {outcome.analysis.bos && (
+                                    <>
+                                        <dt>Break of structure</dt>
+                                        <dd>
+                                            level {fmt(outcome.analysis.bos.level)}
+                                            {outcome.analysis.bos.bosTime
+                                                ? `, confirmed ${fmtTime(outcome.analysis.bos.bosTime)}`
+                                                : ', not confirmed yet'}
+                                        </dd>
+                                    </>
+                                )}
+                                {outcome.analysis.fvg && (
+                                    <>
+                                        <dt>Fair value gap</dt>
+                                        <dd>
+                                            {fmt(outcome.analysis.fvg.bottom)} to {fmt(outcome.analysis.fvg.top)}
+                                        </dd>
+                                    </>
+                                )}
+                                {outcome.analysis.entryTime && (
+                                    <>
+                                        <dt>Entry reached</dt>
+                                        <dd>{fmtTime(outcome.analysis.entryTime)}</dd>
+                                    </>
+                                )}
+                                {outcome.analysis.candlesLeft !== null && outcome.analysis.state === 'ready' && (
+                                    <>
+                                        <dt>Valid for</dt>
+                                        <dd>
+                                            about {outcome.analysis.candlesLeft} more candles (
+                                            {Math.round((outcome.analysis.candlesLeft * tf) / 60)} min)
+                                        </dd>
+                                    </>
+                                )}
+                            </dl>
+
+                            {plan && (
+                                <>
+                                    <h4 className='forex-trader__h'>
+                                        {plan.planned ? 'Planned trade' : 'Trade plan'} ({plan.side})
+                                    </h4>
+                                    <div className='forex-trader__grid'>
+                                        <div className='is-entry'>
+                                            <span>
+                                                Entry{' '}
+                                                {outcome.analysis.entryTime ? '(reached)' : '(pullback to BOS level)'}
+                                            </span>
+                                            <b>{fmt(plan.entry)}</b>
+                                        </div>
+                                        <div className='is-sl'>
+                                            <span>Stop loss</span>
+                                            <b>{fmt(plan.stopLoss)}</b>
+                                        </div>
+                                        <div className='is-tp'>
+                                            <span>Take profit</span>
+                                            <b>{fmt(plan.takeProfit)}</b>
+                                        </div>
+                                        <div>
+                                            <span>Risk : Reward</span>
+                                            <b>1 : {plan.rr.toFixed(2)}</b>
+                                        </div>
+                                        <div>
+                                            <span>Risk (price)</span>
+                                            <b>{fmt(plan.risk)}</b>
+                                        </div>
+                                        <div>
+                                            <span>Midpoint</span>
+                                            <b>{fmt(plan.midpoint)}</b>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {outcome.analysis.watch && outcome.analysis.range && (
+                                <>
+                                    <h4 className='forex-trader__h'>Planned trades (dashed lines, not active yet)</h4>
+                                    <p className='forex-trader__muted'>
+                                        Price is closer to the{' '}
+                                        {outcome.analysis.watch.nearest === 'sell' ? 'HIGH' : 'LOW'}, so that side is
+                                        the one to watch first.
+                                    </p>
+                                    {([outcome.analysis.watch.sell, outcome.analysis.watch.buy] as const).map(sc => (
+                                        <div
+                                            key={sc.side}
+                                            className={`forex-trader__scenario forex-trader__scenario--${sc.side === 'SELL' ? 'sell' : 'buy'}${
+                                                (sc.side === 'SELL') === (outcome.analysis.watch!.nearest === 'sell')
+                                                    ? ' is-near'
+                                                    : ''
+                                            }`}
+                                        >
+                                            <b>
+                                                If the {sc.side === 'SELL' ? 'HIGH' : 'LOW'} is swept → {sc.side}
+                                            </b>
+                                            <ol>
+                                                <li>
+                                                    Price pushes {sc.side === 'SELL' ? 'above' : 'below'}{' '}
+                                                    {fmt(sc.trigger)}
+                                                </li>
+                                                <li>
+                                                    A {TIMEFRAMES.find(t => t.sec === tf)?.label} candle closes back
+                                                    inside the range
+                                                </li>
+                                                <li>
+                                                    Enter {sc.side} at {fmt(sc.entry)}, stop loss {fmt(sc.stopLoss)}
+                                                    {sc.slBasis === 'sweep'
+                                                        ? ' (real sweep extreme + room)'
+                                                        : ` (rule: ${sc.side === 'SELL' ? 'high' : 'low'} ${sc.side === 'SELL' ? '+' : '−'} 1 × ATR + ¼ ATR; moves to the real sweep extreme once price sweeps)`}
+                                                    , take profit {fmt(sc.takeProfit)}
+                                                </li>
+                                            </ol>
+                                            <span className='forex-trader__muted'>
+                                                RR 1 : {sc.rr.toFixed(2)} · price is {fmt(sc.distance)} away
+                                                {sc.distanceAtr !== null ? ` (${sc.distanceAtr.toFixed(1)} × ATR)` : ''}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+
+                            {outcome.analysis.stages.length > 0 && (
+                                <>
+                                    <h4 className='forex-trader__h'>Setup stages</h4>
+                                    <ol className='forex-trader__stages'>
+                                        {outcome.analysis.stages.map(st => (
+                                            <li key={st.label} className={`is-${st.state}`}>
+                                                <span>
+                                                    {st.state === 'done' ? '✔' : st.state === 'now' ? '●' : '○'}
+                                                </span>{' '}
+                                                {st.label}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </>
+                            )}
+
+                            <h4 className='forex-trader__h'>Before you enter</h4>
+                            <ul className='forex-trader__check'>
+                                {checklist(outcome.analysis, closed).map(c => (
+                                    <li key={c.label} className={`is-${c.state}`}>
+                                        <span>{c.state === 'yes' ? '✔' : c.state === 'no' ? '✖' : '○'}</span> {c.label}
+                                    </li>
+                                ))}
+                            </ul>
+
+                            {aiCurrent && outcome.ai?.reasoning && (
+                                <p className='forex-trader__reasoning'>{outcome.ai.reasoning}</p>
+                            )}
+                            {[
+                                ...(outcome.analysis.warnings ?? []),
+                                ...(aiCurrent ? (outcome.ai?.warnings ?? []) : []),
+                            ].map((w, i) => (
+                                <p key={i} className='forex-trader__warn'>
+                                    ⚠ {w}
+                                </p>
+                            ))}
+                            <p className='forex-trader__muted'>
+                                Live: recalculated {new Date(outcome.at).toISOString().slice(11, 19)} GMT from the real
+                                candles. Signals only: no strategy wins every time.
+                            </p>
+                        </>
+                    )}
+                </div>
             )}
         </div>
     );

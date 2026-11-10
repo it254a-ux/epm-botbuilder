@@ -137,20 +137,22 @@
         }
     }
 
-    // opens the compare-charts pop-up; sits left of the LIVE button of the chart
+    // opens the compare-charts pop-up; sits in the empty space at the chart's bottom-right, clear of the price and time scales
     &__compare-btn {
         position: absolute;
-        top: 8px;
-        right: 200px;
+        top: auto;
+        bottom: 42px;
+        right: 96px;
         z-index: 7;
-        padding: 3px 11px;
-        border: 1px solid color-mix(in srgb, var(--text-prominent) 20%, transparent);
+        padding: 2px 10px;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 16%, transparent);
         border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
+        font-size: 10.5px;
+        font-weight: 400;
+        letter-spacing: 0.01em;
         cursor: pointer;
-        color: var(--text-prominent);
-        background: color-mix(in srgb, var(--general-main-1) 82%, transparent);
+        color: color-mix(in srgb, var(--text-prominent) 82%, transparent);
+        background: color-mix(in srgb, var(--general-main-1) 78%, transparent);
         backdrop-filter: blur(8px);
 
         &:hover {

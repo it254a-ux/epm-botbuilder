@@ -1154,3 +1154,208 @@
         }
     }
 }
+
+/* ------------------------------------------------------------------
+   Toolbar row above the chart (Forex Live): candle sizes, Trade setup and the bot on one line,
+   laid out like TradingView's own toolbar. Small type, nothing bold.
+   ------------------------------------------------------------------ */
+.forex-trader__bar {
+    position: relative;
+    z-index: 12;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(30, 36, 50, 0.78), rgba(15, 19, 29, 0.78));
+    box-shadow:
+        0 8px 22px -14px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.forex-trader__bar-sep {
+    flex: none;
+    width: 1px;
+    height: 16px;
+    background: rgba(148, 163, 184, 0.24);
+}
+
+// candle sizes
+.forex-trader__tfs {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+
+    button {
+        height: 24px;
+        min-width: 28px;
+        padding: 0 7px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: #aab4c5;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        cursor: pointer;
+        transition:
+            background 0.18s ease,
+            color 0.18s ease;
+
+        &:hover {
+            background: rgba(148, 163, 184, 0.14);
+            color: #eef2f8;
+        }
+
+        &.is-on {
+            background: rgba(246, 211, 107, 0.16);
+            color: #f6d36b;
+            box-shadow: inset 0 0 0 1px rgba(246, 211, 107, 0.32);
+        }
+    }
+}
+
+.forex-trader__tfs-more {
+    position: relative;
+    min-width: 20px !important;
+    padding: 0 !important;
+
+    i {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 5px;
+        height: 5px;
+        margin: -4px 0 0 -3px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform 0.25s ease;
+    }
+
+    &.is-open i {
+        margin-top: -1px;
+        transform: rotate(225deg);
+    }
+}
+
+.forex-trader__tfs-menu {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 8px);
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 4px 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(30, 36, 50, 0.97), rgba(14, 18, 28, 0.97));
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: forex-trader-menu-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+
+    .forex-trader__tfs-group {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 56px;
+
+        > span {
+            padding: 0 7px 3px;
+            font-size: 8.5px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #7d8799;
+        }
+
+        button {
+            justify-content: flex-start;
+            text-align: left;
+        }
+    }
+}
+
+@keyframes forex-trader-menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+    }
+}
+
+// Trade setup: its button sits in the row; the panel opens over the chart. The row's items slide over as it opens.
+.forex-trader__bar-setup {
+    position: relative;
+    flex: none;
+    width: 108px;
+    height: 26px;
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+
+    &.is-open {
+        width: 340px;
+    }
+
+    .forex-trader__controls {
+        position: absolute !important;
+        z-index: 8;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        box-sizing: border-box;
+    }
+
+    .forex-trader__controls.is-collapsed {
+        height: 26px;
+        padding: 0 8px !important;
+        border-radius: 8px !important;
+        display: flex;
+        align-items: center;
+
+        .forex-trader__head {
+            height: 24px;
+            width: 100%;
+        }
+    }
+}
+
+// the timer at the right end of the row
+.forex-trader__bar-grow {
+    flex: 1 1 auto;
+}
+
+.forex-trader__bar .forex-trader__live {
+    position: static;
+    right: auto;
+    top: auto;
+    flex: none;
+    height: 20px;
+}
+
+// the bot stays where it was: on its own line under the toolbar row, beside the drawing tools
+.forex-trader--result-out .forex-trader__extra.forex-trader__extra--below {
+    top: 108px;
+    left: 86px;
+    transition: none;
+}
+
+// on a wide screen the page is a grid: the toolbar row takes the whole first row and the chart the second
+.forex-trader--result-out .forex-trader__bar {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    margin-bottom: 8px;
+}
+
+@media (min-width: 1100px) {
+    .forex-trader--result-out:not(.forex-trader--panel) .forex-trader__chart-wrap {
+        grid-row: 2 !important;
+    }
+}
