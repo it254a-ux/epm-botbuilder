@@ -81,6 +81,62 @@
         }
     }
 
+    // keeps the chart's place in the page while the chart box itself is lifted to the full height of the screen
+    &__slot {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+
+        > .forex-live__chartcol {
+            flex: 1 1 auto;
+        }
+    }
+
+    // the chart as tall as the whole window, in the same column and the same width as before
+    &__chartcol.is-tall {
+        position: fixed;
+        z-index: 10001;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+    }
+
+    // the "make the chart as tall as the screen" button, in the chart's top-right corner
+    &__tall-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        z-index: 8;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid color-mix(in srgb, var(--text-prominent) 20%, transparent);
+        border-radius: 7px;
+        cursor: pointer;
+        color: var(--text-prominent);
+        background: color-mix(in srgb, var(--general-main-1) 82%, transparent);
+        backdrop-filter: blur(8px);
+        transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+
+        &:hover {
+            background: color-mix(in srgb, var(--general-main-1) 60%, var(--text-prominent) 14%);
+            border-color: color-mix(in srgb, var(--text-prominent) 40%, transparent);
+        }
+
+        &:active {
+            transform: scale(0.92);
+        }
+
+        &.is-on {
+            border-color: rgba(245, 192, 70, 0.7);
+            color: #f5c046;
+        }
+    }
+
     // opens the compare-charts pop-up; sits left of the LIVE button of the chart
     &__compare-btn {
         position: absolute;

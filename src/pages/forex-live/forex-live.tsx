@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
@@ -79,7 +79,10 @@ const ForexLive = observer(() => {
     // the market is shared with the Forex Trader page (see shared-picks)
     const [symbol, setSymbol] = useSharedPick('symbol', DEFAULT_SYMBOL, true);
     const [plan, setPlan] = useState<{ plan: ReportedPlan | null; symbol: string }>({ plan: null, symbol: '' });
-    const [guardLevels, setGuardLevels] = useState<{ levels: GuardLevels; symbol: string }>({ levels: { sell: null, buy: null }, symbol: '' });
+    const [guardLevels, setGuardLevels] = useState<{ levels: GuardLevels; symbol: string }>({
+        levels: { sell: null, buy: null },
+        symbol: '',
+    });
     const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
     // the trades each touch of a Price Guard line opened, watched together
     const groups = useRef<GuardGroup[]>(loadGroups());
@@ -117,10 +120,8 @@ const ForexLive = observer(() => {
 
     const currency = client?.currency || (authData as any)?.currency || '';
 
-    const { positions, log, pending, openTrade, closeTrades, clearClosed, minStakes, probeMinStake, streamAt } = useForexLive(
-        isAuthorized,
-        activeLoginid
-    );
+    const { positions, log, pending, openTrade, closeTrades, clearClosed, minStakes, probeMinStake, streamAt } =
+        useForexLive(isAuthorized, activeLoginid);
     const multipliers = useMultipliers(symbol, isAuthorized);
 
     // readable market names, the multiplier chosen in the trade panel, and a notice when the market changes
@@ -186,7 +187,16 @@ const ForexLive = observer(() => {
 
     // Trades opened together (a Price Guard touch or one click with a total take profit / stop loss): one touch of a line opens the chosen number of trades and remembers them as a group
     const newGroup = useCallback((side: Side, takeProfit: number | null, stopLoss: number | null) => {
-        const group: GuardGroup = { uid: ++groupUid.current, at: Date.now(), active: true, side, ids: [], takeProfit, stopLoss, done: false };
+        const group: GuardGroup = {
+            uid: ++groupUid.current,
+            at: Date.now(),
+            active: true,
+            side,
+            ids: [],
+            takeProfit,
+            stopLoss,
+            done: false,
+        };
         groups.current = [...groups.current, group];
         return (id: number) => {
             group.ids.push(id);
@@ -194,8 +204,15 @@ const ForexLive = observer(() => {
         };
     }, []);
     const guardFire = useCallback(
-        (side: Side, s: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }) => {
-            fireRef.current?.(side, { count: s.count, stake: s.stake ?? undefined, onOpened: newGroup(side, s.takeProfit, s.stopLoss) });
+        (
+            side: Side,
+            s: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }
+        ) => {
+            fireRef.current?.(side, {
+                count: s.count,
+                stake: s.stake ?? undefined,
+                onOpened: newGroup(side, s.takeProfit, s.stopLoss),
+            });
         },
         [newGroup]
     );
@@ -227,12 +244,15 @@ const ForexLive = observer(() => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [positions, groupsTick]
     );
-    const changeGroup = useCallback((uid: number, patch: { takeProfit?: number | null; stopLoss?: number | null; active?: boolean }) => {
-        const g = groups.current.find(x => x.uid === uid);
-        if (!g) return;
-        Object.assign(g, patch);
-        setGroupsTick(n => n + 1);
-    }, []);
+    const changeGroup = useCallback(
+        (uid: number, patch: { takeProfit?: number | null; stopLoss?: number | null; active?: boolean }) => {
+            const g = groups.current.find(x => x.uid === uid);
+            if (!g) return;
+            Object.assign(g, patch);
+            setGroupsTick(n => n + 1);
+        },
+        []
+    );
     const closeGroup = useCallback(
         (uid: number) => {
             const g = groups.current.find(x => x.uid === uid);
@@ -265,7 +285,72 @@ const ForexLive = observer(() => {
     const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
     const tradesDrawn = lines.length > 0;
 
+    // ---- the chart as tall as the whole screen (its width stays as it is). It is the same chart box, lifted to the full height of the window.
+    const slotRef = useRef<HTMLDivElement>(null);
+    const colRef = useRef<HTMLDivElement>(null);
+    const [tall, setTall] = useState(false);
+    const [tallBox, setTallBox] = useState<{ left: number; width: number; dx: number; dy: number } | null>(null);
+    const measureSlot = () => {
+        const r = slotRef.current?.getBoundingClientRect();
+        return r ? { left: r.left, width: r.width } : null;
+    };
+    const toggleTall = () => {
+        if (tall) {
+            setTall(false);
+            setTallBox(null);
+            return;
+        }
+        const box = measureSlot();
+        if (!box) return;
+        setTallBox({ ...box, dx: 0, dy: 0 });
+        setTall(true);
+    };
+    // the box is placed from the window's top-left corner; if some parent changes what "fixed" means, the first measurement corrects it
+    const corrected = useRef(false);
+    useLayoutEffect(() => {
+        if (!tall) {
+            corrected.current = false;
+            return;
+        }
+        const el = colRef.current;
+        if (!el || !tallBox || corrected.current) return;
+        corrected.current = true;
+        const r = el.getBoundingClientRect();
+        const dy = -r.top;
+        const dx = tallBox.left - r.left;
+        if (Math.abs(dy) > 0.5 || Math.abs(dx) > 0.5) setTallBox(b => (b ? { ...b, dx: b.dx + dx, dy: b.dy + dy } : b));
+    }, [tall, tallBox]);
+    useEffect(() => {
+        if (!tall) return undefined;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') toggleTall();
+        };
+        // the page can be resized while the chart is tall (the browser's own full screen, say): the width follows the page column
+        const onResize = () => {
+            const box = measureSlot();
+            if (box) {
+                corrected.current = false;
+                setTallBox({ ...box, dx: 0, dy: 0 });
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        window.addEventListener('resize', onResize);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            window.removeEventListener('resize', onResize);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tall]);
+    useEffect(() => {
+        if (phone && tall) {
+            setTall(false);
+            setTallBox(null);
+        }
+    }, [phone, tall]);
+
     const openCompare = useCallback(() => {
+        setTall(false);
+        setTallBox(null);
         rootRef.current?.scrollTo({ top: 0 });
         setCompare(true);
     }, []);
@@ -292,59 +377,117 @@ const ForexLive = observer(() => {
                 />
             )}
             <div className='forex-live__top'>
-                <div className='forex-live__chartcol'>
-                    {phone && (
-                        <QuickBar
-                            symbol={symbol}
-                            marketName={marketName}
-                            disabled={!isAuthorized}
-                            pending={pending}
-                            onFire={side => fireRef.current?.(side)}
-                            open={{ count: allOpen.open, profit: Math.round(allOpen.profit * 100) / 100, currency }}
-                            streamAt={streamAt}
-                            onOpenTrades={() => setTab('trade')}
-                        />
-                    )}
-                    <ForexTrader
-                        variant='page'
-                        controlledSymbol={symbol}
-                        onSymbolChange={setSymbol}
-                        onPlan={onPlan}
-                        onWatch={onWatch}
-                        toolbarExtra={
-                            <SweepSniper
-                                symbol={symbol}
-                                currency={currency}
-                                levels={guardLevels.symbol === symbol ? guardLevels.levels : { sell: null, buy: null }}
-                                onTrigger={guardFire}
-                                status={guardStatus}
-                                disabled={!isAuthorized}
+                {(() => {
+                    const col = (
+                        <div
+                            ref={colRef}
+                            className={`forex-live__chartcol${tall ? ' is-tall' : ''}`}
+                            style={
+                                tall && tallBox
+                                    ? { left: tallBox.left + tallBox.dx, top: tallBox.dy, width: tallBox.width }
+                                    : undefined
+                            }
+                        >
+                            {!phone && (
+                                <button
+                                    type='button'
+                                    className={`forex-live__tall-btn${tall ? ' is-on' : ''}`}
+                                    onClick={toggleTall}
+                                    aria-pressed={tall}
+                                    title={tall ? 'Back to normal size (Esc)' : 'Make the chart as tall as the screen'}
+                                    aria-label={
+                                        tall ? 'Back to normal chart size' : 'Make the chart as tall as the screen'
+                                    }
+                                >
+                                    <svg
+                                        viewBox='0 0 24 24'
+                                        width='15'
+                                        height='15'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        strokeWidth='1.8'
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        aria-hidden='true'
+                                    >
+                                        {tall ? (
+                                            <path d='M9 4v4a1 1 0 0 1-1 1H4M15 4v4a1 1 0 0 0 1 1h4M9 20v-4a1 1 0 0 0-1-1H4M15 20v-4a1 1 0 0 1 1-1h4' />
+                                        ) : (
+                                            <path d='M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4' />
+                                        )}
+                                    </svg>
+                                </button>
+                            )}
+                            {phone && (
+                                <QuickBar
+                                    symbol={symbol}
+                                    marketName={marketName}
+                                    disabled={!isAuthorized}
+                                    pending={pending}
+                                    onFire={side => fireRef.current?.(side)}
+                                    open={{
+                                        count: allOpen.open,
+                                        profit: Math.round(allOpen.profit * 100) / 100,
+                                        currency,
+                                    }}
+                                    streamAt={streamAt}
+                                    onOpenTrades={() => setTab('trade')}
+                                />
+                            )}
+                            <ForexTrader
+                                variant='page'
+                                controlledSymbol={symbol}
+                                onSymbolChange={setSymbol}
+                                onPlan={onPlan}
+                                onWatch={onWatch}
+                                toolbarExtra={
+                                    <SweepSniper
+                                        symbol={symbol}
+                                        currency={currency}
+                                        levels={
+                                            guardLevels.symbol === symbol
+                                                ? guardLevels.levels
+                                                : { sell: null, buy: null }
+                                        }
+                                        onTrigger={guardFire}
+                                        status={guardStatus}
+                                        disabled={!isAuthorized}
+                                    />
+                                }
+                                extraLines={lines}
+                                onMarkets={setNames}
+                                resultHost={resultHost}
+                                onOpenCompare={openCompare}
+                                noAnalysis={phone}
                             />
-                        }
-                        extraLines={lines}
-                        onMarkets={setNames}
-                        resultHost={resultHost}
-                        onOpenCompare={openCompare}
-                        noAnalysis={phone}
-                    />
-                    {!phone && (
-                    <button
-                        type='button'
-                        className='forex-live__compare-btn'
-                        onClick={openCompare}
-                        title='Open 2 or 4 charts of this market, each with its own candle size'
-                    >
-                        Compare charts
-                    </button>
-                    )}
-                    {tradesDrawn && (
-                        <div className='forex-live__legend'>
-                            <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
-                            <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
-                            <em>at their entry price, with live profit</em>
+                            {!phone && (
+                                <button
+                                    type='button'
+                                    className='forex-live__compare-btn'
+                                    onClick={openCompare}
+                                    title='Open 2 or 4 charts of this market, each with its own candle size'
+                                >
+                                    Compare charts
+                                </button>
+                            )}
+                            {tradesDrawn && (
+                                <div className='forex-live__legend'>
+                                    <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
+                                    <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
+                                    <em>at their entry price, with live profit</em>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
+                    );
+                    // on a computer the chart box sits in a slot that keeps its place in the page while the box is lifted to full height
+                    return phone ? (
+                        col
+                    ) : (
+                        <div ref={slotRef} className='forex-live__slot'>
+                            {col}
+                        </div>
+                    );
+                })()}
 
                 <aside className='forex-live__side'>
                     <TradePanel
@@ -365,7 +508,12 @@ const ForexLive = observer(() => {
                     />
 
                     <div className='forex-live__pane' data-pane='trade'>
-                        <GroupsPanel rows={groupRows} currency={currency} onChange={changeGroup} onCloseAll={closeGroup} />
+                        <GroupsPanel
+                            rows={groupRows}
+                            currency={currency}
+                            onChange={changeGroup}
+                            onCloseAll={closeGroup}
+                        />
                         <PositionsPanel
                             positions={positions}
                             currency={currency}
@@ -389,7 +537,12 @@ const ForexLive = observer(() => {
             {phone && (
                 <nav className='fl-tabs' aria-label='Forex Live sections'>
                     {TABS.map(t => (
-                        <button key={t.key} type='button' className={tab === t.key ? 'is-on' : ''} onClick={() => setTab(t.key)}>
+                        <button
+                            key={t.key}
+                            type='button'
+                            className={tab === t.key ? 'is-on' : ''}
+                            onClick={() => setTab(t.key)}
+                        >
                             <i aria-hidden>{t.icon}</i>
                             <span>{t.label}</span>
                         </button>
