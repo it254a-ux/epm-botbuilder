@@ -30,6 +30,7 @@
     }
 
     &__head {
+        flex: none;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -72,6 +73,7 @@
     }
 
     &__chips {
+        flex: none;
         display: flex;
         gap: 8px;
         padding: 0 18px 12px;

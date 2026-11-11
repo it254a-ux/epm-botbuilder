@@ -14,6 +14,16 @@ interface Props {
 export const shortCode = (symbol: string) => symbol.replace(/^(frx|cry)/, '');
 
 const CHIP_ORDER = ['forex', 'commodities', 'indices', 'cryptocurrency', 'synthetic_index'];
+const PRETTY: Record<string, string> = {
+    forex: 'Forex',
+    commodities: 'Commodities',
+    indices: 'Indices',
+    cryptocurrency: 'Crypto',
+    synthetic_index: 'Synthetic indices',
+};
+/** Forex, Crypto, Synthetic indices… instead of the raw codes the server sends. */
+const pretty = (id: string, given?: string) =>
+    PRETTY[id] ?? given ?? id.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
 
 const Mark = ({ text, q }: { text: string; q: string }) => {
     const at = q ? text.toLowerCase().indexOf(q) : -1;
@@ -38,7 +48,7 @@ const MarketSearchModal = ({ symbols, value, onPick, onClose }: Props) => {
     const chips = useMemo(() => {
         const seen = new Map<string, string>();
         symbols.forEach(s => {
-            if (s.market && !seen.has(s.market)) seen.set(s.market, s.market_display_name ?? s.market);
+            if (s.market && !seen.has(s.market)) seen.set(s.market, pretty(s.market, s.market_display_name));
         });
         return Array.from(seen.entries()).sort((a, b) => {
             const ia = CHIP_ORDER.indexOf(a[0]);
@@ -63,7 +73,15 @@ const MarketSearchModal = ({ symbols, value, onPick, onClose }: Props) => {
             .filter(s => chip === 'all' || s.market === chip)
             .map(s => ({ s, r: rank(s) }))
             .filter(x => x.r >= 0)
-            .sort((a, b) => a.r - b.r || a.s.underlying_symbol_name.localeCompare(b.s.underlying_symbol_name))
+            .sort((a, b) => {
+                const ga = CHIP_ORDER.indexOf(a.s.market);
+                const gb = CHIP_ORDER.indexOf(b.s.market);
+                return (
+                    a.r - b.r ||
+                    (ga === -1 ? 99 : ga) - (gb === -1 ? 99 : gb) ||
+                    a.s.underlying_symbol_name.localeCompare(b.s.underlying_symbol_name)
+                );
+            })
             .map(x => x.s)
             .slice(0, 300);
     }, [symbols, q, chip]);
@@ -160,11 +178,11 @@ const MarketSearchModal = ({ symbols, value, onPick, onClose }: Props) => {
                             </span>
                             <span className='msm__desc'>
                                 <Mark text={s.underlying_symbol_name} q={q} />
-                                <em>{s.submarket_display_name ?? s.market_display_name}</em>
+                                {s.submarket_display_name && <em>{s.submarket_display_name}</em>}
                                 {s.exchange_is_open === 0 && <em className='is-closed'>closed</em>}
                             </span>
                             <span className='msm__src'>
-                                {s.market_display_name ?? s.market}
+                                {pretty(s.market, s.market_display_name)}
                                 <b>Deriv</b>
                             </span>
                         </button>
