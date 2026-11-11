@@ -111,9 +111,10 @@
     // the "make the chart as tall as the screen" button, in the chart's top-right corner
     &__tall-btn {
         position: absolute;
-        top: 6px;
-        right: 8px;
-        z-index: 8;
+        // inside the right end of the toolbar row, above it (the row has its own background)
+        top: 19px;
+        right: 22px;
+        z-index: 14;
         display: grid;
         place-items: center;
         width: 24px;
