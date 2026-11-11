@@ -1109,7 +1109,7 @@ const ForexTrader = ({
         if (!el || typeof ResizeObserver === 'undefined') return undefined;
         const ro = new ResizeObserver(() => {
             const w = el.clientWidth;
-            setBarSize(w >= 1000 ? 'xl' : w >= 860 ? 'l' : w >= 700 ? 'm' : 's');
+            setBarSize(w >= 1030 ? 'xl' : w >= 890 ? 'l' : w >= 730 ? 'm' : 's');
         });
         ro.observe(el);
         return () => ro.disconnect();

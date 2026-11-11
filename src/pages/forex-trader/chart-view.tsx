@@ -191,7 +191,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         if (!host) return;
         const th = readTheme(host);
         const themeOptions = (t: Theme) => ({
-            layout: { background: { color: t.bg }, textColor: t.text, fontSize: 11, fontFamily: t.font },
+            layout: { background: { color: t.bg }, textColor: t.text, fontSize: 10, fontFamily: t.font },
             grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
             rightPriceScale: { borderColor: t.border },
             timeScale: { borderColor: t.border },
