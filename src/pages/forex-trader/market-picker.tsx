@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MarketSearchModal, { shortCode } from './market-search-modal';
 
 export interface MarketSymbol {
     underlying_symbol: string;
@@ -56,7 +57,7 @@ const MarketPicker = ({ symbols, value, onChange, variant = 'field' }: Props) =>
     useEffect(() => {
         if (!open) return;
         const away = (e: MouseEvent | TouchEvent) => {
-            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+            if (!bar && rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
         };
         document.addEventListener('mousedown', away);
         document.addEventListener('touchstart', away);
@@ -107,10 +108,15 @@ const MarketPicker = ({ symbols, value, onChange, variant = 'field' }: Props) =>
                         <path d='M15 15l5 5' />
                     </svg>
                 )}
-                <span className='market-picker__current'>{current ? current.underlying_symbol_name : value}</span>
+                <span className='market-picker__current'>
+                    {bar ? shortCode(value) : current ? current.underlying_symbol_name : value}
+                </span>
                 {!bar && <span className={`market-picker__arrow${open ? ' is-open' : ''}`}>▾</span>}
             </button>
-            {open && (
+            {open && bar && (
+                <MarketSearchModal symbols={symbols} value={value} onPick={pick} onClose={() => setOpen(false)} />
+            )}
+            {open && !bar && (
                 <div className={`market-picker__menu${bar ? ' market-picker__menu--bar' : ''}`}>
                     <input
                         className='market-picker__search'
@@ -126,7 +132,7 @@ const MarketPicker = ({ symbols, value, onChange, variant = 'field' }: Props) =>
                                 ? g.items.filter(
                                       s =>
                                           s.underlying_symbol_name.toLowerCase().includes(q) ||
-                                          s.underlying_symbol.toLowerCase().includes(q)
+                                          shortCode(s.underlying_symbol).toLowerCase().includes(q)
                                   )
                                 : g.items;
                             if (searching && items.length === 0) return null;

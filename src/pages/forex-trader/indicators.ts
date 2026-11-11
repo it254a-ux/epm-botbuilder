@@ -21,7 +21,10 @@ export function sma(candles: Candle[], period: number): Series {
 
 /** Exponential moving average of the closes (starts from the simple average of the first `period` closes). */
 export function ema(candles: Candle[], period: number): Series {
-    return emaOf(candles.map(c => c.close), period);
+    return emaOf(
+        candles.map(c => c.close),
+        period
+    );
 }
 
 function emaOf(values: (number | null)[], period: number): Series {
@@ -94,8 +97,78 @@ export function rsi(candles: Candle[], period = 14): Series {
     return out;
 }
 
+/** Highest high and lowest low of the last `period` candles (Donchian channel). */
+export function donchian(candles: Candle[], period = 20): { upper: Series; lower: Series } {
+    const upper: Series = candles.map(() => null);
+    const lower: Series = candles.map(() => null);
+    for (let i = period - 1; i < candles.length; i += 1) {
+        let hi = -Infinity;
+        let lo = Infinity;
+        for (let j = i - period + 1; j <= i; j += 1) {
+            hi = Math.max(hi, candles[j].high);
+            lo = Math.min(lo, candles[j].low);
+        }
+        upper[i] = hi;
+        lower[i] = lo;
+    }
+    return { upper, lower };
+}
+
+/** Average true range (Wilder smoothing). */
+export function atr(candles: Candle[], period = 14): Series {
+    const out: Series = candles.map(() => null);
+    if (candles.length <= period) return out;
+    const tr = (i: number) =>
+        Math.max(
+            candles[i].high - candles[i].low,
+            Math.abs(candles[i].high - candles[i - 1].close),
+            Math.abs(candles[i].low - candles[i - 1].close)
+        );
+    let sum = 0;
+    for (let i = 1; i <= period; i += 1) sum += tr(i);
+    let prev = sum / period;
+    out[period] = prev;
+    for (let i = period + 1; i < candles.length; i += 1) {
+        prev = (prev * (period - 1) + tr(i)) / period;
+        out[i] = prev;
+    }
+    return out;
+}
+
+/** Stochastic oscillator: %K over `period` candles smoothed by `smooth`, and %D (3-candle average of %K). */
+export function stochastic(candles: Candle[], period = 14, smooth = 3): { k: Series; d: Series } {
+    const raw: Series = candles.map(() => null);
+    for (let i = period - 1; i < candles.length; i += 1) {
+        let hi = -Infinity;
+        let lo = Infinity;
+        for (let j = i - period + 1; j <= i; j += 1) {
+            hi = Math.max(hi, candles[j].high);
+            lo = Math.min(lo, candles[j].low);
+        }
+        raw[i] = hi === lo ? 50 : ((candles[i].close - lo) / (hi - lo)) * 100;
+    }
+    const avg = (src: Series, n: number): Series =>
+        src.map((_, i) => {
+            if (i < n - 1) return null;
+            let t = 0;
+            for (let j = i - n + 1; j <= i; j += 1) {
+                const v = src[j];
+                if (v === null) return null;
+                t += v;
+            }
+            return t / n;
+        });
+    const k = avg(raw, smooth);
+    return { k, d: avg(k, 3) };
+}
+
 /** MACD: fast EMA minus slow EMA, its signal line, and the histogram between them. */
-export function macd(candles: Candle[], fast = 12, slow = 26, signal = 9): { line: Series; signal: Series; hist: Series } {
+export function macd(
+    candles: Candle[],
+    fast = 12,
+    slow = 26,
+    signal = 9
+): { line: Series; signal: Series; hist: Series } {
     const f = ema(candles, fast);
     const s = ema(candles, slow);
     const line: Series = f.map((v, i) => (v !== null && s[i] !== null ? v - (s[i] as number) : null));
@@ -115,16 +188,23 @@ export function heikinAshi(candles: Candle[]): Candle[] {
     return out;
 }
 
-export type StudyKey = 'ma20' | 'ema50' | 'ema200' | 'boll' | 'rsi' | 'macd';
+export type StudyKey =
+    'ma20' | 'ema20' | 'ma50' | 'ma200' | 'ema50' | 'ema200' | 'boll' | 'donch' | 'rsi' | 'macd' | 'stoch' | 'atr';
 export type ChartKind = 'candles' | 'hollow' | 'heikin' | 'bars' | 'line' | 'area';
 
 export const STUDIES: { key: StudyKey; label: string; hint: string }[] = [
     { key: 'ma20', label: 'Moving average 20', hint: 'simple, on the price' },
+    { key: 'ema20', label: 'EMA 20', hint: 'exponential, on the price' },
+    { key: 'ma50', label: 'Moving average 50', hint: 'simple, on the price' },
+    { key: 'ma200', label: 'Moving average 200', hint: 'simple, on the price' },
     { key: 'ema50', label: 'EMA 50', hint: 'exponential, on the price' },
     { key: 'ema200', label: 'EMA 200', hint: 'exponential, on the price' },
     { key: 'boll', label: 'Bollinger bands', hint: '20, 2, on the price' },
+    { key: 'donch', label: 'Donchian channel', hint: '20 highs and lows, on the price' },
     { key: 'rsi', label: 'RSI 14', hint: 'own strip under the chart' },
     { key: 'macd', label: 'MACD 12 26 9', hint: 'own strip under the chart' },
+    { key: 'stoch', label: 'Stochastic 14 3', hint: 'own strip under the chart' },
+    { key: 'atr', label: 'ATR 14', hint: 'own strip under the chart' },
 ];
 
 export const KINDS: { key: ChartKind; label: string }[] = [
@@ -143,7 +223,20 @@ export interface StudyState {
 
 export const DEFAULT_STUDIES: StudyState = {
     kind: 'candles',
-    on: { ma20: false, ema50: false, ema200: false, boll: false, rsi: false, macd: false },
+    on: {
+        ma20: false,
+        ema20: false,
+        ma50: false,
+        ma200: false,
+        ema50: false,
+        ema200: false,
+        boll: false,
+        donch: false,
+        rsi: false,
+        macd: false,
+        stoch: false,
+        atr: false,
+    },
 };
 
 const KEY = 'epm_chart_studies';

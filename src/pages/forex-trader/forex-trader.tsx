@@ -15,6 +15,36 @@ import { analysePreviousDay, type PdhResult } from './pdh';
 import './forex-trader.scss';
 import './forex-trader-premium.scss';
 
+const loadImage = (src: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
+
+/** The TradingView name of a Deriv market (forex, metals and the big cryptos); anything else opens TradingView's own default. */
+const tvSymbol = (symbol: string): string => {
+    if (/^frx[A-Z]{6}$/.test(symbol)) return `OANDA:${symbol.slice(3)}`;
+    const cry = /^cry([A-Z]{3,5})USD$/.exec(symbol);
+    if (cry) return `BITSTAMP:${cry[1]}USD`;
+    return 'OANDA:XAUUSD';
+};
+const TV_INTERVAL: Record<number, string> = {
+    60: '1',
+    120: '2',
+    180: '3',
+    300: '5',
+    600: '10',
+    900: '15',
+    1800: '30',
+    3600: '60',
+    7200: '120',
+    14400: '240',
+    28800: '480',
+    86400: 'D',
+};
+
 interface SymbolInfo {
     underlying_symbol: string;
     underlying_symbol_name: string;
@@ -307,6 +337,8 @@ const ForexTrader = ({
     // chart style + indicators: the toolbar row above the chart drives them (the chart saves them in the browser)
     const [studies, setStudies] = useState<StudyState>(loadStudies);
     const [snapped, setSnapped] = useState(false);
+    // 'deriv' = our live Deriv chart (default, the bot works on it); 'all' = TradingView's chart with every market
+    const [view, setView] = useState<'deriv' | 'all'>('deriv');
     // earlier candles for the chart, asked for when it is dragged back to its oldest one (only the chart gets them: the analysis keeps its own recent candles)
     const olderCtx = useRef({ symbol, sec: 0 });
     olderCtx.current = { symbol, sec: mode === 'mtf' ? M5_SEC : tf };
@@ -1070,14 +1102,62 @@ const ForexTrader = ({
     );
 
     /** Camera button: saves a picture of the chart as it looks now (candles, indicators and the drawn lines). */
-    const takePicture = () => {
+    const takePicture = async () => {
         const url = chartRef.current?.screenshot({ full: true });
         if (!url) return;
+        let out = url;
+        try {
+            // the lines you draw sit in a layer above the chart: paint it onto the picture too
+            const svg = wrapRef.current?.querySelector<SVGSVGElement>('svg.fx-svg');
+            if (svg) {
+                const base = await loadImage(url);
+                const box = svg.getBoundingClientRect();
+                const scale = base.width / Math.max(box.width, 1);
+                const clone = svg.cloneNode(true) as SVGSVGElement;
+                const keep = [
+                    'fill',
+                    'stroke',
+                    'stroke-width',
+                    'stroke-dasharray',
+                    'opacity',
+                    'fill-opacity',
+                    'stroke-opacity',
+                    'font-size',
+                    'font-family',
+                    'font-weight',
+                    'text-anchor',
+                ];
+                const src = [svg, ...Array.from(svg.querySelectorAll('*'))];
+                const dst = [clone, ...Array.from(clone.querySelectorAll('*'))];
+                src.forEach((el, i) => {
+                    const cs = getComputedStyle(el);
+                    const target = dst[i] as SVGElement;
+                    keep.forEach(k => target.style.setProperty(k, cs.getPropertyValue(k)));
+                });
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                clone.setAttribute('width', String(box.width));
+                clone.setAttribute('height', String(box.height));
+                const layer = await loadImage(
+                    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`
+                );
+                const canvas = document.createElement('canvas');
+                canvas.width = base.width;
+                canvas.height = base.height;
+                const g = canvas.getContext('2d');
+                if (g) {
+                    g.drawImage(base, 0, 0);
+                    g.drawImage(layer, 0, 0, box.width * scale, box.height * scale);
+                    out = canvas.toDataURL('image/png');
+                }
+            }
+        } catch {
+            /* the plain chart picture is still saved */
+        }
         const name = (info?.underlying_symbol_name ?? symbol).replace(/[^\w]+/g, '_');
         const label = TIMEFRAMES.find(t => t.sec === tf)?.label ?? '';
         const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
         const a = document.createElement('a');
-        a.href = url;
+        a.href = out;
         a.download = `${name}_${label}_${stamp}.png`;
         document.body.appendChild(a);
         a.click();
@@ -1157,10 +1237,31 @@ const ForexTrader = ({
                     <span className='forex-trader__bar-sep' aria-hidden='true' />
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
                     <span className='forex-trader__bar-grow' aria-hidden='true' />
+                    <div className='forex-trader__bar-view' role='group' aria-label='Chart source'>
+                        <button
+                            type='button'
+                            className={view === 'all' ? 'is-on' : ''}
+                            aria-pressed={view === 'all'}
+                            title="TradingView's chart: search every market on TradingView"
+                            onClick={() => setView('all')}
+                        >
+                            All markets
+                        </button>
+                        <button
+                            type='button'
+                            className={view === 'deriv' ? 'is-on' : ''}
+                            aria-pressed={view === 'deriv'}
+                            title='The live Deriv chart your bot and Sniper work on'
+                            onClick={() => setView('deriv')}
+                        >
+                            Deriv chart
+                        </button>
+                    </div>
                     <button
                         type='button'
                         className={`forex-trader__bar-cam${snapped ? ' is-done' : ''}`}
-                        onClick={takePicture}
+                        onClick={view === 'all' ? undefined : takePicture}
+                        disabled={view === 'all'}
                         title={snapped ? 'Picture saved to your downloads' : 'Save a picture of the chart'}
                         aria-label='Save a picture of the chart'
                     >
@@ -1232,6 +1333,15 @@ const ForexTrader = ({
                     studyState={studies}
                     onStudyState={setStudies}
                 />
+                {view === 'all' && (
+                    <iframe
+                        key={`${symbol}-${tf}`}
+                        className='forex-trader__tv'
+                        title='TradingView, all markets'
+                        allow='fullscreen'
+                        src={`https://s.tradingview.com/widgetembed/?frameElementId=epm_fl&symbol=${encodeURIComponent(tvSymbol(symbol))}&interval=${TV_INTERVAL[tf] ?? '60'}&hidesidetoolbar=0&symboledit=1&saveimage=1&studies=%5B%5D&theme=dark&style=1&timezone=Africa%2FNairobi&withdateranges=1&allow_symbol_change=1&locale=en`}
+                    />
+                )}
                 <div className='forex-trader__chart-info'>
                     <b>{info?.underlying_symbol_name ?? symbol}</b>
                     <span>{mode === 'mtf' ? 'M15 + M5' : TIMEFRAMES.find(t => t.sec === tf)?.label}</span>

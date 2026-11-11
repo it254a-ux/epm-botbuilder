@@ -1430,11 +1430,12 @@
             color: #eef2f8;
         }
 
+        // TradingView's neutral grey for the chosen button
         &.is-on,
         &[aria-expanded='true'] {
-            background: rgba(246, 211, 107, 0.16);
-            color: #f6d36b;
-            box-shadow: inset 0 0 0 1px rgba(246, 211, 107, 0.32);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            box-shadow: none;
         }
     }
 
@@ -1541,8 +1542,8 @@
             height: 14px;
             padding: 0 4px;
             border-radius: 7px;
-            background: #f6d36b;
-            color: #1a1405;
+            background: #2962ff;
+            color: #fff;
             font-size: 9px;
             font-weight: 600;
             line-height: 14px;
@@ -1586,8 +1587,65 @@
 }
 
 // not enough room for the word: the Indicators button keeps just its icon
-@media (max-width: 1400px) {
+@media (max-width: 1150px) {
     .forex-trader__bar .fx-bar-indbtn > span:not(.fx-bar-count) {
         display: none;
+    }
+}
+
+// "All markets / Deriv chart" switch (same capsule as on the TradingView tab)
+.forex-trader__bar .forex-trader__bar-view {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    margin-right: 6px;
+    padding: 2px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+
+    button {
+        height: 22px;
+        padding: 0 11px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #c3cbd9;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        transition:
+            background 0.2s ease,
+            color 0.2s ease;
+
+        &:hover {
+            color: #fff;
+        }
+
+        &.is-on {
+            background: linear-gradient(180deg, #f9dc7e, #e2b93b);
+            color: #1a1405;
+        }
+    }
+}
+
+.forex-trader__bar .forex-trader__bar-cam:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+// TradingView's chart laid over the chart area while "All markets" is chosen
+.forex-trader__chart-wrap {
+    .forex-trader__tv {
+        position: absolute;
+        inset: 0;
+        z-index: 6;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #0b0f17;
     }
 }

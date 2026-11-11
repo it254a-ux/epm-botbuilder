@@ -16,7 +16,9 @@ import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
 import ChartStudies from './chart-studies';
 import {
+    atr,
     bollinger,
+    donchian,
     ema,
     heikinAshi,
     loadStudies,
@@ -24,6 +26,7 @@ import {
     rsi,
     saveStudies,
     sma,
+    stochastic,
     type Series,
     type StudyState,
 } from './indicators';
@@ -379,6 +382,13 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 toLine(c, compute(c))
             );
         if (st.on.ma20) onPrice('#f59e0b', c => sma(c, 20), 2);
+        if (st.on.ema20) onPrice('#facc15', c => ema(c, 20), 1);
+        if (st.on.ma50) onPrice('#fb7185', c => sma(c, 50), 2);
+        if (st.on.ma200) onPrice('#f472b6', c => sma(c, 200), 2);
+        if (st.on.donch) {
+            onPrice('#2dd4bf', c => donchian(c).upper);
+            onPrice('#2dd4bf', c => donchian(c).lower);
+        }
         if (st.on.ema50) onPrice('#38bdf8', c => ema(c, 50), 2);
         if (st.on.ema200) onPrice('#a78bfa', c => ema(c, 200), 2);
         if (st.on.boll) {
@@ -388,13 +398,12 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         }
 
         // indicators with their own strip under the price: the price area gives them room
-        const subs = (['rsi', 'macd'] as const).filter(k => st.on[k]);
-        const strip = 0.22;
-        series
-            .priceScale()
-            .applyOptions({
-                scaleMargins: { top: 0.2, bottom: subs.length ? 0.1 + (strip + 0.02) * subs.length : 0.1 },
-            });
+        const subs = (['rsi', 'macd', 'stoch', 'atr'] as const).filter(k => st.on[k]);
+        // each strip gets up to 22% of the height; with many strips they share 66% so the price keeps room
+        const strip = Math.min(0.22, 0.6 / Math.max(subs.length, 1));
+        series.priceScale().applyOptions({
+            scaleMargins: { top: 0.2, bottom: subs.length ? 0.08 + (strip + 0.02) * subs.length : 0.1 },
+        });
         subs.forEach((kind, i) => {
             const left = subs.length - i;
             const margins = { top: 1 - strip * left, bottom: strip * (left - 1) };
@@ -420,6 +429,40 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 );
                 chart.priceScale('rsi').applyOptions({ scaleMargins: margins, borderVisible: false });
                 add(line, c => toLine(c, rsi(c)));
+            } else if (kind === 'stoch') {
+                const plain = { priceScaleId: 'stoch', priceLineVisible: false, crosshairMarkerVisible: false };
+                const k = chart.addLineSeries({
+                    color: '#38bdf8',
+                    lineWidth: 1,
+                    lastValueVisible: true,
+                    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+                    ...plain,
+                });
+                const d = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1, lastValueVisible: false, ...plain });
+                [80, 20].forEach(level =>
+                    k.createPriceLine({
+                        price: level,
+                        color: '#64748b',
+                        lineWidth: 1,
+                        lineStyle: 2,
+                        axisLabelVisible: false,
+                        title: '',
+                    })
+                );
+                chart.priceScale('stoch').applyOptions({ scaleMargins: margins, borderVisible: false });
+                add(k, c => toLine(c, stochastic(c).k));
+                add(d, c => toLine(c, stochastic(c).d));
+            } else if (kind === 'atr') {
+                const line = chart.addLineSeries({
+                    color: '#34d399',
+                    lineWidth: 1,
+                    priceScaleId: 'atr',
+                    lastValueVisible: true,
+                    priceLineVisible: false,
+                    crosshairMarkerVisible: false,
+                });
+                chart.priceScale('atr').applyOptions({ scaleMargins: margins, borderVisible: false });
+                add(line, c => toLine(c, atr(c)));
             } else {
                 const hist = chart.addHistogramSeries({
                     priceScaleId: 'macd',
