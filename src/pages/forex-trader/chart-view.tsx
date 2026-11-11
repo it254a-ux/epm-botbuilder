@@ -15,7 +15,18 @@ import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
 import ChartStudies from './chart-studies';
-import { bollinger, ema, heikinAshi, loadStudies, macd, rsi, saveStudies, sma, type Series, type StudyState } from './indicators';
+import {
+    bollinger,
+    ema,
+    heikinAshi,
+    loadStudies,
+    macd,
+    rsi,
+    saveStudies,
+    sma,
+    type Series,
+    type StudyState,
+} from './indicators';
 import type { PdhResult } from './pdh';
 
 export interface ChartViewHandle {
@@ -34,7 +45,7 @@ export interface ChartViewHandle {
     /** Draw (or clear, with an empty list) plain price lines owned by a parent page, such as open trades. They stay when the analysis is redrawn. */
     drawLines: (lines: { key: string; title: string; price: number; color: string }[]) => void;
     /** JPEG data URL of the chart as it looks right now, or null. */
-    screenshot: () => string | null;
+    screenshot: (opts?: { full?: boolean }) => string | null;
 }
 
 interface Props {
@@ -43,6 +54,9 @@ interface Props {
     studies?: boolean;
     /** Asked for earlier candles when the chart is dragged back to its oldest one: gives the ones before `before` (epoch seconds), or none when there are no more. */
     loadOlder?: (before: number) => Promise<Candle[]>;
+    /** Chart style + indicators kept by the parent page (so its own toolbar can drive them). Without it the chart keeps its own. */
+    studyState?: StudyState;
+    onStudyState?: (next: StudyState) => void;
 }
 
 const COLORS = {
@@ -137,7 +151,10 @@ interface Derived {
     compute: (candles: Candle[]) => unknown[];
 }
 
-const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSize, studies: showStudies = true, loadOlder }, ref) {
+const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
+    { pipSize, studies: showStudies = true, loadOlder, studyState, onStudyState },
+    ref
+) {
     const hostRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -158,7 +175,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null);
     const [resetKey, setResetKey] = useState(0);
     // chart style + indicators the person switched on (remembered in the browser, shared by every chart)
-    const [studies, setStudies] = useState<StudyState>(loadStudies);
+    const [ownStudies, setOwnStudies] = useState<StudyState>(loadStudies);
+    const studies = studyState ?? ownStudies;
+    const setStudies = onStudyState ?? setOwnStudies;
     const studiesRef = useRef(studies);
     studiesRef.current = studies;
     const derivedRef = useRef<Derived[]>([]);
@@ -183,7 +202,10 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         });
         // Follow the website when its theme (dark / light) is switched.
         const themeWatch = new MutationObserver(() => chart.applyOptions(themeOptions(readTheme(host))));
-        themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+        themeWatch.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'data-theme', 'style'],
+        });
         themeWatch.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
         const series = chart.addCandlestickSeries({
             upColor: '#22c55e',
@@ -195,13 +217,18 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         });
         // Keep every drawn level (SL/TP, planned lines) inside the visible price range.
         series.applyOptions({
-            autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null; margins?: unknown } | null) => {
+            autoscaleInfoProvider: (
+                original: () => { priceRange: { minValue: number; maxValue: number } | null; margins?: unknown } | null
+            ) => {
                 const res = original();
                 const lv = levelsRef.current;
                 if (!res || !res.priceRange || !lv) return res;
                 // Levels near the candles stay in view, but a level far away (like yesterday's low) must not flatten the
                 // candles into a thin strip: it is left off-screen, and zooming out brings it back.
-                const span = Math.max(res.priceRange.maxValue - res.priceRange.minValue, Math.abs(res.priceRange.maxValue) * 1e-5);
+                const span = Math.max(
+                    res.priceRange.maxValue - res.priceRange.minValue,
+                    Math.abs(res.priceRange.maxValue) * 1e-5
+                );
                 const reach = span * 1.2;
                 return {
                     ...res,
@@ -218,10 +245,12 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
 
         const onRange = (range: { from: number; to: number } | null) => {
             const first = candlesRef.current[0];
-            if (!range || range.from > 30 || !first || olderBusy.current || noOlder.current || !loadOlderRef.current) return;
+            if (!range || range.from > 30 || !first || olderBusy.current || noOlder.current || !loadOlderRef.current)
+                return;
             const gen = generation.current;
             olderBusy.current = true;
-            loadOlderRef.current(first.time)
+            loadOlderRef
+                .current(first.time)
                 .then(older => {
                     if (gen !== generation.current) return;
                     const fresh = older.filter(c => c.time < (candlesRef.current[0]?.time ?? Infinity));
@@ -293,23 +322,62 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         // candle style: the candle series always stays (drawings, markers and trade lines are attached to it)
         const candleColors =
             st.kind === 'hollow'
-                ? { upColor: CLEAR, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN }
+                ? {
+                      upColor: CLEAR,
+                      downColor: DOWN,
+                      borderUpColor: UP,
+                      borderDownColor: DOWN,
+                      wickUpColor: UP,
+                      wickDownColor: DOWN,
+                  }
                 : st.kind === 'candles' || st.kind === 'heikin'
-                  ? { upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN }
-                  : { upColor: CLEAR, downColor: CLEAR, borderUpColor: CLEAR, borderDownColor: CLEAR, wickUpColor: CLEAR, wickDownColor: CLEAR };
+                  ? {
+                        upColor: UP,
+                        downColor: DOWN,
+                        borderUpColor: UP,
+                        borderDownColor: DOWN,
+                        wickUpColor: UP,
+                        wickDownColor: DOWN,
+                    }
+                  : {
+                        upColor: CLEAR,
+                        downColor: CLEAR,
+                        borderUpColor: CLEAR,
+                        borderDownColor: CLEAR,
+                        wickUpColor: CLEAR,
+                        wickDownColor: CLEAR,
+                    };
         series.applyOptions(candleColors);
         if (st.kind === 'heikin') add(series as ISeriesApi<SeriesType>, c => heikinAshi(c).map(toBar));
-        if (st.kind === 'line') add(chart.addLineSeries({ color: '#38bdf8', lineWidth: 2, ...quiet }), c => toLine(c, c.map(x => x.close)));
+        if (st.kind === 'line')
+            add(chart.addLineSeries({ color: '#38bdf8', lineWidth: 2, ...quiet }), c =>
+                toLine(
+                    c,
+                    c.map(x => x.close)
+                )
+            );
         if (st.kind === 'area')
             add(
-                chart.addAreaSeries({ lineColor: '#38bdf8', topColor: 'rgba(56,189,248,0.35)', bottomColor: 'rgba(56,189,248,0.02)', lineWidth: 2, ...quiet }),
-                c => toLine(c, c.map(x => x.close))
+                chart.addAreaSeries({
+                    lineColor: '#38bdf8',
+                    topColor: 'rgba(56,189,248,0.35)',
+                    bottomColor: 'rgba(56,189,248,0.02)',
+                    lineWidth: 2,
+                    ...quiet,
+                }),
+                c =>
+                    toLine(
+                        c,
+                        c.map(x => x.close)
+                    )
             );
         if (st.kind === 'bars') add(chart.addBarSeries({ upColor: UP, downColor: DOWN }), c => c.map(toBar));
 
         // indicators drawn on the price
         const onPrice = (color: string, compute: (c: Candle[]) => Series, width: 1 | 2 = 1, dashed = false) =>
-            add(chart.addLineSeries({ color, lineWidth: width, lineStyle: dashed ? 2 : 0, ...quiet }), c => toLine(c, compute(c)));
+            add(chart.addLineSeries({ color, lineWidth: width, lineStyle: dashed ? 2 : 0, ...quiet }), c =>
+                toLine(c, compute(c))
+            );
         if (st.on.ma20) onPrice('#f59e0b', c => sma(c, 20), 2);
         if (st.on.ema50) onPrice('#38bdf8', c => ema(c, 50), 2);
         if (st.on.ema200) onPrice('#a78bfa', c => ema(c, 200), 2);
@@ -322,7 +390,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
         // indicators with their own strip under the price: the price area gives them room
         const subs = (['rsi', 'macd'] as const).filter(k => st.on[k]);
         const strip = 0.22;
-        series.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: subs.length ? 0.1 + (strip + 0.02) * subs.length : 0.1 } });
+        series
+            .priceScale()
+            .applyOptions({
+                scaleMargins: { top: 0.2, bottom: subs.length ? 0.1 + (strip + 0.02) * subs.length : 0.1 },
+            });
         subs.forEach((kind, i) => {
             const left = subs.length - i;
             const margins = { top: 1 - strip * left, bottom: strip * (left - 1) };
@@ -336,16 +408,32 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
                     crosshairMarkerVisible: false,
                     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
                 });
-                [70, 30].forEach(level => line.createPriceLine({ price: level, color: '#64748b', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' }));
+                [70, 30].forEach(level =>
+                    line.createPriceLine({
+                        price: level,
+                        color: '#64748b',
+                        lineWidth: 1,
+                        lineStyle: 2,
+                        axisLabelVisible: false,
+                        title: '',
+                    })
+                );
                 chart.priceScale('rsi').applyOptions({ scaleMargins: margins, borderVisible: false });
                 add(line, c => toLine(c, rsi(c)));
             } else {
-                const hist = chart.addHistogramSeries({ priceScaleId: 'macd', lastValueVisible: false, priceLineVisible: false });
+                const hist = chart.addHistogramSeries({
+                    priceScaleId: 'macd',
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                });
                 const fast = chart.addLineSeries({ color: '#38bdf8', lineWidth: 1, priceScaleId: 'macd', ...quiet });
                 const slow = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1, priceScaleId: 'macd', ...quiet });
                 chart.priceScale('macd').applyOptions({ scaleMargins: margins, borderVisible: false });
                 add(hist, c =>
-                    toLine(c, macd(c).hist).map(p => ({ ...p, color: p.value >= 0 ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)' }))
+                    toLine(c, macd(c).hist).map(p => ({
+                        ...p,
+                        color: p.value >= 0 ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)',
+                    }))
                 );
                 add(fast, c => toLine(c, macd(c).line));
                 add(slow, c => toLine(c, macd(c).signal));
@@ -408,373 +496,420 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView({ pipSiz
     prependRef.current = prepend;
 
     useImperativeHandle(ref, () => {
-      const impl: ChartViewHandle = {
-        setCandles(candles) {
-            generation.current += 1;
-            noOlder.current = false;
-            clearDrawing();
-            candlesRef.current = candles.slice();
-            setResetKey(k => k + 1);
-            seriesRef.current?.setData(candles.map(toBar));
-            refreshDerived();
-            // open on the latest candles, big enough to read (zoom out or in from there)
-            if (candles.length > 30) openView();
-            else chartRef.current?.timeScale().fitContent();
-        },
-        prependCandles: prepend,
-        mergeCandles(candles) {
-            const byTime = new Map<number, Candle>();
-            candlesRef.current.forEach(c => byTime.set(c.time, c));
-            candles.forEach(c => byTime.set(c.time, c));
-            const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
-            candlesRef.current = merged;
-            // keep the zoom and position the person is looking at
-            const ts = chartRef.current?.timeScale();
-            const range = ts?.getVisibleLogicalRange() ?? null;
-            seriesRef.current?.setData(merged.map(toBar));
-            refreshDerived();
-            if (ts && range) ts.setVisibleLogicalRange(range);
-        },
-        drawLines(lines) {
-            const series = seriesRef.current;
-            if (!series) return;
-            parentLinesRef.current.forEach(l => series.removePriceLine(l));
-            parentLinesRef.current = lines
-                .filter(l => Number.isFinite(l.price))
-                .map(l =>
-                    series.createPriceLine({ price: l.price, color: l.color, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: l.title })
-                );
-        },
-        updateCandle(candle) {
-            const list = candlesRef.current;
-            const last = list[list.length - 1];
-            if (last && last.time === candle.time) list[list.length - 1] = candle;
-            else if (!last || candle.time > last.time) list.push(candle);
-            // Heikin Ashi is worked out from the whole list, so it is redone with the indicators
-            if (studiesRef.current.kind !== 'heikin') seriesRef.current?.update(toBar(candle));
-            refreshSoon();
-        },
-        drawPdh(result) {
-            const series = seriesRef.current;
-            clearDrawing();
-            if (!series || !result) return;
-            const addLine = (price: number, title: string, color: string, dashed = false, width: 1 | 2 = 2) => {
-                linesRef.current.push(series.createPriceLine({ price, color, lineWidth: width, lineStyle: dashed ? 2 : 0, axisLabelVisible: true, title }));
-            };
-            const lv = result.levels;
-            if (lv.high !== null) addLine(lv.high, 'Previous Day High', '#f0b429');
-            if (lv.low !== null) addLine(lv.low, 'Previous Day Low', '#f0b429');
-            if (lv.equilibrium !== null) addLine(lv.equilibrium, 'Equilibrium (50%)', '#94a3b8', true, 1);
-            const plan = result.plan;
-            if (plan) {
-                addLine(plan.entry, `ENTRY ${plan.side}`, '#38bdf8');
-                addLine(plan.stopLoss, 'Stop Loss', '#ef4444');
-                addLine(plan.takeProfit, 'Target 1 (Equilibrium)', '#22c55e');
-                addLine(plan.takeProfit2, 'Target 2', '#22c55e', true, 1);
-            }
-            const buy = result.side === 'BUY';
-            const markers: SeriesMarker<Time>[] = result.markers.map(m => {
-                const color = m.kind === 'footprint' ? '#f59e0b' : m.kind === 'sweep' ? '#a78bfa' : buy ? '#22c55e' : '#ef4444';
-                const shape = m.kind === 'footprint' ? 'circle' : m.above ? 'arrowDown' : 'arrowUp';
-                return { time: m.time as UTCTimestamp, position: m.above ? 'aboveBar' : 'belowBar', color, shape, text: m.text };
-            });
-            markers.sort((a, b) => (a.time as number) - (b.time as number));
-            series.setMarkers(markers);
-            // keep the active level and the plan inside the visible price range
-            const vals: number[] = [];
-            if (result.levelPrice !== null) vals.push(result.levelPrice);
-            if (plan) vals.push(plan.entry, plan.stopLoss, plan.takeProfit);
-            if (vals.length) {
-                const span = Math.max(...vals) - Math.min(...vals) || Math.abs(vals[0]) * 0.001;
-                levelsRef.current = { min: Math.min(...vals) - span * 0.06, max: Math.max(...vals) + span * 0.06 };
-            }
-        },
-        drawAnalysis(analysis, candles) {
-            const series = seriesRef.current;
-            const chart = chartRef.current;
-            clearDrawing();
-            if (!series || !chart || !analysis || candles.length < 3) return;
+        const impl: ChartViewHandle = {
+            setCandles(candles) {
+                generation.current += 1;
+                noOlder.current = false;
+                clearDrawing();
+                candlesRef.current = candles.slice();
+                setResetKey(k => k + 1);
+                seriesRef.current?.setData(candles.map(toBar));
+                refreshDerived();
+                // open on the latest candles, big enough to read (zoom out or in from there)
+                if (candles.length > 30) openView();
+                else chartRef.current?.timeScale().fitContent();
+            },
+            prependCandles: prepend,
+            mergeCandles(candles) {
+                const byTime = new Map<number, Candle>();
+                candlesRef.current.forEach(c => byTime.set(c.time, c));
+                candles.forEach(c => byTime.set(c.time, c));
+                const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+                candlesRef.current = merged;
+                // keep the zoom and position the person is looking at
+                const ts = chartRef.current?.timeScale();
+                const range = ts?.getVisibleLogicalRange() ?? null;
+                seriesRef.current?.setData(merged.map(toBar));
+                refreshDerived();
+                if (ts && range) ts.setVisibleLogicalRange(range);
+            },
+            drawLines(lines) {
+                const series = seriesRef.current;
+                if (!series) return;
+                parentLinesRef.current.forEach(l => series.removePriceLine(l));
+                parentLinesRef.current = lines
+                    .filter(l => Number.isFinite(l.price))
+                    .map(l =>
+                        series.createPriceLine({
+                            price: l.price,
+                            color: l.color,
+                            lineWidth: 2,
+                            lineStyle: 0,
+                            axisLabelVisible: true,
+                            title: l.title,
+                        })
+                    );
+            },
+            updateCandle(candle) {
+                const list = candlesRef.current;
+                const last = list[list.length - 1];
+                if (last && last.time === candle.time) list[list.length - 1] = candle;
+                else if (!last || candle.time > last.time) list.push(candle);
+                // Heikin Ashi is worked out from the whole list, so it is redone with the indicators
+                if (studiesRef.current.kind !== 'heikin') seriesRef.current?.update(toBar(candle));
+                refreshSoon();
+            },
+            drawPdh(result) {
+                const series = seriesRef.current;
+                clearDrawing();
+                if (!series || !result) return;
+                const addLine = (price: number, title: string, color: string, dashed = false, width: 1 | 2 = 2) => {
+                    linesRef.current.push(
+                        series.createPriceLine({
+                            price,
+                            color,
+                            lineWidth: width,
+                            lineStyle: dashed ? 2 : 0,
+                            axisLabelVisible: true,
+                            title,
+                        })
+                    );
+                };
+                const lv = result.levels;
+                if (lv.high !== null) addLine(lv.high, 'Previous Day High', '#f0b429');
+                if (lv.low !== null) addLine(lv.low, 'Previous Day Low', '#f0b429');
+                if (lv.equilibrium !== null) addLine(lv.equilibrium, 'Equilibrium (50%)', '#94a3b8', true, 1);
+                const plan = result.plan;
+                if (plan) {
+                    addLine(plan.entry, `ENTRY ${plan.side}`, '#38bdf8');
+                    addLine(plan.stopLoss, 'Stop Loss', '#ef4444');
+                    addLine(plan.takeProfit, 'Target 1 (Equilibrium)', '#22c55e');
+                    addLine(plan.takeProfit2, 'Target 2', '#22c55e', true, 1);
+                }
+                const buy = result.side === 'BUY';
+                const markers: SeriesMarker<Time>[] = result.markers.map(m => {
+                    const color =
+                        m.kind === 'footprint'
+                            ? '#f59e0b'
+                            : m.kind === 'sweep'
+                              ? '#a78bfa'
+                              : buy
+                                ? '#22c55e'
+                                : '#ef4444';
+                    const shape = m.kind === 'footprint' ? 'circle' : m.above ? 'arrowDown' : 'arrowUp';
+                    return {
+                        time: m.time as UTCTimestamp,
+                        position: m.above ? 'aboveBar' : 'belowBar',
+                        color,
+                        shape,
+                        text: m.text,
+                    };
+                });
+                markers.sort((a, b) => (a.time as number) - (b.time as number));
+                series.setMarkers(markers);
+                // keep the active level and the plan inside the visible price range
+                const vals: number[] = [];
+                if (result.levelPrice !== null) vals.push(result.levelPrice);
+                if (plan) vals.push(plan.entry, plan.stopLoss, plan.takeProfit);
+                if (vals.length) {
+                    const span = Math.max(...vals) - Math.min(...vals) || Math.abs(vals[0]) * 0.001;
+                    levelsRef.current = { min: Math.min(...vals) - span * 0.06, max: Math.max(...vals) + span * 0.06 };
+                }
+            },
+            drawAnalysis(analysis, candles) {
+                const series = seriesRef.current;
+                const chart = chartRef.current;
+                clearDrawing();
+                if (!series || !chart || !analysis || candles.length < 3) return;
 
-            const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
-            const lastT = candles[candles.length - 1].time;
-            const endT = (lastT + len * 8) as UTCTimestamp;
+                const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
+                const lastT = candles[candles.length - 1].time;
+                const endT = (lastT + len * 8) as UTCTimestamp;
 
-            const addLine = (price: number, title: string, color: string, dashed = false, width: 1 | 2 = 2) => {
-                linesRef.current.push(
-                    series.createPriceLine({
-                        price,
+                const addLine = (price: number, title: string, color: string, dashed = false, width: 1 | 2 = 2) => {
+                    linesRef.current.push(
+                        series.createPriceLine({
+                            price,
+                            color,
+                            lineWidth: width,
+                            lineStyle: dashed ? 2 : 0,
+                            axisLabelVisible: true,
+                            title,
+                        })
+                    );
+                };
+                const addSegment = (
+                    t0: number,
+                    t1: number,
+                    price: number,
+                    color: string,
+                    width: 1 | 2 | 3 = 2,
+                    dashed = false
+                ) => {
+                    const s = chart.addLineSeries({
                         color,
                         lineWidth: width,
                         lineStyle: dashed ? 2 : 0,
-                        axisLabelVisible: true,
-                        title,
-                    })
-                );
-            };
-            const addSegment = (t0: number, t1: number, price: number, color: string, width: 1 | 2 | 3 = 2, dashed = false) => {
-                const s = chart.addLineSeries({
-                    color,
-                    lineWidth: width,
-                    lineStyle: dashed ? 2 : 0,
-                    lastValueVisible: false,
-                    priceLineVisible: false,
-                    crosshairMarkerVisible: false,
-                });
-                s.setData([
-                    { time: t0 as UTCTimestamp, value: price },
-                    { time: t1 as UTCTimestamp, value: price },
-                ]);
-                extraRef.current.push(s);
-            };
-            /** Shaded zone between `base` and `edge`, from t0 to t1. */
-            const addZone = (t0: number, t1: number, base: number, edge: number, fill: string) => {
-                const z = chart.addBaselineSeries({
-                    baseValue: { type: 'price', price: base },
-                    topLineColor: 'rgba(0,0,0,0)',
-                    topFillColor1: fill,
-                    topFillColor2: fill,
-                    bottomLineColor: 'rgba(0,0,0,0)',
-                    bottomFillColor1: fill,
-                    bottomFillColor2: fill,
-                    lineWidth: 1,
-                    lastValueVisible: false,
-                    priceLineVisible: false,
-                    crosshairMarkerVisible: false,
-                });
-                z.setData([
-                    { time: t0 as UTCTimestamp, value: edge },
-                    { time: t1 as UTCTimestamp, value: edge },
-                ]);
-                extraRef.current.push(z);
-            };
-
-            // ---- session bands (Asian / London / New York): one continuous soft shade per session
-            const sessionOf = (t: number) => {
-                const h = new Date(t * 1000).getUTCHours();
-                return h < 7 ? 'asian' : h < 13 ? 'london' : h < 21 ? 'ny' : null;
-            };
-            const recent = candles.filter(c => c.time > lastT - 3 * 86400);
-            (['asian', 'london', 'ny'] as const).forEach(name => {
-                const shade = COLORS[name];
-                const area = chart.addAreaSeries({
-                    priceScaleId: 'sess',
-                    lineVisible: false,
-                    topColor: shade,
-                    bottomColor: shade,
-                    lastValueVisible: false,
-                    priceLineVisible: false,
-                    crosshairMarkerVisible: false,
-                });
-                // a fixed 0..1 scale, so the shade always fills the full height of the chart
-                area.applyOptions({
-                    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }),
-                } as never);
-                // set after the series exists (before that the scale does not exist yet and the margins were ignored, leaving the shade short)
-                area.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
-                // candles outside this session are blank points, so the shade stops there
-                area.setData(
-                    recent.map(c => (sessionOf(c.time) === name ? { time: c.time as UTCTimestamp, value: 1 } : { time: c.time as UTCTimestamp }))
-                );
-                extraRef.current.push(area);
-            });
-
-            const markers: SeriesMarker<Time>[] = [];
-            const plan = analysis.plan;
-            const r = analysis.range;
-
-            // ---- reference range
-            if (r) {
-                const label = strategyLabel(analysis.strategyId);
-                const inWindow = candles.filter(c => c.time >= r.startTime && c.time < r.endTime);
-                if (inWindow.length > 0) {
-                    const t0 = inWindow[0].time;
-                    const t1 = inWindow[inWindow.length - 1].time;
-                    addSegment(t0, t1, r.high, COLORS.range, 3);
-                    addSegment(t0, t1, r.low, COLORS.range, 3);
-                }
-                if (analysis.watch) {
-                    // Nothing has triggered yet: each range edge doubles as an entry for one
-                    // direction and the target for the other, so the labels say both.
-                    addLine(r.high, `${label} High · Sell entry / Buy TP`, COLORS.range, true, 1);
-                    addLine(r.low, `${label} Low · Buy entry / Sell TP`, COLORS.range, true, 1);
-                    addLine(analysis.watch.sell.stopLoss, 'Sell SL (if High swept)', COLORS.sl, true, 1);
-                    addLine(analysis.watch.buy.stopLoss, 'Buy SL (if Low swept)', COLORS.sl, true, 1);
-                } else {
-                    addLine(r.high, `${label} High`, COLORS.range, true, 1);
-                    addLine(r.low, `${label} Low`, COLORS.range, true, 1);
-                }
-            }
-
-            // ---- sweep wick
-            if (analysis.sweep) {
-                const sw = analysis.sweep;
-                markers.push({
-                    time: sw.extremeTime as UTCTimestamp,
-                    position: sw.side === 'high' ? 'aboveBar' : 'belowBar',
-                    shape: sw.side === 'high' ? 'arrowDown' : 'arrowUp',
-                    color: COLORS.sweep,
-                    text: 'Sweep',
-                });
-            }
-
-            // ---- break of structure, FVG, entry, stop, target, risk/reward boxes
-            const bos = analysis.bos;
-            if (bos && plan) {
-                const sell = plan.side === 'SELL';
-                addSegment(bos.swingTime, bos.bosTime ?? lastT, bos.level, COLORS.bos, 2, true);
-                if (bos.bosTime !== null) {
-                    markers.push({
-                        time: bos.bosTime as UTCTimestamp,
-                        position: sell ? 'belowBar' : 'aboveBar',
-                        shape: sell ? 'arrowDown' : 'arrowUp',
-                        color: COLORS.bos,
-                        text: 'BOS',
-                    });
-                }
-                if (analysis.fvg) {
-                    addZone(analysis.fvg.startTime, endT, analysis.fvg.bottom, analysis.fvg.top, COLORS.fvgFill);
-                    markers.push({
-                        time: (analysis.fvg.startTime + len) as UTCTimestamp,
-                        position: 'inBar',
-                        shape: 'square',
-                        color: COLORS.fvg,
-                        text: 'FVG',
-                    });
-                }
-                // risk (red) and reward (green) boxes
-                const t0 = analysis.entryTime ?? bos.bosTime ?? lastT;
-                const planned = bos.bosTime === null;
-                addZone(t0, endT, plan.entry, plan.takeProfit, planned ? COLORS.rewardFaint : COLORS.rewardFill);
-                addZone(t0, endT, plan.entry, plan.stopLoss, planned ? COLORS.riskFaint : COLORS.riskFill);
-
-                const entryTitle = planned
-                    ? 'Entry (planned, after BOS)'
-                    : analysis.entryTime
-                    ? `Entry ${plan.side}`
-                    : `Entry ${plan.side} (pullback to BOS)`;
-                addLine(plan.entry, entryTitle, COLORS.entry, analysis.entryTime === null);
-                addLine(plan.stopLoss, 'SL', COLORS.sl);
-                addLine(plan.takeProfit, `TP · RR 1:${plan.rr.toFixed(1)}`, COLORS.tp);
-                addLine(plan.midpoint, 'Mid', COLORS.mid, true, 1);
-
-                // ---- projected market path: W shape for a BUY, M shape for a SELL, ending at the TP
-                const dir = sell ? -1 : 1;
-                const lastClose = candles[candles.length - 1].close;
-                const startPrice = analysis.entryTime !== null ? lastClose : plan.entry;
-                const reach = Math.abs(plan.takeProfit - startPrice);
-                const risk = Math.abs(plan.entry - plan.stopLoss);
-                if (reach > 0) {
-                    // first dip / spike is kept small and never goes past half-way to the stop loss
-                    const dip = Math.min(reach * 0.2, risk * 0.5);
-                    // [candles ahead, price]
-                    const steps: Array<[number, number]> = [
-                        [0, startPrice],
-                        [2, startPrice - dir * dip],
-                        [4, startPrice + dir * reach * 0.4],
-                        [6, startPrice + dir * reach * 0.1],
-                        [8, plan.takeProfit],
-                    ];
-                    const pathSeries = chart.addLineSeries({
-                        color: COLORS.path,
-                        lineWidth: 2,
-                        lineStyle: 2,
                         lastValueVisible: false,
                         priceLineVisible: false,
                         crosshairMarkerVisible: false,
                     });
-                    pathSeries.setData(steps.map(([k, value]) => ({ time: (lastT + len * k) as UTCTimestamp, value })));
-                    pathSeries.setMarkers([
-                        {
-                            time: (lastT + len * 8) as UTCTimestamp,
-                            position: sell ? 'belowBar' : 'aboveBar',
-                            shape: sell ? 'arrowDown' : 'arrowUp',
-                            color: COLORS.path,
-                            text: sell ? 'Expected (M)' : 'Expected (W)',
-                        },
+                    s.setData([
+                        { time: t0 as UTCTimestamp, value: price },
+                        { time: t1 as UTCTimestamp, value: price },
                     ]);
-                    extraRef.current.push(pathSeries);
+                    extraRef.current.push(s);
+                };
+                /** Shaded zone between `base` and `edge`, from t0 to t1. */
+                const addZone = (t0: number, t1: number, base: number, edge: number, fill: string) => {
+                    const z = chart.addBaselineSeries({
+                        baseValue: { type: 'price', price: base },
+                        topLineColor: 'rgba(0,0,0,0)',
+                        topFillColor1: fill,
+                        topFillColor2: fill,
+                        bottomLineColor: 'rgba(0,0,0,0)',
+                        bottomFillColor1: fill,
+                        bottomFillColor2: fill,
+                        lineWidth: 1,
+                        lastValueVisible: false,
+                        priceLineVisible: false,
+                        crosshairMarkerVisible: false,
+                    });
+                    z.setData([
+                        { time: t0 as UTCTimestamp, value: edge },
+                        { time: t1 as UTCTimestamp, value: edge },
+                    ]);
+                    extraRef.current.push(z);
+                };
+
+                // ---- session bands (Asian / London / New York): one continuous soft shade per session
+                const sessionOf = (t: number) => {
+                    const h = new Date(t * 1000).getUTCHours();
+                    return h < 7 ? 'asian' : h < 13 ? 'london' : h < 21 ? 'ny' : null;
+                };
+                const recent = candles.filter(c => c.time > lastT - 3 * 86400);
+                (['asian', 'london', 'ny'] as const).forEach(name => {
+                    const shade = COLORS[name];
+                    const area = chart.addAreaSeries({
+                        priceScaleId: 'sess',
+                        lineVisible: false,
+                        topColor: shade,
+                        bottomColor: shade,
+                        lastValueVisible: false,
+                        priceLineVisible: false,
+                        crosshairMarkerVisible: false,
+                    });
+                    // a fixed 0..1 scale, so the shade always fills the full height of the chart
+                    area.applyOptions({
+                        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }),
+                    } as never);
+                    // set after the series exists (before that the scale does not exist yet and the margins were ignored, leaving the shade short)
+                    area.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
+                    // candles outside this session are blank points, so the shade stops there
+                    area.setData(
+                        recent.map(c =>
+                            sessionOf(c.time) === name
+                                ? { time: c.time as UTCTimestamp, value: 1 }
+                                : { time: c.time as UTCTimestamp }
+                        )
+                    );
+                    extraRef.current.push(area);
+                });
+
+                const markers: SeriesMarker<Time>[] = [];
+                const plan = analysis.plan;
+                const r = analysis.range;
+
+                // ---- reference range
+                if (r) {
+                    const label = strategyLabel(analysis.strategyId);
+                    const inWindow = candles.filter(c => c.time >= r.startTime && c.time < r.endTime);
+                    if (inWindow.length > 0) {
+                        const t0 = inWindow[0].time;
+                        const t1 = inWindow[inWindow.length - 1].time;
+                        addSegment(t0, t1, r.high, COLORS.range, 3);
+                        addSegment(t0, t1, r.low, COLORS.range, 3);
+                    }
+                    if (analysis.watch) {
+                        // Nothing has triggered yet: each range edge doubles as an entry for one
+                        // direction and the target for the other, so the labels say both.
+                        addLine(r.high, `${label} High · Sell entry / Buy TP`, COLORS.range, true, 1);
+                        addLine(r.low, `${label} Low · Buy entry / Sell TP`, COLORS.range, true, 1);
+                        addLine(analysis.watch.sell.stopLoss, 'Sell SL (if High swept)', COLORS.sl, true, 1);
+                        addLine(analysis.watch.buy.stopLoss, 'Buy SL (if Low swept)', COLORS.sl, true, 1);
+                    } else {
+                        addLine(r.high, `${label} High`, COLORS.range, true, 1);
+                        addLine(r.low, `${label} Low`, COLORS.range, true, 1);
+                    }
                 }
 
-                // the point of entry itself
-                markers.push(
-                    analysis.entryTime !== null
-                        ? {
-                              time: analysis.entryTime as UTCTimestamp,
-                              position: sell ? 'aboveBar' : 'belowBar',
-                              shape: sell ? 'arrowDown' : 'arrowUp',
-                              color: COLORS.entry,
-                              text: `ENTRY ${plan.side}`,
-                          }
-                        : {
-                              time: lastT as UTCTimestamp,
-                              position: 'inBar',
-                              shape: 'circle',
-                              color: COLORS.entry,
-                              text: planned ? 'Entry' : 'Entry zone',
-                          }
-                );
-            }
+                // ---- sweep wick
+                if (analysis.sweep) {
+                    const sw = analysis.sweep;
+                    markers.push({
+                        time: sw.extremeTime as UTCTimestamp,
+                        position: sw.side === 'high' ? 'aboveBar' : 'belowBar',
+                        shape: sw.side === 'high' ? 'arrowDown' : 'arrowUp',
+                        color: COLORS.sweep,
+                        text: 'Sweep',
+                    });
+                }
 
-            // Labels on neighbouring candles would overlap, so keep the text of the most important
-            // marker (entry > sweep > BOS > FVG) and show only the arrow/shape for the others.
-            const rank = (m: SeriesMarker<Time>) => {
-                const t = m.text ?? '';
-                return t.startsWith('ENTRY') || t.startsWith('Entry') ? 0 : t === 'Sweep' ? 1 : t === 'BOS' ? 2 : 3;
+                // ---- break of structure, FVG, entry, stop, target, risk/reward boxes
+                const bos = analysis.bos;
+                if (bos && plan) {
+                    const sell = plan.side === 'SELL';
+                    addSegment(bos.swingTime, bos.bosTime ?? lastT, bos.level, COLORS.bos, 2, true);
+                    if (bos.bosTime !== null) {
+                        markers.push({
+                            time: bos.bosTime as UTCTimestamp,
+                            position: sell ? 'belowBar' : 'aboveBar',
+                            shape: sell ? 'arrowDown' : 'arrowUp',
+                            color: COLORS.bos,
+                            text: 'BOS',
+                        });
+                    }
+                    if (analysis.fvg) {
+                        addZone(analysis.fvg.startTime, endT, analysis.fvg.bottom, analysis.fvg.top, COLORS.fvgFill);
+                        markers.push({
+                            time: (analysis.fvg.startTime + len) as UTCTimestamp,
+                            position: 'inBar',
+                            shape: 'square',
+                            color: COLORS.fvg,
+                            text: 'FVG',
+                        });
+                    }
+                    // risk (red) and reward (green) boxes
+                    const t0 = analysis.entryTime ?? bos.bosTime ?? lastT;
+                    const planned = bos.bosTime === null;
+                    addZone(t0, endT, plan.entry, plan.takeProfit, planned ? COLORS.rewardFaint : COLORS.rewardFill);
+                    addZone(t0, endT, plan.entry, plan.stopLoss, planned ? COLORS.riskFaint : COLORS.riskFill);
+
+                    const entryTitle = planned
+                        ? 'Entry (planned, after BOS)'
+                        : analysis.entryTime
+                          ? `Entry ${plan.side}`
+                          : `Entry ${plan.side} (pullback to BOS)`;
+                    addLine(plan.entry, entryTitle, COLORS.entry, analysis.entryTime === null);
+                    addLine(plan.stopLoss, 'SL', COLORS.sl);
+                    addLine(plan.takeProfit, `TP · RR 1:${plan.rr.toFixed(1)}`, COLORS.tp);
+                    addLine(plan.midpoint, 'Mid', COLORS.mid, true, 1);
+
+                    // ---- projected market path: W shape for a BUY, M shape for a SELL, ending at the TP
+                    const dir = sell ? -1 : 1;
+                    const lastClose = candles[candles.length - 1].close;
+                    const startPrice = analysis.entryTime !== null ? lastClose : plan.entry;
+                    const reach = Math.abs(plan.takeProfit - startPrice);
+                    const risk = Math.abs(plan.entry - plan.stopLoss);
+                    if (reach > 0) {
+                        // first dip / spike is kept small and never goes past half-way to the stop loss
+                        const dip = Math.min(reach * 0.2, risk * 0.5);
+                        // [candles ahead, price]
+                        const steps: Array<[number, number]> = [
+                            [0, startPrice],
+                            [2, startPrice - dir * dip],
+                            [4, startPrice + dir * reach * 0.4],
+                            [6, startPrice + dir * reach * 0.1],
+                            [8, plan.takeProfit],
+                        ];
+                        const pathSeries = chart.addLineSeries({
+                            color: COLORS.path,
+                            lineWidth: 2,
+                            lineStyle: 2,
+                            lastValueVisible: false,
+                            priceLineVisible: false,
+                            crosshairMarkerVisible: false,
+                        });
+                        pathSeries.setData(
+                            steps.map(([k, value]) => ({ time: (lastT + len * k) as UTCTimestamp, value }))
+                        );
+                        pathSeries.setMarkers([
+                            {
+                                time: (lastT + len * 8) as UTCTimestamp,
+                                position: sell ? 'belowBar' : 'aboveBar',
+                                shape: sell ? 'arrowDown' : 'arrowUp',
+                                color: COLORS.path,
+                                text: sell ? 'Expected (M)' : 'Expected (W)',
+                            },
+                        ]);
+                        extraRef.current.push(pathSeries);
+                    }
+
+                    // the point of entry itself
+                    markers.push(
+                        analysis.entryTime !== null
+                            ? {
+                                  time: analysis.entryTime as UTCTimestamp,
+                                  position: sell ? 'aboveBar' : 'belowBar',
+                                  shape: sell ? 'arrowDown' : 'arrowUp',
+                                  color: COLORS.entry,
+                                  text: `ENTRY ${plan.side}`,
+                              }
+                            : {
+                                  time: lastT as UTCTimestamp,
+                                  position: 'inBar',
+                                  shape: 'circle',
+                                  color: COLORS.entry,
+                                  text: planned ? 'Entry' : 'Entry zone',
+                              }
+                    );
+                }
+
+                // Labels on neighbouring candles would overlap, so keep the text of the most important
+                // marker (entry > sweep > BOS > FVG) and show only the arrow/shape for the others.
+                const rank = (m: SeriesMarker<Time>) => {
+                    const t = m.text ?? '';
+                    return t.startsWith('ENTRY') || t.startsWith('Entry') ? 0 : t === 'Sweep' ? 1 : t === 'BOS' ? 2 : 3;
+                };
+                const keep: SeriesMarker<Time>[] = [];
+                [...markers]
+                    .sort((a, b) => rank(a) - rank(b))
+                    .forEach(m => {
+                        const clash = keep.some(
+                            k => k.text && Math.abs((k.time as number) - (m.time as number)) < 7 * len
+                        );
+                        keep.push(clash ? { ...m, text: '' } : m);
+                    });
+                keep.sort((a, b) => (a.time as number) - (b.time as number));
+                series.setMarkers(keep);
+
+                // make autoscale include all levels
+                const lv: number[] = [];
+                if (r) lv.push(r.high, r.low);
+                if (plan) lv.push(plan.entry, plan.stopLoss, plan.takeProfit);
+                if (analysis.watch) lv.push(analysis.watch.sell.stopLoss, analysis.watch.buy.stopLoss);
+                if (analysis.fvg) lv.push(analysis.fvg.top, analysis.fvg.bottom);
+                if (lv.length) {
+                    const span = Math.max(...lv) - Math.min(...lv);
+                    levelsRef.current = { min: Math.min(...lv) - span * 0.04, max: Math.max(...lv) + span * 0.04 };
+                }
+
+                // Frame the range and the move after it, with room on the right for the boxes.
+                if (r) {
+                    // the latest candles, big enough to read (zoom out for more); keepView leaves a zoom the person already chose alone
+                    openView();
+                }
+            },
+            screenshot(opts) {
+                const chart = chartRef.current;
+                if (!chart) return null;
+                try {
+                    const src = chart.takeScreenshot();
+                    if (opts?.full) return src.toDataURL('image/png');
+                    const maxW = 1100;
+                    const scale = Math.min(1, maxW / src.width);
+                    const out = document.createElement('canvas');
+                    out.width = Math.round(src.width * scale);
+                    out.height = Math.round(src.height * scale);
+                    const ctx = out.getContext('2d');
+                    if (!ctx) return null;
+                    ctx.drawImage(src, 0, 0, out.width, out.height);
+                    return out.toDataURL('image/jpeg', 0.8);
+                } catch {
+                    return null;
+                }
+            },
+        };
+        // redrawing the analysis must never move or re-zoom what the person is looking at
+        const keepView =
+            <A extends unknown[]>(fn: (...a: A) => void) =>
+            (...a: A) => {
+                const ts = chartRef.current?.timeScale();
+                const range = ts?.getVisibleLogicalRange() ?? null;
+                fn(...a);
+                if (ts && range) ts.setVisibleLogicalRange(range);
             };
-            const keep: SeriesMarker<Time>[] = [];
-            [...markers]
-                .sort((a, b) => rank(a) - rank(b))
-                .forEach(m => {
-                    const clash = keep.some(k => k.text && Math.abs((k.time as number) - (m.time as number)) < 7 * len);
-                    keep.push(clash ? { ...m, text: '' } : m);
-                });
-            keep.sort((a, b) => (a.time as number) - (b.time as number));
-            series.setMarkers(keep);
-
-            // make autoscale include all levels
-            const lv: number[] = [];
-            if (r) lv.push(r.high, r.low);
-            if (plan) lv.push(plan.entry, plan.stopLoss, plan.takeProfit);
-            if (analysis.watch) lv.push(analysis.watch.sell.stopLoss, analysis.watch.buy.stopLoss);
-            if (analysis.fvg) lv.push(analysis.fvg.top, analysis.fvg.bottom);
-            if (lv.length) {
-                const span = Math.max(...lv) - Math.min(...lv);
-                levelsRef.current = { min: Math.min(...lv) - span * 0.04, max: Math.max(...lv) + span * 0.04 };
-            }
-
-            // Frame the range and the move after it, with room on the right for the boxes.
-            if (r) {
-                // the latest candles, big enough to read (zoom out for more); keepView leaves a zoom the person already chose alone
-                openView();
-            }
-        },
-        screenshot() {
-            const chart = chartRef.current;
-            if (!chart) return null;
-            try {
-                const src = chart.takeScreenshot();
-                const maxW = 1100;
-                const scale = Math.min(1, maxW / src.width);
-                const out = document.createElement('canvas');
-                out.width = Math.round(src.width * scale);
-                out.height = Math.round(src.height * scale);
-                const ctx = out.getContext('2d');
-                if (!ctx) return null;
-                ctx.drawImage(src, 0, 0, out.width, out.height);
-                return out.toDataURL('image/jpeg', 0.8);
-            } catch {
-                return null;
-            }
-        },
-      };
-      // redrawing the analysis must never move or re-zoom what the person is looking at
-      const keepView = <A extends unknown[]>(fn: (...a: A) => void) => (...a: A) => {
-          const ts = chartRef.current?.timeScale();
-          const range = ts?.getVisibleLogicalRange() ?? null;
-          fn(...a);
-          if (ts && range) ts.setVisibleLogicalRange(range);
-      };
-      return { ...impl, drawAnalysis: keepView(impl.drawAnalysis), drawPdh: keepView(impl.drawPdh) };
+        return { ...impl, drawAnalysis: keepView(impl.drawAnalysis), drawPdh: keepView(impl.drawPdh) };
     });
 
     return (

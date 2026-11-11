@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle } from './chart-view';
+import ChartStudies from './chart-studies';
+import { loadStudies, type StudyState } from './indicators';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
 import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
@@ -302,6 +304,9 @@ const ForexTrader = ({
     const m15StreamRef = useRef('');
 
     const chartRef = useRef<ChartViewHandle>(null);
+    // chart style + indicators: the toolbar row above the chart drives them (the chart saves them in the browser)
+    const [studies, setStudies] = useState<StudyState>(loadStudies);
+    const [snapped, setSnapped] = useState(false);
     // earlier candles for the chart, asked for when it is dragged back to its oldest one (only the chart gets them: the analysis keeps its own recent candles)
     const olderCtx = useRef({ symbol, sec: 0 });
     olderCtx.current = { symbol, sec: mode === 'mtf' ? M5_SEC : tf };
@@ -1064,6 +1069,23 @@ const ForexTrader = ({
         </button>
     );
 
+    /** Camera button: saves a picture of the chart as it looks now (candles, indicators and the drawn lines). */
+    const takePicture = () => {
+        const url = chartRef.current?.screenshot({ full: true });
+        if (!url) return;
+        const name = (info?.underlying_symbol_name ?? symbol).replace(/[^\w]+/g, '_');
+        const label = TIMEFRAMES.find(t => t.sec === tf)?.label ?? '';
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}_${label}_${stamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setSnapped(true);
+        window.setTimeout(() => setSnapped(false), 1600);
+    };
+
     return (
         <div
             ref={rootRef}
@@ -1089,6 +1111,39 @@ const ForexTrader = ({
             )}
             {inBar && (
                 <div className='forex-trader__bar'>
+                    <MarketPicker
+                        variant='bar'
+                        symbols={symbols}
+                        value={symbol}
+                        onChange={sym => {
+                            setSymbol(sym);
+                            onSymbolChange?.(sym);
+                        }}
+                    />
+                    {onOpenCompare && (
+                        <button
+                            type='button'
+                            className='forex-trader__bar-plus'
+                            onClick={onOpenCompare}
+                            title='Compare: open 2 or 4 charts of this market, each with its own candle size'
+                            aria-label='Compare charts'
+                        >
+                            <svg
+                                viewBox='0 0 24 24'
+                                width='18'
+                                height='18'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='1.7'
+                                strokeLinecap='round'
+                                aria-hidden='true'
+                            >
+                                <circle cx='12' cy='12' r='8.5' />
+                                <path d='M12 8v8M8 12h8' />
+                            </svg>
+                        </button>
+                    )}
+                    <span className='forex-trader__bar-sep' aria-hidden='true' />
                     <TfBar
                         tf={tf}
                         mode={mode}
@@ -1098,8 +1153,48 @@ const ForexTrader = ({
                         }}
                     />
                     <span className='forex-trader__bar-sep' aria-hidden='true' />
+                    <ChartStudies variant='bar' state={studies} onChange={setStudies} />
+                    <span className='forex-trader__bar-sep' aria-hidden='true' />
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
                     <span className='forex-trader__bar-grow' aria-hidden='true' />
+                    <button
+                        type='button'
+                        className={`forex-trader__bar-cam${snapped ? ' is-done' : ''}`}
+                        onClick={takePicture}
+                        title={snapped ? 'Picture saved to your downloads' : 'Save a picture of the chart'}
+                        aria-label='Save a picture of the chart'
+                    >
+                        {snapped ? (
+                            <svg
+                                viewBox='0 0 24 24'
+                                width='18'
+                                height='18'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                aria-hidden='true'
+                            >
+                                <path d='M5 12.5l4.5 4.5L19 7.5' />
+                            </svg>
+                        ) : (
+                            <svg
+                                viewBox='0 0 24 24'
+                                width='18'
+                                height='18'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='1.6'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                aria-hidden='true'
+                            >
+                                <path d='M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.2-2h6.6L16.5 7h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z' />
+                                <circle cx='12' cy='13' r='3.4' />
+                            </svg>
+                        )}
+                    </button>
                     {liveButton}
                 </div>
             )}
@@ -1129,7 +1224,14 @@ const ForexTrader = ({
                         : undefined
                 }
             >
-                <ChartView ref={chartRef} pipSize={pipSize} loadOlder={loadOlder} />
+                <ChartView
+                    ref={chartRef}
+                    pipSize={pipSize}
+                    loadOlder={loadOlder}
+                    studies={!inBar}
+                    studyState={studies}
+                    onStudyState={setStudies}
+                />
                 <div className='forex-trader__chart-info'>
                     <b>{info?.underlying_symbol_name ?? symbol}</b>
                     <span>{mode === 'mtf' ? 'M15 + M5' : TIMEFRAMES.find(t => t.sec === tf)?.label}</span>

@@ -16,9 +16,12 @@ interface Props {
     symbols: MarketSymbol[];
     value: string;
     onChange: (symbol: string) => void;
+    /** 'bar' = a TradingView-style search button for a toolbar row (no label, menu drops below, wider). */
+    variant?: 'field' | 'bar';
 }
 
-const MarketPicker = ({ symbols, value, onChange }: Props) => {
+const MarketPicker = ({ symbols, value, onChange, variant = 'field' }: Props) => {
+    const bar = variant === 'bar';
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -80,18 +83,38 @@ const MarketPicker = ({ symbols, value, onChange }: Props) => {
     };
 
     return (
-        <div className='forex-trader__market' ref={rootRef}>
-            <span>Market</span>
-            <button type='button' className='market-picker__button' onClick={toggleOpen} aria-expanded={open}>
-                <span className='market-picker__current'>
-                    {current ? current.underlying_symbol_name : value}
-                </span>
-                <span className={`market-picker__arrow${open ? ' is-open' : ''}`}>▾</span>
+        <div className={`forex-trader__market${bar ? ' forex-trader__market--bar' : ''}`} ref={rootRef}>
+            {!bar && <span>Market</span>}
+            <button
+                type='button'
+                className={bar ? 'market-picker__bar-btn' : 'market-picker__button'}
+                onClick={toggleOpen}
+                aria-expanded={open}
+                title={bar ? 'Search a market' : undefined}
+            >
+                {bar && (
+                    <svg
+                        viewBox='0 0 24 24'
+                        width='15'
+                        height='15'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='1.9'
+                        strokeLinecap='round'
+                        aria-hidden='true'
+                    >
+                        <circle cx='10.5' cy='10.5' r='6' />
+                        <path d='M15 15l5 5' />
+                    </svg>
+                )}
+                <span className='market-picker__current'>{current ? current.underlying_symbol_name : value}</span>
+                {!bar && <span className={`market-picker__arrow${open ? ' is-open' : ''}`}>▾</span>}
             </button>
             {open && (
-                <div className='market-picker__menu'>
+                <div className={`market-picker__menu${bar ? ' market-picker__menu--bar' : ''}`}>
                     <input
                         className='market-picker__search'
+                        autoFocus={bar}
                         placeholder='Search a market…'
                         value={query}
                         onChange={e => setQuery(e.target.value)}

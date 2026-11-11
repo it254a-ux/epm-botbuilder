@@ -5,10 +5,21 @@ import './chart-studies.scss';
 interface Props {
     state: StudyState;
     onChange: (next: StudyState) => void;
+    /** 'rail' = the buttons in the drawing toolbar; 'bar' = TradingView-style entries in the toolbar row above the chart. */
+    variant?: 'rail' | 'bar';
 }
 
 const Svg = ({ children }: { children: ReactNode }) => (
-    <svg viewBox='0 0 24 24' width='18' height='18' fill='none' stroke='currentColor' strokeWidth='1.7' strokeLinecap='round' strokeLinejoin='round'>
+    <svg
+        viewBox='0 0 24 24'
+        width='18'
+        height='18'
+        fill='none'
+        stroke='currentColor'
+        strokeWidth='1.7'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+    >
         {children}
     </svg>
 );
@@ -61,7 +72,7 @@ const FX_ICON = (
  * The chart style and indicators buttons. They sit at the top of the drawing toolbar (same look, same fly-out
  * menus), so nothing floats over the chart and nothing hides the market name or the price.
  */
-const ChartStudies = ({ state, onChange }: Props) => {
+const ChartStudies = ({ state, onChange, variant = 'rail' }: Props) => {
     const [open, setOpen] = useState<'kind' | 'studies' | null>(null);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -89,10 +100,98 @@ const ChartStudies = ({ state, onChange }: Props) => {
     const toggle = (key: StudyKey) => onChange({ ...state, on: { ...state.on, [key]: !state.on[key] } });
     const kindLabel = KINDS.find(k => k.key === state.kind)?.label ?? 'Candles';
 
+    if (variant === 'bar') {
+        const quick: ChartKind[] = ['bars', 'candles', 'line'];
+        const moreOn = !quick.includes(state.kind);
+        return (
+            <div className='fx-studies fx-studies--bar' ref={ref}>
+                <div className='fx-bar-kinds' role='group' aria-label='Chart style'>
+                    {quick.map(k => (
+                        <button
+                            key={k}
+                            type='button'
+                            className={state.kind === k ? 'is-on' : ''}
+                            title={KINDS.find(x => x.key === k)?.label}
+                            aria-label={KINDS.find(x => x.key === k)?.label}
+                            aria-pressed={state.kind === k}
+                            onClick={() => onChange({ ...state, kind: k })}
+                        >
+                            {KIND_ICONS[k]}
+                        </button>
+                    ))}
+                    <button
+                        type='button'
+                        className={`fx-bar-more${open === 'kind' ? ' is-open' : ''}${moreOn ? ' is-on' : ''}`}
+                        title={`All chart styles (now: ${kindLabel})`}
+                        aria-label='All chart styles'
+                        aria-expanded={open === 'kind'}
+                        onClick={() => show('kind')}
+                    >
+                        <i aria-hidden='true' />
+                    </button>
+                    {open === 'kind' && (
+                        <div className='fx-menu fx-menu--drop' role='menu'>
+                            <div className='fx-menu__title'>Chart style</div>
+                            {KINDS.map(k => (
+                                <button
+                                    key={k.key}
+                                    type='button'
+                                    role='menuitemradio'
+                                    aria-checked={state.kind === k.key}
+                                    className={`fx-item${state.kind === k.key ? ' is-on' : ''}`}
+                                    onClick={() => {
+                                        onChange({ ...state, kind: k.key });
+                                        setOpen(null);
+                                    }}
+                                >
+                                    {KIND_ICONS[k.key]}
+                                    <span>{k.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <span className='fx-bar-sep' aria-hidden='true' />
+                <div className='fx-bar-ind'>
+                    <button
+                        type='button'
+                        className={`fx-bar-indbtn${open === 'studies' || count > 0 ? ' is-on' : ''}`}
+                        aria-expanded={open === 'studies'}
+                        title={count ? `Indicators (${count} on)` : 'Indicators'}
+                        onClick={() => show('studies')}
+                    >
+                        {FX_ICON}
+                        <span>Indicators</span>
+                        {count > 0 && <b className='fx-bar-count'>{count}</b>}
+                    </button>
+                    {open === 'studies' && (
+                        <div className='fx-menu fx-menu--wide fx-menu--drop' role='menu'>
+                            <div className='fx-menu__title'>Indicators</div>
+                            {STUDIES.map(st => (
+                                <label key={st.key} className={`fx-item fx-check${state.on[st.key] ? ' is-on' : ''}`}>
+                                    <input type='checkbox' checked={state.on[st.key]} onChange={() => toggle(st.key)} />
+                                    <span className='fx-check__box' aria-hidden='true' />
+                                    <span>{st.label}</span>
+                                    <small>{st.hint}</small>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className='fx-studies' ref={ref}>
             <div className='fx-group'>
-                <button type='button' className={`fx-btn${open === 'kind' ? ' is-on' : ''}`} data-tip={`Chart style: ${kindLabel}`} aria-label='Chart style' onClick={() => show('kind')}>
+                <button
+                    type='button'
+                    className={`fx-btn${open === 'kind' ? ' is-on' : ''}`}
+                    data-tip={`Chart style: ${kindLabel}`}
+                    aria-label='Chart style'
+                    onClick={() => show('kind')}
+                >
                     {KIND_ICONS[state.kind]}
                 </button>
                 {open === 'kind' && (
@@ -118,7 +217,13 @@ const ChartStudies = ({ state, onChange }: Props) => {
                 )}
             </div>
             <div className='fx-group'>
-                <button type='button' className={`fx-btn${open === 'studies' || count > 0 ? ' is-on' : ''}`} data-tip={count ? `Indicators (${count} on)` : 'Indicators'} aria-label='Indicators' onClick={() => show('studies')}>
+                <button
+                    type='button'
+                    className={`fx-btn${open === 'studies' || count > 0 ? ' is-on' : ''}`}
+                    data-tip={count ? `Indicators (${count} on)` : 'Indicators'}
+                    aria-label='Indicators'
+                    onClick={() => show('studies')}
+                >
                     {FX_ICON}
                     {count > 0 && <b className='fx-count'>{count}</b>}
                 </button>

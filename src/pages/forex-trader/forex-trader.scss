@@ -588,13 +588,20 @@
     border: 1px solid rgba(187, 247, 208, 0.55);
     border-radius: 6px;
     background: linear-gradient(180deg, #22c55e, #15803d);
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow:
+        0 2px 8px rgba(34, 197, 94, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
     cursor: default;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    transition:
+        background 0.3s ease,
+        box-shadow 0.3s ease;
 
     // the time left on the forming candle; green = live, amber = reconnecting, grey = paused
     .forex-trader__clock {
-        font: 600 10px/1 'Segoe UI', system-ui, sans-serif;
+        font:
+            600 10px/1 'Segoe UI',
+            system-ui,
+            sans-serif;
         font-variant-numeric: tabular-nums;
         letter-spacing: 0.03em;
         color: #fff;
@@ -604,12 +611,16 @@
 
     &.is-wait {
         background: linear-gradient(180deg, #f59e0b, #b45309);
-        box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        box-shadow:
+            0 4px 14px rgba(245, 158, 11, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
     &.is-paused {
         background: linear-gradient(180deg, #6b7280, #374151);
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        box-shadow:
+            0 4px 14px rgba(0, 0, 0, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
 }
 
@@ -795,7 +806,14 @@
 // A light, even typeface for the analysis result: regular weight, medium for labels and headings only.
 .forex-trader__result,
 .forex-trader__result * {
-    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-family:
+        'Segoe UI',
+        system-ui,
+        -apple-system,
+        Roboto,
+        'Helvetica Neue',
+        Arial,
+        sans-serif !important;
     font-weight: 400 !important;
 }
 
@@ -838,9 +856,15 @@
 // each category is a full-width bar; its strategies slide open directly underneath it
 .forex-trader__acc {
     border-radius: 12px;
-    background: linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent), color-mix(in srgb, #000 24%, transparent));
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, #fff 6%, transparent),
+        color-mix(in srgb, #000 24%, transparent)
+    );
     border: 1px solid color-mix(in srgb, var(--text-prominent) 13%, transparent);
-    transition: border-color 0.25s, box-shadow 0.25s;
+    transition:
+        border-color 0.25s,
+        box-shadow 0.25s;
 
     &.is-open {
         border-color: color-mix(in srgb, #c9a227 65%, transparent);
@@ -894,7 +918,9 @@
         border-right: 1.5px solid var(--text-less-prominent);
         border-bottom: 1.5px solid var(--text-less-prominent);
         transform: rotate(45deg);
-        transition: transform 0.3s ease, border-color 0.2s;
+        transition:
+            transform 0.3s ease,
+            border-color 0.2s;
     }
 
     &:hover i {
@@ -913,7 +939,9 @@
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
-    transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    transition:
+        grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.25s ease;
 
     > .forex-trader__strats {
         overflow: hidden;
@@ -1038,7 +1066,9 @@
         color: var(--text-less-prominent);
         opacity: 0;
         transform: translateX(-6px);
-        transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+        transition:
+            opacity 0.3s ease 0.1s,
+            transform 0.3s ease 0.1s;
     }
 
     i {
@@ -1058,7 +1088,6 @@
 
 // minimised: only the header shows
 .forex-trader__controls.is-collapsed .forex-trader__head {
-
     i {
         transform: rotate(45deg);
         margin-top: -5px;
@@ -1071,7 +1100,10 @@
     grid-template-rows: 1fr;
     opacity: 1;
     transform: none;
-    transition: grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transition:
+        grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.35s ease,
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
         visibility 0s linear 0s;
 }
 
@@ -1090,7 +1122,10 @@
     opacity: 0;
     transform: translateY(-6px);
     visibility: hidden;
-    transition: grid-template-rows 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transition:
+        grid-template-rows 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.25s ease,
+        transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
         visibility 0s linear 0.45s;
 }
 
@@ -1133,7 +1168,6 @@
         }
     }
 }
-
 
 // A control a parent page puts beside the Trade setup button: it sits to the right of it and slides over when the setup opens.
 .forex-trader__extra {
@@ -1299,8 +1333,9 @@
     height: 26px;
     transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 
-    &.is-open {
-        width: 340px;
+    // opening only drops the panel over the chart; the row's other items stay where they are
+    &.is-open .forex-trader__controls {
+        width: 340px !important;
     }
 
     .forex-trader__controls {
@@ -1357,5 +1392,202 @@
 @media (min-width: 1100px) {
     .forex-trader--result-out:not(.forex-trader--panel) .forex-trader__chart-wrap {
         grid-row: 2 !important;
+    }
+}
+
+// ---- TradingView-style entries in the toolbar row: market search, +, chart style, indicators, camera ----
+.forex-trader__bar {
+    .forex-trader__market--bar {
+        position: relative;
+        flex: none;
+        width: auto;
+    }
+
+    .market-picker__bar-btn,
+    .forex-trader__bar-plus,
+    .forex-trader__bar-cam,
+    .fx-bar-kinds > button,
+    .fx-bar-indbtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 26px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #aab4c5;
+        font: inherit;
+        font-size: 11.5px;
+        font-weight: 400;
+        cursor: pointer;
+        transition:
+            background 0.18s ease,
+            color 0.18s ease,
+            box-shadow 0.18s ease;
+
+        &:hover {
+            background: rgba(148, 163, 184, 0.14);
+            color: #eef2f8;
+        }
+
+        &.is-on,
+        &[aria-expanded='true'] {
+            background: rgba(246, 211, 107, 0.16);
+            color: #f6d36b;
+            box-shadow: inset 0 0 0 1px rgba(246, 211, 107, 0.32);
+        }
+    }
+
+    .market-picker__bar-btn {
+        gap: 6px;
+        max-width: 190px;
+        padding: 0 10px 0 8px;
+        color: #e4e9f2;
+
+        .market-picker__current {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: inherit;
+        }
+
+        svg {
+            flex: none;
+            opacity: 0.85;
+        }
+    }
+
+    .forex-trader__bar-plus,
+    .forex-trader__bar-cam {
+        width: 28px;
+        padding: 0;
+    }
+
+    .forex-trader__bar-cam.is-done {
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.14);
+    }
+
+    // chart style (bars / candles / line + all styles) and indicators
+    .fx-studies--bar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        position: relative;
+    }
+
+    .fx-bar-kinds {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 1px;
+
+        > button {
+            width: 28px;
+            padding: 0;
+
+            svg {
+                width: 17px;
+                height: 17px;
+            }
+        }
+
+        .fx-bar-more {
+            position: relative;
+            width: 18px;
+
+            i {
+                width: 5px;
+                height: 5px;
+                margin-top: -3px;
+                border-right: 1.5px solid currentColor;
+                border-bottom: 1.5px solid currentColor;
+                transform: rotate(45deg);
+                transition: transform 0.25s ease;
+            }
+
+            &.is-open i {
+                margin-top: 1px;
+                transform: rotate(225deg);
+            }
+        }
+    }
+
+    .fx-bar-sep {
+        flex: none;
+        width: 1px;
+        height: 16px;
+        margin: 0 4px;
+        background: rgba(148, 163, 184, 0.24);
+    }
+
+    .fx-bar-ind {
+        position: relative;
+    }
+
+    .fx-bar-indbtn {
+        gap: 6px;
+        padding: 0 9px;
+
+        svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        .fx-bar-count {
+            min-width: 14px;
+            height: 14px;
+            padding: 0 4px;
+            border-radius: 7px;
+            background: #f6d36b;
+            color: #1a1405;
+            font-size: 9px;
+            font-weight: 600;
+            line-height: 14px;
+            text-align: center;
+        }
+    }
+
+    // the drop-down menus open under the row instead of beside a vertical toolbar
+    .fx-menu--drop {
+        left: 0;
+        top: calc(100% + 8px);
+        z-index: 40;
+        animation: forex-trader-menu-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+}
+
+.forex-trader__bar .market-picker__menu--bar {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: auto;
+    z-index: 40;
+    width: 330px;
+    padding: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(30, 36, 50, 0.98), rgba(14, 18, 28, 0.98));
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+    animation: forex-trader-menu-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+
+    .market-picker__search {
+        height: 32px;
+        border-color: rgba(148, 163, 184, 0.28);
+        background: rgba(8, 11, 18, 0.7);
+        font-size: 12px;
+    }
+
+    .market-picker__list {
+        max-height: min(420px, 60vh);
+    }
+}
+
+// not enough room for the word: the Indicators button keeps just its icon
+@media (max-width: 1400px) {
+    .forex-trader__bar .fx-bar-indbtn > span:not(.fx-bar-count) {
+        display: none;
     }
 }
