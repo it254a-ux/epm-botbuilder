@@ -1,8 +1,18 @@
 {
   "name": "epm-botbuilder",
+  "main": "worker/index.js",
   "compatibility_date": "2026-11-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/owner", "/admin"]
+  },
+  "alias": {
+    "@libsql/client": "@libsql/client/web",
+    "@resvg/resvg-js": "./worker/stubs/resvg.js",
+    "@neondatabase/serverless": "./worker/stubs/neon.js"
   }
 }
