@@ -43,6 +43,7 @@ const entryLib = require('./_lib/signal-entry');
 const store = require('./_lib/signals-store');
 const news = require('./_lib/news');
 const { authorised } = require('./_lib/signals-auth');
+const { signalsPaused } = require('./_lib/signals-pause');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -482,6 +483,12 @@ const ROUTES = {
 
 module.exports = async function handler(req, res) {
     const route = req.query && req.query.route;
+    // paused: the two watchers (H1 and M15 + M5) are the only things that generate or send signals
+    if ((route === undefined || route === '' || route === 'watch-mtf') && signalsPaused()) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(200).json({ ok: true, paused: true, note: 'Signals are paused. Set SIGNALS_ENABLED=on to resume.' });
+        return;
+    }
     if (route === undefined || route === '') return handleH1(req, res);
     const load = Object.prototype.hasOwnProperty.call(ROUTES, route) ? ROUTES[route] : null;
     if (!load) {

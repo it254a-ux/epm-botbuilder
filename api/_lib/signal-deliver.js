@@ -4,8 +4,10 @@
 // Returns { messageId, picture: true | 'failed: why' }.
 const chart = require('./signal-chart');
 const { sendTelegram, sendTelegramPhoto } = require('./telegram');
+const { signalsPaused } = require('./signals-pause');
 
 async function deliverSignal(text, chartInput) {
+    if (signalsPaused()) return { messageId: null, picture: 'paused' }; // safety net: nothing leaves while paused
     let why = null;
     try {
         const png = chart.renderChartPng(chartInput);
