@@ -337,6 +337,9 @@ const ForexTrader = ({
     // chart style + indicators: the toolbar row above the chart drives them (the chart saves them in the browser)
     const [studies, setStudies] = useState<StudyState>(loadStudies);
     const [snapped, setSnapped] = useState(false);
+    // the toolbar row adapts to the width it is given (a zoomed-in browser or a narrow chart column): smaller steps drop labels, then less-used buttons
+    const barRef = useRef<HTMLDivElement>(null);
+    const [barSize, setBarSize] = useState<'xl' | 'l' | 'm' | 's'>('xl');
     // 'deriv' = our live Deriv chart (default, the bot works on it); 'all' = TradingView's chart with every market
     const [view, setView] = useState<'deriv' | 'all'>('deriv');
     // earlier candles for the chart, asked for when it is dragged back to its oldest one (only the chart gets them: the analysis keeps its own recent candles)
@@ -1101,6 +1104,17 @@ const ForexTrader = ({
         </button>
     );
 
+    useEffect(() => {
+        const el = barRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return undefined;
+        const ro = new ResizeObserver(() => {
+            const w = el.clientWidth;
+            setBarSize(w >= 1000 ? 'xl' : w >= 860 ? 'l' : w >= 700 ? 'm' : 's');
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    });
+
     /** Camera button: saves a picture of the chart as it looks now (candles, indicators and the drawn lines). */
     const takePicture = async () => {
         const url = chartRef.current?.screenshot({ full: true });
@@ -1190,7 +1204,7 @@ const ForexTrader = ({
                 </div>
             )}
             {inBar && (
-                <div className='forex-trader__bar'>
+                <div ref={barRef} className={`forex-trader__bar forex-trader__bar--${barSize}`}>
                     <MarketPicker
                         variant='bar'
                         symbols={symbols}
@@ -1245,7 +1259,8 @@ const ForexTrader = ({
                             title="TradingView's chart: search every market on TradingView"
                             onClick={() => setView('all')}
                         >
-                            All markets
+                            <span className='long'>All markets</span>
+                            <span className='short'>All</span>
                         </button>
                         <button
                             type='button'
@@ -1254,7 +1269,8 @@ const ForexTrader = ({
                             title='The live Deriv chart your bot and Sniper work on'
                             onClick={() => setView('deriv')}
                         >
-                            Deriv chart
+                            <span className='long'>Deriv chart</span>
+                            <span className='short'>Deriv</span>
                         </button>
                     </div>
                     <button

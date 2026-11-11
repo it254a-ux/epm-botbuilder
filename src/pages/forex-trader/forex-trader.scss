@@ -1587,8 +1587,44 @@
 }
 
 // not enough room for the word: the Indicators button keeps just its icon
-@media (max-width: 1150px) {
-    .forex-trader__bar .fx-bar-indbtn > span:not(.fx-bar-count) {
+// narrower rows give up the words first, then the buttons used least
+.forex-trader__bar .forex-trader__bar-view .short {
+    display: none;
+}
+
+.forex-trader__bar--l,
+.forex-trader__bar--m,
+.forex-trader__bar--s {
+    .fx-bar-indbtn > span:not(.fx-bar-count) {
+        display: none;
+    }
+    .market-picker__bar-btn {
+        max-width: 112px;
+    }
+    .forex-trader__bar-view {
+        .long {
+            display: none;
+        }
+        .short {
+            display: inline;
+        }
+    }
+}
+
+.forex-trader__bar--m,
+.forex-trader__bar--s {
+    gap: 4px;
+
+    .forex-trader__bar-plus,
+    .fx-bar-kinds > button:nth-child(1),
+    .fx-bar-kinds > button:nth-child(3) {
+        display: none;
+    }
+}
+
+.forex-trader__bar--s {
+    .forex-trader__bar-view,
+    .forex-trader__bar-sep {
         display: none;
     }
 }
