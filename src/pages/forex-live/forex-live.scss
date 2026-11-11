@@ -103,6 +103,11 @@
         border-radius: 0;
     }
 
+    // keep the toolbar row's right end (camera, candle timer) clear of the enlarge button
+    &__chartcol .forex-trader__bar {
+        padding-right: 44px;
+    }
+
     // the "make the chart as tall as the screen" button, in the chart's top-right corner
     &__tall-btn {
         position: absolute;
@@ -120,7 +125,10 @@
         color: var(--text-prominent);
         background: color-mix(in srgb, var(--general-main-1) 82%, transparent);
         backdrop-filter: blur(8px);
-        transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        transition:
+            background 0.2s ease,
+            border-color 0.2s ease,
+            transform 0.2s ease;
 
         &:hover {
             background: color-mix(in srgb, var(--general-main-1) 60%, var(--text-prominent) 14%);
@@ -223,7 +231,9 @@
         border-radius: 16px;
         background: var(--fl-card);
         border: 1px solid var(--fl-line);
-        box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.55), inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+        box-shadow:
+            0 10px 30px -18px rgba(0, 0, 0, 0.55),
+            inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
 
@@ -397,7 +407,10 @@
         touch-action: manipulation; // no double-tap zoom delay on phones: taps register at once
         user-select: none;
         box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
-        transition: transform 0.05s, filter 0.15s, box-shadow 0.15s;
+        transition:
+            transform 0.05s,
+            filter 0.15s,
+            box-shadow 0.15s;
 
         span {
             font-size: 10px;
@@ -423,12 +436,16 @@
 
         &--buy {
             background: linear-gradient(135deg, #34d399, #059669);
-            box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 8px 18px -10px #10b981;
+            box-shadow:
+                inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent),
+                0 8px 18px -10px #10b981;
         }
 
         &--sell {
             background: linear-gradient(135deg, #f87171, #dc2626);
-            box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 8px 18px -10px #ef4444;
+            box-shadow:
+                inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent),
+                0 8px 18px -10px #ef4444;
         }
     }
 
@@ -503,7 +520,9 @@
         color: var(--text-general);
         background-color: var(--fl-field);
         border: 1px solid var(--fl-line);
-        transition: border-color 0.15s, box-shadow 0.15s;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
 
         &:focus {
             outline: none;
@@ -531,7 +550,9 @@
             color: inherit;
             background: transparent;
             border: 1px solid var(--fl-line);
-            transition: background 0.15s, border-color 0.15s;
+            transition:
+                background 0.15s,
+                border-color 0.15s;
 
             &:hover {
                 border-color: var(--fl-gold);
@@ -1069,7 +1090,14 @@
 .forex-live__card *,
 .forex-live__buttons--pinned,
 .forex-live__buttons--pinned * {
-    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-family:
+        'Segoe UI',
+        system-ui,
+        -apple-system,
+        Roboto,
+        'Helvetica Neue',
+        Arial,
+        sans-serif !important;
     font-weight: 400 !important;
 }
 
@@ -1193,7 +1221,9 @@
                 font-size: 10.5px;
                 font-weight: 700;
                 cursor: pointer;
-                transition: background 0.2s ease, color 0.2s ease;
+                transition:
+                    background 0.2s ease,
+                    color 0.2s ease;
 
                 &.is-on {
                     color: #1a1405;
@@ -1247,7 +1277,9 @@
         border-radius: 6px;
         color: #fff;
         cursor: pointer;
-        transition: transform 0.12s ease, filter 0.2s ease;
+        transition:
+            transform 0.12s ease,
+            filter 0.2s ease;
 
         small {
             font-size: 8.5px;
@@ -1488,7 +1520,9 @@
         font-size: 9.5px;
         font-weight: 600;
         cursor: pointer;
-        transition: color 0.2s ease, background 0.2s ease;
+        transition:
+            color 0.2s ease,
+            background 0.2s ease;
 
         i {
             font-size: 14px;
@@ -1502,9 +1536,6 @@
         }
     }
 }
-
-
-
 
 .fl-groups {
     &__row {
@@ -1585,7 +1616,6 @@
         }
     }
 }
-
 
 .fl-estimate {
     display: grid;

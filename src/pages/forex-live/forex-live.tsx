@@ -298,12 +298,23 @@ const ForexLive = observer(() => {
         if (tall) {
             setTall(false);
             setTallBox(null);
+            try {
+                if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+            } catch {
+                /* already out */
+            }
             return;
         }
         const box = measureSlot();
         if (!box) return;
         setTallBox({ ...box, dx: 0, dy: 0 });
         setTall(true);
+        // the browser's own full screen too, so the chart is as tall as the whole monitor (no tabs, address bar or taskbar)
+        try {
+            void document.documentElement.requestFullscreen?.().catch(() => undefined);
+        } catch {
+            /* the window just keeps its own height */
+        }
     };
     // the box is placed from the window's top-left corner; if some parent changes what "fixed" means, the first measurement corrects it
     const corrected = useRef(false);
@@ -333,11 +344,20 @@ const ForexLive = observer(() => {
                 setTallBox({ ...box, dx: 0, dy: 0 });
             }
         };
+        // Esc (or F11) leaves the browser's full screen: the chart goes back to normal with it
+        const onFull = () => {
+            if (!document.fullscreenElement) {
+                setTall(false);
+                setTallBox(null);
+            }
+        };
         window.addEventListener('keydown', onKey);
         window.addEventListener('resize', onResize);
+        document.addEventListener('fullscreenchange', onFull);
         return () => {
             window.removeEventListener('keydown', onKey);
             window.removeEventListener('resize', onResize);
+            document.removeEventListener('fullscreenchange', onFull);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tall]);
