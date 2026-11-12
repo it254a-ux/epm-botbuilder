@@ -1,4 +1,4 @@
-import { armLevels, touched } from '../price-guard';
+import { armLevels, armTarget, targetReached, touched } from '../price-guard';
 
 describe('Sweep Sniper levels', () => {
     const levels = { sell: 1.105, buy: 1.095 };
@@ -70,5 +70,35 @@ describe('Price Guard group switched off', () => {
         const g = { side: 'BUY' as const, ids: [1], takeProfit: 5, stopLoss: null, done: false, active: false };
         expect(groupVerdict(g, rows)).toBeNull();
         expect(groupVerdict({ ...g, active: true }, rows)).toBe('tp');
+    });
+});
+
+describe('My target (a price marked by hand)', () => {
+    it('remembers which side of the target the price is on, like the sweep lines', () => {
+        expect(armTarget(4075, 'BUY', 4060)).toEqual({ price: 4075, side: 'BUY', from: 'below' });
+        expect(armTarget(4050, 'SELL', 4060)).toEqual({ price: 4050, side: 'SELL', from: 'above' });
+    });
+
+    it('arms nothing without a target, without a live price, or with the price exactly on the target', () => {
+        expect(armTarget(null, 'BUY', 4060)).toBeNull();
+        expect(armTarget(0, 'BUY', 4060)).toBeNull();
+        expect(armTarget(4075, 'BUY', null)).toBeNull();
+        expect(armTarget(4060, 'BUY', 4060)).toBeNull();
+    });
+
+    it('a target above the price is reached on the way up, a target below it on the way down', () => {
+        const up = armTarget(4075, 'BUY', 4060);
+        expect(targetReached(up, 4074.9)).toBe(false);
+        expect(targetReached(up, 4075)).toBe(true);
+        expect(targetReached(up, 4080)).toBe(true);
+        const down = armTarget(4050, 'SELL', 4060);
+        expect(targetReached(down, 4050.1)).toBe(false);
+        expect(targetReached(down, 4050)).toBe(true);
+        expect(targetReached(down, 4040)).toBe(true);
+    });
+
+    it('is never reached when nothing is armed or the price is not a number', () => {
+        expect(targetReached(null, 4075)).toBe(false);
+        expect(targetReached(armTarget(4075, 'BUY', 4060), NaN)).toBe(false);
     });
 });

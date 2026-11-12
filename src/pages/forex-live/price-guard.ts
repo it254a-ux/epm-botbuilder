@@ -53,6 +53,32 @@ export function touched(armed: ArmedLevels, price: number, done: ReadonlySet<Sid
     return null;
 }
 
+/**
+ * A price the person marked by hand (on the chart or by typing it), with the side to trade when the chart reaches it.
+ * `from` is the side of the price the market was on when the target was armed.
+ */
+export interface TargetMark {
+    price: number;
+    side: Side;
+    from: 'below' | 'above';
+}
+
+/**
+ * Arms a hand-marked target. Like the sweep lines, it is touched from the side it is on now: a target above the price is
+ * reached on the way up, one below it on the way down. Nothing is armed when there is no target, no live price yet, or the
+ * price is exactly on the target (nothing to wait for), so arming can never open a trade straight away.
+ */
+export function armTarget(target: number | null | undefined, side: Side, price: number | null): TargetMark | null {
+    if (!hasLevel(target) || price === null || !Number.isFinite(price) || price === target) return null;
+    return { price: target, side, from: price < target ? 'below' : 'above' };
+}
+
+/** True when the price has just reached the armed target (a thin wick counts, like a full candle). */
+export function targetReached(mark: TargetMark | null, price: number): boolean {
+    if (!mark || !Number.isFinite(price)) return false;
+    return mark.from === 'below' ? price >= mark.price : price <= mark.price;
+}
+
 /** A bell that rings again and again until stopped. Needs a tap on the page first (browsers insist), which the guard's own switch is. */
 export function createBell() {
     let ctx: AudioContext | null = null;

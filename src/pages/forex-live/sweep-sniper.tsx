@@ -1,12 +1,32 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDerivWS } from '@deriv/core';
+import type { PickPrice } from '../forex-trader/chart-view';
 import { useMeasureContext } from '../forex-trader/measure-context';
-import { GUARD_COUNTS, armLevels, createBell, touched, tradeFor, type ArmedLevels, type SniperMode } from './price-guard';
+import {
+    GUARD_COUNTS,
+    armLevels,
+    armTarget,
+    createBell,
+    targetReached,
+    touched,
+    tradeFor,
+    type ArmedLevels,
+    type SniperMode,
+    type TargetMark,
+} from './price-guard';
 import type { GuardLevels } from './price-guard';
 import { loadSniper, saveSniper } from './sniper-storage';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
-import type { Side } from './trade-engine';
+import { BUY_COLOR, SELL_COLOR, type Side } from './trade-engine';
+
+/** A plain price line for the chart (the same shape the chart takes for the open trades). */
+export interface TargetLine {
+    key: string;
+    title: string;
+    price: number;
+    color: string;
+}
 
 interface Props {
     symbol: string;
@@ -18,6 +38,10 @@ interface Props {
     /** Live line about the trades the sniper opened, e.g. "3 open · total +2.40 / target 5". */
     status?: string;
     disabled: boolean;
+    /** Waits for a click on the chart and gives the price there (the "Mark" button of My target). Without it the price is typed. */
+    pickPrice?: PickPrice;
+    /** Tells the page the line to draw on the chart for My target (null when there is none). */
+    onTargetLine?: (line: TargetLine | null) => void;
 }
 
 const CLOSE_MS = 200;
@@ -37,8 +61,11 @@ const Crosshair = () => (
  * market (a wick counts like a full candle). When price reaches the "Sell SL" line it opens SELL trades, and when it
  * reaches the "Buy SL" line it opens BUY trades, then a bell rings until you stop it. The trades it opens are watched
  * together: an optional total take profit / stop loss closes them all.
+ *
+ * My target: the person can also mark a price of their own (by clicking the chart or typing it) and choose BUY or SELL.
+ * When the chart reaches that price, that trade opens, the same way and through the same Arm switch.
  */
-const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: Props) => {
+const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pickPrice, onTargetLine }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -47,6 +74,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const [fired, setFired] = useState<Side[]>([]);
     const [ringing, setRinging] = useState(false);
     const [last, setLast] = useState<number | null>(null);
+    const [dir, setDir] = useState<'up' | 'down' | null>(null);
     const [digits, setDigits] = useState<number | null>(null);
     // the settings from before the page was refreshed. The sniper itself always starts OFF: it only switches on when you press Arm.
     const saved = useRef(loadSniper());
@@ -58,6 +86,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const panel = useMeasureContext();
     const [tp, setTp] = useState(saved.current?.tp ?? '');
     const [sl, setSl] = useState(saved.current?.sl ?? '');
+    // My target: a price marked by hand, the side to trade when it is reached, and whether it already fired
+    const [targetText, setTargetText] = useState('');
+    const [targetSide, setTargetSide] = useState<Side>('BUY');
+    const [targetDone, setTargetDone] = useState(false);
+    const [picking, setPicking] = useState(false);
     const root = useRef<HTMLDivElement>(null);
     // the panel is never taller than the room under its button: it scrolls inside itself instead of running off the screen
     const [room, setRoom] = useState<number | null>(null);
@@ -82,6 +115,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     levelsRef.current = levels;
     const triggerRef = useRef(onTrigger);
     triggerRef.current = onTrigger;
+    const onTargetLineRef = useRef(onTargetLine);
+    onTargetLineRef.current = onTargetLine;
     const price = useRef<number | null>(null);
     // the check runs straight inside the price feed's callback (through these refs), not after a screen redraw,
     // so a touch is acted on the instant the tick arrives
@@ -96,6 +131,14 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     const settingsRef = useRef({ count: 1, stake: null as number | null, takeProfit: null as number | null, stopLoss: null as number | null });
     settingsRef.current = { count, stake: num(stake), takeProfit: num(tp), stopLoss: num(sl) };
 
+    // My target, read inside the price feed's callback through refs (same reason as above)
+    const targetPrice = num(targetText);
+    const targetRef = useRef<{ price: number | null; side: Side }>({ price: null, side: 'BUY' });
+    targetRef.current = { price: targetPrice, side: targetSide };
+    const targetMarkRef = useRef<TargetMark | null>(null);
+    const targetDoneRef = useRef(false);
+    const cancelPick = useRef<(() => void) | null>(null);
+
     // the live price of this market (one stream shared with the rest of the page)
     useEffect(() => {
         if (!ws || !isConnected) return;
@@ -105,6 +148,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
             const t = (data as { tick?: { quote?: number; bid?: number; pip_size?: number } }).tick;
             const p = Number(t?.quote ?? t?.bid);
             if (off || !Number.isFinite(p)) return;
+            const before = price.current;
             price.current = p;
             if (onRef.current && armedRef.current) {
                 const line = touched(armedRef.current, p, firedRef.current);
@@ -116,7 +160,23 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                     setRinging(true);
                 }
             }
+            // My target: armed from the side the price is on, then fires once when the price reaches it
+            if (onRef.current && !targetDoneRef.current) {
+                const tg = targetRef.current;
+                if (!targetMarkRef.current) {
+                    targetMarkRef.current = armTarget(tg.price, tg.side, p);
+                } else if (targetReached(targetMarkRef.current, p)) {
+                    const side = targetMarkRef.current.side;
+                    targetDoneRef.current = true;
+                    targetMarkRef.current = null;
+                    setTargetDone(true);
+                    triggerRef.current(side, settingsRef.current);
+                    bell.current!.start();
+                    setRinging(true);
+                }
+            }
             setLast(p);
+            if (before !== null && p !== before) setDir(p > before ? 'up' : 'down');
             if (typeof t?.pip_size === 'number') setDigits(t.pip_size);
         });
         return () => {
@@ -133,7 +193,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [levels.sell, levels.buy, on]);
 
-    // the sniper belongs to one market: changing market disarms it
+    // the sniper belongs to one market: changing market disarms it (and a target price means nothing on another market)
     const firstSymbol = useRef(true);
     useEffect(() => {
         if (firstSymbol.current) {
@@ -142,12 +202,34 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         }
         onRef.current = false;
         firedRef.current = new Set();
+        targetMarkRef.current = null;
+        targetDoneRef.current = false;
+        cancelPick.current?.();
+        cancelPick.current = null;
+        setPicking(false);
+        setTargetText('');
+        setTargetDone(false);
         setOn(false);
         applyArmed(null);
         setFired([]);
         setLast(null);
+        setDir(null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
+
+    // the target is drawn on the chart as a line of its own (gone once it has fired)
+    useEffect(() => {
+        onTargetLineRef.current?.(
+            targetPrice !== null && !targetDone
+                ? {
+                      key: 'sniper-target',
+                      title: `TARGET ${targetSide}`,
+                      price: targetPrice,
+                      color: targetSide === 'BUY' ? BUY_COLOR : SELL_COLOR,
+                  }
+                : null
+        );
+    }, [targetPrice, targetSide, targetDone]);
 
     // remember the settings for a refresh (never the armed state: the sniper stays off until you turn it on)
     useEffect(() => {
@@ -168,14 +250,18 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         () => () => {
             bell.current?.stop();
             void wake.current?.release?.();
+            cancelPick.current?.();
+            window.clearTimeout(closeTimer.current);
+            onTargetLineRef.current?.(null);
         },
         []
     );
 
+    const closeTimer = useRef(0);
     const close = () => {
         if (!open || leaving) return;
         setLeaving(true);
-        window.setTimeout(() => {
+        closeTimer.current = window.setTimeout(() => {
             setOpen(false);
             setLeaving(false);
         }, CLOSE_MS);
@@ -203,6 +289,9 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         firedRef.current = new Set(restoredFired ?? []);
         applyArmed(armLevels(levelsRef.current, price.current));
         setFired([...firedRef.current]);
+        targetDoneRef.current = false;
+        setTargetDone(false);
+        targetMarkRef.current = armTarget(targetRef.current.price, targetRef.current.side, price.current);
         onRef.current = true;
         setOn(true);
         try {
@@ -213,6 +302,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     };
     const disarm = () => {
         onRef.current = false;
+        targetMarkRef.current = null;
         setOn(false);
         applyArmed(null);
         void wake.current?.release?.();
@@ -224,8 +314,30 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
     };
 
     const fmt = (n: number | null) => (n === null ? '—' : digits !== null ? n.toFixed(digits) : String(Number(n.toPrecision(8))));
+
+    // Mark on chart: the panel folds away so the whole chart can be clicked, then the clicked price comes back into the box
+    const stopPick = () => {
+        cancelPick.current?.();
+        cancelPick.current = null;
+        setPicking(false);
+    };
+    const startPick = () => {
+        if (!pickPrice || on) return;
+        stopPick();
+        setPicking(true);
+        cancelPick.current = pickPrice(p => {
+            cancelPick.current = null;
+            setPicking(false);
+            if (p !== null && Number.isFinite(p) && p > 0) setTargetText(digits !== null ? p.toFixed(digits) : String(Number(p.toPrecision(8))));
+            // bring the panel back (a click that came before it had finished folding away must not let it close afterwards)
+            window.clearTimeout(closeTimer.current);
+            setLeaving(false);
+            setOpen(true);
+        });
+        close();
+    };
     const shown = armed ?? levels;
-    const have = levels.sell !== null || levels.buy !== null;
+    const have = levels.sell !== null || levels.buy !== null || targetPrice !== null;
 
     // one small box per line: what it will trade, the line's price, and how close price is
     const card = (line: Side, delay: number) => {
@@ -236,7 +348,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         const none = level === null;
         const away = level !== null && last !== null ? (Math.abs(level - last) / last) * 100 : null;
         const meter = done ? 1 : away === null ? 0 : Math.max(0.04, 1 - away / METER_RANGE_PCT);
-        const cls = `sn-lvl sn-lvl--${side === 'SELL' ? 'sell' : 'buy'}${done ? ' is-fired' : ''}${none ? ' is-off' : ''}`;
+        const near = !done && !none && away !== null && away < METER_RANGE_PCT * 0.2;
+        const cls = `sn-lvl sn-lvl--${side === 'SELL' ? 'sell' : 'buy'}${done ? ' is-fired' : ''}${none ? ' is-off' : ''}${near && on ? ' is-near' : ''}${on && !none && !done ? ' is-live' : ''}`;
         const foot = done
             ? '✓ Fired'
             : none
@@ -263,6 +376,78 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
         );
     };
 
+    // My target: the price you marked, the side to trade there, and how close price is
+    const targetCard = (delay: number) => {
+        const tone = targetSide === 'BUY' ? 'buy' : 'sell';
+        const away = targetPrice !== null && last !== null ? (Math.abs(targetPrice - last) / last) * 100 : null;
+        const meter = targetDone ? 1 : away === null ? 0 : Math.max(0.04, 1 - away / METER_RANGE_PCT);
+        const near = !targetDone && away !== null && away < METER_RANGE_PCT * 0.2;
+        const from = targetMarkRef.current?.from;
+        const foot = targetDone
+            ? `✓ ${targetSide} opened`
+            : picking
+              ? 'Click the chart…'
+              : targetPrice === null
+                ? 'Mark it on the chart, or type a price'
+                : away !== null
+                  ? `${away.toFixed(2)}% away${on && from ? (from === 'above' ? ' ↓' : ' ↑') : ''}`
+                  : '…';
+        return (
+            <div
+                className={`sn-target sn-target--${tone}${targetDone ? ' is-fired' : ''}${near && on ? ' is-near' : ''}${on && targetPrice !== null && !targetDone ? ' is-live' : ''}${picking ? ' is-picking' : ''}`}
+                style={{ ['--d' as string]: `${delay}s` }}
+            >
+                <div className='sn-target__head'>
+                    <span>My target</span>
+                    <div className='sn-side' role='radiogroup' aria-label='Trade to open at the target'>
+                        <button type='button' role='radio' aria-checked={targetSide === 'BUY'} className={targetSide === 'BUY' ? 'is-on is-buy' : ''} disabled={on} onClick={() => setTargetSide('BUY')}>
+                            Buy
+                        </button>
+                        <button type='button' role='radio' aria-checked={targetSide === 'SELL'} className={targetSide === 'SELL' ? 'is-on is-sell' : ''} disabled={on} onClick={() => setTargetSide('SELL')}>
+                            Sell
+                        </button>
+                    </div>
+                </div>
+                <div className='sn-target__row'>
+                    <label className='sn-target__price'>
+                        <em>@</em>
+                        <input
+                            type='number'
+                            min='0'
+                            step='any'
+                            inputMode='decimal'
+                            aria-label='Target price'
+                            placeholder='Price to reach'
+                            value={targetText}
+                            disabled={on}
+                            onChange={e => {
+                                setTargetText(e.target.value);
+                                setTargetDone(false);
+                            }}
+                        />
+                    </label>
+                    <button
+                        type='button'
+                        className={`sn-target__mark${picking ? ' is-on' : ''}`}
+                        disabled={(on && !picking) || !pickPrice}
+                        onClick={picking ? stopPick : startPick}
+                        title='Click the chart where you want the price to reach'
+                    >
+                        <Crosshair />
+                        <span>{picking ? 'Cancel' : 'Mark'}</span>
+                    </button>
+                </div>
+                <div className='sn-lvl__meter'>
+                    <i style={{ transform: `scaleX(${meter})` }} />
+                </div>
+                <div className='sn-lvl__foot'>
+                    <span>{targetPrice !== null ? `${targetSide} at ${fmt(targetPrice)}` : 'No target yet'}</span>
+                    <span>{foot}</span>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div ref={root} className={`sniper${on ? ' is-armed' : ''}${ringing ? ' is-ringing' : ''}${open ? ' is-open' : ''}`}>
             <button
@@ -283,6 +468,16 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                 </svg>
             </button>
 
+            {picking && !open && (
+                <div className='sniper__pick' role='status'>
+                    <Crosshair />
+                    <span>Click the chart where the price should reach</span>
+                    <button type='button' onClick={stopPick}>
+                        Esc
+                    </button>
+                </div>
+            )}
+
             {open && (
                 <div className={`sniper__pop${leaving ? ' is-leaving' : ''}`} role='dialog' aria-label='Sniper' style={room ? { maxHeight: room } : undefined}>
                     <header className='sn-head'>
@@ -291,12 +486,21 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                         </span>
                         <div>
                             <h4>Sniper</h4>
-                            <p>Auto-entry when price touches a sweep line</p>
+                            <p>Auto-entry at a sweep line or your own target</p>
                         </div>
                         <button type='button' className='sn-head__x' onClick={close} aria-label='Close'>
                             ×
                         </button>
                     </header>
+
+                    <div className={`sn-live${dir ? ` is-${dir}` : ''}${on ? ' is-on' : ''}`} aria-live='off'>
+                        <span className='sn-live__dot' />
+                        <span className='sn-live__sym'>{symbol.replace(/^frx/, '')}</span>
+                        <b key={String(last)} className='sn-live__px'>
+                            {fmt(last)}
+                        </b>
+                        <i className='sn-live__arrow' aria-hidden />
+                    </div>
 
                     {ringing && (
                         <button type='button' className='sn-alert' onClick={silence}>
@@ -320,6 +524,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled }: 
                         {card('SELL', 0.06)}
                         {card('BUY', 0.12)}
                     </div>
+
+                    {targetCard(0.15)}
 
                     {status && (
                         <div className='sn-total' style={{ ['--d' as string]: '0.16s' }}>

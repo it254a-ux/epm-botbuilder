@@ -283,6 +283,12 @@
     &__chart-host {
         position: absolute;
         inset: 0;
+
+        // waiting for a click to mark a price (the Sniper's "Mark on chart")
+        &.is-picking,
+        &.is-picking * {
+            cursor: crosshair !important;
+        }
     }
 
     &__chart-info {

@@ -1,14 +1,31 @@
-// Sweep Sniper: the auto-entry bot's button and its panel (dark glass, whatever the page theme)
+// Sweep Sniper: the auto-entry bot's button and its panel.
+// Obsidian glass with a gold hairline, small type and tight spacing, and motion that shows the bot is live:
+// the price ticks green / red, the meters shimmer while armed, a line that is close to being touched glows.
 $gold: #f0b429;
+$gold-hi: #ffd66b;
 $sell: #ff5a64;
 $buy: #22d3a6;
+$ink: #e8edf5;
+$mute: #8d98ab;
+$dim: #6b778c;
 $ease: cubic-bezier(0.22, 1, 0.36, 1);
 $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+@mixin hairline($from: rgba($gold, 0.5), $to: rgba($buy, 0.28)) {
+    // a gradient edge that is only 1px wide (the fill sits on the padding box, the gradient on the border box),
+    // with a soft gold and green glow in the corners of the fill
+    border: 1px solid transparent;
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba($gold, 0.13), transparent 55%) padding-box,
+        radial-gradient(100% 70% at 100% 100%, rgba($buy, 0.09), transparent 60%) padding-box,
+        linear-gradient(rgba(11, 15, 24, 0.95), rgba(11, 15, 24, 0.95)) padding-box,
+        linear-gradient(135deg, $from, rgba(255, 255, 255, 0.07) 45%, $to) border-box;
+}
 
 .sniper {
     position: relative;
     font-family: inherit;
-    color: #e8edf5;
+    color: $ink;
 
     // ---- the button next to "Trade setup" ----
     &__trigger {
@@ -16,33 +33,36 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         overflow: hidden;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         height: 100%;
-        min-height: 28px;
-        padding: 0 9px 0 8px;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: linear-gradient(135deg, rgba(24, 30, 44, 0.92), rgba(12, 16, 26, 0.92));
+        min-height: 26px;
+        padding: 0 8px 0 7px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: linear-gradient(135deg, rgba(24, 30, 44, 0.94), rgba(11, 15, 25, 0.94));
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         color: inherit;
-        font-size: 9.5px;
+        font-size: 9px;
         font-weight: 500;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         white-space: nowrap;
         cursor: pointer;
-        box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.75);
-        transition: transform 0.25s $ease, border-color 0.3s, box-shadow 0.3s;
+        box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        transition:
+            transform 0.3s $ease,
+            border-color 0.3s,
+            box-shadow 0.3s;
 
         &:hover {
             transform: translateY(-1px);
             border-color: rgba($gold, 0.7);
-            box-shadow: 0 14px 30px -10px rgba($gold, 0.35);
+            box-shadow: 0 12px 26px -10px rgba($gold, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.07);
         }
 
         &:active {
-            transform: translateY(0) scale(0.98);
+            transform: translateY(0) scale(0.97);
         }
 
         // a light that sweeps across while the sniper is armed
@@ -50,46 +70,44 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(105deg, transparent 35%, rgba($gold, 0.28) 50%, transparent 65%);
+            background: linear-gradient(105deg, transparent 35%, rgba($gold, 0.26) 50%, transparent 65%);
             transform: translateX(-120%);
             opacity: 0;
         }
     }
 
     &__led {
-        width: 7px;
-        height: 7px;
+        position: relative;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: #5b6577;
-        transition: background 0.3s, box-shadow 0.3s;
+        transition:
+            background 0.35s,
+            box-shadow 0.35s;
     }
 
     &__icon {
         display: grid;
         place-items: center;
         color: $gold;
-        transition: transform 0.6s $ease;
+        transition: transform 0.7s $ease;
+
+        svg {
+            width: 13px;
+            height: 13px;
+        }
     }
 
     &__name {
-        color: #e8edf5;
+        color: $ink;
         font-weight: 500;
-    }
-
-    &__state {
-        padding: 2px 7px;
-        border-radius: 8px;
-        background: rgba(148, 163, 184, 0.16);
-        font-size: 8.5px;
-        font-weight: 500;
-        letter-spacing: 0.08em;
-        color: #aab4c5;
-        transition: background 0.3s, color 0.3s;
+        transition: color 0.3s;
     }
 
     &__chev {
-        opacity: 0.7;
-        transition: transform 0.35s $ease;
+        opacity: 0.65;
+        transition: transform 0.4s $ease;
     }
 
     &.is-open &__chev {
@@ -100,20 +118,20 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         transform: rotate(90deg);
     }
 
-    // armed: gold ring that breathes, a live green light, the sweeping shine
+    // armed: a gold ring that breathes, a live green light, the sweeping shine
     &.is-armed &__trigger {
         border-color: rgba($gold, 0.85);
-        animation: sn-breathe 2.2s ease-in-out infinite;
+        animation: sn-breathe 2.4s ease-in-out infinite;
 
         &::after {
             opacity: 1;
-            animation: sn-sweep 2.6s ease-in-out infinite;
+            animation: sn-sweep 2.8s ease-in-out infinite;
         }
     }
 
     &.is-armed &__led {
         background: $buy;
-        box-shadow: 0 0 0 0 rgba($buy, 0.7);
+        box-shadow: 0 0 8px rgba($buy, 0.8);
         animation: sn-led 1.6s ease-out infinite;
     }
 
@@ -133,36 +151,94 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
     &.is-ringing &__led {
         background: $sell;
+        box-shadow: 0 0 8px rgba($sell, 0.8);
     }
 
     // ---- the panel ----
     &__pop {
+        @include hairline;
+
         position: absolute;
         z-index: 30;
-        top: calc(100% + 10px);
+        top: calc(100% + 8px);
         left: 0;
-        width: 300px;
+        width: 272px;
         max-width: calc(100vw - 24px);
         box-sizing: border-box;
-        padding: 12px;
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        background:
-            radial-gradient(120% 80% at 0% 0%, rgba($gold, 0.14), transparent 55%),
-            radial-gradient(100% 70% at 100% 100%, rgba($buy, 0.1), transparent 60%),
-            rgba(11, 15, 24, 0.94);
+        padding: 10px;
+        border-radius: 16px;
         backdrop-filter: blur(22px) saturate(1.3);
         -webkit-backdrop-filter: blur(22px) saturate(1.3);
-        box-shadow: 0 30px 60px -18px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-        transform-origin: 24px -8px;
+        box-shadow:
+            0 28px 56px -18px rgba(0, 0, 0, 0.9),
+            0 0 0 1px rgba(0, 0, 0, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        transform-origin: 22px -8px;
         overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-width: thin;
         scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
-        animation: sn-pop-in 0.42s $spring both;
+        animation: sn-pop-in 0.45s $spring both;
 
         &.is-leaving {
             animation: sn-pop-out 0.2s ease-in both;
+        }
+    }
+
+    // the hint under the button while the chart waits for a click ("Mark" in My target)
+    &__pick {
+        position: absolute;
+        z-index: 30;
+        top: calc(100% + 8px);
+        left: 0;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: max-content;
+        max-width: min(300px, calc(100vw - 24px));
+        padding: 6px 7px 6px 9px;
+        border-radius: 12px;
+        border: 1px solid rgba($gold, 0.55);
+        background: rgba(11, 15, 24, 0.94);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow:
+            0 14px 30px -12px rgba(0, 0, 0, 0.85),
+            0 0 0 0 rgba($gold, 0.4);
+        color: $ink;
+        font-size: 10px;
+        line-height: 1.25;
+        animation:
+            sn-rise 0.35s $ease both,
+            sn-pick-glow 1.8s ease-in-out 0.35s infinite;
+
+        svg {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            color: $gold;
+            animation: sn-spin 6s linear infinite;
+        }
+
+        button {
+            flex: none;
+            padding: 2px 6px !important;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: $mute;
+            font-size: 8.5px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition:
+                color 0.2s,
+                border-color 0.2s;
+
+            &:hover {
+                color: #fff;
+                border-color: $gold;
+            }
         }
     }
 }
@@ -170,53 +246,60 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 .sn-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
 
     &__icon {
         display: grid;
         place-items: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 11px;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
         color: #1a1405;
-        background: linear-gradient(135deg, #ffd66b, $gold 60%, #c98a00);
-        box-shadow: 0 6px 18px -6px rgba($gold, 0.7);
+        background: linear-gradient(135deg, $gold-hi, $gold 60%, #c98a00);
+        box-shadow:
+            0 6px 16px -6px rgba($gold, 0.75),
+            inset 0 1px 0 rgba(255, 255, 255, 0.45);
 
         svg {
-            width: 19px;
-            height: 19px;
+            width: 15px;
+            height: 15px;
         }
     }
 
     h4 {
         margin: 0;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
         color: #fff;
     }
 
     p {
-        margin: 2px 0 0;
-        font-size: 9.5px;
+        margin: 1px 0 0;
+        font-size: 8.5px;
         line-height: 1.3;
-        color: #8d98ab;
+        color: $mute;
     }
 
     &__x {
         margin-left: auto;
         align-self: flex-start;
-        width: 26px;
-        height: 26px;
+        width: 22px;
+        height: 22px;
+        padding: 0 !important;
         border: 0;
-        border-radius: 8px;
+        border-radius: 7px;
         background: transparent;
-        color: #8d98ab;
-        font-size: 20px;
+        color: $mute;
+        font-size: 17px;
         line-height: 1;
         cursor: pointer;
-        transition: background 0.2s, color 0.2s, transform 0.3s $ease;
+        transition:
+            background 0.2s,
+            color 0.2s,
+            transform 0.35s $ease;
 
         &:hover {
             background: rgba(255, 255, 255, 0.08);
@@ -226,19 +309,103 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 }
 
+// the live price of the market: it ticks green when it rises and red when it falls
+.sn-live {
+    --live: #{$mute};
+
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 7px;
+    padding: 5px 8px;
+    border-radius: 9px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(255, 255, 255, 0.03);
+    font-variant-numeric: tabular-nums;
+    transition:
+        border-color 0.4s,
+        background 0.4s;
+
+    &.is-up {
+        --live: #{$buy};
+    }
+
+    &.is-down {
+        --live: #{$sell};
+    }
+
+    &__dot {
+        flex: none;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--live);
+        box-shadow: 0 0 6px var(--live);
+        transition:
+            background 0.3s,
+            box-shadow 0.3s;
+    }
+
+    &.is-on &__dot {
+        animation: sn-dot 1.4s ease-in-out infinite;
+    }
+
+    &__sym {
+        font-size: 8.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: $mute;
+    }
+
+    &__px {
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.01em;
+    }
+
+    &.is-up &__px {
+        animation: sn-tick-up 0.7s $ease both;
+    }
+
+    &.is-down &__px {
+        animation: sn-tick-down 0.7s $ease both;
+    }
+
+    // a small triangle: up when the price rose, down when it fell
+    &__arrow {
+        flex: none;
+        width: 0;
+        height: 0;
+        border-left: 3.5px solid transparent;
+        border-right: 3.5px solid transparent;
+        border-bottom: 5px solid var(--live);
+        opacity: 0.9;
+        transition:
+            transform 0.35s $spring,
+            border-color 0.3s;
+    }
+
+    &.is-down &__arrow {
+        transform: rotate(180deg);
+    }
+}
+
 .sn-alert {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
-    margin-bottom: 10px;
-    padding: 10px 12px;
+    margin-bottom: 7px;
+    padding: 7px 10px !important;
     border: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     background: linear-gradient(135deg, #ff5a64, #c81e3a);
     color: #fff;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
     animation: sn-alert 0.9s ease-in-out infinite;
@@ -252,20 +419,24 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 .sn-levels {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
 }
 
-.sn-lvl {
+.sn-lvl,
+.sn-target {
+    --tone: #{$sell};
+
     position: relative;
     overflow: hidden;
-    padding: 6px 8px 5px 10px;
     border-radius: 10px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(255, 255, 255, 0.032);
     animation: sn-rise 0.5s $ease var(--d, 0s) both;
-    transition: border-color 0.3s, background 0.3s, opacity 0.3s;
-
-    --tone: #{$sell};
+    transition:
+        border-color 0.35s,
+        background 0.35s,
+        opacity 0.35s,
+        box-shadow 0.35s;
 
     &--buy {
         --tone: #{$buy};
@@ -279,7 +450,25 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         width: 2px;
         background: var(--tone);
         box-shadow: 0 0 10px var(--tone);
+        transition: background 0.35s;
     }
+
+    &.is-fired {
+        border-color: var(--tone);
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    // a line price is about to touch: the box glows in its own colour
+    &.is-near {
+        border-color: var(--tone);
+        animation:
+            sn-rise 0.5s $ease var(--d, 0s) both,
+            sn-near 1.1s ease-in-out infinite;
+    }
+}
+
+.sn-lvl {
+    padding: 5px 7px 4px 9px;
 
     &__row {
         display: flex;
@@ -288,21 +477,22 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         gap: 6px;
 
         b {
-            font-size: 9px;
-            font-weight: 500;
-            letter-spacing: 0.1em;
+            font-size: 8.5px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
             color: var(--tone);
         }
     }
 
     &__price {
-        font-size: 12px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
         color: #fff;
     }
 
     &__meter {
+        position: relative;
         height: 2px;
         margin: 4px 0 3px;
         border-radius: 2px;
@@ -316,7 +506,7 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
             border-radius: 2px;
             background: linear-gradient(90deg, transparent, var(--tone));
             transform-origin: left;
-            transition: transform 0.6s $ease;
+            transition: transform 0.7s $ease;
         }
     }
 
@@ -324,21 +514,260 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         display: flex;
         justify-content: space-between;
         gap: 6px;
-        font-size: 8.5px;
-        color: #8d98ab;
+        font-size: 8px;
+        color: $mute;
+        font-variant-numeric: tabular-nums;
     }
 
     &.is-off {
         opacity: 0.5;
     }
 
-    &.is-fired {
-        border-color: var(--tone);
-        background: rgba(255, 255, 255, 0.07);
+    &.is-fired &__foot span:last-child {
+        color: var(--tone);
+        font-weight: 600;
+    }
 
-        .sn-lvl__foot span:last-child {
-            color: var(--tone);
+    // while armed, a light runs along the meter, so the bot looks awake
+    &.is-live &__meter::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+        transform: translateX(-100%);
+        animation: sn-shimmer 1.8s ease-in-out infinite;
+    }
+}
+
+// My target: a price you marked yourself, and the side to trade when the chart reaches it
+.sn-target {
+    margin-top: 6px;
+    padding: 6px 8px 5px 10px;
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 5px;
+
+        > span {
+            font-size: 8.5px;
             font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: $mute;
+        }
+    }
+
+    &__row {
+        display: flex;
+        align-items: stretch;
+        gap: 5px;
+    }
+
+    &__price {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        align-items: center;
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        background: rgba(255, 255, 255, 0.04);
+        transition:
+            border-color 0.25s,
+            box-shadow 0.25s;
+
+        &:focus-within {
+            border-color: var(--tone);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+        }
+
+        em {
+            flex: none;
+            padding: 0 0 0 8px;
+            font-style: normal;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--tone);
+        }
+
+        // the page styles every input; these must win inside the panel
+        input {
+            flex: 1;
+            min-width: 0;
+            width: 100% !important;
+            height: 100% !important;
+            padding: 0 8px 0 5px !important;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            color: #fff !important;
+            font-size: 11px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+
+            &::placeholder {
+                color: $dim;
+                font-weight: 500;
+                font-size: 10px;
+            }
+
+            &:disabled {
+                opacity: 0.75;
+            }
+        }
+    }
+
+    &__mark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        flex: none;
+        height: 28px;
+        padding: 0 9px !important;
+        border-radius: 8px;
+        border: 1px solid rgba($gold, 0.5);
+        background: rgba($gold, 0.1);
+        color: $gold;
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition:
+            transform 0.25s $spring,
+            background 0.25s,
+            color 0.25s,
+            border-color 0.25s;
+
+        svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        &:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: rgba($gold, 0.2);
+        }
+
+        &:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        &.is-on {
+            background: linear-gradient(135deg, $gold-hi, $gold);
+            border-color: transparent;
+            color: #1a1405;
+
+            svg {
+                animation: sn-spin 4s linear infinite;
+            }
+        }
+
+        &:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+        }
+    }
+
+    .sn-lvl__meter {
+        position: relative;
+        height: 2px;
+        margin: 6px 0 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.09);
+        overflow: hidden;
+
+        i {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 2px;
+            background: linear-gradient(90deg, transparent, var(--tone));
+            transform-origin: left;
+            transition: transform 0.7s $ease;
+        }
+    }
+
+    .sn-lvl__foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 8px;
+        color: $mute;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &.is-fired .sn-lvl__foot span:last-child {
+        color: var(--tone);
+        font-weight: 600;
+    }
+
+    &.is-live .sn-lvl__meter::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+        transform: translateX(-100%);
+        animation: sn-shimmer 1.8s ease-in-out infinite;
+    }
+
+    // waiting for a click on the chart
+    &.is-picking {
+        border-color: $gold;
+        animation:
+            sn-rise 0.5s $ease var(--d, 0s) both,
+            sn-pick-glow 1.8s ease-in-out infinite;
+    }
+}
+
+// Buy / Sell choice of the target
+.sn-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+
+    button {
+        height: 18px;
+        padding: 0 9px !important;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: $mute;
+        font-size: 8.5px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition:
+            background 0.3s $ease,
+            color 0.3s,
+            transform 0.3s $spring;
+
+        &.is-on {
+            transform: scale(1.04);
+        }
+
+        &.is-buy {
+            background: linear-gradient(135deg, #5eead4, $buy);
+            color: #052e25;
+        }
+
+        &.is-sell {
+            background: linear-gradient(135deg, #ff8a92, $sell);
+            color: #3a0a10;
+        }
+
+        &:disabled:not(.is-on) {
+            opacity: 0.45;
+            cursor: not-allowed;
         }
     }
 }
@@ -346,27 +775,31 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 .sn-mode {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    padding: 3px;
-    border-radius: 10px;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
     background: rgba(255, 255, 255, 0.05);
 
     button {
-        height: 24px;
+        height: 21px;
         padding: 0 !important;
         border: 0;
-        border-radius: 8px;
+        border-radius: 7px;
         background: transparent;
         color: #aab4c5;
-        font-size: 10.5px;
+        font-size: 9.5px;
         font-weight: 500;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.04em;
         cursor: pointer;
-        transition: background 0.3s $ease, color 0.3s, transform 0.3s $spring;
+        transition:
+            background 0.35s $ease,
+            color 0.3s,
+            transform 0.3s $spring;
 
         &.is-on {
-            background: linear-gradient(135deg, #ffd66b, $gold);
+            background: linear-gradient(135deg, $gold-hi, $gold);
             color: #1a1405;
+            font-weight: 600;
         }
 
         &:disabled:not(.is-on) {
@@ -376,31 +809,32 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     &__hint {
-        margin: 5px 2px 8px;
-        font-size: 9.5px;
+        margin: 4px 2px 7px;
+        font-size: 8.5px;
         line-height: 1.35;
-        color: #77839a;
+        color: $dim;
     }
 }
 
 .sn-total {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    padding: 8px 11px;
-    border-radius: 11px;
+    gap: 7px;
+    margin-top: 7px;
+    padding: 6px 9px;
+    border-radius: 9px;
     border: 1px solid rgba($buy, 0.35);
     background: rgba($buy, 0.1);
     color: $buy;
-    font-size: 10.5px;
+    font-size: 9.5px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     animation: sn-rise 0.45s $ease var(--d, 0s) both;
 
     i {
-        width: 7px;
-        height: 7px;
+        flex: none;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: $buy;
         animation: sn-led 1.6s ease-out infinite;
@@ -408,59 +842,61 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .sn-set {
-    margin-top: 12px;
+    margin-top: 9px;
     animation: sn-rise 0.5s $ease var(--d, 0s) both;
 
     &__row {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
 
         > span,
         label > span {
-            font-size: 9px;
-            font-weight: 500;
-            letter-spacing: 0.08em;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #8d98ab;
+            color: $mute;
         }
     }
 
     .sn-stake {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        margin-top: 10px;
+        gap: 4px;
+        margin-top: 7px;
 
         > span {
-            font-size: 9px;
-            font-weight: 500;
-            letter-spacing: 0.08em;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #8d98ab;
+            color: $mute;
         }
 
         > div {
             display: flex;
             align-items: center;
-            height: 36px;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
+            height: 30px;
+            border-radius: 9px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
             background: rgba(255, 255, 255, 0.04);
-            transition: border-color 0.25s, box-shadow 0.25s;
+            transition:
+                border-color 0.25s,
+                box-shadow 0.25s;
 
             &:focus-within {
                 border-color: $gold;
-                box-shadow: 0 0 0 3px rgba($gold, 0.18);
+                box-shadow: 0 0 0 3px rgba($gold, 0.16);
             }
         }
 
         em {
             flex: none;
-            padding: 0 0 0 9px;
+            padding: 0 0 0 8px;
             font-style: normal;
-            font-size: 9.5px;
-            color: #8d98ab;
+            font-size: 9px;
+            color: $mute;
         }
 
         input {
@@ -474,70 +910,73 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
             border-radius: 0 !important;
             background: transparent !important;
             color: #fff !important;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
 
             &::placeholder {
-                color: #6b778c;
-                font-weight: 600;
-                font-size: 11px;
+                color: $dim;
+                font-weight: 500;
+                font-size: 10px;
             }
         }
 
         b {
             flex: none;
-            margin-right: 9px;
-            padding: 3px 8px;
-            border-radius: 8px;
+            margin-right: 7px;
+            padding: 2px 7px;
+            border-radius: 7px;
             background: rgba($gold, 0.16);
             color: $gold;
-            font-size: 9.5px;
+            font-size: 9px;
             font-weight: 600;
             font-variant-numeric: tabular-nums;
+            animation: sn-pop-chip 0.35s $spring both;
         }
     }
 
     &__pair {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 10px;
+        gap: 6px;
+        margin-top: 7px;
 
         label {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
             min-width: 0;
 
             > span {
-                font-size: 9px;
-                font-weight: 500;
-                letter-spacing: 0.08em;
+                font-size: 8px;
+                font-weight: 600;
+                letter-spacing: 0.1em;
                 text-transform: uppercase;
-                color: #8d98ab;
+                color: $mute;
             }
 
             > div {
                 display: flex;
                 align-items: center;
-                height: 34px;
-                border-radius: 10px;
-                border: 1px solid rgba(148, 163, 184, 0.25);
+                height: 28px;
+                border-radius: 9px;
+                border: 1px solid rgba(148, 163, 184, 0.24);
                 background: rgba(255, 255, 255, 0.04);
-                transition: border-color 0.25s, box-shadow 0.25s;
+                transition:
+                    border-color 0.25s,
+                    box-shadow 0.25s;
 
                 &:focus-within {
                     border-color: $gold;
-                    box-shadow: 0 0 0 3px rgba($gold, 0.18);
+                    box-shadow: 0 0 0 3px rgba($gold, 0.16);
                 }
             }
 
             em {
                 flex: none;
-                padding: 0 0 0 9px;
+                padding: 0 0 0 8px;
                 font-style: normal;
-                font-size: 9.5px;
-                color: #8d98ab;
+                font-size: 9px;
+                color: $mute;
             }
 
             // the page styles every input; these must win inside the panel
@@ -546,19 +985,19 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
                 min-width: 0;
                 width: 100% !important;
                 height: 100% !important;
-                padding: 0 9px 0 4px !important;
+                padding: 0 8px 0 4px !important;
                 border: 0 !important;
                 outline: 0 !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 background: transparent !important;
                 color: #fff !important;
-                font-size: 12px;
+                font-size: 11px;
+                font-weight: 500;
 
                 &::placeholder {
-                    color: #6b778c;
+                    color: $dim;
                 }
-                font-weight: 500;
             }
         }
     }
@@ -566,7 +1005,7 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
 .sn-chips {
     display: flex;
-    gap: 5px;
+    gap: 4px;
 
     button {
         display: flex;
@@ -574,24 +1013,28 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         justify-content: center;
         padding: 0 !important;
         flex: 1;
-        height: 30px;
-        border-radius: 9px;
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        height: 24px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
         background: rgba(255, 255, 255, 0.04);
         color: #c4cddc;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.25s $spring, background 0.25s, color 0.25s, border-color 0.25s;
+        transition:
+            transform 0.28s $spring,
+            background 0.25s,
+            color 0.25s,
+            border-color 0.25s;
 
         &:hover:not(:disabled) {
-            transform: translateY(-2px);
+            transform: translateY(-1px);
             border-color: rgba($gold, 0.6);
         }
 
         &.is-on {
             border-color: transparent;
-            background: linear-gradient(135deg, #ffd66b, $gold);
+            background: linear-gradient(135deg, $gold-hi, $gold);
             color: #1a1405;
             transform: scale(1.06);
         }
@@ -610,24 +1053,33 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 44px;
-    margin-top: 14px;
+    height: 36px;
+    margin-top: 10px;
+    padding: 0 10px !important;
     border: 0;
-    border-radius: 13px;
-    background: linear-gradient(135deg, #ffd66b, $gold 55%, #d99a00);
+    border-radius: 11px;
+    background: linear-gradient(135deg, $gold-hi, $gold 55%, #d99a00);
     color: #1a1405;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 14px 28px -10px rgba($gold, 0.6);
+    box-shadow:
+        0 12px 24px -10px rgba($gold, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
     animation: sn-rise 0.5s $ease var(--d, 0s) both;
-    transition: transform 0.25s $ease, box-shadow 0.3s, filter 0.3s;
+    transition:
+        transform 0.28s $ease,
+        box-shadow 0.3s,
+        filter 0.3s,
+        background 0.4s;
 
     &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 18px 34px -10px rgba($gold, 0.75);
+        transform: translateY(-1px);
+        box-shadow:
+            0 16px 30px -10px rgba($gold, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
     &:active:not(:disabled) {
@@ -645,7 +1097,9 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     &.is-on {
         background: linear-gradient(135deg, #ff7a82, $sell 55%, #c81e3a);
         color: #fff;
-        box-shadow: 0 14px 28px -10px rgba($sell, 0.6);
+        box-shadow:
+            0 12px 24px -10px rgba($sell, 0.65),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
     &:disabled {
@@ -657,10 +1111,10 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .sn-foot {
-    margin: 10px 2px 0;
-    font-size: 9px;
+    margin: 7px 2px 0;
+    font-size: 8px;
     line-height: 1.4;
-    color: #77839a;
+    color: $dim;
     text-align: center;
 }
 
@@ -688,7 +1142,7 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 @keyframes sn-rise {
     from {
         opacity: 0;
-        transform: translateY(12px);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
@@ -706,24 +1160,101 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 }
 
+@keyframes sn-shimmer {
+    to {
+        transform: translateX(100%);
+    }
+}
+
 @keyframes sn-breathe {
     50% {
-        box-shadow: 0 0 0 4px rgba($gold, 0.16), 0 10px 30px -8px rgba($gold, 0.55);
+        box-shadow:
+            0 0 0 4px rgba($gold, 0.14),
+            0 10px 28px -8px rgba($gold, 0.55);
     }
 }
 
 @keyframes sn-led {
     70% {
-        box-shadow: 0 0 0 8px rgba($buy, 0);
+        box-shadow: 0 0 0 7px rgba($buy, 0);
     }
     100% {
         box-shadow: 0 0 0 0 rgba($buy, 0);
     }
 }
 
+@keyframes sn-dot {
+    50% {
+        transform: scale(1.5);
+        opacity: 0.65;
+    }
+}
+
 @keyframes sn-spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+// the price flashes in the colour of its move, then settles back to white
+@keyframes sn-tick-up {
+    0% {
+        color: $buy;
+        text-shadow: 0 0 12px rgba($buy, 0.8);
+        transform: translateY(3px);
+        opacity: 0.6;
+    }
+    40% {
+        transform: none;
+        opacity: 1;
+    }
+    100% {
+        color: #fff;
+        text-shadow: none;
+    }
+}
+
+@keyframes sn-tick-down {
+    0% {
+        color: $sell;
+        text-shadow: 0 0 12px rgba($sell, 0.8);
+        transform: translateY(-3px);
+        opacity: 0.6;
+    }
+    40% {
+        transform: none;
+        opacity: 1;
+    }
+    100% {
+        color: #fff;
+        text-shadow: none;
+    }
+}
+
+@keyframes sn-near {
+    50% {
+        box-shadow:
+            0 0 0 3px rgba(255, 255, 255, 0.05),
+            0 0 18px -2px var(--tone);
+    }
+}
+
+@keyframes sn-pick-glow {
+    50% {
+        box-shadow:
+            0 14px 30px -12px rgba(0, 0, 0, 0.85),
+            0 0 0 4px rgba($gold, 0.18);
+    }
+}
+
+@keyframes sn-pop-chip {
+    from {
+        opacity: 0;
+        transform: scale(0.7);
+    }
+    to {
+        opacity: 1;
+        transform: none;
     }
 }
 
@@ -774,12 +1305,27 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         max-height: calc(100vh - 140px) !important;
         transform-origin: bottom center;
     }
+
+    .sniper__pick {
+        position: fixed;
+        top: auto;
+        left: 8px;
+        right: 8px;
+        bottom: 66px;
+        width: auto;
+        max-width: none;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .sniper *,
     .sniper__pop,
+    .sniper__pick,
     .sn-lvl,
+    .sn-lvl *,
+    .sn-target,
+    .sn-target *,
+    .sn-live *,
     .sn-set,
     .sn-go,
     .sn-total,

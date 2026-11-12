@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
 let tickHandler: (d: unknown) => void = () => undefined;
@@ -138,5 +139,125 @@ describe('Sweep Sniper', () => {
         render(<SweepSniper symbol='frxXAUUSD' currency='USD' levels={{ sell: 4130, buy: 4000 }} onTrigger={jest.fn()} disabled={false} />);
         fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
         expect(screen.getByText('Breakout').getAttribute('aria-checked')).toBe('true');
+    });
+});
+
+describe('Sweep Sniper: My target', () => {
+    beforeEach(() => localStorage.clear());
+
+    const element = (props: Partial<ComponentProps<typeof SweepSniper>> = {}, symbol = 'frxXAUUSD') => (
+        <SweepSniper symbol={symbol} currency='USD' levels={{ sell: null, buy: null }} onTrigger={jest.fn()} disabled={false} {...props} />
+    );
+    const openPanel = (props: Partial<ComponentProps<typeof SweepSniper>> = {}) => {
+        const onTrigger = jest.fn();
+        const onTargetLine = jest.fn();
+        const view = render(element({ onTrigger, onTargetLine, ...props }));
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
+        return { onTrigger, onTargetLine, ...view };
+    };
+    const setTarget = (v: string) => fireEvent.change(screen.getByLabelText('Target price'), { target: { value: v } });
+
+    it('can be armed with only a target, and opens a BUY when price climbs to it (once)', () => {
+        const { onTrigger } = openPanel();
+        tick(4060);
+        setTarget('4075');
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4070);
+        expect(onTrigger).not.toHaveBeenCalled();
+        tick(4075.2); // a wick through the target
+        expect(onTrigger).toHaveBeenCalledTimes(1);
+        expect(onTrigger).toHaveBeenCalledWith('BUY', { count: 1, stake: null, takeProfit: null, stopLoss: null });
+        expect(screen.getByText('✓ BUY opened')).toBeTruthy();
+        tick(4090); // a target fires once
+        expect(onTrigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('a SELL target below the price opens a SELL when price falls to it', () => {
+        const { onTrigger } = openPanel();
+        tick(4060);
+        setTarget('4050');
+        fireEvent.click(screen.getByRole('radio', { name: 'Sell' }));
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4055);
+        expect(onTrigger).not.toHaveBeenCalled();
+        tick(4049.9);
+        expect(onTrigger).toHaveBeenCalledWith('SELL', { count: 1, stake: null, takeProfit: null, stopLoss: null });
+    });
+
+    it('uses the trades per trigger, stake and total take profit set in the panel', () => {
+        const { onTrigger } = openPanel();
+        tick(4060);
+        setTarget('4075');
+        fireEvent.click(screen.getByText('3'));
+        fireEvent.change(screen.getByPlaceholderText('Trade panel stake'), { target: { value: '12' } });
+        fireEvent.change(screen.getAllByPlaceholderText('Off')[0], { target: { value: '5' } });
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4076);
+        expect(onTrigger).toHaveBeenCalledWith('BUY', { count: 3, stake: 12, takeProfit: 5, stopLoss: null });
+    });
+
+    it('never trades while the sniper is off, even when the price reaches the target', () => {
+        const { onTrigger } = openPanel();
+        tick(4060);
+        setTarget('4075');
+        tick(4080);
+        tick(4040);
+        expect(onTrigger).not.toHaveBeenCalled();
+    });
+
+    it('can be disarmed before the target is reached', () => {
+        const { onTrigger } = openPanel();
+        tick(4060);
+        setTarget('4075');
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        fireEvent.click(screen.getByText('Disarm Sniper'));
+        tick(4080);
+        expect(onTrigger).not.toHaveBeenCalled();
+    });
+
+    it('shows its line on the chart, and takes it off once it has fired', () => {
+        const { onTargetLine } = openPanel();
+        tick(4060);
+        setTarget('4075');
+        expect(onTargetLine).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'sniper-target', title: 'TARGET BUY', price: 4075 }));
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        tick(4076);
+        expect(onTargetLine).toHaveBeenLastCalledWith(null);
+    });
+
+    it('Mark waits for a click on the chart and puts that price in the box', () => {
+        let finish: (p: number | null) => void = () => undefined;
+        const cancel = jest.fn();
+        const pickPrice = jest.fn((cb: (p: number | null) => void) => {
+            finish = cb;
+            return cancel;
+        });
+        openPanel({ pickPrice });
+        tick(4060);
+        fireEvent.click(screen.getByText('Mark'));
+        expect(pickPrice).toHaveBeenCalledTimes(1);
+        act(() => finish(4071.2345));
+        expect((screen.getByLabelText('Target price') as HTMLInputElement).value).toBe('4071.23');
+        // Esc on the chart (no price) leaves what is in the box alone
+        fireEvent.click(screen.getByText('Mark'));
+        act(() => finish(null));
+        expect((screen.getByLabelText('Target price') as HTMLInputElement).value).toBe('4071.23');
+    });
+
+    it('has no Mark button to press when the page gives no chart to click', () => {
+        openPanel();
+        expect((screen.getByText('Mark').closest('button') as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('a target belongs to one market: changing market clears it and switches the sniper off', () => {
+        const onTrigger = jest.fn();
+        const { rerender } = render(element({ onTrigger }));
+        fireEvent.click(screen.getByText('Sniper', { selector: '.sniper__name' }));
+        tick(4060);
+        setTarget('4075');
+        fireEvent.click(screen.getByText(/Arm Sniper/));
+        rerender(element({ onTrigger }, 'frxEURUSD'));
+        expect((screen.getByLabelText('Target price') as HTMLInputElement).value).toBe('');
+        expect(document.querySelector('.sniper__trigger')?.getAttribute('data-state')).toBe('off');
     });
 });

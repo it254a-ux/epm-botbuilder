@@ -5,6 +5,7 @@ import {
     type IChartApi,
     type IPriceLine,
     type ISeriesApi,
+    type MouseEventParams,
     type SeriesMarker,
     type SeriesType,
     type Time,
@@ -32,7 +33,15 @@ import {
 } from './indicators';
 import type { PdhResult } from './pdh';
 
+/**
+ * Waits for the next click on the chart and gives the price at the spot that was clicked (null when Esc cancels it, or the
+ * chart is not ready). Returns a function that cancels the wait without calling `onPick`.
+ */
+export type PickPrice = (onPick: (price: number | null) => void) => () => void;
+
 export interface ChartViewHandle {
+    /** Let the person click the chart to mark a price (the crosshair cursor shows while it waits). */
+    pickPrice: PickPrice;
     /** Replace all candles (initial load / market or timeframe change). */
     setCandles: (candles: Candle[]) => void;
     /** Put earlier candles on the left of the ones shown, keeping the same candles in view. */
@@ -553,6 +562,37 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 else chartRef.current?.timeScale().fitContent();
             },
             prependCandles: prepend,
+            pickPrice(onPick) {
+                const chart = chartRef.current;
+                const series = seriesRef.current;
+                const host = hostRef.current;
+                if (!chart || !series) {
+                    onPick(null);
+                    return () => undefined;
+                }
+                let finished = false;
+                // (function declarations: the three refer to each other)
+                function finish(price: number | null, silent = false) {
+                    if (finished) return;
+                    finished = true;
+                    chart!.unsubscribeClick(onClick);
+                    window.removeEventListener('keydown', onKey, true);
+                    host?.classList.remove('is-picking');
+                    if (!silent) onPick(price);
+                }
+                function onClick(param: MouseEventParams) {
+                    if (!param.point) return;
+                    const price = series!.coordinateToPrice(param.point.y);
+                    finish(price !== null && Number.isFinite(Number(price)) ? Number(price) : null);
+                }
+                function onKey(e: KeyboardEvent) {
+                    if (e.key === 'Escape') finish(null);
+                }
+                chart.subscribeClick(onClick);
+                window.addEventListener('keydown', onKey, true);
+                host?.classList.add('is-picking');
+                return () => finish(null, true);
+            },
             mergeCandles(candles) {
                 const byTime = new Map<number, Candle>();
                 candlesRef.current.forEach(c => byTime.set(c.time, c));

@@ -4,12 +4,13 @@ import { useApiBase } from '@/hooks/useApiBase';
 import { useStore } from '@/hooks/useStore';
 import { setLiveEquity } from '@/utils/live-equity';
 import { useSharedPick } from '../forex-trader/shared-picks';
+import type { PickPrice } from '../forex-trader/chart-view';
 import CompareCharts from '../forex-trader/compare-charts';
 import ForexTrader, { type ReportedPlan } from '../forex-trader/forex-trader';
 import ActivityPanel from './activity-panel';
 import { groupTotal, groupVerdict, type GuardGroup, type GuardLevels } from './price-guard';
 import GroupsPanel, { type GroupRow } from './groups-panel';
-import SweepSniper from './sweep-sniper';
+import SweepSniper, { type TargetLine } from './sweep-sniper';
 import { loadGroups, saveGroups } from './sniper-storage';
 import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
@@ -284,6 +285,16 @@ const ForexLive = observer(() => {
     // (the analysis plan and key levels are drawn by the Forex Trader chart itself)
     const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
     const tradesDrawn = lines.length > 0;
+    // the Sniper's "My target" line goes on the main chart too (not on the Compare charts)
+    const [targetLine, setTargetLine] = useState<TargetLine | null>(null);
+    const chartLines = useMemo(() => (targetLine ? [...lines, targetLine] : lines), [lines, targetLine]);
+    // the chart hands over its "click to mark a price" function; the Sniper calls it through here
+    const pickRef = useRef<PickPrice | null>(null);
+    const pickPrice = useCallback<PickPrice>(onPick => {
+        if (pickRef.current) return pickRef.current(onPick);
+        onPick(null);
+        return () => undefined;
+    }, []);
 
     // ---- the chart as tall as the whole screen (its width stays as it is). It is the same chart box, lifted to the full height of the window.
     const slotRef = useRef<HTMLDivElement>(null);
@@ -453,9 +464,12 @@ const ForexLive = observer(() => {
                                         onTrigger={guardFire}
                                         status={guardStatus}
                                         disabled={!isAuthorized}
+                                        pickPrice={pickPrice}
+                                        onTargetLine={setTargetLine}
                                     />
                                 }
-                                extraLines={lines}
+                                extraLines={chartLines}
+                                pickRef={pickRef}
                                 onMarkets={setNames}
                                 resultHost={resultHost}
                                 onOpenCompare={openCompare}

@@ -1,9 +1,9 @@
 import { createPortal } from 'react-dom';
 import { useSharedPick } from './shared-picks';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
-import ChartView, { type ChartViewHandle } from './chart-view';
+import ChartView, { type ChartViewHandle, type PickPrice } from './chart-view';
 import ChartStudies from './chart-studies';
 import { loadStudies, type StudyState } from './indicators';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
@@ -201,6 +201,8 @@ interface ForexTraderProps {
     onOpenCompare?: () => void;
     /** A plain price chart: no analysis lines, labels or signal badges, and only a small candle-size picker (phones). */
     noAnalysis?: boolean;
+    /** Filled with a function that waits for a click on the chart and gives its price (a parent page's own "mark a price" control). */
+    pickRef?: MutableRefObject<PickPrice | null>;
 }
 
 /** Time left on the forming candle (candles start on exact multiples of their length), counting down every second. */
@@ -302,6 +304,7 @@ const ForexTrader = ({
     resultHost,
     onOpenCompare,
     noAnalysis,
+    pickRef,
 }: ForexTraderProps) => {
     // persistent: the price feed reconnects for good by itself, so the chart never goes dead until a page refresh
     const { ws, isConnected } = useDerivWS({ persistent: true });
@@ -334,6 +337,13 @@ const ForexTrader = ({
     const m15StreamRef = useRef('');
 
     const chartRef = useRef<ChartViewHandle>(null);
+    if (pickRef) {
+        pickRef.current = onPick => {
+            if (chartRef.current) return chartRef.current.pickPrice(onPick);
+            onPick(null);
+            return () => undefined;
+        };
+    }
     // chart style + indicators: the toolbar row above the chart drives them (the chart saves them in the browser)
     const [studies, setStudies] = useState<StudyState>(loadStudies);
     const [snapped, setSnapped] = useState(false);
