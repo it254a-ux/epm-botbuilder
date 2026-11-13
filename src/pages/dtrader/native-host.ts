@@ -1,3 +1,4 @@
+import './dtrader-host.css';
 /**
  * Runs Deriv's DTrader (built from dtrader-template, files in public/dtrader-app) inside the site's own page,
  * with no iframe. It signs in with the website's login, and stays loaded after the first visit so coming

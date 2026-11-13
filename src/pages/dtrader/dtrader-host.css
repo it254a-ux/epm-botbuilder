@@ -1,0 +1,31 @@
+/*
+ * DTrader running inside the site (see native-host.ts): make it look like part of the site.
+ * - the site already has its own header, menu, help and theme switch, so the template's own side menu is hidden
+ * - the template's developer panel and its red "</>" button are never shown on the live site
+ * - it fills exactly the frame the page gives it (no extra height that would push it under the viewport)
+ */
+.derivatives-trader {
+    height: 100%;
+    width: 100%;
+    font-family: var(--brand-font-primary, inherit);
+}
+
+.derivatives-trader .sidebar,
+.derivatives-trader .dc-flyout,
+.derivatives-trader .devtools__toggle-button,
+.derivatives-trader .devtools__panel {
+    display: none !important;
+}
+
+.derivatives-trader .app-contents,
+.derivatives-trader .dc-themed-scrollbars,
+.derivatives-trader .app-shell {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+}
+
+.derivatives-trader .app-shell__main-content {
+    margin-inline-start: 0 !important;
+    width: 100% !important;
+}
