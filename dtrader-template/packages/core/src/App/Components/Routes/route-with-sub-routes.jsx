@@ -24,7 +24,7 @@ const RouteWithSubRoutes = observer(route => {
 
     const renderFactory = props => {
         let result = null;
-        const pathname = removeBranchName(location.pathname.replace(/^\/dtrader-app/, '')).replace(/\/$/, '');
+        const pathname = removeBranchName(location.pathname.replace(/^\/(dtrader-app|dtrader)/, '')).replace(/\/$/, '');
         const is_valid_route = validateRoute(pathname);
 
         if (route.component === Redirect) {

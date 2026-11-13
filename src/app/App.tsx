@@ -67,7 +67,7 @@ const router = createBrowserRouter(
             {/* App Builder embeds the template at /preview — render the same app shell */}
             <Route path='preview' element={null} />
             {/* Ported Rise/Fall trading page (formerly its own repo) */}
-            <Route path='dtrader' element={<DtraderPage />} />
+            <Route path='dtrader/*' element={<DtraderPage />} />
             {/* Standalone info/legal pages — see src/pages/info/. Nested
                 here (not siblings of '/') so they render inside the same
                 Layout/AppHeader as every other page -- same nav bar,

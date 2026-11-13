@@ -67,7 +67,7 @@ const RouteWithSubRoutes = ({
             }
         } else {
             const default_subroute = routes.find(r => r.default);
-            const pathname = removeBranchName(location.pathname.replace(/^\/dtrader-app/, '')).replace(/\/$/, '');
+            const pathname = removeBranchName(location.pathname.replace(/^\/(dtrader-app|dtrader)/, '')).replace(/\/$/, '');
             const is_valid_route = validateRoute(pathname);
             const should_redirect = !Component404;
 

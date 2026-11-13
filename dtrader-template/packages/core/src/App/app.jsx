@@ -24,7 +24,7 @@ const App = ({ root_store }) => {
     });
     const l = window.location;
     const base = l.pathname.split('/')[1];
-    const has_base = /^\/(br_|dtrader-app)/.test(l.pathname);
+    const has_base = /^\/(br_|dtrader-app|dtrader)/.test(l.pathname);
     const { preferred_language } = root_store.client;
     const { is_dark_mode_on } = root_store.ui;
     const is_dark_mode = is_dark_mode_on || JSON.parse(localStorage.getItem('ui_store'))?.is_dark_mode_on;

@@ -10,10 +10,8 @@ import registerServiceWorker from 'Utils/PWA';
 
 import AppNotificationMessages from './App/Containers/app-notification-messages.jsx';
 
-if (
-    !!window?.localStorage.getItem?.('debug_service_worker') || // To enable local service worker related development
-    !window.location.hostname.startsWith('localhost')
-) {
+// EPM: DTrader runs inside the website's own page, so it must not install its own service worker over the whole site.
+if (!!window?.localStorage.getItem?.('debug_service_worker') && !window.__EPM_EMBEDDED__) {
     registerServiceWorker();
 }
 
