@@ -29,3 +29,12 @@
     margin-inline-start: 0 !important;
     width: 100% !important;
 }
+
+/*
+ * Login and account belong to the website, not the template: its own Log in / Sign up buttons and its
+ * "Real account / balance / Deposit" block are removed, so the site's header is the only place to sign in
+ * and switch account (DTrader already signs in with the site's login, see native-host.ts).
+ */
+.derivatives-trader .account-header {
+    display: none !important;
+}
