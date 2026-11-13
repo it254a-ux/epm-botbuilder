@@ -2,7 +2,8 @@ import { getUrlBase } from '@deriv/shared';
 import { setSmartChartsPublicPath } from '@deriv-com/smartcharts-champion';
 
 // Set SmartCharts public path
-setSmartChartsPublicPath(getUrlBase('/js/smartcharts/'));
+// EPM: the chart files live under /dtrader-app on this site (the template expects them at the site root).
+setSmartChartsPublicPath('/dtrader-app/js/smartcharts/');
 
 // Export all SmartChart components directly
 export {
