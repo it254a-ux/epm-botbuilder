@@ -9,6 +9,54 @@ const HOLDER_ID = 'epm-dtrader-holder';
 const ROOT_ID = 'derivatives_trader';
 
 let loading: Promise<void> | null = null;
+let themeSyncStarted = false;
+
+/** The site's own light/dark choice (the site saves it as 'theme' and puts a class on <body>). */
+const siteIsDark = (): boolean => {
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+  } catch {
+    /* no saved theme */
+  }
+  return document.body.classList.contains('theme--dark');
+};
+
+/** Tells DTrader's own theme setting before it starts, so it never opens in the wrong theme. */
+function seedTheme(): void {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ui_store') || '{}') || {};
+    saved.is_dark_mode_on = siteIsDark();
+    localStorage.setItem('ui_store', JSON.stringify(saved));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Keeps DTrader (and its chart) in the site's theme, both when it opens and whenever the site's theme switch is used.
+ * DTrader writes the same <body> theme classes as the site, so the site's saved choice is always the one that wins.
+ */
+function startThemeSync(): void {
+  if (themeSyncStarted) return;
+  themeSyncStarted = true;
+  const apply = () => {
+    const dark = siteIsDark();
+    const ui = (window as unknown as { __deriv_store?: { ui?: { is_dark_mode_on?: boolean; setDarkMode?: (v: boolean) => void } } })
+      .__deriv_store?.ui;
+    if (ui?.setDarkMode && ui.is_dark_mode_on !== dark) ui.setDarkMode(dark);
+    const cls = document.body.classList;
+    if (dark !== cls.contains('theme--dark')) {
+      cls.remove('theme--light', 'theme--dark');
+      cls.add(dark ? 'theme--dark' : 'theme--light');
+    }
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+  };
+  new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  window.setInterval(apply, 1500);
+  apply();
+}
 
 /** Gives the template the website's login: it looks for its token in this tab's session storage. */
 export function shareSiteLogin(): void {
@@ -77,6 +125,8 @@ export function loadDtrader(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
     shareSiteLogin();
+    seedTheme();
+    startThemeSync();
     getRoot();
     const html = await (await fetch(ASSET_BASE)).text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
