@@ -108,7 +108,7 @@ const config: Config = {
     },
 
     // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
-    // modulePathIgnorePatterns: [],
+    modulePathIgnorePatterns: ['<rootDir>/dtrader-template/'],
 
     // Activates notifications for test results
     // notify: false,
@@ -173,7 +173,7 @@ const config: Config = {
     testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
 
     // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
-    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/api/__tests__/'], // API tests run via jest.api.config.js
+    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/api/__tests__/', '<rootDir>/dtrader-template/'], // API tests run via jest.api.config.js
     // testPathIgnorePatterns: [
     //   "/node_modules/"
     // ],
