@@ -101,3 +101,8 @@
         font-weight: 500;
     }
 }
+
+/* Full width: the home page keeps 1.6rem of space on both sides of its tabs; Dtrader uses all of it. */
+body.epm-dtrader-active .main {
+    padding: 0 !important;
+}

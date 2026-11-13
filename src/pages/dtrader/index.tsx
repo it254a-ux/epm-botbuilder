@@ -14,7 +14,12 @@ export default function DtraderPage() {
         if (!el) return;
         attachDtrader(el);
         void loadDtrader();
-        return () => detachDtrader();
+        // lets dtrader-host.css remove the site's side padding so the page touches both walls
+        document.body.classList.add('epm-dtrader-active');
+        return () => {
+            document.body.classList.remove('epm-dtrader-active');
+            detachDtrader();
+        };
     }, []);
 
     useEffect(() => {
