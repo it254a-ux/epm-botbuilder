@@ -208,7 +208,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE_react_router_dom__;
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "reports/js/reports." + chunkId + "." + {"404":"f9039d7a9eb21c8e82cc","vendors-node_modules_deriv_quill-icons_dist_esm_react_Legacy_LegacyOpenPositionIcon_js-node_m-461bd6":"55a33f77d41c549390d3","reports-app":"62cdcfb90758e949477f","vendors-node_modules_deriv_deriv-api_dist_DerivAPIBasic_js-node_modules_tanstack_query-core_b-d19654":"fc7e84e3fa6439882a80","trade-modals":"ca3dd6788b49a31c4266","reports-routes":"2c57f642593bac53ce22","two-month-picker":"3792490fe10cc259ba49"}[chunkId] + ".js";
+/******/ 			return "reports/js/reports." + chunkId + "." + {"404":"75028faf72287429bc2a","vendors-node_modules_deriv_quill-icons_dist_esm_react_Legacy_LegacyOpenPositionIcon_js-node_m-461bd6":"55a33f77d41c549390d3","reports-app":"4c8807362ec8ff590b89","vendors-node_modules_deriv_deriv-api_dist_DerivAPIBasic_js-node_modules_tanstack_query-core_b-d19654":"fc7e84e3fa6439882a80","trade-modals":"f056e371d20f90ce7a3e","reports-routes":"5af156746d5356d30ebf","two-month-picker":"b0c1cef290f9a46181cd"}[chunkId] + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	

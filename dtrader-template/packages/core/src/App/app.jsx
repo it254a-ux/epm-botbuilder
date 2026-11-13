@@ -74,6 +74,15 @@ const App = ({ root_store }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // The host website (executiveprimemarkets.site) switches this app's account when its own account switcher changes.
+    React.useEffect(() => {
+        window.__epmSwitchAccount = id => root_store.client.switchAccount(id);
+        return () => {
+            delete window.__epmSwitchAccount;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Send trading:ready event to ensure smooth loader transition
     React.useEffect(() => {
         if (isBridgeAvailable) {

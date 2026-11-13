@@ -181,6 +181,15 @@ const AppWrapper = observer(() => {
         });
     }, [is_loading]);
 
+    // Load DTrader quietly in the background a few seconds after the site opens, like the other tabs,
+    // so opening the Dtrader tab (or switching account) is instant.
+    React.useEffect(() => {
+        const t = window.setTimeout(() => {
+            import('../dtrader/native-host').then(m => m.loadDtrader()).catch(() => undefined);
+        }, 4000);
+        return () => window.clearTimeout(t);
+    }, []);
+
     // Reset URL parameter processing when location changes
     React.useEffect(() => {
         resetUrlParamProcessing();

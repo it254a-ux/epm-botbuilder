@@ -4177,7 +4177,7 @@ module.exports = webpackAsyncContext;
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "js/core." + chunkId + "." + {"node_modules_deriv-com_smartcharts-champion_dist_smartcharts_css":"64982a013da58c0a7f4a","dtrader-header":"9c7fd598d62eadc74922","url-unavailable-modal":"5db4b6df792c9a8b80a9","vendors-node_modules_deriv-com_quill-ui_dist_snackbar-controller-C8s4yN-x_js":"658ba5f488f456217471","logout-success-modal":"0aea3c843911d9a43b6d","try-real-modal":"f98e3af6581406bd829c","reset-password-modal":"56cf4ec54a8ccb5989f8","menu":"5e111f58e38a0c996609","vendors-node_modules_deriv-com_smartcharts-champion_dist_smartcharts_js":"92558cb9100d45aee5fe","trader":"2fe83c90b5552f47f52e","reports":"82db99b5044f305a8d01","account-info":"4c2241f9317c44b7848f"}[chunkId] + ".js";
+/******/ 			return "js/core." + chunkId + "." + {"node_modules_deriv-com_smartcharts-champion_dist_smartcharts_css":"64982a013da58c0a7f4a","dtrader-header":"9c7fd598d62eadc74922","url-unavailable-modal":"5db4b6df792c9a8b80a9","vendors-node_modules_deriv-com_quill-ui_dist_snackbar-controller-C8s4yN-x_js":"658ba5f488f456217471","logout-success-modal":"0aea3c843911d9a43b6d","try-real-modal":"f98e3af6581406bd829c","reset-password-modal":"56cf4ec54a8ccb5989f8","menu":"5e111f58e38a0c996609","vendors-node_modules_deriv-com_smartcharts-champion_dist_smartcharts_js":"92558cb9100d45aee5fe","trader":"157e7a72caeaed7f16ce","reports":"2333b94ce9c82296da90","account-info":"4c2241f9317c44b7848f"}[chunkId] + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	

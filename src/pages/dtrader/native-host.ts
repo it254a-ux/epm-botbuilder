@@ -65,6 +65,9 @@ export function shareSiteLogin(): void {
     if (!raw) return;
     const info = JSON.parse(raw) as { access_token?: string; refresh_token?: string; expires_at?: number };
     if (!info?.access_token) return;
+    // Open on the account the website is on (Real or Demo), not on whichever account the template picks first.
+    const loginid = localStorage.getItem('active_loginid');
+    if (loginid) sessionStorage.setItem('active_loginid', loginid);
     // The site keeps the expiry in seconds, the template in milliseconds.
     const expires_at = info.expires_at ? (info.expires_at < 1e12 ? info.expires_at * 1000 : info.expires_at) : null;
     sessionStorage.setItem(
@@ -125,6 +128,7 @@ export function loadDtrader(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
     shareSiteLogin();
+    startAccountSync();
     seedTheme();
     startThemeSync();
     getRoot();
@@ -151,4 +155,26 @@ export function attachDtrader(container: HTMLElement): void {
 export function detachDtrader(): void {
   const root = document.getElementById(ROOT_ID);
   if (root) getHolder().appendChild(root);
+}
+
+/**
+ * Follows the website's account switcher: when the site's active account changes, DTrader switches to the
+ * same account (no reload), so Real/Demo always match the rest of the site.
+ */
+let watching = false;
+export function startAccountSync(): void {
+  if (watching) return;
+  watching = true;
+  let last = localStorage.getItem('active_loginid');
+  window.setInterval(() => {
+    const now = localStorage.getItem('active_loginid');
+    if (!now || now === last) return;
+    last = now;
+    try {
+      sessionStorage.setItem('active_loginid', now);
+    } catch {
+      /* ignore */
+    }
+    (window as unknown as { __epmSwitchAccount?: (id: string) => void }).__epmSwitchAccount?.(now);
+  }, 500);
 }
