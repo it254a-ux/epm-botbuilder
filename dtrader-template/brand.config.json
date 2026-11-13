@@ -2,10 +2,10 @@
     "brand_name": "Trading Platform",
     "brand_logo": "brand/platform-logo.svg",
     "brand_logo_dark": "brand/platform-logo.svg",
-    "brand_domain": "deriv.com",
+    "brand_domain": "executiveprimemarkets.site",
     "brand_hostname": {
-        "staging": "staging.dtrader-template.pages.dev",
-        "production": "dtrader-template.pages.dev"
+        "staging": "staging.executiveprimemarkets.site",
+        "production": "executiveprimemarkets.site"
     },
     "platform": {
         "name": "Trading Platform",
@@ -19,8 +19,8 @@
         "staging": "https://staging-home.deriv.com/dashboard/signup"
     },
     "deposit_url": {
-        "staging": "https://staging.dtrader-template.pages.dev/transfer",
-        "production": "https://dtrader-template.pages.dev/transfer"
+        "staging": "https://staging.executiveprimemarkets.site/transfer",
+        "production": "https://executiveprimemarkets.site/transfer"
     },
     "auth": {
         "staging": "https://staging-auth.deriv.com",
