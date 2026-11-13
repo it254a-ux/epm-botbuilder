@@ -30,10 +30,14 @@ export default function DtraderPage() {
             m.style.height = `${Math.max(320, Math.round(window.innerHeight - top))}px`;
         };
         fit();
-        const timer = window.setInterval(fit, 700);
+        // re-fit only when something actually changes size (no constant timer, so no extra work or lag)
+        const ro = new ResizeObserver(fit);
+        ro.observe(document.body);
         window.addEventListener('resize', fit);
+        const settle = window.setTimeout(fit, 400);
         return () => {
-            window.clearInterval(timer);
+            ro.disconnect();
+            window.clearTimeout(settle);
             window.removeEventListener('resize', fit);
         };
     }, []);

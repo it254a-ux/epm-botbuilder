@@ -18,6 +18,7 @@ import './app-root.scss';
 
 const Layout = lazy(() => import('../components/layout'));
 const DtraderPage = lazy(() => import('../pages/dtrader'));
+const TransferRedirect = lazy(() => import('../pages/dtrader/transfer-redirect'));
 const AboutPage = lazy(() => import('../pages/info/about'));
 const ContactPage = lazy(() => import('../pages/info/contact'));
 const RiskDisclosurePage = lazy(() => import('../pages/info/risk-disclosure'));
@@ -68,6 +69,7 @@ const router = createBrowserRouter(
             <Route path='preview' element={null} />
             {/* Ported Rise/Fall trading page (formerly its own repo) */}
             <Route path='dtrader/*' element={<DtraderPage />} />
+            <Route path='transfer' element={<TransferRedirect />} />
             {/* Standalone info/legal pages — see src/pages/info/. Nested
                 here (not siblings of '/') so they render inside the same
                 Layout/AppHeader as every other page -- same nav bar,
