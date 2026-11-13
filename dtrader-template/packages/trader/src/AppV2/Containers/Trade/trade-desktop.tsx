@@ -80,6 +80,7 @@ const TradeDesktop = observer(() => {
         is_all_types_with_errors ||
         (is_high_low && is_any_type_with_errors);
 
+    const has_shown_trade_ref = React.useRef(false);
     const symbols = React.useMemo(
         () =>
             active_symbols.map(({ underlying_symbol: underlying }) => ({
@@ -115,10 +116,13 @@ const TradeDesktop = observer(() => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [current_language, network_status.class]);
 
+    // EPM: after the first time the page is shown, keep it on screen while the trade types are refreshed (no skeleton).
+    if (symbols.length && trade_types.length) has_shown_trade_ref.current = true;
+
     return (
         <>
             {should_show_portrait_loader && <Loader isFullScreen />}
-            {symbols.length && trade_types.length ? (
+            {symbols.length && (trade_types.length || has_shown_trade_ref.current) ? (
                 <div
                     className={clsx('trade', {
                         trade__logout: !is_logged_in,

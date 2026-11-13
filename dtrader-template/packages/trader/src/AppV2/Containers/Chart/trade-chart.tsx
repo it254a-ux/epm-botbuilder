@@ -88,6 +88,7 @@ const TradeChart = observer(() => {
     } = useTraderStore();
     const is_accumulator = isAccumulatorContract(contract_type);
     const timeoutsMapRef = React.useRef<Map<number, NodeJS.Timeout>>(new Map());
+    const has_chart_data_ref = React.useRef(false);
     const settings = {
         countdown: is_chart_countdown_visible,
         isHighestLowestMarkerEnabled: false, // TODO: Pending UI,
@@ -192,7 +193,10 @@ const TradeChart = observer(() => {
 
     if (!symbol || !active_symbols.length) return null;
 
-    if (isLoading) {
+    // EPM: once the chart has been shown, never swap it for a loading box (switching trade types must not blank it).
+    if (chartData?.tradingTimes) has_chart_data_ref.current = true;
+
+    if (isLoading && !has_chart_data_ref.current) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
                 <div>Loading chart data...</div>
