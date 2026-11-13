@@ -38,3 +38,66 @@
 .derivatives-trader .account-header {
     display: none !important;
 }
+
+/*
+ * The trade types (Rise/Fall, Accumulators, ...) become a thin vertical rail on the left in a small font.
+ * Only the rail is changed: it floats on the left, and the chart + trade panel keep their own sizes and just
+ * start to the right of it. (Desktop and tablet only.)
+ */
+@media (min-width: 600px) {
+    .derivatives-trader .trade {
+        position: relative;
+        padding-left: 10.4rem !important;
+    }
+
+    .derivatives-trader .trade__header {
+        position: absolute !important;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 10.4rem;
+        height: auto !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        padding: 0 !important;
+        border-bottom: 0 !important;
+        border-right: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+        overflow: hidden;
+    }
+
+    .derivatives-trader .trade__header:after {
+        display: none !important;
+    }
+
+    .derivatives-trader .trade__trade-types,
+    .derivatives-trader .trade__logout .trade__trade-types {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        height: 100%;
+        min-height: 0 !important;
+        padding: 0.6rem !important;
+        gap: 0.4rem !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        white-space: normal !important;
+    }
+
+    .derivatives-trader .trade__trade-types .quill-chip,
+    .derivatives-trader .trade__trade-types button.quill-chip {
+        width: 100%;
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 0.5rem 0.8rem !important;
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .derivatives-trader .trade__trade-types .quill-chip *,
+    .derivatives-trader .trade__trade-types button.quill-chip * {
+        font-size: 1.15rem !important;
+        line-height: 1.5rem !important;
+        font-weight: 500;
+    }
+}
