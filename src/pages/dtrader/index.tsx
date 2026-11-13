@@ -2,24 +2,40 @@ import { useEffect, useRef } from 'react';
 import { attachDtrader, detachDtrader, loadDtrader } from './native-host';
 
 /**
- * DTrader: Deriv's trading screen (built from the dtrader-template) running inside the site itself, no iframe.
- * It sits in the same frame the old page used: below the site header, full width, and the same height
- * (viewport minus 5.6rem on desktop, the full area on mobile).
+ * Fills the space under the site's tab bar. The height is measured from the screen instead of trusting the
+ * parent boxes (inside the home page's Dtrader tab they have no height, which left this page blank).
  */
 export default function DtraderPage() {
-  const frame = useRef<HTMLDivElement>(null);
+    const main = useRef<HTMLElement>(null);
+    const frame = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    attachDtrader(el);
-    void loadDtrader();
-    return () => detachDtrader();
-  }, []);
+    useEffect(() => {
+        const el = frame.current;
+        if (!el) return;
+        attachDtrader(el);
+        void loadDtrader();
+        return () => detachDtrader();
+    }, []);
 
-  return (
-    <main className='flex flex-col bg-background max-lg:h-full lg:h-[calc(100vh-5.6rem)] lg:overflow-hidden'>
-      <div ref={frame} className='h-full w-full flex-1' />
-    </main>
-  );
+    useEffect(() => {
+        const fit = () => {
+            const m = main.current;
+            if (!m) return;
+            const top = m.getBoundingClientRect().top;
+            m.style.height = `${Math.max(320, Math.round(window.innerHeight - top))}px`;
+        };
+        fit();
+        const timer = window.setInterval(fit, 700);
+        window.addEventListener('resize', fit);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('resize', fit);
+        };
+    }, []);
+
+    return (
+        <main ref={main} className='flex flex-col bg-background overflow-hidden' style={{ minHeight: 320 }}>
+            <div ref={frame} className='h-full w-full flex-1' />
+        </main>
+    );
 }
