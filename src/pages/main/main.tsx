@@ -646,7 +646,6 @@ const AppWrapper = observer(() => {
                                         <Localize i18n_default_text='Dtrader' />
                                     </>
                                 }
-                                data-no-keep-alive
                                 id='id-dtrader'
                                 // .dtrader-app (dtrader/index.tsx) is 'h-full',
                                 // meant to fill this panel, but a plain block
