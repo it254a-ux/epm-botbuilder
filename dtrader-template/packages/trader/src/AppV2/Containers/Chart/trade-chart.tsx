@@ -89,6 +89,11 @@ const TradeChart = observer(() => {
     const is_accumulator = isAccumulatorContract(contract_type);
     const timeoutsMapRef = React.useRef<Map<number, NodeJS.Timeout>>(new Map());
     const has_chart_data_ref = React.useRef(false);
+    // EPM: the chart is only rebuilt when the symbol changes while a digit trade type is open. Switching between
+    // trade types (Rise/Fall, Accumulators, Multipliers, ...) keeps the same chart, so it no longer reloads.
+    const chart_key_ref = React.useRef({ symbol, n: 0 });
+    if (show_digits_stats && chart_key_ref.current.symbol !== symbol) chart_key_ref.current.n += 1;
+    chart_key_ref.current.symbol = symbol;
     const settings = {
         countdown: is_chart_countdown_visible,
         isHighestLowestMarkerEnabled: false, // TODO: Pending UI,
@@ -229,7 +234,7 @@ const TradeChart = observer(() => {
     return (
         <>
             <SmartChart
-                key={show_digits_stats ? symbol : 'trade-chart'}
+                key={`trade-chart-${chart_key_ref.current.n}`}
                 drawingToolFloatingMenuPosition={
                     isMobile
                         ? CHART_CONSTANTS.MOBILE_DRAWING_TOOL_POSITION
