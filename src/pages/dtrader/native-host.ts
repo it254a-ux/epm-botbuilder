@@ -1,15 +1,33 @@
 import './dtrader-host.css';
+import frameCss from './dtrader-frame.css?inline';
 /**
- * Runs Deriv's DTrader (built from dtrader-template, files in public/dtrader-app) inside the site's own page,
- * with no iframe. It signs in with the website's login, and stays loaded after the first visit so coming
- * back to it is instant.
+ * Runs Deriv's DTrader (built from dtrader-template, files in public/dtrader-app) in its own frame.
+ * A frame keeps DTrader's chart engine completely separate from the Charts page's chart engine (two chart engines
+ * in one page clashed and left a chart blank when moving between the two pages). The frame is created once, keeps
+ * running while another page is showing (so coming back is instant), and is laid over the Dtrader page's area
+ * when that page is open. It signs in with the website's login, account and theme.
  */
-const ASSET_BASE = '/dtrader-app/';
-const HOLDER_ID = 'epm-dtrader-holder';
-const ROOT_ID = 'derivatives_trader';
+const FRAME_ID = 'epm-dtrader-frame';
+const SRC = '/dtrader-app/';
+const HIDDEN_CSS =
+  'position:fixed;left:-99999px;top:0;width:1200px;height:800px;border:0;visibility:hidden;pointer-events:none;';
 
 let loading: Promise<void> | null = null;
-let themeSyncStarted = false;
+let frame: HTMLIFrameElement | null = null;
+let host: HTMLElement | null = null;
+
+type TStoreWindow = Window & {
+  __epmSwitchAccount?: (id: string) => void;
+  __deriv_store?: { ui?: { is_dark_mode_on?: boolean; setDarkMode?: (v: boolean) => void } };
+};
+const frameWin = (): TStoreWindow | null => (frame?.contentWindow as TStoreWindow | null) ?? null;
+const frameDoc = (): Document | null => {
+  try {
+    return frame?.contentDocument ?? null;
+  } catch {
+    return null;
+  }
+};
 
 /** The site's own light/dark choice (the site saves it as 'theme' and puts a class on <body>). */
 const siteIsDark = (): boolean => {
@@ -33,29 +51,27 @@ function seedTheme(): void {
   }
 }
 
-/**
- * Keeps DTrader (and its chart) in the site's theme, both when it opens and whenever the site's theme switch is used.
- * DTrader writes the same <body> theme classes as the site, so the site's saved choice is always the one that wins.
- */
+/** Keeps the frame's theme (and chart) the same as the site's, now and whenever the site's theme switch is used. */
+let themeSyncStarted = false;
 function startThemeSync(): void {
   if (themeSyncStarted) return;
   themeSyncStarted = true;
   const apply = () => {
+    const doc = frameDoc();
+    if (!doc?.body) return;
     const dark = siteIsDark();
-    const ui = (window as unknown as { __deriv_store?: { ui?: { is_dark_mode_on?: boolean; setDarkMode?: (v: boolean) => void } } })
-      .__deriv_store?.ui;
+    const ui = frameWin()?.__deriv_store?.ui;
     if (ui?.setDarkMode && ui.is_dark_mode_on !== dark) ui.setDarkMode(dark);
-    const cls = document.body.classList;
+    const cls = doc.body.classList;
     if (dark !== cls.contains('theme--dark')) {
       cls.remove('theme--light', 'theme--dark');
       cls.add(dark ? 'theme--dark' : 'theme--light');
     }
-    document.documentElement.classList.toggle('dark', dark);
-    document.documentElement.classList.toggle('light', !dark);
+    doc.documentElement.classList.toggle('dark', dark);
+    doc.documentElement.classList.toggle('light', !dark);
   };
   new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   window.setInterval(apply, 1500);
-  apply();
 }
 
 /** Gives the template the website's login: it looks for its token in this tab's session storage. */
@@ -79,91 +95,114 @@ export function shareSiteLogin(): void {
   }
 }
 
-/** A hidden place that keeps DTrader alive while another tab is showing. */
-function getHolder(): HTMLElement {
-  let holder = document.getElementById(HOLDER_ID);
-  if (!holder) {
-    holder = document.createElement('div');
-    holder.id = HOLDER_ID;
-    holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:1200px;height:800px;overflow:hidden;visibility:hidden;';
-    document.body.appendChild(holder);
+/** Puts the frame exactly over the page's area while the Dtrader page is open, and out of sight otherwise. */
+let placing = false;
+function place(): void {
+  if (!frame) return;
+  if (!host || !host.isConnected) {
+    frame.style.cssText = HIDDEN_CSS;
+    return;
   }
-  return holder;
+  const r = host.getBoundingClientRect();
+  frame.style.cssText = `position:fixed;left:${Math.round(r.left)}px;top:${Math.round(r.top)}px;width:${Math.round(
+    r.width
+  )}px;height:${Math.round(r.height)}px;border:0;z-index:1;background:transparent;`;
+}
+function startPlacing(): void {
+  if (placing) return;
+  placing = true;
+  let queued = false;
+  const schedule = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      place();
+    });
+  };
+  window.addEventListener('resize', schedule);
+  window.addEventListener('scroll', schedule, true);
+  window.setInterval(schedule, 400);
 }
 
-function getRoot(): HTMLElement {
-  let root = document.getElementById(ROOT_ID);
-  if (!root) {
-    root = document.createElement('div');
-    root.id = ROOT_ID;
-    root.className = 'derivatives-trader';
-    root.style.cssText = 'height:100%;width:100%;';
-    getHolder().appendChild(root);
-  }
-  return root;
+let selfRepairAt = 0;
+function onFrameReady(): void {
+  const doc = frameDoc();
+  const win = frameWin();
+  if (!doc || !win) return;
+  const style = doc.createElement('style');
+  style.textContent = frameCss;
+  doc.head.appendChild(style);
+  // "Transfer" / "Deposit" belong to the website, not to the frame
+  doc.addEventListener(
+    'click',
+    e => {
+      const a = (e.target as Element | null)?.closest?.('a');
+      const href = a?.getAttribute('href') || '';
+      if (/^\/(transfer|cashier)/i.test(href)) {
+        e.preventDefault();
+        window.location.href = href;
+      }
+    },
+    true
+  );
+  // self-repair: an old tab asking for a file that no longer exists -> reload once to get the new version
+  const heal = (msg: unknown) => {
+    const text = String((msg as { message?: string })?.message ?? msg ?? '');
+    if (!/ChunkLoadError|Loading chunk|Loading CSS chunk/i.test(text)) return;
+    if (Date.now() - selfRepairAt < 60000) return;
+    selfRepairAt = Date.now();
+    win.location.reload();
+  };
+  win.addEventListener('error', e => heal(e.error ?? e.message));
+  win.addEventListener('unhandledrejection', e => heal(e.reason));
 }
 
-const addCss = (href: string) =>
-  new Promise<void>(resolve => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    link.onload = () => resolve();
-    link.onerror = () => resolve();
-    document.head.appendChild(link);
-  });
-
-const addScript = (src: string) =>
-  new Promise<void>(resolve => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = false;
-    s.onload = () => resolve();
-    s.onerror = () => resolve();
-    document.body.appendChild(s);
-  });
+function getFrame(): HTMLIFrameElement {
+  if (frame && frame.isConnected) return frame;
+  const f = document.createElement('iframe');
+  f.id = FRAME_ID;
+  f.title = 'DTrader';
+  f.setAttribute('allow', 'clipboard-write; fullscreen');
+  f.style.cssText = HIDDEN_CSS;
+  f.src = SRC;
+  document.body.appendChild(f);
+  frame = f;
+  return f;
+}
 
 /** Starts DTrader once (safe to call many times, e.g. from the site's tab preloading). */
 export function loadDtrader(): Promise<void> {
   if (loading) return loading;
-  loading = (async () => {
+  loading = new Promise<void>(resolve => {
     shareSiteLogin();
-    startAccountSync();
-    startSelfRepair();
-    startUrlSync();
-    if (/^\/dtrader\/./i.test(window.location.pathname)) {
-      pendingSlug = pendingSlug || readSlugFromPath();
-      history.replaceState(window.history.state, '', '/dtrader');
-    }
     seedTheme();
     startThemeSync();
-    getRoot();
-    const html = await (await fetch(ASSET_BASE)).text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const abs = (u: string) => (u.startsWith('http') || u.startsWith('/') ? u : ASSET_BASE + u);
-    const styles = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(l => abs(l.getAttribute('href') || ''));
-    const scripts = Array.from(doc.querySelectorAll('script[src]')).map(s => abs(s.getAttribute('src') || ''));
-    await Promise.all(styles.filter(Boolean).map(addCss));
-    for (const src of scripts.filter(Boolean)) await addScript(src);
-  })().catch(err => {
-    loading = null;
-    throw err;
+    startAccountSync();
+    startUrlSync();
+    startPlacing();
+    const f = getFrame();
+    f.addEventListener('load', () => {
+      onFrameReady();
+      place();
+      resolve();
+    });
+    place();
   });
   return loading;
 }
 
-/** Shows DTrader inside `container` (the page's frame). */
+/** Shows DTrader over `container` (the page's area). */
 export function attachDtrader(container: HTMLElement): void {
   pendingSlug = readSlugFromPath() || pendingSlug;
-  container.appendChild(getRoot());
-  redrawCharts();
+  host = container;
+  if (frame) place();
 }
 
-/** Puts DTrader back in the hidden holder so it keeps running. */
+/** Moves DTrader out of sight; it keeps running. */
 export function detachDtrader(): void {
-  const root = document.getElementById(ROOT_ID);
-  if (root) getHolder().appendChild(root);
-  redrawCharts(); // the Charts page is shown again: make it measure itself
+  host = null;
+  place();
 }
 
 /**
@@ -184,32 +223,8 @@ export function startAccountSync(): void {
     } catch {
       /* ignore */
     }
-    (window as unknown as { __epmSwitchAccount?: (id: string) => void }).__epmSwitchAccount?.(now);
+    frameWin()?.__epmSwitchAccount?.(now);
   }, 500);
-}
-
-/**
- * Self-repair: after a site update, an old open tab can ask for a DTrader file that no longer exists
- * (a "Loading chunk failed" crash). Reload once to pick up the new version instead of staying broken.
- */
-let healing = false;
-export function startSelfRepair(): void {
-  if (healing) return;
-  healing = true;
-  const check = (msg: unknown) => {
-    const text = String((msg as { message?: string })?.message ?? msg ?? '');
-    if (!/ChunkLoadError|Loading chunk|Loading CSS chunk|Unexpected token '<'/i.test(text)) return;
-    try {
-      const last = Number(sessionStorage.getItem('epm_dtrader_reload') || 0);
-      if (Date.now() - last < 60000) return; // never loop
-      sessionStorage.setItem('epm_dtrader_reload', String(Date.now()));
-    } catch {
-      return;
-    }
-    window.location.reload();
-  };
-  window.addEventListener('error', e => check(e.error ?? e.message));
-  window.addEventListener('unhandledrejection', e => check(e.reason));
 }
 
 /**
@@ -237,16 +252,11 @@ export function startUrlSync(): void {
   if (urlSyncing) return;
   urlSyncing = true;
 
-  // Hide DTrader's own long address while its page is on screen.
   const original = history.replaceState.bind(history);
-  history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
-    if (url && /trade_type=/.test(String(url))) return; // never show DTrader's long address (also while it runs hidden in the background)
-    original(data, unused, url);
-  };
 
   window.setInterval(() => {
     if (!document.body.classList.contains('epm-dtrader-active')) return;
-    const box = document.querySelector(TYPES_SELECTOR);
+    const box = frameDoc()?.querySelector(TYPES_SELECTOR);
     if (!box) return;
     const chips = Array.from(box.querySelectorAll<HTMLButtonElement>('button'));
     if (!chips.length) return;
@@ -279,18 +289,3 @@ export function startUrlSync(): void {
   }, 250);
 }
 
-/**
- * Charts draw on a canvas that is sized when the page is shown. After DTrader is moved in or out of view (or
- * the Charts page comes back), tell every chart to measure itself again so none stays blank.
- */
-export function redrawCharts(): void {
-  [60, 250, 600, 1400].forEach(ms =>
-    window.setTimeout(() => {
-      try {
-        window.dispatchEvent(new Event('resize'));
-      } catch {
-        /* ignore */
-      }
-    }, ms)
-  );
-}
