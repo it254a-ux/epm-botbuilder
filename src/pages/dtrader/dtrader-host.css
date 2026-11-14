@@ -106,3 +106,17 @@
 body.epm-dtrader-active .main {
     padding: 0 !important;
 }
+
+/*
+ * Touch both walls: the template sizes its page as "screen width minus 7.2rem" (room for its own side menu, which is
+ * hidden here), which left an empty strip on the right. It is now the full screen width, like the site's header.
+ */
+@media (min-width: 600px) {
+    body.epm-dtrader-active .derivatives-trader {
+        overflow: hidden;
+    }
+
+    body.epm-dtrader-active .derivatives-trader .trade {
+        width: 100vw !important;
+    }
+}

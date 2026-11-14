@@ -14,9 +14,14 @@ export default function DtraderPage() {
         if (!el) return;
         attachDtrader(el);
         void loadDtrader();
-        // lets dtrader-host.css remove the site's side padding so the page touches both walls
-        document.body.classList.add('epm-dtrader-active');
+        // Lets dtrader-host.css remove the site's side padding so the page touches both walls. This is switched on only
+        // while the Dtrader tab is actually showing (the page also stays mounted, hidden, while another tab is open).
+        const mark = () => document.body.classList.toggle('epm-dtrader-active', el.getBoundingClientRect().width > 0);
+        mark();
+        const seen = new ResizeObserver(mark);
+        seen.observe(el);
         return () => {
+            seen.disconnect();
             document.body.classList.remove('epm-dtrader-active');
             detachDtrader();
         };
