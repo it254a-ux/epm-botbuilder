@@ -14,7 +14,7 @@ const HIDDEN_CSS =
 
 let loading: Promise<void> | null = null;
 let frame: HTMLIFrameElement | null = null;
-let host: HTMLElement | null = null;
+const hosts = new Set<HTMLElement>(); // every open Dtrader page area (the real one is the one that is on screen)
 
 type TStoreWindow = Window & {
   __epmSwitchAccount?: (id: string) => void;
@@ -99,14 +99,24 @@ export function shareSiteLogin(): void {
 let placing = false;
 function place(): void {
   if (!frame) return;
-  if (!host || !host.isConnected) {
+  let host: HTMLElement | null = null;
+  let r: DOMRect | null = null;
+  hosts.forEach(h => {
+    if (!h.isConnected) return;
+    const rect = h.getBoundingClientRect();
+    if (rect.width > 20 && rect.height > 20 && (!r || rect.width * rect.height > r.width * r.height)) {
+      host = h;
+      r = rect;
+    }
+  });
+  if (!host || !r) {
     frame.style.cssText = HIDDEN_CSS;
     return;
   }
-  const r = host.getBoundingClientRect();
-  frame.style.cssText = `position:fixed;left:${Math.round(r.left)}px;top:${Math.round(r.top)}px;width:${Math.round(
-    r.width
-  )}px;height:${Math.round(r.height)}px;border:0;z-index:50;background:transparent;`;
+  const box = r as DOMRect;
+  frame.style.cssText = `position:fixed;left:${Math.round(box.left)}px;top:${Math.round(box.top)}px;width:${Math.round(
+    box.width
+  )}px;height:${Math.round(box.height)}px;border:0;z-index:50;background:transparent;`;
 }
 function startPlacing(): void {
   if (placing) return;
@@ -200,13 +210,14 @@ export function loadDtrader(): Promise<void> {
 /** Shows DTrader over `container` (the page's area). */
 export function attachDtrader(container: HTMLElement): void {
   pendingSlug = readSlugFromPath() || pendingSlug;
-  host = container;
+  hosts.add(container);
   if (frame) place();
 }
 
 /** Moves DTrader out of sight; it keeps running. */
-export function detachDtrader(): void {
-  host = null;
+export function detachDtrader(container?: HTMLElement): void {
+  if (container) hosts.delete(container);
+  else hosts.clear();
   place();
 }
 
