@@ -238,7 +238,7 @@ export function startUrlSync(): void {
   // Hide DTrader's own long address while its page is on screen.
   const original = history.replaceState.bind(history);
   history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
-    if (document.body.classList.contains('epm-dtrader-active') && url && /trade_type=/.test(String(url))) return;
+    if (url && /trade_type=/.test(String(url))) return; // never show DTrader's long address (also while it runs hidden in the background)
     original(data, unused, url);
   };
 
@@ -274,5 +274,5 @@ export function startUrlSync(): void {
         original(window.history.state, '', target);
       }
     }
-  }, 700);
+  }, 250);
 }
