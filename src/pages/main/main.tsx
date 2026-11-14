@@ -181,19 +181,19 @@ const AppWrapper = observer(() => {
         });
     }, [is_loading]);
 
-    // Load DTrader quietly in the background a few seconds after the site opens, like the other tabs,
-    // so opening the Dtrader tab (or switching account) is instant.
+    // Load DTrader quietly in the background, but only after Charts has fully loaded (same gate as the other
+    // pages above) and the browser is idle -- so Charts always comes first and nothing competes with it.
     React.useEffect(() => {
+        if (!(chart_store.is_chart_loading || charts_preload_timed_out)) return undefined;
         const start = () => import('../dtrader/native-host').then(m => m.loadDtrader()).catch(() => undefined);
-        // wait until the browser is idle (and the site has settled) so the home page never stutters while it loads
         const t = window.setTimeout(() => {
             const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void })
                 .requestIdleCallback;
-            if (idle) idle(() => void start(), { timeout: 8000 });
+            if (idle) idle(() => void start(), { timeout: 6000 });
             else void start();
-        }, 6000);
+        }, 1500);
         return () => window.clearTimeout(t);
-    }, []);
+    }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 
     // Reset URL parameter processing when location changes
     React.useEffect(() => {

@@ -17,7 +17,7 @@ import i18nInstance from './i18n';
 import './app-root.scss';
 
 const Layout = lazy(() => import('../components/layout'));
-const DtraderPage = lazy(() => import('../pages/dtrader'));
+import DtraderRedirect from '../pages/dtrader/redirect';
 const TransferRedirect = lazy(() => import('../pages/dtrader/transfer-redirect'));
 const AboutPage = lazy(() => import('../pages/info/about'));
 const ContactPage = lazy(() => import('../pages/info/contact'));
@@ -68,7 +68,7 @@ const router = createBrowserRouter(
             {/* App Builder embeds the template at /preview — render the same app shell */}
             <Route path='preview' element={null} />
             {/* Ported Rise/Fall trading page (formerly its own repo) */}
-            <Route path='dtrader/*' element={<DtraderPage />} />
+            <Route path='dtrader/*' element={<DtraderRedirect />} />
             <Route path='transfer' element={<TransferRedirect />} />
             {/* Standalone info/legal pages — see src/pages/info/. Nested
                 here (not siblings of '/') so they render inside the same
