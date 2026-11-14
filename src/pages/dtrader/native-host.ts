@@ -130,6 +130,11 @@ export function loadDtrader(): Promise<void> {
     shareSiteLogin();
     startAccountSync();
     startSelfRepair();
+    startUrlSync();
+    if (/^\/dtrader\/./i.test(window.location.pathname)) {
+      pendingSlug = pendingSlug || readSlugFromPath();
+      history.replaceState(window.history.state, '', '/dtrader');
+    }
     seedTheme();
     startThemeSync();
     getRoot();
@@ -149,6 +154,7 @@ export function loadDtrader(): Promise<void> {
 
 /** Shows DTrader inside `container` (the page's frame). */
 export function attachDtrader(container: HTMLElement): void {
+  pendingSlug = readSlugFromPath() || pendingSlug;
   container.appendChild(getRoot());
 }
 
@@ -202,4 +208,62 @@ export function startSelfRepair(): void {
   };
   window.addEventListener('error', e => check(e.error ?? e.message));
   window.addEventListener('unhandledrejection', e => check(e.reason));
+}
+
+/**
+ * Clean web addresses: /dtrader/rise-fall, /dtrader/accumulators, /dtrader/even-odd, ...
+ * The address follows the selected trade type, and opening such an address selects that trade type.
+ * (DTrader itself writes long ?chart_type=...&symbol=... addresses; those are not shown.)
+ */
+const slugOf = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+let pendingSlug: string | null = null;
+let urlSyncing = false;
+const TYPES_SELECTOR = '.derivatives-trader .trade__trade-types';
+
+function readSlugFromPath(): string | null {
+  const m = window.location.pathname.match(/^\/dtrader\/([a-z-]+)\/?$/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+export function startUrlSync(): void {
+  if (urlSyncing) return;
+  urlSyncing = true;
+
+  // Hide DTrader's own long address while its page is on screen.
+  const original = history.replaceState.bind(history);
+  history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
+    if (document.body.classList.contains('epm-dtrader-active') && url && /trade_type=/.test(String(url))) return;
+    original(data, unused, url);
+  };
+
+  window.setInterval(() => {
+    if (!document.body.classList.contains('epm-dtrader-active')) return;
+    const box = document.querySelector(TYPES_SELECTOR);
+    if (!box) return;
+    const chips = Array.from(box.querySelectorAll<HTMLButtonElement>('button'));
+    if (!chips.length) return;
+    const selected = chips.find(c => c.getAttribute('data-state') === 'selected');
+
+    if (pendingSlug) {
+      const wanted = chips.find(c => slugOf(c.textContent || '') === pendingSlug);
+      pendingSlug = null;
+      if (wanted && wanted !== selected) {
+        wanted.click();
+        return;
+      }
+    }
+
+    if (!selected) return;
+    const slug = slugOf(selected.textContent || '');
+    if (!slug) return;
+    const target = `/dtrader/${slug}`;
+    if (window.location.pathname !== target || window.location.search || window.location.hash) {
+      original(window.history.state, '', target);
+    }
+  }, 700);
 }
