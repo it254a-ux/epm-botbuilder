@@ -164,6 +164,11 @@ function getFrame(): HTMLIFrameElement {
   f.id = FRAME_ID;
   f.title = 'DTrader';
   f.setAttribute('allow', 'clipboard-write; fullscreen');
+  // no top navigation: whatever happens inside the frame, it can never take over the whole tab
+  f.setAttribute(
+    'sandbox',
+    'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals'
+  );
   f.style.cssText = HIDDEN_CSS;
   f.src = SRC;
   document.body.appendChild(f);
