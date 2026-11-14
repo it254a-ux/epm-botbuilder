@@ -106,7 +106,7 @@ function place(): void {
   const r = host.getBoundingClientRect();
   frame.style.cssText = `position:fixed;left:${Math.round(r.left)}px;top:${Math.round(r.top)}px;width:${Math.round(
     r.width
-  )}px;height:${Math.round(r.height)}px;border:0;z-index:1;background:transparent;`;
+  )}px;height:${Math.round(r.height)}px;border:0;z-index:50;background:transparent;`;
 }
 function startPlacing(): void {
   if (placing) return;
