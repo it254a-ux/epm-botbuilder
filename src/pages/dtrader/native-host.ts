@@ -226,7 +226,8 @@ let urlSyncing = false;
 const TYPES_SELECTOR = '.derivatives-trader .trade__trade-types';
 
 function readSlugFromPath(): string | null {
-  const m = window.location.pathname.match(/^\/dtrader\/([a-z-]+)\/?$/i);
+  const m =
+    window.location.pathname.match(/^\/dtrader\/([a-z-]+)\/?$/i) || window.location.hash.match(/^#dtrader\/([a-z-]+)$/i);
   return m ? m[1].toLowerCase() : null;
 }
 
@@ -261,9 +262,17 @@ export function startUrlSync(): void {
     if (!selected) return;
     const slug = slugOf(selected.textContent || '');
     if (!slug) return;
-    const target = `/dtrader/${slug}`;
-    if (window.location.pathname !== target || window.location.search || window.location.hash) {
-      original(window.history.state, '', target);
+    if (window.location.pathname.startsWith('/dtrader')) {
+      const target = `/dtrader/${slug}`;
+      if (window.location.pathname !== target || window.location.search || window.location.hash) {
+        original(window.history.state, '', target);
+      }
+    } else {
+      // inside the home page's Dtrader tab: keep the site's #hash style
+      const target = `${window.location.pathname}#dtrader/${slug}`;
+      if (window.location.search || window.location.hash !== `#dtrader/${slug}`) {
+        original(window.history.state, '', target);
+      }
     }
   }, 700);
 }

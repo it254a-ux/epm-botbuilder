@@ -168,7 +168,7 @@ const AppWrapper = observer(() => {
     const is_preview_mode = window.location.pathname.includes('/preview');
     let tab_value: number | string = active_tab;
     const GetHashedValue = (tab: number) => {
-        tab_value = location.hash?.split('#')[1];
+        tab_value = location.hash?.split('#')[1]?.split('/')[0]; // '#dtrader/accumulators' still means the dtrader tab
         if (!tab_value) return is_preview_mode ? BOT_BUILDER : tab;
         return Number(hash.indexOf(String(tab_value)));
     };
