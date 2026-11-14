@@ -195,6 +195,12 @@ const AppWrapper = observer(() => {
         return () => window.clearTimeout(t);
     }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 
+    // Moving between the Charts page and Dtrader: make every chart measure itself again so none stays blank.
+    React.useEffect(() => {
+        const timers = [80, 300, 800, 1600].map(ms => window.setTimeout(() => window.dispatchEvent(new Event('resize')), ms));
+        return () => timers.forEach(t => window.clearTimeout(t));
+    }, [active_tab]);
+
     // Reset URL parameter processing when location changes
     React.useEffect(() => {
         resetUrlParamProcessing();

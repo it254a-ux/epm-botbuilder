@@ -156,12 +156,14 @@ export function loadDtrader(): Promise<void> {
 export function attachDtrader(container: HTMLElement): void {
   pendingSlug = readSlugFromPath() || pendingSlug;
   container.appendChild(getRoot());
+  redrawCharts();
 }
 
 /** Puts DTrader back in the hidden holder so it keeps running. */
 export function detachDtrader(): void {
   const root = document.getElementById(ROOT_ID);
   if (root) getHolder().appendChild(root);
+  redrawCharts(); // the Charts page is shown again: make it measure itself
 }
 
 /**
@@ -275,4 +277,20 @@ export function startUrlSync(): void {
       }
     }
   }, 250);
+}
+
+/**
+ * Charts draw on a canvas that is sized when the page is shown. After DTrader is moved in or out of view (or
+ * the Charts page comes back), tell every chart to measure itself again so none stays blank.
+ */
+export function redrawCharts(): void {
+  [60, 250, 600, 1400].forEach(ms =>
+    window.setTimeout(() => {
+      try {
+        window.dispatchEvent(new Event('resize'));
+      } catch {
+        /* ignore */
+      }
+    }, ms)
+  );
 }
