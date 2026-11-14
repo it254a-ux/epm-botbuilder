@@ -184,9 +184,14 @@ const AppWrapper = observer(() => {
     // Load DTrader quietly in the background a few seconds after the site opens, like the other tabs,
     // so opening the Dtrader tab (or switching account) is instant.
     React.useEffect(() => {
+        const start = () => import('../dtrader/native-host').then(m => m.loadDtrader()).catch(() => undefined);
+        // wait until the browser is idle (and the site has settled) so the home page never stutters while it loads
         const t = window.setTimeout(() => {
-            import('../dtrader/native-host').then(m => m.loadDtrader()).catch(() => undefined);
-        }, 4000);
+            const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void })
+                .requestIdleCallback;
+            if (idle) idle(() => void start(), { timeout: 8000 });
+            else void start();
+        }, 6000);
         return () => window.clearTimeout(t);
     }, []);
 
