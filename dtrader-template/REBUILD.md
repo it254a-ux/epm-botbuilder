@@ -22,3 +22,10 @@ npm run build --workspace=@deriv/core -- dtrader-app
 rm -rf ../public/dtrader-app && cp -r packages/core/dist ../public/dtrader-app
 find ../public/dtrader-app -name '*.map' -delete
 ```
+
+## After every rebuild: keep DTrader's chart engine separate from the Charts page's
+After copying `packages/core/dist` to `public/dtrader-app` (and deleting `*.map` / `*.LICENSE.txt`), run:
+
+    sh dtrader-template/isolate-smartcharts.sh
+
+It renames the chart engine's shared global names inside DTrader's copy (`window.flutterChart` -> `flutterChartDt`, `_flutter` -> `_flutterDt`, ...), so the Charts page and DTrader no longer take over each other's chart (blank chart when moving between the two pages).
