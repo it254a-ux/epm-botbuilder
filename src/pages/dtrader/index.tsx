@@ -23,7 +23,7 @@ export default function DtraderPage() {
         return () => {
             seen.disconnect();
             document.body.classList.remove('epm-dtrader-active');
-            detachDtrader(el);
+            detachDtrader();
         };
     }, []);
 

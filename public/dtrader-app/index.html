@@ -62,9 +62,12 @@
                 document.documentElement.style.setProperty('--initial-loader-display', 'none');
             }</script><style id="antiClickjack">body {
                 display: none !important;
-            }</style><script type="text/javascript">// EPM: DTrader runs inside the website's own frame, so it must not push the whole tab to its own address.
-            var antiClickjack = document.getElementById('antiClickjack');
-            antiClickjack.parentNode.removeChild(antiClickjack);</script><noscript>Your browser does not support JavaScript!</noscript><script type="text/javascript">(function (l) {
+            }</style><script type="text/javascript">if (self === top) {
+                var antiClickjack = document.getElementById('antiClickjack');
+                antiClickjack.parentNode.removeChild(antiClickjack);
+            } else {
+                top.location = self.location;
+            }</script><noscript>Your browser does not support JavaScript!</noscript><script type="text/javascript">(function (l) {
                 if (l.search) {
                     // Create object without prototype to prevent pollution
                     var q = Object.create(null);

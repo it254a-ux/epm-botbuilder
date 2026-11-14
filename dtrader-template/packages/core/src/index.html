@@ -79,9 +79,12 @@
             }
         </style>
         <script type="text/javascript">
-            // EPM: DTrader runs inside the website's own frame, so it must not push the whole tab to its own address.
-            var antiClickjack = document.getElementById('antiClickjack');
-            antiClickjack.parentNode.removeChild(antiClickjack);
+            if (self === top) {
+                var antiClickjack = document.getElementById('antiClickjack');
+                antiClickjack.parentNode.removeChild(antiClickjack);
+            } else {
+                top.location = self.location;
+            }
         </script>
         <!-- End Anti-Clickjack -->
 

@@ -1,4 +1,122 @@
+/*
+ * DTrader running inside the site (see native-host.ts): make it look like part of the site.
+ * - the site already has its own header, menu, help and theme switch, so the template's own side menu is hidden
+ * - the template's developer panel and its red "</>" button are never shown on the live site
+ * - it fills exactly the frame the page gives it (no extra height that would push it under the viewport)
+ */
+.derivatives-trader {
+    height: 100%;
+    width: 100%;
+    font-family: var(--brand-font-primary, inherit);
+}
+
+.derivatives-trader .sidebar,
+.derivatives-trader .dc-flyout,
+.derivatives-trader .devtools__toggle-button,
+.derivatives-trader .devtools__panel {
+    display: none !important;
+}
+
+.derivatives-trader .app-contents,
+.derivatives-trader .dc-themed-scrollbars,
+.derivatives-trader .app-shell {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+}
+
+.derivatives-trader .app-shell__main-content {
+    margin-inline-start: 0 !important;
+    width: 100% !important;
+}
+
+/*
+ * Login and account belong to the website, not the template: its own Log in / Sign up buttons and its
+ * "Real account / balance / Deposit" block are removed, so the site's header is the only place to sign in
+ * and switch account (DTrader already signs in with the site's login, see native-host.ts).
+ */
+.derivatives-trader .account-header {
+    display: none !important;
+}
+
+/*
+ * The trade types (Rise/Fall, Accumulators, ...) become a thin vertical rail on the left in a small font.
+ * Only the rail is changed: it floats on the left, and the chart + trade panel keep their own sizes and just
+ * start to the right of it. (Desktop and tablet only.)
+ */
+@media (min-width: 600px) {
+    .derivatives-trader .trade {
+        position: relative;
+        padding-left: 10.4rem !important;
+    }
+
+    .derivatives-trader .trade__header {
+        position: absolute !important;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 10.4rem;
+        height: auto !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        padding: 0 !important;
+        border-bottom: 0 !important;
+        border-right: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+        overflow: hidden;
+    }
+
+    .derivatives-trader .trade__header:after {
+        display: none !important;
+    }
+
+    .derivatives-trader .trade__trade-types,
+    .derivatives-trader .trade__logout .trade__trade-types {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        height: 100%;
+        min-height: 0 !important;
+        padding: 0.6rem !important;
+        gap: 0.4rem !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        white-space: normal !important;
+    }
+
+    .derivatives-trader .trade__trade-types .quill-chip,
+    .derivatives-trader .trade__trade-types button.quill-chip {
+        width: 100%;
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 0.5rem 0.8rem !important;
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .derivatives-trader .trade__trade-types .quill-chip *,
+    .derivatives-trader .trade__trade-types button.quill-chip * {
+        font-size: 1.15rem !important;
+        line-height: 1.5rem !important;
+        font-weight: 500;
+    }
+}
+
 /* Full width: the home page keeps 1.6rem of space on both sides of its tabs; Dtrader uses all of it. */
 body.epm-dtrader-active .main {
     padding: 0 !important;
+}
+
+/*
+ * Touch both walls: the template sizes its page as "screen width minus 7.2rem" (room for its own side menu, which is
+ * hidden here), which left an empty strip on the right. It is now the full screen width, like the site's header.
+ */
+@media (min-width: 600px) {
+    body.epm-dtrader-active .derivatives-trader {
+        overflow: hidden;
+    }
+
+    body.epm-dtrader-active .derivatives-trader .trade {
+        width: 100vw !important;
+    }
 }
