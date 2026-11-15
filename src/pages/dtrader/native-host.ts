@@ -131,6 +131,7 @@ export function loadDtrader(): Promise<void> {
     startAccountSync();
     startSelfRepair();
     startUrlSync();
+    startVideoSwap();
     if (/^\/dtrader\/./i.test(window.location.pathname)) {
       pendingSlug = pendingSlug || readSlugFromPath();
       history.replaceState(window.history.state, '', '/dtrader');
@@ -293,4 +294,51 @@ export function redrawCharts(): void {
       }
     }, ms)
   );
+}
+
+/**
+ * Help videos: DTrader's videos are on Deriv's video account, which only plays on Deriv's own sites. If a copy of a
+ * video is saved in /dtrader-videos/<video id>.mp4 (see public/dtrader-videos/README.txt), it is played from there instead.
+ * Videos with no saved copy are left as they are.
+ */
+const videoFiles = new Map<string, Promise<boolean>>();
+const hasVideoFile = (id: string): Promise<boolean> => {
+  let known = videoFiles.get(id);
+  if (!known) {
+    known = fetch(`/dtrader-videos/${id}.mp4`, { method: 'HEAD' })
+      .then(r => r.ok && /video|octet/i.test(r.headers.get('content-type') || ''))
+      .catch(() => false);
+    videoFiles.set(id, known);
+  }
+  return known;
+};
+
+let videoSwapStarted = false;
+export function startVideoSwap(): void {
+  if (videoSwapStarted) return;
+  videoSwapStarted = true;
+  const swap = (frame: HTMLIFrameElement) => {
+    const m = frame.src.match(/^https:\/\/iframe\.cloudflarestream\.com\/([0-9a-f]{32})\?(.*)$/i);
+    if (!m || frame.dataset.epmChecked) return;
+    frame.dataset.epmChecked = '1';
+    const [, id, query] = m;
+    const params = new URLSearchParams(query);
+    void hasVideoFile(id).then(found => {
+      if (!found || !frame.isConnected) return;
+      const video = document.createElement('video');
+      video.className = frame.className;
+      video.src = `/dtrader-videos/${id}.mp4`;
+      video.style.cssText = 'width:100%;height:100%;object-fit:contain;background:transparent;';
+      video.autoplay = params.get('autoplay') !== 'false';
+      video.muted = params.get('muted') !== 'false';
+      video.loop = params.get('loop') !== 'false';
+      video.controls = params.get('controls') === 'true';
+      video.playsInline = true;
+      frame.replaceWith(video);
+      void video.play().catch(() => undefined);
+    });
+  };
+  new MutationObserver(() => {
+    document.querySelectorAll<HTMLIFrameElement>('iframe.stream__iframe').forEach(swap);
+  }).observe(document.body, { childList: true, subtree: true });
 }
