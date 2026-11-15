@@ -220,8 +220,8 @@ body.epm-dtrader-active .main {
 }
 
 .quill-action-sheet--root {
-    zoom: 0.72;
-    max-height: calc(90dvh / 0.72) !important;
+    zoom: 0.625;
+    max-height: calc(90dvh / 0.625) !important;
     display: flex;
     flex-direction: column;
 }
@@ -232,8 +232,8 @@ body.epm-dtrader-active .main {
     }
 
     .quill-action-sheet--root {
-        width: calc(640px / 0.72) !important;
-        max-width: calc(94vw / 0.72) !important;
+        width: calc(640px / 0.625) !important;
+        max-width: calc(94vw / 0.625) !important;
         border-radius: 1.8rem !important;
     }
 }
@@ -246,4 +246,14 @@ body.epm-dtrader-active .main {
 
 .quill-action-sheet--root .stream__wrapper {
     max-height: 40vh;
+}
+
+/*
+ * The big "guide" pop-up on desktop (trade type help with the tabs along the top): the template sizes it in rem for a
+ * 10px page text size, while the site uses 16px, so it came out about 1.6 times too big (wide, taller than the screen,
+ * large text). Scaled back to the size Deriv shows it at.
+ */
+.guide-desktop-modal .modal__content {
+    zoom: 0.625;
+    max-height: calc(92dvh / 0.625) !important;
 }
