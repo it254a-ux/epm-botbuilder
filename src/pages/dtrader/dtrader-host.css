@@ -302,3 +302,30 @@ body.epm-dtrader-active .main {
     font-size: 0.9rem !important;
     line-height: 1.2rem !important;
 }
+
+/* Trade types list, part 2: compact rows (they were 55px tall each) and a height that fits below the grid button. */
+.trade-types-selector__popover .input-popover__content {
+    max-height: calc(100dvh - 17rem) !important;
+}
+
+.trade-types-selector__modal {
+    height: min(67rem, calc(100dvh - 17rem)) !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__item {
+    padding: 0.5rem 0.9rem !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__tab {
+    padding: 0.7rem 0 !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__content {
+    margin-top: 0.4rem !important;
+    padding-bottom: 0.8rem;
+}
+
+.trade-types-selector__modal .trade-types-selector__category-label {
+    margin-top: 0.4rem !important;
+    padding-block: 0.2rem;
+}
