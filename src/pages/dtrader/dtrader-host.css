@@ -329,3 +329,22 @@ body.epm-dtrader-active .main {
 iframe[src*='cloudflarestream.com'] {
     visibility: hidden !important;
 }
+
+/*
+ * Trade-type guide pop-up (the big one with the tabs): the earlier rule aimed at a class that does not exist in the
+ * pop-up, so it stayed too big. This targets the card itself: scaled to Deriv's size (512px wide, 14px text), centred,
+ * never taller than the screen, with the text area scrolling inside and the "Got it" button always visible.
+ */
+.guide-desktop-modal {
+    zoom: 0.625;
+    width: 51.2rem !important;
+    max-width: calc(96vw / 0.625) !important;
+    height: auto !important;
+    max-height: calc(92dvh / 0.625) !important;
+}
+
+.guide-desktop-modal .guide-desktop-modal__content {
+    min-height: 0 !important;
+    max-height: calc(92dvh / 0.625 - 24rem) !important;
+    overflow-y: auto !important;
+}
