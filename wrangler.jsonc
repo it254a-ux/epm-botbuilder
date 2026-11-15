@@ -3,6 +3,10 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-11-10",
   "compatibility_flags": ["nodejs_compat"],
+  // Keep the variables you add in the Cloudflare dashboard (TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, ...)
+  // when the site is redeployed. Without this, each deploy can wipe them and the Bots page shows
+  // "TURSO_DATABASE_URL is not set".
+  "keep_vars": true,
   "observability": { "enabled": true },
   "assets": {
     "directory": "./dist",
