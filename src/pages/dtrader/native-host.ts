@@ -319,17 +319,20 @@ export function startVideoSwap(): void {
   videoSwapStarted = true;
   const swap = (frame: HTMLIFrameElement) => {
     const m = frame.src.match(/^https:\/\/iframe\.cloudflarestream\.com\/([0-9a-f]{32})\?(.*)$/i);
-    if (!m || frame.dataset.epmChecked) return;
+    if (frame.dataset.epmChecked) return;
     frame.dataset.epmChecked = '1';
-    const [, id, query] = m;
+    const [, id, query] = m || [];
+    const hide = () => {
+      // Deriv's player is blocked on this site: remove the whole video box (and its black background)
+      const box = (frame.closest('.stream__wrapper, .guide-video__wrapper, [class*="video"]') ||
+        frame.parentElement) as HTMLElement | null;
+      (box || frame).style.setProperty('display', 'none', 'important');
+    };
+    if (!id) return hide();
     const params = new URLSearchParams(query);
     void hasVideoFile(id).then(found => {
       if (!frame.isConnected) return;
-      if (!found) {
-        // Deriv's own player is blocked on this site: show no black box instead
-        (frame.closest('.stream__wrapper') as HTMLElement | null)?.style.setProperty('display', 'none');
-        return;
-      }
+      if (!found) return hide();
       const video = document.createElement('video');
       video.className = frame.className;
       video.src = `/dtrader-videos/${id}.mp4`;
@@ -343,7 +346,9 @@ export function startVideoSwap(): void {
       void video.play().catch(() => undefined);
     });
   };
-  new MutationObserver(() => {
-    document.querySelectorAll<HTMLIFrameElement>('iframe.stream__iframe').forEach(swap);
-  }).observe(document.body, { childList: true, subtree: true });
+  const scan = () =>
+    document.querySelectorAll<HTMLIFrameElement>('iframe[src*="cloudflarestream.com"]').forEach(swap);
+  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+  window.setInterval(scan, 1000);
+  scan();
 }

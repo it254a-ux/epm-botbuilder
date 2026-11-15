@@ -324,3 +324,8 @@ body.epm-dtrader-active .main {
     margin-top: 0.4rem !important;
     padding-block: 0.2rem;
 }
+
+/* Deriv's help-video player is blocked on this site: never show its black "not configured" box, not even for a moment. */
+iframe[src*='cloudflarestream.com'] {
+    visibility: hidden !important;
+}
