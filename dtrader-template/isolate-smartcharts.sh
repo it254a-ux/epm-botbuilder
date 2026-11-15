@@ -16,4 +16,7 @@ for f in $FILES; do
     -e 's/flutterConfiguration(Dt)?/flutterConfigurationDt/g' \
     "$f"
 done
+# the chart engine also saves its settings (chart type, time interval, ...) in the browser under the prefix "flutter."
+# -- give DTrader's copy its own prefix so the Charts page's saved settings can never be loaded into DTrader's chart
+sed -i 's/"flutter\."/"flutterdt."/g' js/smartcharts/chart/main.dart.js
 echo "isolated: $(echo "$FILES" | wc -w) files"
