@@ -132,6 +132,7 @@ export function loadDtrader(): Promise<void> {
     startSelfRepair();
     startUrlSync();
     startVideoSwap();
+    startChartZoomOut();
     if (/^\/dtrader\/./i.test(window.location.pathname)) {
       pendingSlug = pendingSlug || readSlugFromPath();
       history.replaceState(window.history.state, '', '/dtrader');
@@ -351,4 +352,25 @@ export function startVideoSwap(): void {
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
   window.setInterval(scan, 1000);
   scan();
+}
+
+/**
+ * The chart opens zoomed out (many candles in view) instead of zoomed right in. DTrader's chart has no setting for its
+ * opening zoom, so once the chart is on screen with its data, its own "zoom out" button is pressed a few times, once
+ * for each chart (each open or refresh). The user can still zoom however they like afterwards.
+ */
+const ZOOM_OUT_STEPS = 6;
+let zoomedOutButton: Element | null = null;
+export function startChartZoomOut(): void {
+  window.setInterval(() => {
+    if (!document.body.classList.contains('epm-dtrader-active')) return;
+    const button = document.querySelector<HTMLElement>('.derivatives-trader .cq-zoom-out');
+    if (!button || button === zoomedOutButton) return;
+    const chart = button.closest('.sc-chart, .smartcharts, .ciq-chart-area') || document.querySelector('.derivatives-trader');
+    if (/Retrieving Chart Data|Loading/i.test(chart?.textContent || '')) return; // wait until the data is drawn
+    zoomedOutButton = button;
+    window.setTimeout(() => {
+      for (let i = 0; i < ZOOM_OUT_STEPS; i++) window.setTimeout(() => button.click(), i * 120);
+    }, 800);
+  }, 700);
 }
