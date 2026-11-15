@@ -28,7 +28,9 @@
 }
 
 .injectionDiv {
-    height: calc(100vh - 16.4rem);
+    // Same height as #scratch_div and the Run panel, so the blocks canvas reaches the bottom of the page
+    // (it used to stop short and leave an empty dark strip underneath).
+    height: var(--bot-content-height, calc(100vh - 16.4rem));
     position: relative;
     touch-action: none;
     overflow: hidden;
