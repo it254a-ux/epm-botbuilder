@@ -1,0 +1,4 @@
+dist
+chart_app/.fvm
+chart_app/build
+node_modules

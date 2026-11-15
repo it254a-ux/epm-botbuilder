@@ -1,0 +1,13 @@
+/**
+* Edit (and rename) this file to implement your own style.
+* Run sass to generate a css file from this file. Include that css in your html.
+**/
+/* TODO: deal with translations on all :after and :before content */
+@import url('https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,400,500,700&display=swap&subset=cyrillic,cyrillic-ext,latin-ext,vietnamese');
+@import 'styles/chart';
+@import 'styles/main';
+@import 'components/barrier';
+@import 'components/loader';
+@import 'components/drawing-confirmation-toast';
+@import 'components/deletion-snackbar';
+// Add an import for your overrides here and then recompile the SASS

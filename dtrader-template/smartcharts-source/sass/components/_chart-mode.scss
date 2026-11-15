@@ -1,0 +1,38 @@
+// Toolbar trigger for the chart type / time interval dialog.
+// The dialog surface itself is styled in _quill-dialogs.scss.
+.sc-chart-mode {
+    &__menu {
+        position: relative;
+
+        .ic-icon {
+            margin: auto;
+            position: relative;
+
+            svg {
+                stroke: none !important;
+            }
+        }
+
+        // "5m"-style interval badge pinned to the top-right of the chart-type button
+        &__interval {
+            position: absolute;
+            top: -5px;
+            left: 22px;
+            padding: 4px 3px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 6px;
+            text-align: center;
+            white-space: nowrap;
+            text-transform: lowercase;
+            word-spacing: -0.3em;
+            pointer-events: none;
+
+            @include themify($themes) {
+                background: themed('IntervalBadgeBg');
+                color: themed('IntervalBadgeColor');
+            }
+        }
+    }
+}

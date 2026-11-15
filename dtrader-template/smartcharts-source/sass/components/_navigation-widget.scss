@@ -1,0 +1,102 @@
+/*! rtl:begin:ignore */
+.sc-navigation-widget {
+    direction: ltr;
+    position: absolute;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+
+    &__buttons {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+    }
+    &__item {
+        position: relative;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        box-shadow: none;
+        border-radius: 50%;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: none;
+        // Reset native <button> styling so the items render identically to the
+        // surrounding icon buttons.
+        margin: 0;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        appearance: none;
+        -webkit-appearance: none;
+        @include themify($themes) {
+            background-color: themed('ToolbarWidgetMobileBg');
+        }
+
+        &:hover {
+            @include themify($themes) {
+                background-color: themed('ToolbarWidgetItemHoverBg');
+            }
+        }
+        &:focus {
+            outline: none;
+        }
+        &:focus-visible {
+            @include themify($themes) {
+                outline: 2px solid themed('ToolbarWidgetItemIcon');
+            }
+            outline-offset: 2px;
+        }
+        .ic-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            svg {
+                width: 24px;
+                height: 24px;
+                stroke: none;
+                @include themify($themes) {
+                    fill: themed('ToolbarWidgetItemIcon');
+                }
+            }
+        }
+        &--hidden {
+            display: none;
+        }
+        &--disabled,
+        &:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    }
+
+    // Tooltip wrappers around the crosshair and scale buttons. The tooltip
+    // bubble is absolutely positioned, so the wrapper has to be the
+    // positioning context.
+    .sc-crosshair-toggle,
+    .sc-scale-toggle {
+        position: relative;
+        display: flex;
+    }
+
+    // The wrapper has to collapse with the button it wraps, otherwise it keeps
+    // occupying a flex slot (and its gap) once the scale button is hidden.
+    .sc-scale-toggle--hidden {
+        display: none;
+    }
+
+    // Shift the widget up when the historical date picker is present
+    &--indent {
+        bottom: 78px;
+    }
+}
+/*! rtl:end:ignore */

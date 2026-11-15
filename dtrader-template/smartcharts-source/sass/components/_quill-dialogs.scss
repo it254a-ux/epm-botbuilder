@@ -1,0 +1,1907 @@
+/**
+ * Redesigned chart dialogs (Chart type + Time interval, Drawing tools).
+ *
+ * Built on quill-ui primitives (Modal / ActionSheet / Chip / SegmentedControl / Tooltip).
+ * Quill's design tokens are CSS custom properties declared on `html.light` / `html.dark`.
+ * SmartCharts, however, is themed by its own `settings.theme` prop, and the two can disagree
+ * (a host may run a light shell around a dark chart). Because custom properties inherit, we
+ * re-declare the semantic tokens these dialogs consume on the portal container, so the whole
+ * subtree - including quill's own internals - follows the chart's theme.
+ *
+ * Values below are the resolved light/dark pairs from quill-ui's base2.css.
+ */
+
+.smartcharts-quill-portal {
+    &.smartcharts-light {
+        --semantic-color-slate-solid-surface-frame-low: #ffffff;
+        --semantic-color-slate-solid-surface-frame-mid: #f6f7f8;
+        --semantic-color-monochrome-textIcon-normal-high: rgba(0, 0, 0, 0.72);
+        --semantic-color-monochrome-textIcon-normal-mid: rgba(0, 0, 0, 0.48);
+        --semantic-color-slate-solid-textIcon-normal-highest: #000000;
+        --semantic-color-monochrome-border-normal-low: rgba(0, 0, 0, 0.04);
+        --semantic-color-monochrome-border-normal-mid: rgba(0, 0, 0, 0.08);
+        --semantic-color-monochrome-border-normal-high: rgba(0, 0, 0, 0.16);
+        --semantic-color-monochrome-surface-normal-lowest: rgba(0, 0, 0, 0.04);
+        --semantic-color-monochrome-surface-normal-low: rgba(0, 0, 0, 0.08);
+        --semantic-color-monochrome-surface-normal-midHigh: rgba(0, 0, 0, 0.24);
+        --semantic-color-slate-solid-border-inverse-mid: #181c25;
+    }
+    &.smartcharts-dark {
+        --semantic-color-slate-solid-surface-frame-low: #181c25;
+        --semantic-color-slate-solid-surface-frame-mid: #11141b;
+        --semantic-color-monochrome-textIcon-normal-high: rgba(255, 255, 255, 0.72);
+        --semantic-color-monochrome-textIcon-normal-mid: rgba(255, 255, 255, 0.48);
+        --semantic-color-slate-solid-textIcon-normal-highest: #ffffff;
+        --semantic-color-monochrome-border-normal-low: rgba(255, 255, 255, 0.04);
+        --semantic-color-monochrome-border-normal-mid: rgba(255, 255, 255, 0.08);
+        --semantic-color-monochrome-border-normal-high: rgba(255, 255, 255, 0.16);
+        --semantic-color-monochrome-surface-normal-lowest: rgba(255, 255, 255, 0.04);
+        --semantic-color-monochrome-surface-normal-low: rgba(255, 255, 255, 0.08);
+        --semantic-color-monochrome-surface-normal-midHigh: rgba(255, 255, 255, 0.24);
+        --semantic-color-slate-solid-border-inverse-mid: #ced0d6;
+    }
+}
+
+/* Shared -------------------------------------------------------------------- */
+
+/* Off-screen but still in the accessibility tree and the reading order. Used for the
+   disabled-option reasons, whose visible affordances (hover, tap) are pointer-only. */
+.sc-visually-hidden {
+    block-size: 1px;
+    /* The legacy `clip` rect rather than `clip-path`: universally supported, and the
+       repo's stylelint browser-features rule rejects `clip-path`. */
+    clip: rect(0 0 0 0);
+    inline-size: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+}
+
+.sc-quill-dialog {
+    &__heading {
+        color: var(--component-textIcon-normal-default);
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-weight: 800;
+        margin: 0;
+
+        /* h5 on desktop, h6 on mobile - per the Figma frames */
+        font-size: 20px;
+        line-height: 28px;
+
+        .smartcharts-mobile & {
+            font-size: 16px;
+            line-height: 24px;
+        }
+    }
+    &__divider {
+        background: var(--semantic-color-monochrome-border-normal-low);
+        block-size: 1px;
+        inline-size: 100%;
+    }
+}
+
+/* Desktop modal widths come straight from the Figma frames; on mobile the sheet is
+   always full width, so these only apply to the modal container. */
+.smartcharts-quill-portal .quill-modal__container {
+    border-radius: 32px;
+
+    /* Both dialogs share one close button treatment: a resting tertiary fill that darkens
+       on hover. Declaring a background overrides quill's default, which would otherwise
+       swallow its hover state, so the hover step is restated here. */
+    .quill-modal__close-icon {
+        background-color: var(--semantic-color-monochrome-surface-normal-lowest);
+
+        &:hover {
+            background-color: var(--semantic-color-monochrome-surface-normal-low);
+        }
+    }
+    &.sc-chart-type-dialog {
+        inline-size: 560px;
+    }
+    &.sc-draw-tools-dialog {
+        inline-size: 512px;
+    }
+
+    /* Narrower than its siblings: two tiles and a sentence, with no list to give room to. */
+    &.sc-download-dialog {
+        inline-size: 400px;
+    }
+}
+
+/* Chart type + Time interval ------------------------------------------------ */
+
+/* A ceiling, not a height: the sheet hugs its content, so no state trails empty space
+   below the time intervals. The sheet is anchored to the bottom of the screen, so a
+   height that grew would drag the handle up over the chart - `AreaStyleSection` therefore
+   pins this element to its collapsed height for as long as the disclosure is open, which
+   leaves the handle where it is and pushes the content below the section further down
+   inside the sheet's own scroll region.
+
+   Quill already makes this element the scroll region (`flex-grow: 1; overflow-y: auto`),
+   so nothing else is needed for that to work. `sc-quill-sheet` is `DialogShell`'s own
+   marker for it, and only the sheet carries it - so this never reaches the desktop Modal,
+   which shares the `sc-chart-type-dialog` class.
+
+   `vh`, not the `dvh` quill itself uses, because `dvh` is not in this repo's
+   `unit-allowed-list` and widening that is not this feature's call. The difference only
+   shows while a mobile browser's URL bar is visible, where `vh` measures the larger
+   viewport and the sheet comes out a little taller than 60% of what is on screen;
+   quill's own `90dvh` on the sheet root remains the backstop for that case. */
+.sc-chart-type-dialog.sc-quill-sheet {
+    max-block-size: 60vh;
+}
+
+.sc-chart-type-dialog {
+    &__content {
+        /* Published as a custom property because the Area settings section has to cancel
+           exactly one of these gaps while it is collapsed away - see
+           `.sc-area-settings-reveal--hidden`. */
+        --sc-dialog-section-gap: 24px;
+
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-dialog-section-gap);
+        padding: 32px;
+
+        /* On mobile quill's own `.action-sheet--content` already applies the design's
+           16px inset, so this layer contributes spacing only. */
+        .smartcharts-mobile & {
+            --sc-dialog-section-gap: 16px;
+
+            padding: 0;
+        }
+    }
+    &__section {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        inline-size: 100%;
+    }
+    &__types {
+        display: flex;
+        align-items: stretch;
+        inline-size: 100%;
+    }
+
+    /* One equal-width column per chart type, whether or not a tooltip wraps it. */
+    &__tile-slot {
+        display: flex;
+        flex: 1 0 0;
+        min-inline-size: 0;
+    }
+
+    /* The mobile counterpart of quill's hover tooltip, tapped open instead. Portalled out
+       of the sheet (which scrolls) and so positioned from script; only presentation lives
+       here. Box, padding and radius come from quill's own `tooltip-content` classes; what
+       is set below is what quill applies inline on its bubble, plus the two values
+       derivatives-trader corrects globally for its mobile tooltips.
+
+       Those corrections are restated rather than inherited: the host scopes them to
+       `.react-tiny-popover-container`, which this bubble is deliberately not inside, and a
+       library should not look different depending on whether its host happens to patch
+       quill. */
+    /* The `.tooltip-content` half is load-bearing, not decorative: it outweighs quill's
+       own `.tooltip-content__variant-base { color }` instead of merely tying with it. */
+    &__tap-tooltip.tooltip-content {
+        background-color: var(--component-textIcon-normal-prominent);
+        /* Above quill's modal overlay, which sits at 9999. */
+        z-index: 10000;
+        /* Quill's own `--component-textIcon-inverse-default` is only 72% opaque; the
+           design calls for the solid inverse. */
+        color: var(--component-textIcon-inverse-prominent, #fff);
+        /* 328px is the host's max; the viewport clamp keeps it off the edges on narrow
+           screens, where 328px + margins would not fit. */
+        max-inline-size: min(328px, calc(100vw - 32px));
+        inline-size: max-content;
+        text-align: center;
+
+        /* Points at the cell being explained. `--sc-tooltip-arrow-left` is set alongside
+           the position, because a bubble nudged in from a screen edge no longer lines up
+           with its cell. */
+        &:after {
+            border: 4px solid transparent;
+            border-block-end-width: 0;
+            border-block-start-color: var(--component-textIcon-normal-prominent);
+            content: '';
+            inset-block-start: 100%;
+            inset-inline-start: var(--sc-tooltip-arrow-left, 50%);
+            position: absolute;
+            transform: translateX(-50%);
+        }
+
+        /* Not enough headroom above the cell, so the bubble sits below it instead and the
+           arrow moves to the top edge to keep pointing back at what it describes. */
+        &.sc-chart-type-dialog__tap-tooltip--below:after {
+            border-block-end-color: var(--component-textIcon-normal-prominent);
+            border-block-end-width: 4px;
+            border-block-start-color: transparent;
+            border-block-start-width: 0;
+            inset-block-start: auto;
+            inset-block-end: 100%;
+        }
+    }
+    &__tile {
+        align-items: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 16px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        inline-size: 100%;
+        min-inline-size: 0;
+        padding: 16px 8px;
+
+        svg {
+            block-size: 24px;
+            inline-size: 24px;
+        }
+        &__label {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            line-height: 20px;
+            text-align: center;
+            inline-size: 100%;
+        }
+        &--active {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+            border-color: var(--semantic-color-slate-solid-border-inverse-mid);
+        }
+        &--disabled {
+            cursor: default;
+
+            svg {
+                opacity: 0.32;
+            }
+            .sc-chart-type-dialog__tile__label {
+                color: var(--component-textIcon-normal-subtle);
+            }
+        }
+    }
+    &__intervals {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        inline-size: 100%;
+    }
+    &__interval-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        inline-size: 100%;
+    }
+
+    /* Each chip fills its column so the grid stays aligned across rows. Spacer cells
+       occupy the short last row's remaining columns. */
+    &__interval {
+        display: flex;
+        flex: 1 0 0;
+        min-inline-size: 0;
+    }
+    &__interval > .quill-chip {
+        inline-size: 100%;
+        /* Design uses a tighter inline padding than quill's md default so "10m"/"30m" fit. */
+        padding-inline: 12px;
+
+        /* Match the chart type tiles: both are selectable options, so both use the same
+           affordance. Quill leaves its chip button at the browser default arrow. */
+        &:not(:disabled) {
+            cursor: pointer;
+        }
+
+        /* "1 tick" is the widest label, and in English it sits on one line as the design
+           has it. It is not one line everywhere: every other chip is a number and a
+           hardcoded letter, but this one is a number plus a translated word, and some
+           locales render that word as a whole phrase - Polish has "najmniejsza zmiana
+           ceny" for "tick".
+
+           No pill this size fits that, so the job here is only to fail tidily. On one
+           line it used to overflow sideways and cover the chip beside it, which is why
+           "1m" was reported broken in Polish too; wrapping instead just moves the
+           overflow to the vertical axis, where it escapes the pill and lands on the
+           heading. Clipping to the chip keeps it contained on both axes, and the ellipsis
+           says the label is cut rather than simply odd.
+
+           The real fix is the translation: a chart interval unit has to be a short word.
+           This only stops a long one breaking the layout. */
+        >p {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .smartcharts-mobile & {
+            padding-inline: 8px;
+        }
+    }
+
+    /* Selected chip: filled + 1.5px inverse border, per the Figma spec. Quill's own selected
+       styling uses a mid-grey fill and an inverted label, so the box and text both need
+       overriding - but the weight stays at the unselected value, as the design has it. */
+    &__interval > .quill-chip[data-state='selected'] {
+        background-color: var(--semantic-color-monochrome-surface-normal-lowest);
+        border-color: var(--semantic-color-slate-solid-border-inverse-mid);
+        border-width: 1.5px;
+
+        >p {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        }
+
+        /* Quill's selected hover/active fills are near-opaque (rgba(0,0,0,.8)), which buries
+           the label. Step the surface tint instead, exactly as the unselected chip does, so
+           the label keeps its contrast in both themes. */
+        &:hover,
+        &:active {
+            background-color: var(--semantic-color-monochrome-surface-normal-low);
+
+            >p {
+                color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            }
+        }
+    }
+}
+
+/* Area settings ------------------------------------------------------------- */
+
+/* The one clipped box both height changes animate through - the disclosure, and the
+   section arriving or leaving with the chart type. `max-block-size` is set inline from
+   measurements taken in `AreaStyleSection`, which is where the reasoning lives. */
+.sc-area-settings-reveal {
+    overflow: hidden;
+
+    /* Armed only once the first measurement has landed, so opening the dialog does not
+       animate a section that was simply always there. See `AreaStyleSection`. */
+    &--animated {
+        transition: max-block-size 0.22s ease, margin-block-start 0.22s ease, visibility 0.22s;
+
+        /* Someone who has asked for less motion gets the same disclosure without the
+           height animation; the state change is still obvious from the chevron. */
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+    }
+
+    /* Collapsed to nothing, this is still a flex item, and flex gaps do not collapse:
+       the dialog would put one on each side of a zero-height box and leave double
+       spacing between the sections it sits between. Cancelling one gap here keeps that
+       spacing at exactly one, and animating the margin alongside the height keeps the
+       two in step on the way in and out. */
+    &--hidden {
+        margin-block-start: calc(-1 * var(--sc-dialog-section-gap));
+    }
+
+    /* Matches the gap the dialog would have given these two children, so the divider
+       sits the same distance from the heading as every other section's does. */
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-dialog-section-gap);
+    }
+}
+
+/* The disclosure around the picker, on mobile: the heading row is the toggle, so the sheet
+   opens at its compact height and only grows when the settings are actually wanted. The
+   desktop modal has room for the controls and shows them outright, so it renders a plain
+   heading and the `__trigger` / `__chevron` rules below never apply there. */
+.sc-area-settings {
+    /* The section's own `gap` would sit between the heading and the controls, outside the
+       height the reveal box subtracts to find the heading row - so a closed row would
+       trail a phantom 16px. The controls carry that spacing as padding instead, where it
+       is counted. */
+    gap: 0;
+
+    &__heading {
+        /* The heading is only a wrapper for the button; all of the box belongs to the
+           button, so the whole row is the hit target. */
+        inline-size: 100%;
+    }
+    &__trigger {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        box-sizing: border-box;
+        color: inherit;
+        cursor: pointer;
+        display: flex;
+        /* Inherits the heading's family, size and weight, so the row reads exactly as the
+           two headings around it. */
+        font: inherit;
+        inline-size: 100%;
+        justify-content: space-between;
+        margin: 0;
+        /* Vertical padding, not margin: it extends the tappable row past the text without
+           opening a gap the collapsed panel would have to account for. */
+        padding: 4px 0;
+        text-align: start;
+
+        &:focus-visible {
+            border-radius: 8px;
+            outline: 2px solid var(--semantic-color-slate-solid-border-inverse-mid);
+            outline-offset: 2px;
+        }
+    }
+    &__chevron {
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    &__trigger[aria-expanded='true'] &__chevron {
+        transform: rotate(180deg);
+    }
+
+    /* The controls. No clipping of its own - the reveal box above does that - but it does
+       carry the design's 16px between the heading and the first control, because this
+       element's measured height is what the reveal box subtracts to find the heading
+       row's height. Spacing left outside it would strand 16px under a closed heading.
+
+       `visibility` is set inline and transitions discretely, so the controls leave the tab
+       order for as long as they are clipped out of sight. */
+    &__panel {
+        padding-block-start: 16px;
+        transition: visibility 0.22s;
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+
+        /* The bootstrap state, before anything has been measured: it lets the reveal box
+           above size itself to the heading row alone, which is the height the measured
+           numbers will agree on a frame later. Dropped as soon as they arrive.
+
+           Dropping the padding is what actually gets this to zero. `max-block-size: 0`
+           caps the content box, so the 16px above it would still be laid out; and
+           `box-sizing: border-box` does not help either, because a border box is floored
+           at its own padding and border. Either way the first paint came out 16px taller
+           than the measurement that replaced it - a visible settle every time the dialog
+           was opened on the Area chart. The padding is back the moment this class is
+           dropped, by which point the reveal box is clipping above it anyway. */
+        &--clipped {
+            max-block-size: 0;
+            overflow: hidden;
+            padding-block-start: 0;
+        }
+    }
+}
+
+/* The Area chart's fill, line colour and line thickness. Lives inside the chart-type
+   dialog, below the type tiles, behind the disclosure above.
+
+   Every selectable cell shares the type tiles' affordance - transparent at rest, a tinted
+   surface plus a 1.5px inverse border when selected - so the three groups read as one
+   family with the row above them. */
+.sc-area-style {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    inline-size: 100%;
+
+    .smartcharts-mobile & {
+        gap: 12px;
+    }
+    &__group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        inline-size: 100%;
+    }
+
+    /* Colour beside thickness where there is room for both: three stacked groups pushed
+       the time intervals out of the desktop modal. Wrapping rather than a
+       `.smartcharts-mobile` branch, so the break comes from the space actually available
+       - the mobile sheet is narrower than the modal, but so is a narrow modal. */
+    &__row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        inline-size: 100%;
+    }
+
+    /* The swatches are a fixed size, so the colour group takes only what it needs and
+       thickness absorbs the rest of the row - down to a floor below which the three
+       labels would not fit, at which point it takes a row of its own. */
+    &__group--colour {
+        flex: 0 0 auto;
+        inline-size: auto;
+
+        /* On the sheet the row has always wrapped, so the colour group has a line to
+           itself: give it the full width and centre the swatches in it, which reads
+           better than six circles hanging off the left edge. Desktop keeps them
+           left-aligned, where they sit beside the thickness cells. */
+        .smartcharts-mobile & {
+            inline-size: 100%;
+
+            .sc-area-style__colours {
+                justify-content: center;
+            }
+        }
+    }
+    &__group--thickness {
+        flex: 1 1 200px;
+        min-inline-size: 200px;
+    }
+
+    /* Sub-labels, a step below the section heading: they name a control rather than a
+       section, so they take the body colour at caption size and regular weight. */
+    &__label {
+        color: var(--component-textIcon-normal-default);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    /* Shared by all three cell types. They are <button>s, so the UA's own font, padding
+       and margin are reset here rather than relying on a host's base stylesheet. */
+    &__fill,
+    &__colour,
+    &__thickness {
+        align-items: center;
+        background: transparent;
+
+        /* Already the selected width, just transparent until then, so that selecting a
+           cell changes only colour and never geometry. Browsers disagree about how a
+           1.5px border is rounded - Chrome floors it to 1px, Safari and any Retina
+           display render it faithfully - so a width that changed with selection moved
+           the row's height by a pixel on some machines and not others. */
+        border: 1.5px solid transparent;
+        /* Not inherited from a host reset: the dialogs are portalled outside the chart's
+           own subtree, and every size below counts the border and padding in. */
+        box-sizing: border-box;
+        cursor: pointer;
+        display: flex;
+        font: inherit;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+
+        &:focus-visible {
+            outline: 2px solid var(--semantic-color-slate-solid-border-inverse-mid);
+            outline-offset: 2px;
+        }
+    }
+    &__fill,
+    &__thickness {
+        border-radius: 12px;
+
+        /* Content packed to the top rather than centred, so that a label which wraps to
+           two lines in one language does not push its own preview down and leave it out
+           of line with the cell beside it. The cells stretch to a common height either
+           way, so with everything starting at the top the previews always agree. */
+        justify-content: flex-start;
+
+        &:hover {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+        }
+        &--active {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+            border-color: var(--semantic-color-slate-solid-border-inverse-mid);
+        }
+    }
+
+    /* Fill: two equal-width tiles, each a miniature of the chart as configured. */
+    &__fills {
+        display: flex;
+        gap: 8px;
+        inline-size: 100%;
+    }
+    &__fill {
+        flex: 1 0 0;
+        flex-direction: column;
+        gap: 8px;
+        min-inline-size: 0;
+        padding: 8px;
+
+        &__canvas {
+            /* Deliberately unfilled: the line and its gradient sit straight on the tile,
+               so the tile reads as one surface - the same treatment the thickness cells
+               get. An inner panel here would be a box the thickness cells do not have.
+
+               The preview is drawn with `preserveAspectRatio: none`, so it takes exactly
+               the box given here - a 2:1 landscape, as in the design. */
+            block-size: 48px;
+            display: block;
+            inline-size: 100%;
+
+            /* No hex of its own for the "Default" swatch: the preview inherits this
+               colour through `currentColor`, and the inline style only overrides it when
+               an explicit colour is selected. */
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        }
+        &__label {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            line-height: 20px;
+
+            /* Far more room here than the thickness cells have, but the same rule
+               applies: a label that wraps must not drag its preview out of line with
+               the tile beside it. */
+            word-break: break-word;
+            text-align: center;
+        }
+    }
+    &__preview {
+        block-size: 100%;
+        display: block;
+        inline-size: 100%;
+    }
+
+    /* Colour: round swatches, sized so all six fit one row on the narrowest phone. */
+    &__colours {
+        display: flex;
+        /* Only reached on a viewport narrower than the six swatches, where a second row
+           is better than an overflowing one. */
+        flex-wrap: wrap;
+        gap: 8px;
+        inline-size: 100%;
+
+        /* The swatches are shorter than the thickness cells beside them, so they take
+           the group's leftover height and sit centred in it rather than hanging from
+           their label. */
+        align-items: center;
+        flex: 1 0 auto;
+    }
+    &__colour {
+        block-size: 36px;
+        border-radius: 50%;
+        inline-size: 36px;
+
+        /* The ring is the border itself, kept clear of the swatch by the padding, so a
+           selected dark swatch is still distinguishable on a dark surface. */
+        padding: 3px;
+
+        &:hover .sc-area-style__colour__swatch {
+            transform: scale(1.08);
+        }
+        &--active {
+            border-color: var(--semantic-color-slate-solid-border-inverse-mid);
+        }
+        &__swatch {
+            block-size: 100%;
+            border-radius: 50%;
+            display: block;
+            inline-size: 100%;
+            transition: transform 0.15s ease;
+
+            /* The default swatch, which carries no inline background: the same near-black
+               / near-white the engine's own theme paints the area line with. */
+            background: var(--semantic-color-slate-solid-textIcon-normal-highest);
+
+            /* A hairline so a white swatch is still a circle on the light surface. */
+            box-shadow: inset 0 0 0 1px var(--semantic-color-monochrome-border-normal-mid);
+        }
+    }
+
+    /* Thickness: three equal-width cells, each drawing its own line weight. */
+    &__thicknesses {
+        display: flex;
+        gap: 8px;
+        inline-size: 100%;
+    }
+    &__thickness {
+        flex: 1 0 0;
+        flex-direction: column;
+        gap: 10px;
+        min-inline-size: 0;
+
+        /* Little inline padding, because there is little to spare: the colour swatches
+           beside this group take a fixed 256px, leaving each of these three cells about
+           69px. At 8px a side that is 51px of text, and "Medium" alone needs 54 - so
+           even English wrapped. The line sample is 40px and centred, so the padding was
+           only ever protecting the label, which is the thing that needed the room. */
+        padding: 12px 4px;
+
+        &__line {
+            background: currentcolor;
+            border-radius: 2px;
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            display: block;
+            /* A fixed-length sample rather than the full cell width: three lines that
+               differ by a pixel read as weights side by side, not as rules. */
+            inline-size: 40px;
+            /* `block-size` is set inline, from the option's own pixel thickness. */
+        }
+        &__label {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            line-height: 20px;
+
+            /* These cells are about 69px wide on desktop, which several languages'
+               single words exceed - Swahili's "Nyembamba" for "Thin", for one. Breaking
+               inside the word keeps it in the cell; without this it simply spills over
+               the cell beside it. */
+            word-break: break-word;
+            text-align: center;
+        }
+    }
+}
+
+/* Drawing tools ------------------------------------------------------------- */
+
+.sc-draw-tools-dialog {
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        padding: 32px 32px 24px;
+
+        /* On mobile quill's own `.action-sheet--content` already applies the design's
+           16px inset, so this layer contributes spacing only. */
+        .smartcharts-mobile & {
+            gap: 16px;
+            padding: 0;
+        }
+    }
+
+    /* Switch + list group: 16px internally, 32px away from the dialog title. */
+    &__body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        inline-size: 100%;
+    }
+    &__title {
+        color: var(--component-textIcon-normal-prominent);
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 32px;
+        margin: 0;
+    }
+    &__tabs {
+        inline-size: 100%;
+
+        /* Quill's `sm` gives the design's 40px/32px proportions but squares the corners off
+           at 8px/4px. The design keeps a full pill, so restore the radius on the track and
+           the moving segment. `.segmented-control-single--sm .item` matches at (0,2,0) and
+           quill's stylesheet loads after ours, so the class is repeated here to outrank it.
+           The animated `:before` backdrop uses `border-radius: inherit` and follows along. */
+        &.segmented-control-single {
+            border-radius: 999px;
+            /* The chart's crosshair cursor leaks onto the track; only segments are hit targets. */
+            cursor: default;
+
+            .item {
+                border-radius: 999px;
+            }
+        }
+    }
+
+    /* Both tabs share one fixed-height content box, on desktop and mobile alike, so
+       switching tabs never resizes the dialog or the sheet. Comfortably fits both default
+       states - the empty state and the full tool list - and longer lists scroll inside it,
+       which keeps the title, the tab switch and "Clear all" pinned. */
+    &__tab-content {
+        block-size: 216px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        inline-size: 100%;
+        overflow: hidden;
+    }
+
+    /* The only scrollable region. `min-block-size: 0` is what lets a flex child actually
+       shrink below its content height and scroll rather than stretching its parent. */
+    &__scroll {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-block-size: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        /* Keeps the delete icons clear of the scrollbar: 12px against a 6px bar leaves a
+           visible gap whether the platform draws it inline or as an overlay. The stable
+           gutter reserves the track on both tabs, so rows never shift when it appears. */
+        padding-inline-end: 12px;
+        scrollbar-gutter: stable;
+
+        /* Standard properties (Firefox). The thumb colour is fixed so it does not change
+           while being dragged. */
+        scrollbar-color: var(--semantic-color-monochrome-surface-normal-midHigh) transparent;
+        scrollbar-width: thin;
+
+        /* WebKit/Blink equivalent. Left unstyled, macOS swaps in a light overlay bar with a
+           grey track the moment you grab it, which is jarring on a dark dialog - every state
+           below is pinned to the same pair of colours. */
+        &::-webkit-scrollbar {
+            inline-size: 6px;
+        }
+        &::-webkit-scrollbar-track,
+        &::-webkit-scrollbar-track:hover,
+        &::-webkit-scrollbar-track:active,
+        &::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+        &::-webkit-scrollbar-thumb,
+        &::-webkit-scrollbar-thumb:hover,
+        &::-webkit-scrollbar-thumb:active {
+            background-color: var(--semantic-color-monochrome-surface-normal-midHigh);
+            border-radius: 999px;
+        }
+        &::-webkit-scrollbar-button {
+            display: none;
+        }
+
+        /* Momentum scrolling for the sheet's list on iOS. No `touch-action` guard is needed:
+           `ActionSheet.Portal` is mounted without `shouldDetectSwipingOnContainer`, so the
+           swipe-to-dismiss is only picked up on the handlebar, not over the list. */
+        -webkit-overflow-scrolling: touch;
+    }
+    &__list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        inline-size: 100%;
+
+        /* The active list is denser and uses hairlines instead of whitespace. */
+        &--active {
+            gap: 8px;
+        }
+    }
+    &__separator {
+        background: var(--semantic-color-monochrome-border-normal-mid);
+        block-size: 1px;
+        inline-size: 100%;
+    }
+    &__item {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        block-size: 56px;
+        /* Active-tab rows are not selectable - only their trailing delete button is. The
+           whole row is clickable in "All drawings", which opts in via `--action`. */
+        cursor: default;
+        display: flex;
+        gap: 16px;
+        inline-size: 100%;
+        padding: 0;
+        text-align: start;
+
+        &--action {
+            cursor: pointer;
+        }
+
+        /* Leading tool glyph only (direct child) - the trailing trash icon is a quill
+           icon inside the delete button and is sized separately below. */
+        >svg {
+            block-size: 24px;
+            flex-shrink: 0;
+            inline-size: 24px;
+        }
+        &__label {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            flex: 1 0 0;
+            font-size: 16px;
+            line-height: 24px;
+            min-inline-size: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        &__delete {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            display: flex;
+            flex-shrink: 0;
+            padding: 0;
+
+            /* Design places the trash glyph in a 24px box; fill comes from the inline prop. */
+            >svg {
+                block-size: 24px;
+                inline-size: 24px;
+            }
+        }
+    }
+    &__actions {
+        display: flex;
+        /* Pinned above the scroll area - never compressed by a long list. */
+        flex-shrink: 0;
+        justify-content: flex-end;
+        inline-size: 100%;
+    }
+    &__clear-all {
+        background: transparent;
+        border: 1px solid var(--semantic-color-slate-solid-border-inverse-mid);
+        border-radius: 12px;
+        block-size: 24px;
+        color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        cursor: pointer;
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 12px;
+        min-inline-size: 48px;
+        padding-inline: 12px;
+    }
+
+    /* Empty state: 64px magnifier illustration over a bold title and a subtle caption,
+       centred in the space the list would occupy. */
+    &__empty {
+        align-items: center;
+        display: flex;
+        flex: 1 0 auto;
+        flex-direction: column;
+        justify-content: center;
+        padding-block: 32px;
+        text-align: center;
+
+        /* 64px square, per the design's "Magnifier 1" frame. The asset is 4x that so it
+           stays sharp on high-DPI screens; the element pins the displayed size. */
+        &__image {
+            block-size: 64px;
+            display: block;
+            inline-size: 64px;
+        }
+        &__text {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            inline-size: 100%;
+            margin-block-start: 8px;
+        }
+        &__title {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.5;
+            margin: 0;
+        }
+    }
+}
+
+/* Download ------------------------------------------------------------------ */
+
+.sc-download-dialog {
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 32px 32px 24px;
+
+        /* On mobile quill's own `.action-sheet--content` already applies the design's
+           16px inset, so this layer contributes spacing only. */
+        .smartcharts-mobile & {
+            padding: 0;
+        }
+    }
+    &__title {
+        color: var(--component-textIcon-normal-prominent);
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 32px;
+        margin: 0;
+    }
+    &__description {
+        color: var(--component-textIcon-normal-subtle);
+        font-size: 14px;
+        line-height: 20px;
+        margin: 0;
+    }
+    &__tiles {
+        display: flex;
+        gap: 8px;
+        inline-size: 100%;
+    }
+
+    /* Deliberately the chart type tile's shape - icon over label, 16px radius - since both
+       present a small set of equally weighted options. These are actions rather than a
+       selection, so there is a hover state but no selected state. */
+    &__tile {
+        align-items: center;
+        background: transparent;
+        border-radius: 16px;
+        cursor: pointer;
+        display: flex;
+        flex: 1 0 0;
+        flex-direction: column;
+        /* Icon to label. Tighter than the 8px between the tiles themselves, so the pair
+           reads as one unit rather than two stacked items. */
+        gap: 4px;
+        min-inline-size: 0;
+        /* Centres the group if the row ever stretches a tile past its content height. */
+        justify-content: center;
+        padding: 16px 8px;
+
+        /* Sized on the `.ic-icon` wrapper rather than the svg it contains: the wrapper is
+           what the flex column measures, so sizing only the svg leaves it overflowing a
+           24px box and butting straight into the label, swallowing the gap above. */
+        .ic-icon {
+            block-size: 32px;
+            inline-size: 32px;
+
+            svg {
+                block-size: 100%;
+                inline-size: 100%;
+            }
+        }
+        &:hover {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+        }
+        &:active {
+            background: var(--semantic-color-monochrome-surface-normal-low);
+        }
+        &__label {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            inline-size: 100%;
+            line-height: 20px;
+            text-align: center;
+        }
+    }
+}
+
+/* Indicators (desktop) ------------------------------------------------------ */
+
+/* The design frames this dialog at 900x480 with a 24px radius and a visible hairline
+   border, unlike the other two which are borderless with a 32px radius. */
+.smartcharts-quill-portal .quill-modal__container.sc-indicators-dialog {
+    block-size: 480px;
+    border: 1px solid var(--semantic-color-monochrome-border-normal-high);
+    border-radius: 24px;
+    inline-size: 900px;
+    overflow: hidden;
+    padding-block: 24px;
+}
+
+.sc-indicators-dialog {
+    &__content {
+        block-size: 100%;
+        display: flex;
+        inline-size: 100%;
+    }
+
+    /* Left navigation ------------------------------------------------------- */
+
+    &__nav {
+        block-size: 100%;
+        border-inline-end: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        gap: 24px;
+        inline-size: 228px;
+        padding-inline-start: 8px;
+
+        &__title {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-family: var(--core-fontFamily-inter, inherit);
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1.4;
+            margin: 0;
+            padding-inline: 16px;
+        }
+        &__group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            inline-size: 100%;
+        }
+        &__list {
+            display: flex;
+            flex-direction: column;
+            inline-size: 100%;
+        }
+        &__divider {
+            background: var(--semantic-color-monochrome-border-normal-mid);
+            block-size: 1px;
+            margin-inline: 16px;
+        }
+        &__item {
+            align-items: center;
+            background: transparent;
+            block-size: 40px;
+            border: 0;
+            color: var(--component-textIcon-normal-subtle);
+            cursor: pointer;
+            display: flex;
+            font-size: 16px;
+            inline-size: 100%;
+            line-height: 1.5;
+            padding: 0 0 0 16px;
+            position: relative;
+            text-align: start;
+
+            >span {
+                flex: 1 0 0;
+                min-inline-size: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            /* 4x40 coral marker pinned to the divider edge, per the design. */
+            &__bar {
+                background: #ff444f;
+                block-size: 40px;
+                border-radius: 999px;
+                inline-size: 4px;
+                inset-block-start: 0;
+                inset-inline-end: 0;
+                position: absolute;
+            }
+            &--selected {
+                color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+                font-weight: 700;
+            }
+        }
+    }
+
+    /* Right pane ------------------------------------------------------------ */
+
+    &__pane {
+        block-size: 100%;
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 16px;
+        min-inline-size: 0;
+        padding-inline: 8px;
+    }
+    &__header {
+        align-items: center;
+        block-size: 40px;
+        display: flex;
+        flex-shrink: 0;
+        gap: 16px;
+        inline-size: 100%;
+        /* The search normally fills the row; on the settings page it is absent, and this keeps
+           back and close pinned to their own ends rather than bunched together. */
+        justify-content: space-between;
+        padding-inline: 16px;
+    }
+    &__icon-btn {
+        align-items: center;
+        background: var(--semantic-color-monochrome-surface-normal-lowest);
+        block-size: 32px;
+        border: 0;
+        border-radius: 999px;
+        cursor: pointer;
+        display: flex;
+        flex-shrink: 0;
+        inline-size: 32px;
+        justify-content: center;
+        padding: 0;
+
+        &:hover {
+            background: var(--semantic-color-monochrome-surface-normal-low);
+        }
+        svg {
+            fill: var(--component-textIcon-normal-default);
+        }
+    }
+
+    /* Quill's SearchField supplies the magnifier and the clear control; it is reshaped here
+       into the design's flat 40px bar.
+
+       Quill nests a `__wrapper` inside the `__container` and gives *both* a surface, a border
+       and a radius. Left alone that reads as a field inside a field, so only the container
+       keeps the bar and the wrapper is flattened to a plain row. */
+    &__search {
+        flex: 1 1 auto;
+        min-inline-size: 0;
+
+        .quill-input__container {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+            /* This container is a *column* - quill stacks the field row above its validation
+               row - and sizes the row from its own field-height token, so the row does not
+               stretch to the taller bar. Centring it is therefore justify-content, not
+               align-items. */
+            justify-content: center;
+            block-size: 40px;
+            border: 0;
+            border-radius: 8px;
+            gap: 8px;
+            min-block-size: 40px;
+            padding-inline: 16px;
+        }
+
+        /* Quill repaints the wrapper on focus via `.quill-input__wrapper__variant--fill--neutral:focus-within`,
+           which ties a two-class override on specificity and loads later - so a plain reset is
+           beaten the moment the field is focused and the inner box returns. Going one class
+           deeper outranks it in every state. */
+        .quill-input__container .quill-input__wrapper {
+            &,
+            &:focus,
+            &:focus-within {
+                background: transparent;
+                border: 0;
+                border-radius: 0;
+                box-shadow: none;
+                min-block-size: 0;
+                padding: 0;
+            }
+        }
+        .quill-input {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.5;
+
+            &::placeholder {
+                color: var(--component-textIcon-normal-subtle);
+            }
+        }
+
+        /* The clear control is a bare button in quill's markup; the icons around it reuse the
+           same class on plain spans, so only the button is restyled. */
+        button.icon_wrapper {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            display: flex;
+            padding: 0;
+        }
+        svg {
+            flex-shrink: 0;
+        }
+    }
+    &__title {
+        color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.4;
+        margin: 0;
+        padding-inline: 16px;
+    }
+
+    /* The only scrolling region, so the header and title stay pinned. */
+    &__slot {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-block-size: 0;
+        overflow: hidden;
+    }
+
+    /* Lists ----------------------------------------------------------------- */
+
+    &__list {
+        display: flex;
+        flex-direction: column;
+        inline-size: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding-inline: 8px;
+        scrollbar-color: var(--semantic-color-monochrome-surface-normal-midHigh) transparent;
+        scrollbar-width: thin;
+
+        &::-webkit-scrollbar {
+            inline-size: 6px;
+        }
+        &::-webkit-scrollbar-track,
+        &::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+        &::-webkit-scrollbar-thumb,
+        &::-webkit-scrollbar-thumb:hover,
+        &::-webkit-scrollbar-thumb:active {
+            background-color: var(--semantic-color-monochrome-surface-normal-midHigh);
+            border-radius: 999px;
+        }
+    }
+    &__row {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        cursor: pointer;
+        display: flex;
+        flex-shrink: 0;
+        gap: 16px;
+        inline-size: 100%;
+        padding: 16px;
+        text-align: start;
+
+        >svg,
+        >.ic-icon {
+            block-size: 20px;
+            flex-shrink: 0;
+            inline-size: 20px;
+        }
+        &__label {
+            flex: 1 0 0;
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.5;
+            min-inline-size: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        &__action {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            display: flex;
+            flex-shrink: 0;
+            padding: 0;
+
+            svg {
+                fill: var(--component-textIcon-normal-default);
+            }
+        }
+
+        /* Quill icons default to a dark fill, which vanished against the dark theme's pane.
+           The indicator icon beside it is a themed sprite, so only the chevron is claimed. */
+        &__chevron {
+            fill: var(--component-textIcon-normal-default);
+        }
+        &:hover {
+            background: var(--semantic-color-monochrome-surface-normal-lowest);
+        }
+        &--disabled {
+            cursor: default;
+            opacity: 0.32;
+
+            &:hover {
+                background: transparent;
+            }
+        }
+    }
+
+    /* Quill's tooltip wraps the row in an element of its own; it must not disturb the list's
+       column layout or steal the row's full width. */
+    &__row-tip {
+        display: block;
+        inline-size: 100%;
+    }
+
+    /* Active rows are not themselves clickable - only their trailing controls are - and
+       the design separates them with a hairline. */
+    &__list--active &__row {
+        border-block-end: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+        border-radius: 0;
+        cursor: default;
+
+        &:hover {
+            background: transparent;
+        }
+    }
+
+    /* Guide ----------------------------------------------------------------- */
+
+    &__guide {
+        display: flex;
+        flex-direction: column;
+        inline-size: 100%;
+        overflow-y: auto;
+        padding-inline: 16px;
+        scrollbar-color: var(--semantic-color-monochrome-surface-normal-midHigh) transparent;
+        scrollbar-width: thin;
+
+        &::-webkit-scrollbar {
+            inline-size: 6px;
+        }
+        &::-webkit-scrollbar-thumb {
+            background-color: var(--semantic-color-monochrome-surface-normal-midHigh);
+            border-radius: 999px;
+        }
+        &__item {
+            padding-block: 16px;
+
+            +.sc-indicators-dialog__guide__item {
+                border-block-start: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+            }
+        }
+        &__title {
+            align-items: center;
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            display: flex;
+            font-size: 16px;
+            font-weight: 700;
+            gap: 8px;
+            line-height: 1.5;
+            margin: 0 0 4px;
+
+            svg,
+            .ic-icon {
+                block-size: 20px;
+                inline-size: 20px;
+            }
+        }
+        &__text {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+        }
+    }
+
+    /* Empty state ----------------------------------------------------------- */
+
+    &__empty {
+        align-items: center;
+        display: flex;
+        flex: 1 0 auto;
+        flex-direction: column;
+        justify-content: center;
+        padding: 32px 16px;
+        text-align: center;
+
+        /* See the drawing-tools empty state: 64px per the design, 4x asset. */
+        &__image {
+            block-size: 64px;
+            display: block;
+            inline-size: 64px;
+            margin-block-end: 8px;
+        }
+        &__text {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        &__title {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.5;
+            margin: 0;
+        }
+        &__subtitle {
+            color: var(--component-textIcon-normal-subtle);
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+        }
+    }
+
+    /* Indicator settings (staged) ------------------------------------------ */
+    &__settings {
+        block-size: 100%;
+        display: flex;
+        flex-direction: column;
+        inline-size: 100%;
+
+        /* Only the parameters scroll; the footer buttons stay reachable. */
+        &__scroll {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            gap: 24px;
+            min-block-size: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-inline: 16px;
+            scrollbar-color: var(--semantic-color-monochrome-surface-normal-midHigh) transparent;
+            scrollbar-width: thin;
+
+            &::-webkit-scrollbar {
+                inline-size: 6px;
+            }
+            &::-webkit-scrollbar-thumb {
+                background-color: var(--semantic-color-monochrome-surface-normal-midHigh);
+                border-radius: 999px;
+            }
+        }
+
+        /* Colour and select parameters sit two-up, as in the design. */
+        &__grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: 1fr 1fr;
+        }
+        &__stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        &__actions {
+            display: flex;
+            flex-shrink: 0;
+            gap: 8px;
+            inline-size: 100%;
+            padding-block-start: 16px;
+            padding-inline: 16px;
+        }
+    }
+    &__btn {
+        align-items: center;
+        block-size: 40px;
+        border-radius: 999px;
+        cursor: pointer;
+        display: flex;
+        flex: 1 0 0;
+        font-family: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        justify-content: center;
+        line-height: 1.5;
+        min-inline-size: 80px;
+
+        &--secondary {
+            background: transparent;
+            border: 1.5px solid var(--semantic-color-slate-solid-border-inverse-mid);
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        }
+        &--primary {
+            background: #ff444f;
+            border: 0;
+            color: #ffffff;
+        }
+        &:disabled {
+            cursor: default;
+            opacity: 0.32;
+        }
+    }
+
+    /* Dropdown fields (colour + select) ------------------------------------- */
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+
+        &__control {
+            align-items: center;
+            background: var(--semantic-color-slate-solid-surface-frame-low);
+            block-size: 56px;
+            border: 1px solid var(--semantic-color-monochrome-border-normal-high);
+            border-radius: 8px;
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            cursor: pointer;
+            display: flex;
+            gap: 8px;
+            inline-size: 100%;
+            padding-inline: 16px;
+            text-align: start;
+
+            svg {
+                fill: var(--component-textIcon-normal-default);
+                flex-shrink: 0;
+            }
+            &--open {
+                border-color: var(--semantic-color-slate-solid-border-inverse-mid);
+            }
+        }
+        &__label {
+            flex: 1 0 0;
+            font-size: 16px;
+            line-height: 1.5;
+            min-inline-size: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            /* The select's current value trails its label on the same line. */
+            em {
+                color: var(--component-textIcon-normal-subtle);
+                font-style: normal;
+                margin-inline-start: 8px;
+            }
+        }
+    }
+    &__swatch {
+        block-size: 16px;
+        border-radius: 999px;
+        flex-shrink: 0;
+        inline-size: 16px;
+    }
+
+    /* Popovers are portalled next to the modal and positioned from their trigger's rect (see
+       the Popover component), so they overlay the footer instead of being clipped by the
+       scrolling pane. Only the surface is styled here; placement is set inline.
+
+       They share a stacking context with quill's modal overlay, which sits at 9999, so they
+       have to outrank it or the dialog's own content paints over them. */
+    &__swatches,
+    &__options {
+        background: var(--semantic-color-slate-solid-surface-frame-low);
+        border: 1px solid var(--semantic-color-monochrome-border-normal-mid);
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+        z-index: 10000;
+    }
+    &__swatches {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(6, 32px);
+        padding: 16px;
+
+        &__item {
+            block-size: 32px;
+            border: 0;
+            border-radius: 999px;
+            cursor: pointer;
+            inline-size: 32px;
+            position: relative;
+
+            /* A tick drawn on the selected swatch, matching the design. */
+            &--selected:after {
+                block-size: 6px;
+                border-block-end: 2px solid #ffffff;
+                border-inline-start: 2px solid #ffffff;
+                content: '';
+                inline-size: 11px;
+                inset-block-start: 11px;
+                inset-inline-start: 10px;
+                position: absolute;
+                transform: rotate(-45deg);
+            }
+        }
+    }
+    &__options {
+        display: flex;
+        flex-direction: column;
+        /* Width is set inline from the trigger's rect; as a fixed-position element a
+           percentage would resolve against the viewport instead of the field. */
+        max-block-size: 220px;
+        overflow-y: auto;
+        padding: 8px;
+
+        &__item {
+            background: transparent;
+            border: 0;
+            border-radius: 8px;
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 8px 12px;
+            text-align: start;
+
+            &:hover {
+                background: var(--semantic-color-monochrome-surface-normal-lowest);
+            }
+            &--selected {
+                font-weight: 700;
+            }
+        }
+    }
+
+    /* Slider ---------------------------------------------------------------- */
+
+    &__slider {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+
+        &__head {
+            align-items: center;
+            display: flex;
+            gap: 12px;
+        }
+        &__label {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            flex: 1 0 0;
+            font-size: 16px;
+            line-height: 1.5;
+            min-inline-size: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        &__value {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.5;
+        }
+
+        /* A native range input, restyled: the filled portion is painted with a gradient
+           driven by --sc-slider-progress, which the component sets per value. */
+        &__input {
+            appearance: none;
+            background: linear-gradient(to right,
+            var(--semantic-color-slate-solid-border-inverse-mid) 0 var(--sc-slider-progress, 0%),
+            var(--semantic-color-monochrome-border-normal-mid) var(--sc-slider-progress, 0%) 100%);
+            block-size: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            inline-size: 100%;
+            outline: none;
+
+            &::-webkit-slider-thumb {
+                appearance: none;
+                background: var(--semantic-color-slate-solid-border-inverse-mid);
+                block-size: 24px;
+                border: 0;
+                border-radius: 999px;
+                cursor: pointer;
+                inline-size: 24px;
+            }
+            &::-moz-range-thumb {
+                background: var(--semantic-color-slate-solid-border-inverse-mid);
+                block-size: 24px;
+                border: 0;
+                border-radius: 999px;
+                cursor: pointer;
+                inline-size: 24px;
+            }
+        }
+    }
+
+    /* Toggle + paired value/colour ------------------------------------------ */
+
+    &__toggle {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+
+        &__label {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            flex: 1 0 0;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        &__control {
+            background: var(--semantic-color-monochrome-surface-normal-low);
+            block-size: 24px;
+            border: 0;
+            border-radius: 999px;
+            cursor: pointer;
+            flex-shrink: 0;
+            inline-size: 44px;
+            padding: 0;
+            position: relative;
+            transition: background-color 0.15s ease;
+
+            &:after {
+                background: #ffffff;
+                block-size: 20px;
+                border-radius: 999px;
+                content: '';
+                inline-size: 20px;
+                inset-block-start: 2px;
+                inset-inline-start: 2px;
+                position: absolute;
+                transition: inset-inline-start 0.15s ease;
+            }
+            &--on {
+                background: #00a758;
+
+                &:after {
+                    inset-inline-start: 22px;
+                }
+            }
+        }
+    }
+    &__paired {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+
+        &__label {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            flex: 1 0 0;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        &__value {
+            background: var(--semantic-color-slate-solid-surface-frame-low);
+            block-size: 40px;
+            border: 1px solid var(--semantic-color-monochrome-border-normal-high);
+            border-radius: 8px;
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-family: inherit;
+            font-size: 16px;
+            inline-size: 80px;
+            padding-inline: 12px;
+        }
+        .sc-indicators-dialog__field {
+            flex-shrink: 0;
+            inline-size: 72px;
+        }
+        .sc-indicators-dialog__field__control {
+            block-size: 40px;
+            justify-content: center;
+            padding-inline: 12px;
+        }
+    }
+
+    /* "What is X?" note ----------------------------------------------------- */
+
+    &__note {
+        background: rgba(44, 154, 255, 0.16);
+        border-radius: 16px;
+        display: flex;
+        gap: 8px;
+        padding: 16px;
+
+        &__icon {
+            fill: var(--component-textIcon-normal-default);
+            flex-shrink: 0;
+        }
+        &__body {
+            display: flex;
+            flex: 1 0 0;
+            flex-direction: column;
+            gap: 8px;
+            min-inline-size: 0;
+        }
+        &__title {
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.5;
+            margin: 0;
+        }
+        &__text {
+            color: var(--component-textIcon-normal-default);
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+        }
+    }
+}
+
+/* Confirmation dialog ------------------------------------------------------- */
+
+.smartcharts-quill-portal .quill-modal__container.sc-confirm-dialog {
+    border: 1px solid var(--semantic-color-monochrome-border-normal-high);
+    border-radius: 16px;
+    inline-size: 440px;
+    max-inline-size: calc(100vw - 32px);
+}
+
+.sc-confirm-dialog {
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 24px;
+    }
+    &__title {
+        color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        font-family: var(--core-fontFamily-inter, inherit);
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.5;
+        margin: 0;
+    }
+    &__text {
+        color: var(--component-textIcon-normal-default);
+        font-size: 14px;
+        line-height: 1.5;
+        margin: 0;
+    }
+    &__actions {
+        display: flex;
+        gap: 8px;
+        margin-block-start: 16px;
+    }
+    &__btn {
+        align-items: center;
+        block-size: 40px;
+        border-radius: 999px;
+        cursor: pointer;
+        display: flex;
+        flex: 1 0 0;
+        font-family: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        justify-content: center;
+        line-height: 1.5;
+
+        &--secondary {
+            background: transparent;
+            border: 1.5px solid var(--semantic-color-slate-solid-border-inverse-mid);
+            color: var(--semantic-color-slate-solid-textIcon-normal-highest);
+        }
+        &--primary {
+            background: #ff444f;
+            border: 0;
+            color: #ffffff;
+        }
+    }
+}
+
+/* Tooltip arrow on unavailable indicator rows -------------------------------
+ *
+ * `popoverAlign: 'start'` lines the bubble up with the row's leading edge, but quill pins the
+ * arrow to the centre of whatever the tooltip wraps - and these rows span the whole pane, so
+ * the arrow ends up far from the name it describes. There is no prop for it, so the single
+ * inline `left` quill writes is overridden here to sit above where the name starts: the row's
+ * 16px inset, plus its 20px icon, plus the 16px gap after it.
+ *
+ * Keyed off a marker inside the content so every other quill tooltip keeps its own arrow, and
+ * written as `left` because that is the physical property quill sets inline.
+ */
+.react-tiny-popover-container:has(.sc-indicators-dialog__tip) > div > div:first-child {
+    left: 52px !important;
+}

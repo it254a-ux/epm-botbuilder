@@ -1,0 +1,110 @@
+.sc-drawing-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+
+    display: flex;
+    max-width: 90vw;
+    width: max-content;
+    min-height: 3rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    align-items: center;
+    gap: 0.5rem;
+
+    border-radius: 0.5rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+
+    // Animation
+    animation: slideUp 0.3s ease-out;
+
+    @include themify($themes) {
+        border: 1px solid themed('DrawingToastBorder');
+        background: themed('DrawingToastBg');
+        color: themed('DrawingToastText');
+        box-shadow: 0 4px 8px 2px themed('DrawingToastShadow1'), 0 4px 8px 2px themed('DrawingToastShadow2');
+    }
+
+    &__content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 8px;
+    }
+    &__message {
+        flex: 1;
+    }
+    &__cancel {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: 500;
+        padding: 8px 12px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+
+        @include themify($themes) {
+            color: themed('DrawingToastButtonText');
+
+            &:hover {
+                background: themed('DrawingToastButtonHoverBg');
+            }
+            &:active {
+                background: themed('DrawingToastButtonActiveBg');
+            }
+        }
+
+        &:focus {
+            outline: 2px solid;
+
+            @include themify($themes) {
+                outline-color: themed('DrawingToastFocusOutline');
+            }
+        }
+    }
+
+    // Mobile responsive
+    @media (max-width: 768px) {
+        max-width: calc(100vw - 32px);
+        margin: 0 16px;
+        left: 0;
+        right: 0;
+        transform: none;
+
+        &__message {
+            font-size: 14px;
+        }
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+// Mobile animation
+@media (max-width: 768px) {
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}

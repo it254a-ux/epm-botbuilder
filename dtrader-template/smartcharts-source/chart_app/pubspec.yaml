@@ -1,0 +1,40 @@
+name: chart_app
+description: Chart App
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+    sdk: ">=3.3.3 <4.0.0"
+    flutter: "3.24.1"
+
+dependencies:
+    flutter:
+        sdk: flutter
+    deriv_chart:
+        git:
+            url: https://github.com/deriv-com/flutter-chart.git
+            ref: 645c87e5761d6fe941203d5d0cf005a0bfb6efb8
+    web: ^1.1.1
+
+dev_dependencies:
+    deriv_lint:
+        git:
+            url: https://github.com/deriv-com/flutter-deriv-packages.git
+            path: packages/deriv_lint
+            ref: dev
+    flutter_test:
+        sdk: flutter
+
+flutter:
+    fonts:
+        - family: IBMPlexSans
+          fonts:
+              - asset: fonts/IBMPlexSans-Regular.ttf
+              - asset: fonts/IBMPlexSans-Bold.ttf
+                weight: 700
+        # Seven quill glyphs for the on-chart indicator labels, built from
+        # @deriv/quill-icons by tool/generate_quill_icon_font.py.
+        - family: QuillChartIcons
+          fonts:
+              - asset: fonts/QuillChartIcons.otf
+    uses-material-design: true

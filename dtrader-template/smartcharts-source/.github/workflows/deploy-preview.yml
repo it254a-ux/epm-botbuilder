@@ -1,0 +1,199 @@
+# Preview deployment workflow
+# Builds SmartCharts and integrates with derivatives-trader for preview
+
+name: Deploy Preview
+
+on:
+    pull_request:
+        branches:
+            - '**'
+        types: [opened, synchronize, reopened]
+    workflow_dispatch:
+        inputs:
+            smartcharts_ref:
+                description: 'deriv-smartcharts branch/tag/SHA to build'
+                required: true
+                default: 'master'
+            flutter_chart_ref:
+                description: 'flutter-chart branch/tag/SHA to use in chart_app'
+                required: true
+                default: 'master'
+            derivatives_trader_ref:
+                description: 'derivatives-trader branch/tag/SHA to build the preview from'
+                required: true
+                default: 'master'
+
+# Cancel outdated deployments per PR, or per ref combination for manual triggers —
+# all three refs, so two manual runs that differ only in one of them don't cancel
+# each other.
+concurrency:
+    group: >-
+        deploy-preview-${{ github.event.number ||
+        format('{0}-{1}-{2}', github.event.inputs.smartcharts_ref, github.event.inputs.flutter_chart_ref,
+        github.event.inputs.derivatives_trader_ref) }}
+    cancel-in-progress: true
+
+jobs:
+    build_and_deploy_preview_link:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            checks: write
+            pull-requests: write
+        steps:
+            - name: Mint GitHub App token
+              id: app-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.CLIENT_ID_GHAPP }}
+                  private-key: ${{ secrets.PRIVATE_KEY_GHAPP }}
+                  owner: deriv-com
+                  repositories: derivatives-trader
+
+            - name: Verify user
+              if: github.event_name == 'pull_request'
+              uses: 'deriv-com/shared-actions/.github/actions/verify_user_in_organization@v3'
+              with:
+                  username: ${{ github.event.pull_request.user.login }}
+                  token: ${{ steps.app-token.outputs.token }}
+
+            - name: Post preview build comment
+              if: github.event_name == 'pull_request'
+              id: post_preview_build_comment
+              uses: 'deriv-com/shared-actions/.github/actions/post_preview_build_comment@v1'
+              with:
+                  issue_number: ${{ github.event.number }}
+                  head_sha: ${{ github.event.pull_request.head.sha }}
+
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  repository: deriv-com/deriv-smartcharts
+                  path: deriv-smartcharts
+                  ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.smartcharts_ref || github.event.pull_request.head.sha }}
+                  persist-credentials: false
+
+            - name: Checkout derivatives-trader
+              uses: actions/checkout@v4
+              with:
+                  repository: deriv-com/derivatives-trader
+                  path: derivatives-trader
+                  ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.derivatives_trader_ref || 'master' }}
+                  token: ${{ steps.app-token.outputs.token }}
+                  persist-credentials: false
+
+            - name: Setup Flutter
+              uses: subosito/flutter-action@62f096cacda5168a3bd7b95793373be14fa4fbaf
+              with:
+                  flutter-version: '3.24.1'
+                  channel: 'stable'
+                  cache: true
+
+            - name: Update flutter-chart ref in pubspec.yaml
+              if: github.event_name == 'workflow_dispatch'
+              env:
+                  FLUTTER_REF: ${{ github.event.inputs.flutter_chart_ref }}
+              run: |
+                  cd deriv-smartcharts/chart_app
+                  # Validate input format (alphanumeric, slashes, hyphens, underscores, dots only).
+                  if ! [[ "${FLUTTER_REF}" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+                    echo "Error: Invalid flutter_chart_ref format. Only alphanumeric characters, slashes, hyphens, underscores, and dots are allowed."
+                    exit 1
+                  fi
+                  # Rewrite only the 'ref:' belonging to the flutter-chart dependency. A blind
+                  # 's/ref:/' would also clobber deriv_lint's, and anchoring on 'ref: master'
+                  # would fail on any branch that already points chart_app somewhere else.
+                  python3 - "${FLUTTER_REF}" <<'PY'
+                  import re, sys
+
+                  ref = sys.argv[1]
+                  path = 'pubspec.yaml'
+                  url = 'url: https://github.com/deriv-com/flutter-chart.git'
+
+                  lines = open(path).read().splitlines(keepends=True)
+                  for i, line in enumerate(lines):
+                      if url in line:
+                          break
+                  else:
+                      sys.exit(f'Error: flutter-chart git dependency not found in {path}')
+
+                  for j in range(i + 1, min(i + 4, len(lines))):
+                      indent = re.match(r'(\s*)ref:', lines[j])
+                      if indent:
+                          lines[j] = f'{indent.group(1)}ref: {ref}\n'
+                          break
+                  else:
+                      sys.exit('Error: no ref: found under the flutter-chart dependency')
+
+                  open(path, 'w').write(''.join(lines))
+                  print(f'Updated {path} to use flutter-chart ref: {ref}')
+                  PY
+                  cat pubspec.yaml
+                  if ! grep -A3 -F 'url: https://github.com/deriv-com/flutter-chart.git' pubspec.yaml | grep -qF "ref: ${FLUTTER_REF}"; then
+                    echo "Error: Failed to update flutter-chart ref"
+                    exit 1
+                  fi
+
+            - name: Build Flutter chart component
+              run: |
+                  cd deriv-smartcharts/chart_app
+                  flutter pub get
+                  flutter build web --wasm --release
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22.x
+
+            - name: Setup derivatives-trader
+              run: cd derivatives-trader && npm run bootstrap
+
+            - name: Remove existing @deriv-com/smartcharts-champion in derivatives-trader
+              run: rm -rf derivatives-trader/node_modules/@deriv-com/smartcharts-champion/dist
+
+            - name: Setup SmartCharts
+              run: cd deriv-smartcharts && npm install
+
+            - name: Build SmartCharts
+              run: cd deriv-smartcharts && npm run build -- --output-path ../derivatives-trader/node_modules/@deriv-com/smartcharts-champion/dist
+
+            - name: Build derivatives-trader
+              env:
+                  NODE_ENV: 'test'
+              run: cd derivatives-trader && npm run build:all
+
+            - name: Setup Node for Cloudflare
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Publish to CF pages branch
+              id: publish_to_pages_branch
+              uses: 'deriv-com/shared-actions/.github/actions/publish_to_pages_branch@v1'
+              with:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_TEST_LINKS_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_TEST_LINKS_ACCOUNT_ID }}
+                  project_name: 'derivatives-trader'
+                  branch_name: ${{ github.head_ref || format('{0}-{1}-{2}', github.event.inputs.smartcharts_ref, github.event.inputs.flutter_chart_ref, github.event.inputs.derivatives_trader_ref) }}
+                  output_dir: derivatives-trader/packages/app/dist
+
+            - name: Generate preview link comment
+              if: always() && github.event_name == 'pull_request' && steps.post_preview_build_comment.outcome == 'success'
+              uses: 'deriv-com/shared-actions/.github/actions/post_preview_link_comment@v1'
+              with:
+                  issue_number: ${{ github.event.number }}
+                  check_run_id: ${{ steps.post_preview_build_comment.outputs.check_run_id }}
+                  preview_url: ${{ steps.publish_to_pages_branch.outputs.cf_pages_url }}
+                  status: ${{ job.status }}
+
+            - name: Output preview URL for manual trigger
+              if: github.event_name == 'workflow_dispatch'
+              run: |
+                  echo "## Preview Deployment Complete" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Preview URL:** ${{ steps.publish_to_pages_branch.outputs.cf_pages_url }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+                  echo "- deriv-smartcharts ref: \`${{ github.event.inputs.smartcharts_ref }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- flutter-chart ref: \`${{ github.event.inputs.flutter_chart_ref }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "- derivatives-trader ref: \`${{ github.event.inputs.derivatives_trader_ref }}\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,234 @@
+@charset "UTF-8";
+
+$chart-green: #4caf50;
+$chart-red: #f95454;
+
+/* CSS Document */
+
+html,
+body {
+    -ms-touch-action: none; /* This is necessary to allow the chart to grab windows touch events */ /* stylelint-disable-line plugin/no-unsupported-browser-features */
+    touch-action: none; /* Standard property for compatibility */ /* stylelint-disable-line plugin/no-unsupported-browser-features */
+    margin: 0px; /*to deal with iFraming which sets 8px by default in some browsers*/
+}
+
+/*! rtl:ignore */
+.chartContainer {
+    /* DIV that the canvas expands to. #chartContainer is only for backward compatibility with older libraries. */
+    display: block;
+    font-family: $base-font;
+    font-size: 12px;
+    position: relative; /* chart container must be relative for internal DOM elements to be correct */
+    transition: height 0.4s ease-in-out;
+    @include themify($themes) {
+        background: themed('ChartBg');
+        color: themed('ChartText');
+    }
+
+    .flutter-chart {
+        width: 100%;
+        height: 100%;
+    }
+}
+
+/*! rtl:ignore */
+.cq-inchart-subholder {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0px;
+    pointer-events: none; /* stylelint-disable-line plugin/no-unsupported-browser-features */
+}
+/* Chart Block */
+
+/*! rtl:ignore */
+.ciq-chart {
+    height: auto;
+    width: 100%;
+    z-index: 4;
+    touch-action: none; /* stylelint-disable-line plugin/no-unsupported-browser-features */
+
+    @include themify($themes) {
+        background: themed('ChartBg');
+    }
+
+    &--screenshot {
+        .calendar,
+        .cq-menu-dropdown,
+        .sc-toolbar-widget,
+        .sc-navigation-widget,
+        .time-picker-dropdown {
+            /*
+            There is a strange bug where dropdowns get displayed (partially)
+            when html is being rendered to canvas. So we set this to manually
+            hide it when PNG is exported.
+            */
+            display: none !important;
+        }
+    }
+}
+
+/* The Chart */
+
+/*! rtl:ignore */
+.cq-chart-control-left {
+    .chartContainer {
+        width: calc(100% - 100px);
+        margin-left: 100px;
+    }
+}
+
+/* --------------------------------------------------------- BUTTONS --------------------------------------------------------- */
+
+/* Up/Down Arrow indicators */
+.cq-change {
+    &:after {
+        /*! rtl:ignore */
+        float: right;
+        margin-top: 5px;
+        margin-right: 5px;
+        @include triangle-base(6px);
+    }
+    &.up:after {
+        border-bottom: 8px solid $COLOR_GREEN_1;
+    }
+    &.down:after {
+        border-top: 8px solid $COLOR_RED;
+    }
+    .cq-todays-change-percent {
+        padding-left: 3px;
+    }
+}
+
+/* --------------------------------------------------------- CHART CONTROLS --------------------------------------------------------- */
+
+/*! rtl:ignore */
+
+.scroll_to_recent:hover,
+.scroll_to_recent:active {
+    /* Make buttons full opacity on hover or hit */
+    opacity: 1;
+}
+
+/*! rtl:ignore */
+
+.scroll_to_recent {
+    /* Button  jumping to today's data */
+    color: #fff;
+    overflow: hidden;
+    position: absolute;
+    bottom: 12px;
+    right: 80px;
+    line-height: 0px;
+    height: 32px;
+    width: 32px;
+    padding: 0px;
+    margin-bottom: 17px;
+    border-radius: $border-radius;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    @include themify($themes) {
+        background: themed('NavigationWidgetBg');
+    }
+
+    svg {
+        position: relative;
+        @include themify($themes) {
+            fill: themed('NavigationWidgetColor');
+        }
+    }
+}
+
+/* ------------------------------------------------------- CHART OVERLAY ELEMENTS ------------------------------------------------------ */
+.mSticky {
+    position: absolute;
+    display: none;
+    z-index: 44;
+    white-space: nowrap;
+    border-radius: $border-radius;
+    font-size: 12px;
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1.5;
+    letter-spacing: normal;
+    text-align: center;
+    @include themify($themes) {
+        color: themed('ChartStickyText');
+        background: themed('ChartStickyBg');
+    }
+
+    .mStickyInterior {
+        padding: 8px;
+        position: relative;
+        width: 100%;
+        border-radius: $border-radius $border-radius 0px 0px;
+        border: none;
+        box-sizing: border-box;
+        font-size: 12px;
+        font-weight: bold;
+        font-style: normal;
+        line-height: 1.5;
+        letter-spacing: normal;
+        text-align: center;
+        @include themify($themes) {
+            background: themed('ChartStickyInnerBg');
+            color: themed('ChartStickyInnerText');
+        }
+    }
+}
+
+.mouseDeleteInstructions {
+    margin: 8px;
+    background: transparent;
+    display: block;
+}
+
+/* --------------------------------------------------------- CHART SDK --------------------------------------------------------- */
+
+/* -------- Axis tabs and current Prices -------- */
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba($COLOR_ORANGE, 0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba($COLOR_ORANGE, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba($COLOR_ORANGE, 0);
+    }
+}
+
+.smartcharts-mobile {
+    .mSticky {
+        background: none;
+
+        .mStickyInterior {
+            margin: 0px;
+            padding: 0px 8px 0 !important;
+            line-height: 30px;
+            border-radius: 3px 0px 0px 3px;
+            width: auto;
+            z-index: 99;
+        }
+    }
+    .ciq-chart {
+        padding: 0 8px;
+    }
+}
+
+// To hide google translate tooltips on drag
+#gtx-trans {
+    display: none;
+}
+
+.fast-marker {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    overflow: hidden;
+}

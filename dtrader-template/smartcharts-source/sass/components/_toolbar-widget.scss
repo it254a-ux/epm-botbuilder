@@ -1,0 +1,251 @@
+/*! rtl:begin:ignore */
+
+// Shared frosted-pill look for a single toolbar button
+@mixin toolbar-pill {
+    width: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    box-shadow: none;
+    border-radius: 50%;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    @include themify($themes) {
+        background: themed('ToolbarWidgetMobileBg');
+    }
+
+    .ic-icon {
+        width: 24px !important;
+        height: 24px !important;
+        top: 0;
+
+        svg {
+            width: 24px !important;
+            height: 24px !important;
+            position: relative;
+            bottom: 0;
+            stroke: none;
+
+            @include themify($themes) {
+                fill: themed('ToolbarWidgetItemIcon');
+            }
+        }
+    }
+    .sc-notification-badge {
+        height: 8px;
+        width: 8px;
+        min-width: 8px;
+        font-size: 0;
+        top: 4px;
+        right: 4px;
+    }
+}
+
+.sc-toolbar-widget {
+    position: absolute;
+    direction: ltr;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 40px;
+    left: 16px;
+    bottom: 48px;
+    top: auto;
+    z-index: 4;
+    box-sizing: content-box;
+
+    .ciq-menu {
+        // Neutralise the global menu-item floor (min-height:45px) and button
+        // padding (3px 5px) so each pill wrapper is exactly 40px — otherwise the
+        // 8px gap renders larger than designed.
+        min-height: 0;
+
+        .cq-menu-btn {
+            padding: 0;
+            height: auto;
+
+            .sc-chart-mode__menu,
+            .sc-views__menu,
+            .sc-download__menu,
+            .sc-studies__menu,
+            .sc-dtools__menu {
+                @include toolbar-pill;
+            }
+            &:hover {
+                .sc-chart-mode__menu,
+                .sc-views__menu,
+                .sc-download__menu,
+                .sc-studies__menu,
+                .sc-dtools__menu {
+                    @include themify($themes) {
+                        background: themed('ToolbarWidgetItemHoverBg');
+                    }
+                }
+            }
+        }
+    }
+    .sc-tooltip__inner {
+        left: calc(100% + 15px);
+    }
+
+    // Legacy position modifiers all resolve to the design's bottom-left anchor
+    &--bottom,
+    &--left,
+    &--top {
+        top: auto;
+        bottom: 48px;
+        left: 16px;
+    }
+    &:hover {
+        z-index: 5;
+    }
+}
+
+// ---- Mobile: single vertical-ellipsis that expands upward ----
+// Matches the deriv mobile app's ChartToolbar: a 260ms fade + slide reveal
+// (easeOutCubic expand / easeInCubic collapse). Each revealed pill animates its
+// OWN opacity + transform — never an ancestor clip/transform — so nothing is
+// clipped and every pill keeps its backdrop-filter (glass) throughout the motion.
+$toolbar-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1); // easeOutCubic (expand)
+$toolbar-ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19); // easeInCubic (collapse)
+
+.smartcharts-mobile {
+    .sc-toolbar-widget {
+        border: none;
+        background: transparent;
+        gap: 0;
+        // Align the ellipsis button's distance from the chart bottom with the
+        // consumer app's maximize button (24px, matching --core-spacing-1200).
+        bottom: 24px;
+
+        // Revealed stack is taken out of flow and anchored above the ellipsis,
+        // so the ellipsis stays flush at the bottom when collapsed and the pills
+        // are never clipped (no overflow:hidden -> glass survives the animation).
+        // Stack the revealed pills BELOW the ellipsis, and (within the stack)
+        // each button below the one nearer the ellipsis, so during the slide they
+        // emerge from behind each other: ellipsis > drawing > chart settings.
+        &__items {
+            position: absolute;
+            left: 0;
+            // 44px = ellipsis (40) + drawing's 4px margin, so the drawing button's
+            // 4px bottom margin + the ellipsis's 4px top margin add up to an 8px gap.
+            bottom: 44px;
+            width: 40px;
+            z-index: 1;
+        }
+        &__items-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+
+            // Each button carries a 4px margin top & bottom; stacked, adjacent
+            // margins add to a consistent 8px gap between every button (and 8px to
+            // the ellipsis). Collapsed, each pill also carries its travel distance
+            // down to the ellipsis — uniform 8px gaps make every step 40 + 8 = 48px,
+            // so nth-last-child(k) = k * 48. nth-last-child(1) is nearest the ellipsis.
+            > * {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                margin: 4px 0;
+                --sc-tb-travel: 48px;
+            }
+            > *:nth-last-child(2) {
+                --sc-tb-travel: 96px;
+            }
+            > *:nth-last-child(3) {
+                --sc-tb-travel: 144px;
+            }
+            > *:nth-last-child(4) {
+                --sc-tb-travel: 192px;
+            }
+
+            // Collapsed, each pill sits translated DOWN onto the ellipsis (opacity 0);
+            // expanding slides it up into place. Transforming the pill itself (not an
+            // ancestor) keeps its backdrop-filter live throughout the slide.
+            .sc-chart-mode__menu,
+            .sc-views__menu,
+            .sc-download__menu,
+            .sc-studies__menu,
+            .sc-dtools__menu {
+                opacity: 0;
+                transform: translateY(var(--sc-tb-travel, 48px));
+                transition: transform 0.26s $toolbar-ease-in, opacity 0.26s $toolbar-ease-in;
+            }
+        }
+        &__more {
+            position: relative;
+            flex: 0 0 auto;
+            cursor: pointer;
+            margin-top: 4px; // pairs with the drawing button's 4px margin -> 8px gap
+            z-index: 2; // ellipsis sits above the revealed stack
+            @include toolbar-pill;
+        }
+
+        // "5m"-style badge on the ellipsis (collapsed). It cross-fades with
+        // ChartMode's own badge, which rides up on the chart-settings pill when
+        // expanded — so the label appears to move to the top of the stack.
+        &__interval {
+            position: absolute;
+            top: -5px;
+            left: 21px;
+            z-index: 3; // badge above the ellipsis
+            padding: 2px 3px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+            text-transform: lowercase;
+            word-spacing: -0.3em;
+            pointer-events: none;
+            transition: opacity 0.26s $toolbar-ease-out;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            @include themify($themes) {
+                background: themed('IntervalBadgeBg');
+                color: themed('IntervalBadgeColor');
+            }
+        }
+        &--expanded {
+            .sc-toolbar-widget__items-inner {
+                pointer-events: auto;
+
+                .sc-chart-mode__menu,
+                .sc-views__menu,
+                .sc-download__menu,
+                .sc-studies__menu,
+                .sc-dtools__menu {
+                    opacity: 1;
+                    transform: translateY(0);
+                    transition: transform 0.26s $toolbar-ease-out, opacity 0.26s $toolbar-ease-out;
+                }
+            }
+            .sc-toolbar-widget__interval {
+                opacity: 0;
+            }
+        }
+        .ciq-menu .cq-menu-btn {
+            .sc-chart-mode__menu,
+            .sc-views__menu,
+            .sc-download__menu,
+            .sc-studies__menu,
+            .sc-dtools__menu {
+                @include toolbar-pill;
+            }
+        }
+        .sc-tooltip__inner {
+            display: none !important;
+        }
+    }
+}
+/*! rtl:end:ignore */

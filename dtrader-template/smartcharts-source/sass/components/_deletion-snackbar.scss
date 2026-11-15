@@ -1,0 +1,111 @@
+.sc-deletion-snackbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+
+    display: flex;
+    max-width: 90vw;
+    width: max-content;
+    min-height: 3rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    align-items: center;
+    gap: 0.5rem;
+
+    border-radius: 0.5rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+
+    // Animation
+    animation: slideUpSnackbar 0.3s ease-out;
+
+    @include themify($themes) {
+        border: 1px solid themed('DeletionSnackbarBorder');
+        background: themed('DeletionSnackbarBg');
+        color: themed('DeletionSnackbarText');
+        box-shadow: 0 4px 8px 2px themed('DeletionSnackbarShadow1'), 0 4px 8px 2px themed('DeletionSnackbarShadow2');
+    }
+
+    &__content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 12px;
+    }
+    &__message {
+        flex: 1;
+    }
+    &__close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 18px;
+        font-weight: 400;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+
+        @include themify($themes) {
+            color: themed('DeletionSnackbarCloseText');
+
+            &:hover {
+                background: themed('DeletionSnackbarCloseHoverBg');
+            }
+            &:active {
+                background: themed('DeletionSnackbarCloseActiveBg');
+            }
+        }
+
+        &:focus {
+            outline: 2px solid;
+
+            @include themify($themes) {
+                outline-color: themed('DeletionSnackbarFocusOutline');
+            }
+        }
+
+        // Ensure SVG icons inherit the color
+        .ic-icon > svg {
+            @include themify($themes) {
+                fill: themed('DeletionSnackbarCloseText');
+            }
+        }
+    }
+
+    // Mobile responsive.
+    //
+    // Only the width cap changes here. Earlier this block also set `left: 0; right: 0;
+    // transform: none`, but the base rule sizes the snackbar to its content
+    // (`width: max-content`), so a fixed box with both offsets *and* a width is
+    // over-constrained: `right` is dropped and it pins to the left edge. Keeping the
+    // `left: 50%` / `translateX(-50%)` centring from above keeps it centred on every
+    // width, and lets both sizes share one entry animation.
+    @media (max-width: 768px) {
+        max-width: calc(100vw - 32px);
+
+        &__message {
+            font-size: 14px;
+        }
+    }
+}
+
+@keyframes slideUpSnackbar {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
