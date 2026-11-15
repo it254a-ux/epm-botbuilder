@@ -4,12 +4,13 @@
 #scratch_div {
     position: relative;
     width: calc(100vw - 3.2rem);
-    height: var(--bot-content-height);
+    height: calc(100vh - 10.4rem);
     top: 0;
 
     @include mobile-or-tablet-screen {
         width: 100%;
         padding-top: 0.4rem;
+        height: var(--bot-content-height);
     }
 }
 
@@ -28,9 +29,14 @@
 }
 
 .injectionDiv {
-    // Same height as #scratch_div and the Run panel, so the blocks canvas reaches the bottom of the page
-    // (it used to stop short and leave an empty dark strip underneath).
-    height: var(--bot-content-height, calc(100vh - 16.4rem));
+    // Desktop: same height as the Run panel on the right (100vh - 10.4rem measured from the top of the
+    // page), so the blocks canvas reaches the bottom instead of stopping short with an empty strip.
+    height: calc(100vh - 10.4rem);
+
+    @include mobile-or-tablet-screen {
+        height: calc(100vh - 16.4rem);
+    }
+
     position: relative;
     touch-action: none;
     overflow: hidden;
