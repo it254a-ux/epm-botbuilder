@@ -23,7 +23,12 @@ function databaseUrl(env = process.env) {
 function connect(env = process.env) {
     const url = databaseUrl(env);
     if (!url) {
-        throw new Error('TURSO_DATABASE_URL is not set in environment variables (and TURSO_AUTH_TOKEN for a hosted database)');
+        // Names only, never values: shows whether the host passed the settings to the server at all.
+        const names = Object.keys(env).filter(k => /^(TURSO|DATABASE_URL|ADMIN_PASSWORD)/.test(k));
+        throw new Error(
+            'TURSO_DATABASE_URL is not set in environment variables (and TURSO_AUTH_TOKEN for a hosted database). ' +
+                `[Server can see ${names.length ? names.join(', ') : 'none of the Turso/admin settings'}; ${Object.keys(env).length} settings in total]`
+        );
     }
     const local = /^file:/i.test(url);
     // On Vercel use the plain web client (no native code) over https; local files (tests) need the full client.
