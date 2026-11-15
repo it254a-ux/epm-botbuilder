@@ -324,7 +324,12 @@ export function startVideoSwap(): void {
     const [, id, query] = m;
     const params = new URLSearchParams(query);
     void hasVideoFile(id).then(found => {
-      if (!found || !frame.isConnected) return;
+      if (!frame.isConnected) return;
+      if (!found) {
+        // Deriv's own player is blocked on this site: show no black box instead
+        (frame.closest('.stream__wrapper') as HTMLElement | null)?.style.setProperty('display', 'none');
+        return;
+      }
       const video = document.createElement('video');
       video.className = frame.className;
       video.src = `/dtrader-videos/${id}.mp4`;

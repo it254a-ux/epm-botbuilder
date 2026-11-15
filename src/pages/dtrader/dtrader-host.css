@@ -209,13 +209,33 @@ body.epm-dtrader-active .main {
 }
 
 /*
- * Pop-up sheets (trade type help, Accumulators info, ...): they could be taller than the screen, so their last part
- * (and the Got it / Close button) ended up below the bottom edge. They now stay inside the screen and scroll inside.
+ * Pop-up sheets (trade type help, Accumulators info, ...): like Deriv's own site, a clean centred card that is always
+ * inside the screen, with smaller text, and the content scrolls inside it. (The site's page text is larger than the
+ * template expects, so the card is scaled down to the size Deriv shows it at.)
  */
+.quill-action-sheet--portal--wrapper {
+    position: fixed !important;
+    inset: 0 !important;
+    height: 100dvh !important;
+}
+
 .quill-action-sheet--root {
-    max-height: 92vh !important;
+    zoom: 0.72;
+    max-height: calc(90dvh / 0.72) !important;
     display: flex;
     flex-direction: column;
+}
+
+@media (min-width: 600px) {
+    .quill-action-sheet--portal--wrapper {
+        align-items: center !important;
+    }
+
+    .quill-action-sheet--root {
+        width: calc(640px / 0.72) !important;
+        max-width: calc(94vw / 0.72) !important;
+        border-radius: 1.8rem !important;
+    }
 }
 
 .quill-action-sheet--root .action-sheet--content {
@@ -224,7 +244,6 @@ body.epm-dtrader-active .main {
     overflow-y: auto !important;
 }
 
-/* A help video that cannot play (Deriv only allows its own sites) is kept to a sensible height. */
 .quill-action-sheet--root .stream__wrapper {
     max-height: 40vh;
 }
