@@ -201,12 +201,7 @@ body.epm-dtrader-active .main {
 /*
  * Phone: the chart is as tall as the phone's screen (the trade panel sits below it, scroll down to reach it).
  */
-@media (max-width: 599px) {
-    .derivatives-trader .trade__chart {
-        height: 100dvh !important;
-        min-height: 100vh;
-    }
-}
+/* Phone: the chart keeps DTrader's own height (screen minus header, trade types, panel and bottom bar), so the trading panel and Buy buttons are on screen with no scrolling. */
 
 /*
  * Pop-up sheets (trade type help, Accumulators info, ...): like Deriv's own site, a clean centred card that is always
