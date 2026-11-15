@@ -207,3 +207,24 @@ body.epm-dtrader-active .main {
         min-height: 100vh;
     }
 }
+
+/*
+ * Pop-up sheets (trade type help, Accumulators info, ...): they could be taller than the screen, so their last part
+ * (and the Got it / Close button) ended up below the bottom edge. They now stay inside the screen and scroll inside.
+ */
+.quill-action-sheet--root {
+    max-height: 92vh !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.quill-action-sheet--root .action-sheet--content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
+}
+
+/* A help video that cannot play (Deriv only allows its own sites) is kept to a sensible height. */
+.quill-action-sheet--root .stream__wrapper {
+    max-height: 40vh;
+}
