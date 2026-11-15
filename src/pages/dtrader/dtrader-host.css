@@ -47,7 +47,7 @@
 @media (min-width: 600px) {
     .derivatives-trader .trade {
         position: relative;
-        padding-left: 10.4rem !important;
+        padding-left: 8rem !important;
     }
 
     .derivatives-trader .trade__header {
@@ -55,7 +55,7 @@
         top: 0;
         bottom: 0;
         left: 0;
-        width: 10.4rem;
+        width: 8rem;
         height: auto !important;
         flex-direction: column !important;
         align-items: stretch !important;
@@ -77,8 +77,8 @@
         width: 100% !important;
         height: 100%;
         min-height: 0 !important;
-        padding: 0.6rem !important;
-        gap: 0.4rem !important;
+        padding: 0.4rem !important;
+        gap: 0.25rem !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         white-space: normal !important;
@@ -89,15 +89,15 @@
         width: 100%;
         min-height: 0 !important;
         height: auto !important;
-        padding: 0.5rem 0.8rem !important;
+        padding: 0.3rem 0.6rem !important;
         justify-content: flex-start;
         text-align: left;
     }
 
     .derivatives-trader .trade__trade-types .quill-chip *,
     .derivatives-trader .trade__trade-types button.quill-chip * {
-        font-size: 1.15rem !important;
-        line-height: 1.5rem !important;
+        font-size: 1rem !important;
+        line-height: 1.3rem !important;
         font-weight: 500;
     }
 }
@@ -118,5 +118,47 @@ body.epm-dtrader-active .main {
 
     body.epm-dtrader-active .derivatives-trader .trade {
         width: 100vw !important;
+    }
+}
+
+/*
+ * The chart's own tools column (interval, indicators, drawing tools): smaller buttons and icons so it uses less room.
+ */
+.derivatives-trader .sc-toolbar-widget {
+    width: 28px !important;
+    left: 8px !important;
+    gap: 2px !important;
+}
+
+.derivatives-trader .sc-toolbar-widget__items {
+    width: 28px !important;
+}
+
+.derivatives-trader .sc-toolbar-widget__items-inner > *,
+.derivatives-trader .sc-toolbar-widget__more {
+    width: 28px !important;
+    height: 28px !important;
+    margin: 2px 0 !important;
+    padding: 4px !important;
+}
+
+.derivatives-trader .sc-toolbar-widget .ic-icon,
+.derivatives-trader .sc-toolbar-widget .ic-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.derivatives-trader .sc-toolbar-widget__interval {
+    font-size: 8px !important;
+    left: 14px !important;
+}
+
+/*
+ * Phone: the chart is as tall as the phone's screen (the trade panel sits below it, scroll down to reach it).
+ */
+@media (max-width: 599px) {
+    .derivatives-trader .trade__chart {
+        height: 100dvh !important;
+        min-height: 100vh;
     }
 }
