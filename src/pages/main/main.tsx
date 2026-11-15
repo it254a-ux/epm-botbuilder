@@ -195,6 +195,14 @@ const AppWrapper = observer(() => {
         return () => window.clearTimeout(t);
     }, [chart_store.is_chart_loading, charts_preload_timed_out]);
 
+    // The chart engine can only run one chart at a time: only the page on screen (Charts or Dtrader) keeps its chart
+    // mounted, so the hidden one can never push data into the engine and blank the visible one.
+    const dtrader_on_screen = String(active_tab) === String(DBOT_TABS.DTRADER);
+    (window as unknown as { __epmDtraderChartOwner?: boolean }).__epmDtraderChartOwner = dtrader_on_screen;
+    React.useEffect(() => {
+        (window as unknown as { __epmSetChartOwner?: (v: boolean) => void }).__epmSetChartOwner?.(dtrader_on_screen);
+    }, [dtrader_on_screen]);
+
     // Moving between the Charts page and Dtrader: make every chart measure itself again so none stays blank.
     React.useEffect(() => {
         const timers = [80, 300, 800, 1600].map(ms => window.setTimeout(() => window.dispatchEvent(new Event('resize')), ms));
@@ -801,7 +809,7 @@ const AppWrapper = observer(() => {
                             granularity, tick subscriptions). Off-screen, not
                             display:none -- some chart libraries need real
                             layout dimensions to initialize correctly. */}
-                        {active_tab !== DBOT_TABS.CHART && !chart_store.is_chart_loading && (
+                        {active_tab !== DBOT_TABS.CHART && !dtrader_on_screen && !chart_store.is_chart_loading && (
                             <div
                                 style={{
                                     position: 'fixed',

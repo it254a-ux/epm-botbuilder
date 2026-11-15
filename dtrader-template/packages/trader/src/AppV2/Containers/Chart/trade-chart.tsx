@@ -94,6 +94,19 @@ const TradeChart = observer(() => {
     const chart_key_ref = React.useRef({ symbol, n: 0 });
     if (show_digits_stats && chart_key_ref.current.symbol !== symbol) chart_key_ref.current.n += 1;
     chart_key_ref.current.symbol = symbol;
+    // EPM: the chart engine can only run ONE chart per page. The site tells us (window.__epmDtraderChartOwner) when
+    // the Dtrader tab is the one on screen: only then is this chart mounted, so it can't push data into the engine
+    // while the Charts page is showing (that is what made both charts go blank).
+    const [is_engine_owner, setEngineOwner] = React.useState<boolean>(
+        () => (window as unknown as { __epmDtraderChartOwner?: boolean }).__epmDtraderChartOwner !== false
+    );
+    React.useEffect(() => {
+        const w = window as unknown as { __epmSetChartOwner?: (v: boolean) => void };
+        w.__epmSetChartOwner = setEngineOwner;
+        return () => {
+            if (w.__epmSetChartOwner === setEngineOwner) delete w.__epmSetChartOwner;
+        };
+    }, []);
     const settings = {
         countdown: is_chart_countdown_visible,
         isHighestLowestMarkerEnabled: false, // TODO: Pending UI,
@@ -229,7 +242,7 @@ const TradeChart = observer(() => {
         );
     }
 
-    if (!chartData || !chartData.tradingTimes) return null;
+    if (!chartData || !chartData.tradingTimes || !is_engine_owner) return null;
 
     return (
         <>
