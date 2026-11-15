@@ -257,3 +257,48 @@ body.epm-dtrader-active .main {
     zoom: 0.625;
     max-height: calc(92dvh / 0.625) !important;
 }
+
+/*
+ * The "Trade types" list that opens from the grid button: its height (67rem) and text are sized for a 10px page text
+ * size, so on the site it was taller than the screen (the end of the list hidden) with oversized text. Smaller text,
+ * and it never grows taller than the screen: the list scrolls inside.
+ */
+.trade-types-selector__popover .input-popover__content {
+    max-height: 82dvh !important;
+}
+
+.trade-types-selector__modal {
+    height: min(67rem, 82dvh) !important;
+    gap: 0.6rem !important;
+}
+
+.trade-types-selector__content {
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.trade-types-selector__modal .trade-types-selector__header * {
+    font-size: 1.05rem !important;
+    line-height: 1.4rem !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__guide-button * {
+    font-size: 0.8rem !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__tab * {
+    font-size: 0.85rem !important;
+    line-height: 1.2rem !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__category-label {
+    font-size: 0.7rem !important;
+    line-height: 1rem !important;
+}
+
+.trade-types-selector__modal .trade-types-selector__item,
+.trade-types-selector__modal .trade-types-selector__item * {
+    font-size: 0.9rem !important;
+    line-height: 1.2rem !important;
+}
