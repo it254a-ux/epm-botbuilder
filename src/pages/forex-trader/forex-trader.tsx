@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useSharedPick } from './shared-picks';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { useDerivWS } from '@deriv/core';
 import MarketPicker from './market-picker';
 import ChartView, { type ChartViewHandle, type PickPrice } from './chart-view';
@@ -8,6 +8,7 @@ import ChartStudies from './chart-studies';
 import { loadStudies, type StudyState } from './indicators';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
+import { analyseSmc, SMC_ID } from './smc';
 import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
 import MtfPanel from './mtf-panel';
 import PdhPanel from './pdh-panel';
@@ -137,6 +138,17 @@ function checklist(a: Analysis, marketClosed: boolean): CheckItem[] {
         { label: 'Market is open', state: marketClosed ? 'no' : 'yes' },
         { label: 'Data is fresh (new candles are arriving)', state: a.state === 'stale' ? 'no' : 'yes' },
     ];
+    if (a.smc) {
+        // Smart Money: the checklist is its own steps, in the order the strategy teaches them
+        a.stages.forEach(s => items.push({ label: s.label, state: s.state === 'done' ? 'yes' : 'wait' }));
+        if (a.plan) {
+            items.push({
+                label: `Reward at least 1 : ${MIN_RR} (now 1 : ${a.plan.rr.toFixed(2)})`,
+                state: a.plan.rr >= MIN_RR ? 'yes' : 'no',
+            });
+        }
+        return items;
+    }
     if (a.plan) {
         items.push({
             label: `Reward at least 1 : ${MIN_RR} (now 1 : ${a.plan.rr.toFixed(2)})`,
@@ -745,7 +757,10 @@ const ForexTrader = ({
         const all = candlesRef.current;
         const closedCandles = all.filter(x => x.time + c.tf <= now);
         const forming = all.find(x => x.time + c.tf > now) ?? null;
-        const analysis = analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
+        const analysis =
+            c.strategy.id === SMC_ID
+                ? analyseSmc(closedCandles, c.kind, forming, now)
+                : analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
         const lastClosed = closedCandles.length ? closedCandles[closedCandles.length - 1].time : 0;
         // changes when the situation really changes: new closed candle, new state, new sweep
         const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;
@@ -763,6 +778,7 @@ const ForexTrader = ({
             n(analysis.plan?.stopLoss),
             n(analysis.watch?.sell.stopLoss),
             n(analysis.watch?.buy.stopLoss),
+            analysis.smc?.key,
             closedCandles.length,
         ].join('|');
         if (sig !== drawKey.current) {
@@ -1476,6 +1492,12 @@ const ForexTrader = ({
                                         <dd>{fmt(outcome.analysis.lastPrice)}</dd>
                                     </>
                                 )}
+                                {outcome.analysis.smc?.facts.map(f => (
+                                    <Fragment key={f.label}>
+                                        <dt>{f.label}</dt>
+                                        <dd>{f.value}</dd>
+                                    </Fragment>
+                                ))}
                                 {outcome.analysis.range && (
                                     <>
                                         <dt>Reference range</dt>
@@ -1546,7 +1568,11 @@ const ForexTrader = ({
                                         <div className='is-entry'>
                                             <span>
                                                 Entry{' '}
-                                                {outcome.analysis.entryTime ? '(reached)' : '(pullback to BOS level)'}
+                                                {outcome.analysis.entryTime
+                                                    ? '(reached)'
+                                                    : outcome.analysis.smc
+                                                      ? '(when the MSS level breaks)'
+                                                      : '(pullback to BOS level)'}
                                             </span>
                                             <b>{fmt(plan.entry)}</b>
                                         </div>

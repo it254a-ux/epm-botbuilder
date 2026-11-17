@@ -19,6 +19,7 @@ export const STRATEGIES: StrategyInfo[] = [
     { id: 6, name: 'Equal highs/lows grab', category: 'Liquidity sweeps and breakouts', ready: false },
     { id: 7, name: 'Opening range breakout', category: 'Liquidity sweeps and breakouts', ready: false },
     { id: 8, name: 'Fake breakout', category: 'Liquidity sweeps and breakouts', ready: false },
+    { id: 34, name: 'Smart money: BOS + zone + sweep + MSS', category: 'Smart-money concepts (ICT)', ready: true },
     { id: 9, name: 'Order blocks', category: 'Smart-money concepts (ICT)', ready: false },
     { id: 10, name: 'Fair value gaps', category: 'Smart-money concepts (ICT)', ready: false },
     { id: 11, name: 'Break of structure / change of character', category: 'Smart-money concepts (ICT)', ready: false },

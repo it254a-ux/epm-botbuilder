@@ -32,6 +32,7 @@ import {
     type StudyState,
 } from './indicators';
 import type { PdhResult } from './pdh';
+import { drawSmc } from './smc-draw';
 
 /**
  * Waits for the next click on the chart and gives the price at the spot that was clicked (null when Esc cancels it, or the
@@ -694,6 +695,18 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 const chart = chartRef.current;
                 clearDrawing();
                 if (!series || !chart || !analysis || candles.length < 3) return;
+
+                // Smart Money strategy: its own markings (zone, BOS, sweep, MSS, liquidity, trade box) instead of the range picture
+                if (analysis.smc) {
+                    const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, analysis.smc, candles);
+                    series.setMarkers(out.markers);
+                    if (out.levels.length) {
+                        const span = Math.max(...out.levels) - Math.min(...out.levels);
+                        levelsRef.current = { min: Math.min(...out.levels) - span * 0.04, max: Math.max(...out.levels) + span * 0.04 };
+                    }
+                    openView();
+                    return;
+                }
 
                 const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
                 const lastT = candles[candles.length - 1].time;

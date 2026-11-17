@@ -1,0 +1,590 @@
+/**
+ * Smart Money strategy (ICT category, number 34): pure calculation, no React, no network.
+ * It follows the two Smart Money videos step by step. Everything below is written for a SELL. A BUY is calculated on
+ * mirrored candles (every price x -> -x) with the very same rule, and turned back for display.
+ *
+ *  1. DIRECTION: a candle closes below a swing low that was still untouched = BOS (break of structure). Sellers are in control.
+ *  2. ZONE: the swing high that started the drop is the SUPPLY ZONE (top = that high, bottom = where the first strong red candle opened).
+ *     A candle that CLOSES above the top of the zone cancels the idea. A wick above it does not.
+ *  3. TARGET: the lowest low of the drop = SELL SIDE LIQUIDITY (where the stops are resting).
+ *  4. RETRACE: price comes back up into the zone. The zone is "unmitigated" until price touches it, "mitigated" after.
+ *  5. SWEEP (LS) / INDUCEMENT: on the way up, price takes out swing highs formed after the BOS. The one nearest the zone is the
+ *     MAJOR INDUCEMENT (the trap), an earlier one is the MINOR INDUCEMENT. No sweep = no trade.
+ *  6. MSS (market structure shift): after the sweep and the touch of the zone, price makes a swing low. A STRONG red candle that
+ *     closes below that low is the confirmation and the entry.
+ *  7. TRADE: stop loss above the zone (and above any wick that went through it) + a small buffer, take profit at the target,
+ *     at least 1 : 2. IL-1 / IL-2 are the internal liquidity lows below: while price keeps breaking them, the trade is held.
+ *     A stop and the target in the same candle counts as a loss.
+ * Closed candles only. Anything missing, old or unclear: no signal.
+ */
+import { atr, px, sessionAt, MIN_RR, type Analysis, type Candle, type MarketKind, type Side, type Stage, type SweepStrategyId, type TradePlan, type SetupState } from './engine';
+
+export const SMC_ID = 34;
+export const SMC_NAME = 'Smart money: BOS + zone + sweep + MSS';
+/** A swing point is the highest / lowest of this many candles on each side. */
+export const SMC_PIVOT_SIDE = 3;
+const MAX_CANDLES = 400;
+const MIN_CANDLES = 60;
+/** A break of structure older than this many candles is forgotten. */
+const BOS_MAX_AGE = 150;
+/** The drop that broke the structure must be at least this many ATR tall (a real push, not a drift). */
+const MIN_LEG_ATR = 1.5;
+const MIN_ZONE_ATR = 0.3;
+const MAX_ZONE_ATR = 3;
+const SL_BUFFER_ATR = 0.1;
+/** The confirming candle: body at least this share of its whole range, and at least the average body of the last 10 candles. */
+const STRONG_BODY_SHARE = 0.5;
+const STALE_AFTER_CANDLES = 3;
+/** If price already ran this share of the way to the target after the entry, the entry has passed. */
+const LATE_SHARE = 0.5;
+
+export interface SmcLine {
+    price: number;
+    fromTime: number;
+    /** null = the line runs on to the right edge. */
+    toTime: number | null;
+    label: string;
+}
+
+/** Everything the chart needs to draw the markings (real prices, real times). */
+export interface SmcOverlay {
+    /** Changes whenever something drawn changes. */
+    key: string;
+    side: Side;
+    zone: { top: number; bottom: number; startTime: number; label: string; touched: boolean };
+    bos: SmcLine;
+    /** Sell-side (BUY setup: buy-side) liquidity, the take profit. */
+    target: SmcLine;
+    minor: SmcLine | null;
+    major: (SmcLine & { sweepTime: number }) | null;
+    mss: SmcLine | null;
+    internals: (SmcLine & { broken: boolean })[];
+    plan: { entry: number; stopLoss: number; takeProfit: number; fromTime: number; planned: boolean } | null;
+    entryTime: number | null;
+    exit: { time: number; kind: 'target' | 'stop' } | null;
+    /** Lines of text for the result panel. */
+    facts: { label: string; value: string }[];
+}
+
+interface Pivot {
+    idx: number;
+    price: number;
+}
+interface Swept extends Pivot {
+    sweepIdx: number;
+}
+
+/** Working frame (a SELL): everything the scan found, in indexes and working-frame prices. */
+interface Core {
+    bosIdx: number;
+    bosLevel: number;
+    bosFromIdx: number;
+    hIdx: number;
+    zoneTop: number;
+    zoneBottom: number;
+    zoneStartIdx: number;
+    invalidIdx: number | null;
+    touchIdx: number | null;
+    /** Price ran to the target after touching the zone, without any entry: the chance is gone. */
+    missedIdx: number | null;
+    targetPrice: number;
+    targetIdx: number;
+    major: Swept | null;
+    minor: Swept | null;
+    mss: Pivot | null;
+    weakBreak: boolean;
+    triggerIdx: number | null;
+    ils: Pivot[];
+    entry: number | null;
+    stopLoss: number | null;
+    takeProfit: number | null;
+    outcome: { idx: number; kind: 'target' | 'stop' } | null;
+    ilBroken: (number | null)[];
+}
+
+const mirror = (c: Candle): Candle => ({ time: c.time, open: -c.open, high: -c.low, low: -c.high, close: -c.close });
+
+function pivotHighs(c: Candle[], side: number): number[] {
+    const out: number[] = [];
+    for (let i = side; i <= c.length - 1 - side; i++) {
+        let ok = true;
+        for (let j = 1; j <= side && ok; j++) ok = c[i - j].high < c[i].high && c[i + j].high <= c[i].high;
+        if (ok) out.push(i);
+    }
+    return out;
+}
+function pivotLows(c: Candle[], side: number): number[] {
+    const out: number[] = [];
+    for (let i = side; i <= c.length - 1 - side; i++) {
+        let ok = true;
+        for (let j = 1; j <= side && ok; j++) ok = c[i - j].low > c[i].low && c[i + j].low >= c[i].low;
+        if (ok) out.push(i);
+    }
+    return out;
+}
+
+/** Strong red candle: a real body (share of its range) that is at least as big as the recent average body. */
+function isStrongRed(c: Candle[], k: number): boolean {
+    const x = c[k];
+    const body = x.open - x.close;
+    const range = x.high - x.low;
+    if (!(body > 0) || !(range > 0) || body < STRONG_BODY_SHARE * range) return false;
+    const from = Math.max(0, k - 10);
+    let sum = 0;
+    for (let j = from; j < k; j++) sum += Math.abs(c[j].close - c[j].open);
+    const avg = k > from ? sum / (k - from) : 0;
+    return body >= avg;
+}
+
+interface BosEvent {
+    idx: number;
+    level: number;
+    from: number;
+    h: number;
+}
+/** How many of the latest breaks of structure are kept as possible setups. */
+const MAX_SETUPS = 6;
+/** A finished trade (target or stop) stays on screen for this many candles before the page moves on to a newer setup. */
+const SHOW_FINISHED_CANDLES = 12;
+
+/** The SELL rule on a series: one Core for each of the latest qualifying breaks of structure (newest first). */
+function scan(c: Candle[], a: number): Core[] {
+    const n = c.length;
+    const S = SMC_PIVOT_SIDE;
+    const lows = pivotLows(c, S);
+    const highs = pivotHighs(c, S);
+
+    // 1. breaks of structure: a candle closes below a swing low that was still untouched, after a real push down
+    const events: BosEvent[] = [];
+    for (const L of lows) {
+        let i = -1;
+        for (let k = L + S + 1; k < n; k++) {
+            if (c[k].close < c[L].low) {
+                i = k;
+                break;
+            }
+        }
+        if (i < 0 || n - 1 - i > BOS_MAX_AGE) continue;
+        let h = -1;
+        for (let k = L + 1; k < i; k++) if (h < 0 || c[k].high >= c[h].high) h = k;
+        if (h < 0) continue;
+        const lowest = Math.min(...c.slice(h, i + 1).map(x => x.low));
+        if (c[h].high - lowest < MIN_LEG_ATR * a) continue;
+        events.push({ idx: i, level: c[L].low, from: L, h });
+    }
+    events.sort((x, y) => y.idx - x.idx || y.from - x.from);
+    const unique: BosEvent[] = [];
+    for (const e of events) if (!unique.some(u => u.idx === e.idx)) unique.push(e);
+    return unique.slice(0, MAX_SETUPS).map(e => scanOne(c, a, e, lows, highs));
+}
+
+/** Steps 2 to 8 for one break of structure. */
+function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: number[]): Core {
+    const n = c.length;
+    const S = SMC_PIVOT_SIDE;
+    const bosIdx = best.idx;
+    const hIdx = best.h;
+
+    // 2. the zone: top = the swing high, bottom = where the first strong red candle of the drop opened
+    const zoneTop = c[hIdx].high;
+    let d = -1;
+    for (let k = hIdx; k <= bosIdx; k++) {
+        if (c[k].close < c[k].open && c[k].open - c[k].close >= 0.4 * a) {
+            d = k;
+            break;
+        }
+    }
+    let zoneBottom = d >= 0 ? c[d].open : c[Math.min(hIdx + 1, bosIdx)].open;
+    zoneBottom = Math.min(zoneBottom, zoneTop - MIN_ZONE_ATR * a);
+    zoneBottom = Math.max(zoneBottom, zoneTop - MAX_ZONE_ATR * a);
+    const zoneStartIdx = Math.max(0, hIdx - 2);
+
+    // the idea is cancelled by a candle that CLOSES above the zone (a wick is fine)
+    let invalidIdx: number | null = null;
+    for (let k = bosIdx + 1; k < n; k++) {
+        if (c[k].close > zoneTop) {
+            invalidIdx = k;
+            break;
+        }
+    }
+    const end = invalidIdx ?? n;
+
+    // 3. the retrace: first candle back into the zone
+    let touchIdx: number | null = null;
+    for (let k = bosIdx + 1; k < end; k++) {
+        if (c[k].high >= zoneBottom) {
+            touchIdx = k;
+            break;
+        }
+    }
+
+    // 4. the target: the lowest low of the drop (before the retrace reached the zone)
+    let targetIdx = hIdx;
+    const tEnd = touchIdx ?? end - 1;
+    for (let k = hIdx; k <= tEnd; k++) if (c[k].low < c[targetIdx].low) targetIdx = k;
+    const targetPrice = c[targetIdx].low;
+
+    // 5. sweeps: swing highs formed after the BOS, below the zone, that price later took out
+    const swept: Swept[] = [];
+    for (const p of highs) {
+        if (p <= bosIdx || p >= (touchIdx ?? end) || c[p].high >= zoneBottom) continue;
+        for (let k = p + S + 1; k < end; k++) {
+            if (c[k].high > c[p].high) {
+                swept.push({ idx: p, price: c[p].high, sweepIdx: k });
+                break;
+            }
+        }
+    }
+    let major: Swept | null = null;
+    for (const s of swept) if (!major || s.price > major.price || (s.price === major.price && s.idx > major.idx)) major = s;
+    let minor: Swept | null = null;
+    for (const s of swept) {
+        if (!major || s === major || s.price >= major.price) continue;
+        if (!minor || s.idx < minor.idx) minor = s;
+    }
+
+    // 6. MSS: after the sweep and the touch, price makes a swing low; a strong red candle closing below it is the entry
+    let mss: Pivot | null = null;
+    let weakBreak = false;
+    let triggerIdx: number | null = null;
+    if (touchIdx !== null && major) {
+        const start = Math.max(touchIdx, major.sweepIdx);
+        const after = lows.filter(p => p > start);
+        const consumed = new Set<number>();
+        for (let k = start + 1; k < end; k++) {
+            let cand: number | null = null;
+            for (const p of after) if (p + S <= k && !consumed.has(p) && (cand === null || p > cand)) cand = p;
+            if (cand === null) continue;
+            mss = { idx: cand, price: c[cand].low };
+            if (c[k].close < c[cand].low) {
+                if (isStrongRed(c, k)) {
+                    triggerIdx = k;
+                    break;
+                }
+                consumed.add(cand);
+                weakBreak = true;
+            }
+        }
+        if (triggerIdx === null) {
+            // no entry yet: show the swing low that still has to break (if any)
+            let cand: number | null = null;
+            for (const p of after) if (p + S <= n - 1 && !consumed.has(p) && (cand === null || p > cand)) cand = p;
+            mss = cand === null ? null : { idx: cand, price: c[cand].low };
+        }
+    }
+
+    let missedIdx: number | null = null;
+    if (touchIdx !== null && triggerIdx === null) {
+        for (let k = touchIdx + 1; k < end; k++) {
+            if (c[k].low < targetPrice) {
+                missedIdx = k;
+                break;
+            }
+        }
+    }
+
+    // 7. internal liquidity: the swing lows made while price climbed to the zone, nearest below the entry first
+    const ref = mss ? mss.price : zoneBottom;
+    const ils: Pivot[] = lows
+        .filter(p => p > bosIdx && p < (touchIdx ?? end) && c[p].low < ref)
+        .map(p => ({ idx: p, price: c[p].low }))
+        .sort((x, y) => y.price - x.price)
+        .slice(0, 2);
+
+    // 8. the trade
+    let entry: number | null = null;
+    let stopLoss: number | null = null;
+    let takeProfit: number | null = null;
+    let outcome: Core['outcome'] = null;
+    let ilBroken: (number | null)[] = ils.map(() => null);
+    if (touchIdx !== null && (triggerIdx !== null || mss)) {
+        const upTo = triggerIdx ?? n - 1;
+        let hh = zoneTop;
+        for (let k = touchIdx; k <= upTo; k++) hh = Math.max(hh, c[k].high);
+        stopLoss = hh + SL_BUFFER_ATR * a;
+        takeProfit = targetPrice;
+        entry = triggerIdx !== null ? c[triggerIdx].close : (mss as Pivot).price;
+    }
+    if (triggerIdx !== null && stopLoss !== null && takeProfit !== null) {
+        for (let k = triggerIdx + 1; k < n; k++) {
+            const stopHit = c[k].high >= stopLoss;
+            const tpHit = c[k].low <= takeProfit;
+            if (stopHit || tpHit) {
+                outcome = { idx: k, kind: stopHit ? 'stop' : 'target' };
+                break;
+            }
+        }
+        ilBroken = ils.map(il => {
+            for (let k = triggerIdx + 1; k < n; k++) if (c[k].low <= il.price) return k;
+            return null;
+        });
+    }
+
+    return {
+        bosIdx, bosLevel: best.level, bosFromIdx: best.from, hIdx, zoneTop, zoneBottom, zoneStartIdx, invalidIdx, touchIdx, missedIdx,
+        targetPrice, targetIdx, major, minor, mss, weakBreak, triggerIdx, ils, entry, stopLoss, takeProfit, outcome, ilBroken,
+    };
+}
+
+/**
+ * @param candlesRaw closed candles, oldest first
+ * @param forming    the candle still forming (used only for the live price)
+ * @param now        seconds since epoch (stale-data check); omit to skip it
+ */
+export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Candle | null, now?: number): Analysis {
+    void kind;
+    const c = candlesRaw.slice(-MAX_CANDLES);
+    const last = c.length ? c[c.length - 1] : null;
+    const base: Analysis = {
+        strategyId: SMC_ID as unknown as SweepStrategyId,
+        strategyName: SMC_NAME,
+        state: 'no_data',
+        statusText: 'No candle data yet',
+        range: null,
+        sweep: null,
+        plan: null,
+        lastPrice: forming ? forming.close : last ? last.close : null,
+        atr: atr(c),
+        warnings: [],
+        candlesAnalysed: c.length,
+        watch: null,
+        candlesSince: null,
+        candlesLeft: null,
+        sessionNow: last ? sessionAt(last.time) : '',
+        lastCandleTime: last ? last.time : null,
+        bos: null,
+        fvg: null,
+        entryTime: null,
+        stages: [],
+    };
+    const stage = (label: string, state: Stage['state'], note?: string): Stage => ({ label, state, note });
+    const waiting = (state: SetupState, text: string, warnings: string[] = []): Analysis => ({
+        ...base,
+        state,
+        statusText: text,
+        warnings,
+        stages: [
+            stage('Direction: break of structure (BOS)', 'now', text),
+            stage('Zone marked', 'todo'),
+            stage('Target marked', 'todo'),
+            stage('Price retraces into the zone', 'todo'),
+            stage('Liquidity sweep (LS / trap)', 'todo'),
+            stage('Market structure shift (MSS)', 'todo'),
+            stage('Entry', 'todo'),
+        ],
+    });
+    if (c.length < MIN_CANDLES || !last) {
+        return waiting('no_data', 'Not enough candles loaded yet', [`Fewer than ${MIN_CANDLES} candles loaded: not enough to analyse.`]);
+    }
+    const len = c.length > 1 ? c[c.length - 1].time - c[c.length - 2].time : 0;
+    if (now !== undefined && len > 0 && now - (last.time + len) > STALE_AFTER_CANDLES * len) {
+        const ageMin = Math.round((now - (last.time + len)) / 60);
+        return waiting('stale', `Waiting for fresh data: the newest candle is ${ageMin} min old`, [
+            'The market feed is not delivering new candles (market closed or feed problem). Nothing is analysed on old data.',
+        ]);
+    }
+    const a = base.atr;
+    if (!a || a <= 0) return waiting('no_data', 'Cannot measure the normal candle size yet');
+
+    // Both directions are looked at. A pullback inside a bearish structure breaks small highs on the way up, so the "latest BOS wins"
+    // is wrong: the setup to follow is a live trade first, then an idea still alive, and among those the zone price is closest to.
+    const priceNowReal = forming ? forming.close : last.close;
+    const rank = (k: Core, isBuy: boolean): [number, number, number, number] => {
+        const finishedRecently = k.outcome !== null && c.length - 1 - k.outcome.idx <= SHOW_FINISHED_CANDLES;
+        const live = k.triggerIdx !== null && k.outcome === null;
+        const alive = k.invalidIdx === null && k.outcome === null && k.missedIdx === null;
+        const tier = live || finishedRecently ? 0 : alive ? 1 : 2;
+        // an idea that is further along (touched the zone, swept, MSS level formed) is not replaced by a fresh small break
+        const progress = (k.touchIdx !== null ? 1 : 0) + (k.major ? 1 : 0) + (k.mss ? 1 : 0);
+        const wp = isBuy ? -priceNowReal : priceNowReal;
+        const dist = Math.max(0, k.zoneBottom - wp, wp - k.zoneTop) / a;
+        return [tier, tier === 1 ? -progress : 0, tier === 0 ? 0 : dist, -k.bosIdx];
+    };
+    const all: { core: Core; isBuy: boolean; r: [number, number, number, number] }[] = [
+        ...scan(c, a).map(k => ({ core: k, isBuy: false, r: rank(k, false) })),
+        ...scan(c.map(mirror), a).map(k => ({ core: k, isBuy: true, r: rank(k, true) })),
+    ];
+    all.sort((x, y) => x.r[0] - y.r[0] || x.r[1] - y.r[1] || x.r[2] - y.r[2] || x.r[3] - y.r[3]);
+    const pick = all.length ? all[0] : null;
+    const buy = pick ? pick.isBuy : false;
+    const core = pick ? pick.core : null;
+    if (!core) {
+        return waiting('waiting_bos', 'Waiting for the direction: no recent break of structure (BOS) on this timeframe yet');
+    }
+
+    const sgn = buy ? -1 : 1;
+    const R = (m: number) => sgn * m;
+    const T = (i: number) => c[i].time;
+    const side: Side = buy ? 'BUY' : 'SELL';
+    const zoneName = buy ? 'DEMAND ZONE' : 'SUPPLY ZONE';
+    const liqName = buy ? 'BUY SIDE LIQUIDITY' : 'SELL SIDE LIQUIDITY';
+    const word = buy ? { up: 'above', down: 'below', high: 'low', low: 'high', red: 'green' } : { up: 'below', down: 'above', high: 'high', low: 'low', red: 'red' };
+    const zTop = Math.max(R(core.zoneTop), R(core.zoneBottom));
+    const zBottom = Math.min(R(core.zoneTop), R(core.zoneBottom));
+    const zoneText = `${px(zBottom)} to ${px(zTop)}`;
+    const lastClose = forming ? forming.close : last.close;
+    const n = c.length;
+
+    // ---- the trade plan (planned until the MSS entry candle has closed)
+    let plan: TradePlan | null = null;
+    if (core.entry !== null && core.stopLoss !== null && core.takeProfit !== null) {
+        const risk = core.stopLoss - core.entry;
+        const reward = core.entry - core.takeProfit;
+        if (risk > 0 && reward > 0) {
+            plan = {
+                planned: core.triggerIdx === null,
+                side,
+                entry: R(core.entry),
+                stopLoss: R(core.stopLoss),
+                takeProfit: R(core.takeProfit),
+                midpoint: R((core.entry + core.takeProfit) / 2),
+                risk,
+                reward,
+                rr: reward / risk,
+            };
+        }
+    }
+
+    // ---- state
+    let state: SetupState;
+    let text: string;
+    const warnings: string[] = [];
+    const entryTime = core.triggerIdx !== null ? T(core.triggerIdx) : null;
+    const wp = buy ? -lastClose : lastClose; // current price in the SELL working frame
+    if (core.triggerIdx !== null && core.outcome) {
+        if (core.outcome.kind === 'target') {
+            state = 'target_reached';
+            text = `Target reached: price took the ${liqName.toLowerCase()} at ${px(R(core.targetPrice))}`;
+        } else {
+            state = 'invalidated';
+            text = `Stop loss was hit after the entry at ${px(R(core.entry as number))}`;
+        }
+    } else if (core.triggerIdx !== null && plan) {
+        const ran = (core.entry as number) - wp;
+        const share = ran / ((core.entry as number) - (core.takeProfit as number));
+        if (share > LATE_SHARE) {
+            state = 'expired';
+            text = `The ${side} entry at ${px(plan.entry)} has passed: price already ran more than half way to the target`;
+        } else if (plan.rr < MIN_RR) {
+            state = 'poor_market';
+            text = `Waiting for the market to be good: reward is only 1 : ${plan.rr.toFixed(2)} (minimum is 1 : ${MIN_RR})`;
+            warnings.push(`Reward is only 1 : ${plan.rr.toFixed(2)}, the minimum is 1 : ${MIN_RR}.`);
+        } else {
+            state = 'ready';
+            text = `${side} entry confirmed: a strong ${word.red} candle closed ${word.up} the MSS level ${px(R((core.mss as Pivot).price))}. Hold while price keeps breaking IL-1 / IL-2, target ${px(plan.takeProfit)}`;
+        }
+    } else if (core.triggerIdx !== null) {
+        state = 'poor_market';
+        text = 'The entry candle closed, but the stop distance is not usable. Waiting.';
+    } else if (core.missedIdx !== null) {
+        state = 'expired';
+        text = `Price ran to the ${liqName.toLowerCase()} without a valid entry: this setup is over. Waiting for a new break of structure`;
+    } else if (core.invalidIdx !== null) {
+        state = 'invalidated';
+        text = `A candle closed with its body ${word.down} the ${zoneName.toLowerCase()} (${zoneText}): the idea is cancelled. Waiting for a new break of structure`;
+    } else if (core.touchIdx === null) {
+        state = 'waiting_for_sweep';
+        text = `Direction is ${side} (BOS at ${px(R(core.bosLevel))}). ${zoneName} marked ${zoneText}. Waiting for price to come back into the zone`;
+    } else if (!core.major) {
+        state = 'sweep_in_progress';
+        text = `Price reached the ${zoneName.toLowerCase()} but has not swept a previous ${word.high} yet: waiting for the liquidity sweep (LS)`;
+    } else if (!core.mss) {
+        state = 'sweep_in_progress';
+        text = `Sweep done (LS at ${px(R(core.major.price))}). Waiting for price to make a ${word.low} inside the zone, then break it (MSS)`;
+    } else {
+        state = 'sweep_in_progress';
+        text = core.weakBreak
+            ? `The MSS level ${px(R(core.mss.price))} was broken without a strong candle: waiting for a strong ${word.red} candle to close ${word.up} it`
+            : `Sweep done. Waiting for a strong ${word.red} candle to close ${word.up} the MSS level ${px(R(core.mss.price))}`;
+    }
+
+    // ---- stages
+    const done = [
+        true,
+        true,
+        true,
+        core.touchIdx !== null,
+        core.major !== null && core.touchIdx !== null,
+        core.triggerIdx !== null,
+        core.triggerIdx !== null && state === 'ready',
+    ];
+    const labels = [
+        `Direction: break of structure (BOS) at ${px(R(core.bosLevel))}`,
+        `Zone marked: ${zoneName} ${zoneText}`,
+        `Target marked: ${liqName} ${px(R(core.targetPrice))}`,
+        'Price retraces into the zone',
+        'Liquidity sweep (LS / trap) taken',
+        'Market structure shift (MSS) with a strong candle',
+        'Entry',
+    ];
+    let nowSet = false;
+    const stages: Stage[] = labels.map((label, i) => {
+        if (done[i]) return stage(label, 'done');
+        if (!nowSet && !['invalidated', 'target_reached', 'expired'].includes(state)) {
+            nowSet = true;
+            return stage(label, 'now', text);
+        }
+        return stage(label, 'todo');
+    });
+
+    // ---- overlay for the chart (real prices)
+    const lineLabel = {
+        minor: 'MINOR INDUCEMENT',
+        major: 'MAJOR INDUCEMENT ( TRAP )',
+    };
+    const overlay: SmcOverlay = {
+        key: '',
+        side,
+        zone: {
+            top: zTop,
+            bottom: zBottom,
+            startTime: T(core.zoneStartIdx),
+            label: `${zoneName} · ${core.touchIdx !== null ? 'MITIGATED' : 'UNMITIGATED'}`,
+            touched: core.touchIdx !== null,
+        },
+        bos: { price: R(core.bosLevel), fromTime: T(core.bosFromIdx), toTime: T(core.bosIdx), label: 'BOS' },
+        target: { price: R(core.targetPrice), fromTime: T(core.targetIdx), toTime: null, label: `${liqName} 🎯` },
+        minor: core.minor ? { price: R(core.minor.price), fromTime: T(core.minor.idx), toTime: T(core.minor.sweepIdx), label: lineLabel.minor } : null,
+        major: core.major
+            ? { price: R(core.major.price), fromTime: T(core.major.idx), toTime: T(core.major.sweepIdx), label: lineLabel.major, sweepTime: T(core.major.sweepIdx) }
+            : null,
+        mss: core.mss ? { price: R(core.mss.price), fromTime: T(core.mss.idx), toTime: core.triggerIdx !== null ? T(core.triggerIdx) : null, label: 'MSS' } : null,
+        internals: core.ils.map((il, i) => ({
+            price: R(il.price),
+            fromTime: T(il.idx),
+            toTime: core.ilBroken[i] !== null ? T(core.ilBroken[i] as number) : null,
+            label: `IL-${i + 1}`,
+            broken: core.ilBroken[i] !== null,
+        })),
+        plan: plan && core.touchIdx !== null ? { entry: plan.entry, stopLoss: plan.stopLoss, takeProfit: plan.takeProfit, fromTime: core.triggerIdx !== null ? T(core.triggerIdx) : last.time, planned: plan.planned === true } : null,
+        entryTime,
+        exit: core.outcome ? { time: T(core.outcome.idx), kind: core.outcome.kind } : null,
+        facts: [
+            { label: 'Direction', value: `${side} (break of structure at ${px(R(core.bosLevel))})` },
+            { label: zoneName.charAt(0) + zoneName.slice(1).toLowerCase(), value: `${zoneText} (${core.touchIdx !== null ? 'mitigated' : 'unmitigated'})` },
+            { label: liqName.charAt(0) + liqName.slice(1).toLowerCase() + ' (target)', value: px(R(core.targetPrice)) },
+            ...(core.major ? [{ label: 'Major inducement (trap)', value: `${px(R(core.major.price))}, swept` }] : []),
+            ...(core.minor ? [{ label: 'Minor inducement', value: `${px(R(core.minor.price))}, swept` }] : []),
+            ...(core.mss ? [{ label: 'MSS level', value: px(R(core.mss.price)) }] : []),
+            ...core.ils.map((il, i) => ({ label: `IL-${i + 1} (internal liquidity)`, value: `${px(R(il.price))}${core.ilBroken[i] !== null ? ', broken' : ''}` })),
+        ],
+    };
+    overlay.key = [
+        side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
+        overlay.minor?.price, overlay.major?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
+        overlay.plan?.entry, overlay.plan?.stopLoss, entryTime, overlay.exit?.time, n,
+    ].join('|');
+
+    return {
+        ...base,
+        state,
+        statusText: text,
+        plan,
+        warnings,
+        candlesSince: core.triggerIdx !== null ? n - 1 - core.triggerIdx : null,
+        bos: { side, level: R(core.bosLevel), swingTime: T(core.bosFromIdx), bosTime: T(core.bosIdx) },
+        entryTime,
+        stages,
+        smc: overlay,
+    };
+}

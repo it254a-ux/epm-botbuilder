@@ -8,6 +8,8 @@
  * back inside, and the trade goes back across the range.
  */
 
+import type { SmcOverlay } from './smc';
+
 export interface Candle {
     /** Candle open time, seconds since epoch (UTC). */
     time: number;
@@ -140,6 +142,8 @@ export interface Analysis {
     entryTime: number | null;
     /** The six stages of the setup, for the checklist. */
     stages: Stage[];
+    /** Smart Money strategy only: the markings the chart draws (zone, BOS, sweep, MSS, liquidity...). */
+    smc?: SmcOverlay | null;
 }
 
 const DAY = 86400;

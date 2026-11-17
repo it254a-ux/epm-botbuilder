@@ -6,6 +6,7 @@ import { analyseMtf, M15_SEC, type MtfSignal } from './mtf';
 import { analysePreviousDay } from './pdh';
 import { useSharedPick } from './shared-picks';
 import { STRATEGIES } from './strategies';
+import { analyseSmc, SMC_ID } from './smc';
 import './compare-charts.scss';
 
 /** Candle sizes Deriv offers, in seconds. */
@@ -115,8 +116,8 @@ const ChartPanel = ({ symbol, kind, strategyId, startSec, lines, onClose }: Pane
             if (!strat?.ready || all.length < 3) return;
             const closed = all.filter(x => x.time + s <= now);
             const forming = all.find(x => x.time + s > now) ?? null;
-            const a = analyse(sid as SweepStrategyId, closed, k, forming, now);
-            const key = `s|${sid}|${a.state}|${a.sweep?.confirmTime ?? ''}|${closed.length}|${a.plan?.stopLoss ?? ''}`;
+            const a = sid === SMC_ID ? analyseSmc(closed, k, forming, now) : analyse(sid as SweepStrategyId, closed, k, forming, now);
+            const key = `s|${sid}|${a.state}|${a.sweep?.confirmTime ?? ''}|${closed.length}|${a.plan?.stopLoss ?? ''}|${a.smc?.key ?? ''}`;
             if (key !== drawKey.current) {
                 drawKey.current = key;
                 chart.drawAnalysis(a, closed);
