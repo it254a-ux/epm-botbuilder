@@ -1360,15 +1360,6 @@ const ForexTrader = ({
                                 <span className='forex-trader__strip-text' title={outcome.analysis.statusText}>
                                     {outcome.analysis.statusText}
                                 </span>
-                                {outcome.analysis.strategyId === (SMC_ID as unknown) && outcome.analysis.stages.length === 7 && (
-                                    <span className='forex-trader__strip-steps'>
-                                        {outcome.analysis.stages.map((s, i) => (
-                                            <i key={i} className={`is-${s.state}`} title={s.label}>
-                                                {['BOS', 'Zone', 'Target', 'Retrace', 'Sweep', 'MSS', 'Entry'][i]}
-                                            </i>
-                                        ))}
-                                    </span>
-                                )}
                             </>
                         ) : (
                             <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
