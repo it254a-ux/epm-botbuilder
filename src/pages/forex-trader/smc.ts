@@ -155,7 +155,7 @@ interface BosEvent {
 /** How many of the latest breaks of structure are kept as possible setups. */
 const MAX_SETUPS = 6;
 /** A finished trade (target or stop) stays on screen for this many candles before the page moves on to a newer setup. */
-const SHOW_FINISHED_CANDLES = 12;
+const SHOW_FINISHED_CANDLES = 3;
 /** History (older setups on the chart): a setup lives this many candles after its break of structure, and the break must follow its swing within BOS_MAX_GAP. */
 const SETUP_LIFETIME = 200;
 const BOS_MAX_GAP = 80;
@@ -204,6 +204,7 @@ function scan(c: Candle[], a: number, liveIdx: number | null, history = false): 
 /** A finished (or running) trade from the past, as a drawing that stops where that trade stopped. */
 function historyOverlay(core: Core, buy: boolean, c: Candle[]): SmcOverlay | null {
     if (core.triggerIdx === null || core.entry === null || core.stopLoss === null || core.takeProfit === null) return null;
+    if (!(core.stopLoss > core.entry) || (core.entry - core.takeProfit) / (core.stopLoss - core.entry) < MIN_RR) return null;
     const R = (m: number) => (buy ? -m : m);
     const T = (i: number) => c[i].time;
     const side: Side = buy ? 'BUY' : 'SELL';
@@ -517,8 +518,10 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     const liveIdx = live ? c.length : null;
     const priceNowReal = forming ? forming.close : last.close;
     const rank = (k: Core, isBuy: boolean): [number, number, number, number] => {
-        const finishedRecently = k.outcome !== null && cs.length - 1 - k.outcome.idx <= SHOW_FINISHED_CANDLES;
-        const live = k.triggerIdx !== null && k.outcome === null;
+        // an entry whose reward is under the minimum (like 1 : 0.1) is not a trade worth holding the screen for
+        const rrOk = k.entry !== null && k.stopLoss !== null && k.takeProfit !== null && k.stopLoss > k.entry && (k.entry - k.takeProfit) / (k.stopLoss - k.entry) >= MIN_RR;
+        const finishedRecently = rrOk && k.outcome !== null && cs.length - 1 - k.outcome.idx <= SHOW_FINISHED_CANDLES;
+        const live = rrOk && k.triggerIdx !== null && k.outcome === null;
         const alive = k.invalidIdx === null && k.outcome === null && k.missedIdx === null;
         const tier = live || finishedRecently ? 0 : alive ? 1 : 2;
         // an idea that is further along (touched the zone, swept, MSS level formed) is not replaced by a fresh small break

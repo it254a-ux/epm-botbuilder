@@ -131,40 +131,43 @@ export function drawSmc(
         zone(o.zone.startTime, endT, o.zone.bottom, o.zone.top, zFill);
         segment(o.zone.top, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
         segment(o.zone.bottom, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
-        segment((o.zone.top + o.zone.bottom) / 2, o.zone.startTime, endT, zEdge, o.zone.label, zText, anchor - len * 14, { hidden: true });
+        // an earlier setup is drawn light: its zone, trade box and entry / exit marks only (no names), so old setups never cover the current one
+        if (main) segment((o.zone.top + o.zone.bottom) / 2, o.zone.startTime, endT, zEdge, o.zone.label, zText, anchor - len * 14, { hidden: true });
 
-        // ---- BOS (the swing that was broken, up to the candle that closed through it)
-        segment(o.bos.price, o.bos.fromTime, o.bos.toTime ?? anchor, C.bos, o.bos.label, C.bos, ((o.bos.fromTime) + (o.bos.toTime ?? anchor)) / 2, { width: 2 });
+        if (main) {
+            // ---- BOS (the swing that was broken, up to the candle that closed through it)
+            segment(o.bos.price, o.bos.fromTime, o.bos.toTime ?? anchor, C.bos, o.bos.label, C.bos, ((o.bos.fromTime) + (o.bos.toTime ?? anchor)) / 2, { width: 2 });
 
-        // ---- the target: SELL SIDE LIQUIDITY 🎯 (BUY: BUY SIDE LIQUIDITY 🎯)
-        segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, { width: 1 });
+            // ---- the target: SELL SIDE LIQUIDITY 🎯 (BUY: BUY SIDE LIQUIDITY 🎯)
+            segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, { width: 1 });
 
-        // ---- inducements (minor, then the major trap) and the sweep (LS)
-        if (o.minor) segment(o.minor.price, o.minor.fromTime, o.minor.toTime ?? anchor, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + (o.minor.toTime ?? anchor)) / 2);
-        if (o.major) {
-            segment(o.major.price, o.major.fromTime, o.major.toTime ?? anchor, C.major, o.major.label, C.lineText, (o.major.fromTime + (o.major.toTime ?? anchor)) / 2, { width: 2 });
-            markers.push({
-                time: nearest(o.major.sweepTime) as UTCTimestamp,
-                position: sell ? 'aboveBar' : 'belowBar',
-                shape: sell ? 'arrowDown' : 'arrowUp',
-                color: C.sweep,
-                text: 'LS',
+            // ---- inducements (minor, then the major trap) and the sweep (LS)
+            if (o.minor) segment(o.minor.price, o.minor.fromTime, o.minor.toTime ?? anchor, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + (o.minor.toTime ?? anchor)) / 2);
+            if (o.major) {
+                segment(o.major.price, o.major.fromTime, o.major.toTime ?? anchor, C.major, o.major.label, C.lineText, (o.major.fromTime + (o.major.toTime ?? anchor)) / 2, { width: 2 });
+                markers.push({
+                    time: nearest(o.major.sweepTime) as UTCTimestamp,
+                    position: sell ? 'aboveBar' : 'belowBar',
+                    shape: sell ? 'arrowDown' : 'arrowUp',
+                    color: C.sweep,
+                    text: 'LS',
+                });
+            }
+
+            // ---- POC: the most-traded price of the drop (the volume-profile idea, measured in time at price). Bold when it sits in the zone.
+            if (o.poc) {
+                segment(o.poc.price, o.poc.fromTime, endT, C.poc, o.poc.label, C.poc, anchor - len * 6, { width: o.poc.nearZone ? 2 : 1, dashed: !o.poc.nearZone });
+                if (main) levels.push(o.poc.price);
+            }
+
+            // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
+            if (o.mss) segment(o.mss.price, o.mss.fromTime, o.mss.toTime ?? endT, C.mss, o.mss.label, C.mss, (o.mss.fromTime + (o.mss.toTime ?? anchor)) / 2, { width: 2 });
+
+            // ---- internal liquidity: IL-1 is the nearest to the entry. Once broken the line stops there and turns grey.
+            o.internals.forEach(il => {
+                segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, anchor - len * 10, { dashed: il.broken });
             });
         }
-
-        // ---- POC: the most-traded price of the drop (the volume-profile idea, measured in time at price). Bold when it sits in the zone.
-        if (o.poc) {
-            segment(o.poc.price, o.poc.fromTime, endT, C.poc, o.poc.label, C.poc, anchor - len * 6, { width: o.poc.nearZone ? 2 : 1, dashed: !o.poc.nearZone });
-            if (main) levels.push(o.poc.price);
-        }
-
-        // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
-        if (o.mss) segment(o.mss.price, o.mss.fromTime, o.mss.toTime ?? endT, C.mss, o.mss.label, C.mss, (o.mss.fromTime + (o.mss.toTime ?? anchor)) / 2, { width: 2 });
-
-        // ---- internal liquidity: IL-1 is the nearest to the entry. Once broken the line stops there and turns grey.
-        o.internals.forEach(il => {
-            segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, anchor - len * 10, { dashed: il.broken });
-        });
 
         // ---- the trade box and its price tags
         if (main) levels.push(o.zone.top, o.zone.bottom, o.target.price, o.bos.price);
@@ -172,7 +175,7 @@ export function drawSmc(
         if (main) o.internals.forEach(i => levels.push(i.price));
         if (o.plan) {
             const p = o.plan;
-            const faint = p.planned;
+            const faint = p.planned || !main;
             zone(p.fromTime, endT, p.entry, p.takeProfit, faint ? C.rewardFaint : C.rewardFill);
             zone(p.fromTime, endT, p.entry, p.stopLoss, faint ? C.riskFaint : C.riskFill);
             const rr = Math.abs(p.takeProfit - p.entry) / (Math.abs(p.stopLoss - p.entry) || 1);
