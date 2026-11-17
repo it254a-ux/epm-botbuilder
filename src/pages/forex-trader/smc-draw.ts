@@ -155,6 +155,17 @@ export function drawSmc(t: SmcDrawTarget, o: SmcOverlay, candles: Candle[]): { m
         axisLine(p.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp);
         levels.push(p.entry, p.stopLoss, p.takeProfit);
     }
+    if (!o.plan && o.area) {
+        // no entry yet: the zone is where the entry is expected. Faint box = expected reward above/below, expected risk beyond the zone.
+        const q = o.area;
+        zone(q.fromTime, endT, q.entry, q.takeProfit, C.rewardFaint);
+        zone(q.fromTime, endT, q.entry, q.stopLoss, C.riskFaint);
+        const rr = Math.abs(q.takeProfit - q.entry) / (Math.abs(q.stopLoss - q.entry) || 1);
+        axisLine(q.entry, `${o.side} ENTRY AREA`, C.entry, true);
+        axisLine(q.stopLoss, 'SL (idea fails)', C.sl, true);
+        axisLine(q.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp, true);
+        levels.push(q.entry, q.stopLoss, q.takeProfit);
+    }
     if (o.entryTime !== null) {
         markers.push({
             time: nearest(o.entryTime) as UTCTimestamp,

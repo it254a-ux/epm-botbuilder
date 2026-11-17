@@ -60,6 +60,8 @@ export interface SmcOverlay {
     mss: SmcLine | null;
     internals: (SmcLine & { broken: boolean })[];
     plan: { entry: number; stopLoss: number; takeProfit: number; fromTime: number; planned: boolean } | null;
+    /** Before the MSS level exists: the area where the entry is expected (the zone edge nearest price), with the stop beyond the zone and the target. */
+    area: { entry: number; stopLoss: number; takeProfit: number; fromTime: number } | null;
     entryTime: number | null;
     exit: { time: number; kind: 'target' | 'stop' } | null;
     /** Lines of text for the result panel. */
@@ -532,6 +534,16 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         minor: 'MINOR INDUCEMENT',
         major: 'MAJOR INDUCEMENT ( TRAP )',
     };
+    // before the MSS entry exists: show where the entry is expected (the zone), where the idea fails (beyond the zone) and the target
+    let area: SmcOverlay['area'] = null;
+    if (!plan && core.triggerIdx === null && core.invalidIdx === null && core.missedIdx === null) {
+        let hh = core.zoneTop;
+        if (core.touchIdx !== null) for (let k = core.touchIdx; k < n; k++) hh = Math.max(hh, c[k].high);
+        const sl = hh + SL_BUFFER_ATR * a;
+        if (sl > core.zoneBottom && core.zoneBottom > core.targetPrice) {
+            area = { entry: R(core.zoneBottom), stopLoss: R(sl), takeProfit: R(core.targetPrice), fromTime: last.time };
+        }
+    }
     const overlay: SmcOverlay = {
         key: '',
         side,
@@ -539,7 +551,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
             top: zTop,
             bottom: zBottom,
             startTime: T(core.zoneStartIdx),
-            label: `${zoneName} · ${core.touchIdx !== null ? 'MITIGATED' : 'UNMITIGATED'}`,
+            label: `${side} ENTRY AREA · ${zoneName} · ${core.touchIdx !== null ? 'MITIGATED' : 'UNMITIGATED'}`,
             touched: core.touchIdx !== null,
         },
         bos: { price: R(core.bosLevel), fromTime: T(core.bosFromIdx), toTime: T(core.bosIdx), label: 'BOS' },
@@ -556,6 +568,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
             label: `IL-${i + 1}`,
             broken: core.ilBroken[i] !== null,
         })),
+        area,
         plan: plan && core.touchIdx !== null ? { entry: plan.entry, stopLoss: plan.stopLoss, takeProfit: plan.takeProfit, fromTime: core.triggerIdx !== null ? T(core.triggerIdx) : last.time, planned: plan.planned === true } : null,
         entryTime,
         exit: core.outcome ? { time: T(core.outcome.idx), kind: core.outcome.kind } : null,
@@ -565,6 +578,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
             { label: liqName.charAt(0) + liqName.slice(1).toLowerCase() + ' (target)', value: px(R(core.targetPrice)) },
             ...(core.major ? [{ label: 'Major inducement (trap)', value: `${px(R(core.major.price))}, swept` }] : []),
             ...(core.minor ? [{ label: 'Minor inducement', value: `${px(R(core.minor.price))}, swept` }] : []),
+            ...(area ? [{ label: `${side} entry area`, value: `${zoneText}, stop ${px(area.stopLoss)}, target ${px(area.takeProfit)}` }] : []),
             ...(core.mss ? [{ label: 'MSS level', value: px(R(core.mss.price)) }] : []),
             ...core.ils.map((il, i) => ({ label: `IL-${i + 1} (internal liquidity)`, value: `${px(R(il.price))}${core.ilBroken[i] !== null ? ', broken' : ''}` })),
         ],
@@ -572,7 +586,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     overlay.key = [
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
         overlay.minor?.price, overlay.major?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
-        overlay.plan?.entry, overlay.plan?.stopLoss, entryTime, overlay.exit?.time, n,
+        overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,
     ].join('|');
 
     return {

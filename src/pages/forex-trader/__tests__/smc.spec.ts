@@ -59,7 +59,7 @@ describe('Smart money strategy', () => {
         expect(a.state).toBe('sweep_in_progress');
         const o = a.smc!;
         expect(o.side).toBe('SELL');
-        expect(o.zone.label).toBe('SUPPLY ZONE · MITIGATED');
+        expect(o.zone.label).toBe('SELL ENTRY AREA · SUPPLY ZONE · MITIGATED');
         expect(o.target.label).toBe('SELL SIDE LIQUIDITY 🎯');
         expect(o.major!.label).toBe('MAJOR INDUCEMENT ( TRAP )');
         expect(o.minor!.label).toBe('MINOR INDUCEMENT');
@@ -89,6 +89,21 @@ describe('Smart money strategy', () => {
         expect(a.smc!.exit!.kind).toBe('stop');
     });
 
+    it('shows the entry area (side, zone, stop, target) from the start, before price reaches the zone', () => {
+        const early = analyseSmc(build(SELL.slice(0, 6)), 'forex'); // the drop is done, price has not come back yet
+        expect(early.state).toBe('waiting_for_sweep');
+        expect(early.plan).toBeNull();
+        const q = early.smc!.area!;
+        expect(early.smc!.side).toBe('SELL');
+        expect(early.smc!.zone.label).toBe('SELL ENTRY AREA · SUPPLY ZONE · UNMITIGATED');
+        expect(q.stopLoss).toBeGreaterThan(q.entry);
+        expect(q.entry).toBeGreaterThan(q.takeProfit);
+        const buy = analyseSmc(flip(build(SELL.slice(0, 6))), 'forex');
+        expect(buy.smc!.side).toBe('BUY');
+        expect(buy.smc!.area!.stopLoss).toBeLessThan(buy.smc!.area!.entry);
+        expect(buy.smc!.area!.takeProfit).toBeGreaterThan(buy.smc!.area!.entry);
+    });
+
     it('does not enter on a weak candle that merely pokes below the MSS low', () => {
         const base = build(SELL);
         const last = base[base.length - 1];
@@ -104,7 +119,7 @@ describe('Smart money strategy', () => {
         const buy = analyseSmc(flip(build(SELL, [[1, 4108], [8, 4060], [6, 4038]])), 'forex');
         expect(buy.state).toBe(sell.state);
         expect(buy.smc!.side).toBe('BUY');
-        expect(buy.smc!.zone.label).toBe('DEMAND ZONE · MITIGATED');
+        expect(buy.smc!.zone.label).toBe('BUY ENTRY AREA · DEMAND ZONE · MITIGATED');
         expect(buy.smc!.target.label).toBe('BUY SIDE LIQUIDITY 🎯');
         expect(buy.plan!.side).toBe('BUY');
         expect(buy.plan!.rr).toBeCloseTo(sell.plan!.rr, 6);
