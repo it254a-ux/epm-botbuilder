@@ -1828,6 +1828,7 @@
     align-items: center;
     gap: 8px;
     justify-content: flex-end;
+    overflow: hidden;
 
     .forex-trader__pill {
         flex: none;

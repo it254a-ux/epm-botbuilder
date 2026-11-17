@@ -401,9 +401,6 @@ const ForexTrader = ({
     const [fitHeight, setFitHeight] = useState<number | null>(null);
     // on Forex Live the trade setup floats over the chart; this opens and closes it
     const [setupOpen, setSetupOpen] = useState(!resultHost);
-    // the setup strip under the toolbar: one line always, the full details open on a tap
-    const [stripOpen, setStripOpen] = useState(false);
-    const [stripEl, setStripEl] = useState<HTMLElement | null>(null);
     const [drawHost, setDrawHost] = useState<HTMLElement | null>(null);
     // the control beside the Trade setup button copies its exact top and height, so the two sit on one line
     const controlsRef = useRef<HTMLDivElement>(null);
@@ -1002,7 +999,7 @@ const ForexTrader = ({
     // the results card can live in a parent page's side column; it then has to carry the tool's own class so its styles still apply
     const headerMode = !!resultInHeader && !!resultHost && !noAnalysis && variant !== 'panel';
     const renderResult = (node: JSX.Element) =>
-        headerMode ? (stripEl ? createPortal(node, stripEl) : null) : resultHost ? createPortal(node, resultHost) : node;
+        headerMode ? null : resultHost ? createPortal(node, resultHost) : node;
 
     // the Trade setup button and its panel; on Forex Live it sits in the toolbar row above the chart
     const inBar = hostedHere && !noAnalysis && variant !== 'panel';
@@ -1288,7 +1285,7 @@ const ForexTrader = ({
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
                     {headerMode && toolbarExtra && <div className='forex-trader__bar-extra'>{toolbarExtra}</div>}
                     {headerMode ? (
-                        <div className={`forex-trader__bar-status${stripOpen ? ' is-open' : ''}`}>
+                        <div className='forex-trader__bar-status'>
                             {outcome ? (
                                 <>
                                     <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
@@ -1301,15 +1298,6 @@ const ForexTrader = ({
                             ) : (
                                 <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
                             )}
-                            <button
-                                type='button'
-                                className='forex-trader__strip-btn'
-                                aria-expanded={stripOpen}
-                                onClick={() => setStripOpen(o => !o)}
-                            >
-                                Details {stripOpen ? '▴' : '▾'}
-                            </button>
-                            <div ref={setStripEl} className='forex-trader__strip-drawer' hidden={!stripOpen} />
                         </div>
                     ) : (
                         <span className='forex-trader__bar-grow' aria-hidden='true' />
