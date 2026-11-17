@@ -16,9 +16,7 @@ import PositionsPanel from './positions-panel';
 import QuickBar from './quick-bar';
 import QuotesPanel from './quotes-panel';
 import {
-    BUY_COLOR,
     DEFAULT_SYMBOL,
-    SELL_COLOR,
     positionLines,
     summarize,
     type Side,
@@ -284,7 +282,6 @@ const ForexLive = observer(() => {
     // the open trades on this market, drawn on the Forex Trader chart where they were entered
     // (the analysis plan and key levels are drawn by the Forex Trader chart itself)
     const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
-    const tradesDrawn = lines.length > 0;
     // the Sniper's "My target" line goes on the main chart too (not on the Compare charts)
     const [targetLine, setTargetLine] = useState<TargetLine | null>(null);
     const chartLines = useMemo(() => (targetLine ? [...lines, targetLine] : lines), [lines, targetLine]);
@@ -485,13 +482,6 @@ const ForexLive = observer(() => {
                                 >
                                     Compare charts
                                 </button>
-                            )}
-                            {tradesDrawn && (
-                                <div className='forex-live__legend'>
-                                    <span style={{ color: BUY_COLOR }}>— Your BUY trades</span>
-                                    <span style={{ color: SELL_COLOR }}>— Your SELL trades</span>
-                                    <em>at their entry price, with live profit</em>
-                                </div>
                             )}
                         </div>
                     );
