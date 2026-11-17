@@ -1,5 +1,5 @@
 import type { Candle } from '../engine';
-import { analyseSmc, SMC_ID } from '../smc';
+import { analyseSmc, smcHistory, SMC_ID } from '../smc';
 
 /** [number of candles, price at the end]: straight moves between waypoints, a tiny zig-zag so no flat candles. */
 type Path = [number, number][];
@@ -162,5 +162,32 @@ describe('Smart money strategy', () => {
         const a = analyseSmc(cs, 'forex', null, cs[cs.length - 1].time + 300 * 20);
         expect(a.state).toBe('stale');
         expect(a.smc).toBeUndefined();
+    });
+
+    it('history: an earlier setup stays on the chart, fixed, and new candles never change it', () => {
+        const done: Path = [[1, 4108], [8, 4060], [6, 4038]];
+        const short = build(SELL, done);
+        const h1 = smcHistory(short);
+        expect(h1.length).toBe(1);
+        expect(h1[0].side).toBe('SELL');
+        expect(h1[0].exit!.kind).toBe('target');
+        expect(h1[0].endTime).toBe(h1[0].exit!.time);
+        expect(h1[0].plan!.planned).toBe(false);
+        // many more candles later: the same setup is still there, identical
+        const longer = build(SELL, [...done, [60, 4045], [40, 4030]]);
+        const h2 = smcHistory(longer);
+        const same = h2.find(h => h.zone.startTime === h1[0].zone.startTime && h.side === 'SELL')!;
+        expect(same.key).toBe(h1[0].key);
+        expect(same.endTime).toBe(h1[0].endTime);
+        // the setup that is current is not repeated in the history
+        expect(smcHistory(short, analyseSmc(short, 'forex').smc).length).toBe(0);
+    });
+
+    it('history: the BUY side is the mirror', () => {
+        const done: Path = [[1, 4108], [8, 4060], [6, 4038]];
+        const h = smcHistory(flip(build(SELL, done)));
+        expect(h.length).toBe(1);
+        expect(h[0].side).toBe('BUY');
+        expect(h[0].plan!.stopLoss).toBeLessThan(h[0].plan!.entry);
     });
 });

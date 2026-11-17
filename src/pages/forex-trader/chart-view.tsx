@@ -33,6 +33,7 @@ import {
 } from './indicators';
 import type { PdhResult } from './pdh';
 import { drawSmc } from './smc-draw';
+import { SMC_ID, smcHistory, type SmcOverlay } from './smc';
 
 /**
  * Waits for the next click on the chart and gives the price at the spot that was clicked (null when Esc cancels it, or the
@@ -195,6 +196,11 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     studiesRef.current = studies;
     const derivedRef = useRef<Derived[]>([]);
     const refreshTimer = useRef<number>(0);
+    // Smart Money: the current setup plus every earlier one found in the loaded candles (more appear as the chart is dragged back)
+    const smcRef = useRef<{ current: SmcOverlay | null } | null>(null);
+    const smcWindow = useRef<{ from: number; to: number } | null>(null);
+    const smcTimer = useRef<number>(0);
+    const paintSmcRef = useRef<() => void>(() => undefined);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -257,6 +263,17 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         setApis({ chart, series });
 
         const onRange = (range: { from: number; to: number } | null) => {
+            // Smart Money history: when the view leaves the part that was drawn, draw the setups of the new part
+            const win = smcWindow.current;
+            if (range && win && smcRef.current) {
+                const cs = candlesRef.current;
+                const t0 = cs[Math.max(0, Math.floor(range.from))]?.time ?? cs[0]?.time;
+                const t1 = cs[Math.min(cs.length - 1, Math.ceil(range.to))]?.time ?? cs[cs.length - 1]?.time;
+                if (t0 !== undefined && t1 !== undefined && (t0 < win.from || t1 > win.to)) {
+                    window.clearTimeout(smcTimer.current);
+                    smcTimer.current = window.setTimeout(() => paintSmcRef.current(), 120);
+                }
+            }
             const first = candlesRef.current[0];
             if (!range || range.from > 30 || !first || olderBusy.current || noOlder.current || !loadOlderRef.current)
                 return;
@@ -297,6 +314,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
             derivedRef.current = [];
             window.clearTimeout(refreshTimer.current);
             refreshTimer.current = 0;
+            window.clearTimeout(smcTimer.current);
+            smcRef.current = null;
+            smcWindow.current = null;
         };
     }, []);
 
@@ -514,6 +534,37 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         seriesRef.current?.applyOptions({ priceFormat: { type: 'price', precision: pipSize, minMove } });
     }, [pipSize]);
 
+    /** (Re)draws the Smart Money markings: the current setup and the earlier ones around what is on screen. Keeps the person's view. */
+    const paintSmc = () => {
+        const series = seriesRef.current;
+        const chart = chartRef.current;
+        const st = smcRef.current;
+        const cs = candlesRef.current;
+        if (!series || !chart || !st || cs.length < 3) return;
+        const ts = chart.timeScale();
+        const range = ts.getVisibleLogicalRange();
+        clearDrawing();
+        smcRef.current = st;
+        // the newest candle may still be forming: history uses closed candles only
+        const hist = smcHistory(cs.slice(0, -1), st.current);
+        let view: { from: number; to: number } | undefined;
+        if (range) {
+            const t0 = cs[Math.max(0, Math.floor(range.from))]?.time ?? cs[0].time;
+            const t1 = cs[Math.min(cs.length - 1, Math.ceil(range.to))]?.time ?? cs[cs.length - 1].time;
+            const w = Math.max(t1 - t0, 1);
+            view = { from: t0 - w, to: t1 + w };
+            smcWindow.current = view;
+        }
+        const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, st.current, cs, hist, view);
+        series.setMarkers(out.markers);
+        if (out.levels.length) {
+            const span = Math.max(...out.levels) - Math.min(...out.levels);
+            levelsRef.current = { min: Math.min(...out.levels) - span * 0.04, max: Math.max(...out.levels) + span * 0.04 };
+        }
+        if (range) ts.setVisibleLogicalRange(range);
+    };
+    paintSmcRef.current = paintSmc;
+
     const clearDrawing = () => {
         const series = seriesRef.current;
         const chart = chartRef.current;
@@ -523,6 +574,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         extraRef.current = [];
         series?.setMarkers([]);
         levelsRef.current = null;
+        // whatever draws next decides again whether it is Smart Money (paintSmc puts it back)
+        smcRef.current = null;
+        smcWindow.current = null;
     };
 
     // How a chart opens: each candle about 9 pixels wide, sitting at the latest price (zoom out or in from there).
@@ -545,6 +599,10 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         // the chart keeps the same candles in view when earlier ones are added on the left, so the view is left alone
         seriesRef.current?.setData(candlesRef.current.map(toBar));
         refreshDerived();
+        if (smcRef.current) {
+            window.clearTimeout(smcTimer.current);
+            smcTimer.current = window.setTimeout(() => paintSmcRef.current(), 120);
+        }
     };
     prependRef.current = prepend;
 
@@ -697,16 +755,14 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 if (!series || !chart || !analysis || candles.length < 3) return;
 
                 // Smart Money strategy: its own markings (zone, BOS, sweep, MSS, liquidity, trade box) instead of the range picture
-                if (analysis.smc) {
-                    const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, analysis.smc, candles);
-                    series.setMarkers(out.markers);
-                    if (out.levels.length) {
-                        const span = Math.max(...out.levels) - Math.min(...out.levels);
-                        levelsRef.current = { min: Math.min(...out.levels) - span * 0.04, max: Math.max(...out.levels) + span * 0.04 };
-                    }
+                if (analysis.strategyId === (SMC_ID as unknown)) {
+                    smcRef.current = { current: analysis.smc ?? null };
+                    paintSmcRef.current();
                     openView();
                     return;
                 }
+                smcRef.current = null;
+                smcWindow.current = null;
 
                 const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
                 const lastT = candles[candles.length - 1].time;

@@ -42,13 +42,27 @@ const C = {
     rewardFaint: 'rgba(45,212,191,0.10)',
 };
 
-export function drawSmc(t: SmcDrawTarget, o: SmcOverlay, candles: Candle[]): { markers: SeriesMarker<Time>[]; levels: number[] } {
+/** Past setups drawn at most this many at once (each one is about a dozen small series). */
+const MAX_HISTORY_DRAWN = 24;
+
+/**
+ * @param o       the current setup (null when there is none right now)
+ * @param history earlier setups, each already fixed (they end where their own trade ended)
+ * @param view    only past setups that touch this time window are drawn, so scrolling back draws more, and the chart stays light
+ */
+export function drawSmc(
+    t: SmcDrawTarget,
+    o: SmcOverlay | null,
+    candles: Candle[],
+    history: SmcOverlay[] = [],
+    view?: { from: number; to: number }
+): { markers: SeriesMarker<Time>[]; levels: number[] } {
     const { chart, extra, lines } = t;
     const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
     const lastT = candles[candles.length - 1].time;
-    const endT = lastT + len * 8;
+    const defaultEndT = lastT + len * 8;
     const markers: SeriesMarker<Time>[] = [];
-    const sell = o.side === 'SELL';
+    const levels: number[] = [];
 
     /** The candle time closest to `time`, so a label always sits on a real candle. */
     const nearest = (time: number) => {
@@ -104,86 +118,101 @@ export function drawSmc(t: SmcDrawTarget, o: SmcOverlay, candles: Candle[]): { m
         );
     };
 
-    // ---- the zone (SUPPLY ZONE for a SELL, DEMAND ZONE for a BUY), named UNMITIGATED until price touches it
-    const zFill = sell ? C.supplyFill : C.demandFill;
-    const zEdge = sell ? C.supplyEdge : C.demandEdge;
-    const zText = sell ? C.supplyText : C.demandText;
-    zone(o.zone.startTime, endT, o.zone.bottom, o.zone.top, zFill);
-    segment(o.zone.top, o.zone.startTime, endT, zEdge, null, zEdge, lastT);
-    segment(o.zone.bottom, o.zone.startTime, endT, zEdge, null, zEdge, lastT);
-    segment((o.zone.top + o.zone.bottom) / 2, o.zone.startTime, endT, zEdge, o.zone.label, zText, lastT - len * 14, { hidden: true });
+    /** Draws one setup. The current one runs on to the right edge; a past one stops where its own trade stopped. */
+    const one = (o: SmcOverlay, main: boolean) => {
+        const sell = o.side === 'SELL';
+        const endT = o.endTime != null ? o.endTime : defaultEndT;
+        const anchor = o.endTime != null ? o.endTime : lastT;
+        // ---- the zone (SUPPLY ZONE for a SELL, DEMAND ZONE for a BUY), named UNMITIGATED until price touches it
+        const zFill = sell ? C.supplyFill : C.demandFill;
+        const zEdge = sell ? C.supplyEdge : C.demandEdge;
+        const zText = sell ? C.supplyText : C.demandText;
+        zone(o.zone.startTime, endT, o.zone.bottom, o.zone.top, zFill);
+        segment(o.zone.top, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
+        segment(o.zone.bottom, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
+        segment((o.zone.top + o.zone.bottom) / 2, o.zone.startTime, endT, zEdge, o.zone.label, zText, anchor - len * 14, { hidden: true });
 
-    // ---- BOS (the swing that was broken, up to the candle that closed through it)
-    segment(o.bos.price, o.bos.fromTime, o.bos.toTime ?? lastT, C.bos, o.bos.label, C.bos, ((o.bos.fromTime) + (o.bos.toTime ?? lastT)) / 2, { width: 2 });
+        // ---- BOS (the swing that was broken, up to the candle that closed through it)
+        segment(o.bos.price, o.bos.fromTime, o.bos.toTime ?? anchor, C.bos, o.bos.label, C.bos, ((o.bos.fromTime) + (o.bos.toTime ?? anchor)) / 2, { width: 2 });
 
-    // ---- the target: SELL SIDE LIQUIDITY 🎯 (BUY: BUY SIDE LIQUIDITY 🎯)
-    segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, lastT - len * 20, { width: 1 });
+        // ---- the target: SELL SIDE LIQUIDITY 🎯 (BUY: BUY SIDE LIQUIDITY 🎯)
+        segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, { width: 1 });
 
-    // ---- inducements (minor, then the major trap) and the sweep (LS)
-    if (o.minor) segment(o.minor.price, o.minor.fromTime, o.minor.toTime ?? lastT, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + (o.minor.toTime ?? lastT)) / 2);
-    if (o.major) {
-        segment(o.major.price, o.major.fromTime, o.major.toTime ?? lastT, C.major, o.major.label, C.lineText, (o.major.fromTime + (o.major.toTime ?? lastT)) / 2, { width: 2 });
-        markers.push({
-            time: nearest(o.major.sweepTime) as UTCTimestamp,
-            position: sell ? 'aboveBar' : 'belowBar',
-            shape: sell ? 'arrowDown' : 'arrowUp',
-            color: C.sweep,
-            text: 'LS',
+        // ---- inducements (minor, then the major trap) and the sweep (LS)
+        if (o.minor) segment(o.minor.price, o.minor.fromTime, o.minor.toTime ?? anchor, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + (o.minor.toTime ?? anchor)) / 2);
+        if (o.major) {
+            segment(o.major.price, o.major.fromTime, o.major.toTime ?? anchor, C.major, o.major.label, C.lineText, (o.major.fromTime + (o.major.toTime ?? anchor)) / 2, { width: 2 });
+            markers.push({
+                time: nearest(o.major.sweepTime) as UTCTimestamp,
+                position: sell ? 'aboveBar' : 'belowBar',
+                shape: sell ? 'arrowDown' : 'arrowUp',
+                color: C.sweep,
+                text: 'LS',
+            });
+        }
+
+        // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
+        if (o.mss) segment(o.mss.price, o.mss.fromTime, o.mss.toTime ?? endT, C.mss, o.mss.label, C.mss, (o.mss.fromTime + (o.mss.toTime ?? anchor)) / 2, { width: 2 });
+
+        // ---- internal liquidity: IL-1 is the nearest to the entry. Once broken the line stops there and turns grey.
+        o.internals.forEach(il => {
+            segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, anchor - len * 10, { dashed: il.broken });
         });
-    }
 
-    // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
-    if (o.mss) segment(o.mss.price, o.mss.fromTime, o.mss.toTime ?? endT, C.mss, o.mss.label, C.mss, (o.mss.fromTime + (o.mss.toTime ?? lastT)) / 2, { width: 2 });
+        // ---- the trade box and its price tags
+        if (main) levels.push(o.zone.top, o.zone.bottom, o.target.price, o.bos.price);
+        if (main && o.mss) levels.push(o.mss.price);
+        if (main) o.internals.forEach(i => levels.push(i.price));
+        if (o.plan) {
+            const p = o.plan;
+            const faint = p.planned;
+            zone(p.fromTime, endT, p.entry, p.takeProfit, faint ? C.rewardFaint : C.rewardFill);
+            zone(p.fromTime, endT, p.entry, p.stopLoss, faint ? C.riskFaint : C.riskFill);
+            const rr = Math.abs(p.takeProfit - p.entry) / (Math.abs(p.stopLoss - p.entry) || 1);
+            if (main) axisLine(p.entry, faint ? `Entry ${o.side} (planned, on MSS break)` : `ENTRY ${o.side}`, C.entry, faint);
+            if (main) axisLine(p.stopLoss, 'SL', C.sl);
+            if (main) axisLine(p.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp);
+            if (main) levels.push(p.entry, p.stopLoss, p.takeProfit);
+        }
+        if (main && !o.plan && o.area) {
+            // no entry yet: the zone is where the entry is expected. Faint box = expected reward above/below, expected risk beyond the zone.
+            const q = o.area;
+            zone(q.fromTime, endT, q.entry, q.takeProfit, C.rewardFaint);
+            zone(q.fromTime, endT, q.entry, q.stopLoss, C.riskFaint);
+            const rr = Math.abs(q.takeProfit - q.entry) / (Math.abs(q.stopLoss - q.entry) || 1);
+            axisLine(q.entry, `${o.side} ENTRY AREA`, C.entry, true);
+            axisLine(q.stopLoss, 'SL (idea fails)', C.sl, true);
+            axisLine(q.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp, true);
+            levels.push(q.entry, q.stopLoss, q.takeProfit);
+        }
+        if (o.entryTime !== null) {
+            markers.push({
+                time: nearest(o.entryTime) as UTCTimestamp,
+                position: sell ? 'aboveBar' : 'belowBar',
+                shape: sell ? 'arrowDown' : 'arrowUp',
+                color: C.entry,
+                text: `ENTRY ${o.side}`,
+            });
+        }
+        if (o.exit) {
+            markers.push({
+                time: nearest(o.exit.time) as UTCTimestamp,
+                position: o.exit.kind === 'target' ? (sell ? 'belowBar' : 'aboveBar') : sell ? 'aboveBar' : 'belowBar',
+                shape: 'circle',
+                color: o.exit.kind === 'target' ? C.tp : C.sl,
+                text: o.exit.kind === 'target' ? 'TARGET ✓' : 'SL',
+            });
+        }
+    };
 
-    // ---- internal liquidity: IL-1 is the nearest to the entry. Once broken the line stops there and turns grey.
-    o.internals.forEach(il => {
-        segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, lastT - len * 10, { dashed: il.broken });
-    });
-
-    // ---- the trade box and its price tags
-    const levels: number[] = [o.zone.top, o.zone.bottom, o.target.price, o.bos.price];
-    if (o.mss) levels.push(o.mss.price);
-    o.internals.forEach(i => levels.push(i.price));
-    if (o.plan) {
-        const p = o.plan;
-        const faint = p.planned;
-        zone(p.fromTime, endT, p.entry, p.takeProfit, faint ? C.rewardFaint : C.rewardFill);
-        zone(p.fromTime, endT, p.entry, p.stopLoss, faint ? C.riskFaint : C.riskFill);
-        const rr = Math.abs(p.takeProfit - p.entry) / (Math.abs(p.stopLoss - p.entry) || 1);
-        axisLine(p.entry, faint ? `Entry ${o.side} (planned, on MSS break)` : `ENTRY ${o.side}`, C.entry, faint);
-        axisLine(p.stopLoss, 'SL', C.sl);
-        axisLine(p.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp);
-        levels.push(p.entry, p.stopLoss, p.takeProfit);
-    }
-    if (!o.plan && o.area) {
-        // no entry yet: the zone is where the entry is expected. Faint box = expected reward above/below, expected risk beyond the zone.
-        const q = o.area;
-        zone(q.fromTime, endT, q.entry, q.takeProfit, C.rewardFaint);
-        zone(q.fromTime, endT, q.entry, q.stopLoss, C.riskFaint);
-        const rr = Math.abs(q.takeProfit - q.entry) / (Math.abs(q.stopLoss - q.entry) || 1);
-        axisLine(q.entry, `${o.side} ENTRY AREA`, C.entry, true);
-        axisLine(q.stopLoss, 'SL (idea fails)', C.sl, true);
-        axisLine(q.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp, true);
-        levels.push(q.entry, q.stopLoss, q.takeProfit);
-    }
-    if (o.entryTime !== null) {
-        markers.push({
-            time: nearest(o.entryTime) as UTCTimestamp,
-            position: sell ? 'aboveBar' : 'belowBar',
-            shape: sell ? 'arrowDown' : 'arrowUp',
-            color: C.entry,
-            text: `ENTRY ${o.side}`,
-        });
-    }
-    if (o.exit) {
-        markers.push({
-            time: nearest(o.exit.time) as UTCTimestamp,
-            position: o.exit.kind === 'target' ? (sell ? 'belowBar' : 'aboveBar') : sell ? 'aboveBar' : 'belowBar',
-            shape: 'circle',
-            color: o.exit.kind === 'target' ? C.tp : C.sl,
-            text: o.exit.kind === 'target' ? 'TARGET ✓' : 'SL',
-        });
-    }
+    // past setups first (older underneath), the current one on top
+    const from = view ? view.from : -Infinity;
+    const to = view ? view.to : Infinity;
+    history
+        .filter(h => h.zone.startTime <= to && (h.endTime ?? Infinity) >= from)
+        .slice(-MAX_HISTORY_DRAWN)
+        .forEach(h => one(h, false));
+    if (o) one(o, true);
     markers.sort((a, b) => (a.time as number) - (b.time as number));
     return { markers, levels };
 }

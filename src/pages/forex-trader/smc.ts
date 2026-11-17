@@ -64,6 +64,8 @@ export interface SmcOverlay {
     area: { entry: number; stopLoss: number; takeProfit: number; fromTime: number } | null;
     entryTime: number | null;
     exit: { time: number; kind: 'target' | 'stop' } | null;
+    /** Only for a PAST setup (history): where its drawing stops (its exit, or the end of its life). Missing / null = runs on to the right edge. */
+    endTime?: number | null;
     /** Lines of text for the result panel. */
     facts: { label: string; value: string }[];
 }
@@ -139,6 +141,8 @@ function isStrongRed(c: Candle[], k: number): boolean {
 }
 
 interface BosEvent {
+    /** ATR used for this event (history: measured around the event itself, so old calm or wild periods are judged fairly). */
+    a: number;
     idx: number;
     level: number;
     from: number;
@@ -148,9 +152,13 @@ interface BosEvent {
 const MAX_SETUPS = 6;
 /** A finished trade (target or stop) stays on screen for this many candles before the page moves on to a newer setup. */
 const SHOW_FINISHED_CANDLES = 12;
+/** History (older setups on the chart): a setup lives this many candles after its break of structure, and the break must follow its swing within BOS_MAX_GAP. */
+const SETUP_LIFETIME = 200;
+const BOS_MAX_GAP = 80;
+const HISTORY_CANDLES = 5000;
 
 /** The SELL rule on a series: one Core for each of the latest qualifying breaks of structure (newest first). */
-function scan(c: Candle[], a: number, liveIdx: number | null): Core[] {
+function scan(c: Candle[], a: number, liveIdx: number | null, history = false): Core[] {
     const n = c.length;
     /** Candles that are really closed. The forming candle (the last one, while it is still open) only counts for touches and wicks. */
     const nc = liveIdx ?? n;
@@ -162,24 +170,112 @@ function scan(c: Candle[], a: number, liveIdx: number | null): Core[] {
     const events: BosEvent[] = [];
     for (const L of lows) {
         let i = -1;
-        for (let k = L + S + 1; k < nc; k++) {
+        const lastK = history ? Math.min(nc, L + S + 1 + BOS_MAX_GAP) : nc;
+        for (let k = L + S + 1; k < lastK; k++) {
             if (c[k].close < c[L].low) {
                 i = k;
                 break;
             }
         }
-        if (i < 0 || n - 1 - i > BOS_MAX_AGE) continue;
+        if (i < 0 || (!history && n - 1 - i > BOS_MAX_AGE)) continue;
         let h = -1;
         for (let k = L + 1; k < i; k++) if (h < 0 || c[k].high >= c[h].high) h = k;
         if (h < 0) continue;
         const lowest = Math.min(...c.slice(h, i + 1).map(x => x.low));
-        if (c[h].high - lowest < MIN_LEG_ATR * a) continue;
-        events.push({ idx: i, level: c[L].low, from: L, h });
+        const aa = history ? atr(c.slice(Math.max(0, i - 60), i + 1)) ?? 0 : a;
+        if (!(aa > 0) || c[h].high - lowest < MIN_LEG_ATR * aa) continue;
+        events.push({ a: aa, idx: i, level: c[L].low, from: L, h });
     }
     events.sort((x, y) => y.idx - x.idx || y.from - x.from);
     const unique: BosEvent[] = [];
     for (const e of events) if (!unique.some(u => u.idx === e.idx)) unique.push(e);
-    return unique.slice(0, MAX_SETUPS).map(e => scanOne(c, a, e, lows, highs, nc));
+    if (!history) return unique.slice(0, MAX_SETUPS).map(e => scanOne(c, a, e, lows, highs, nc));
+    // history: each setup is judged only on the candles of its own life, so later candles can never change it
+    return unique.map(e => {
+        const cut = Math.min(nc, e.idx + SETUP_LIFETIME + 1);
+        return scanOne(c.slice(0, cut), e.a, e, lows.filter(p => p + S < cut), highs.filter(p => p + S < cut), cut);
+    });
+}
+
+/** A finished (or running) trade from the past, as a drawing that stops where that trade stopped. */
+function historyOverlay(core: Core, buy: boolean, c: Candle[]): SmcOverlay | null {
+    if (core.triggerIdx === null || core.entry === null || core.stopLoss === null || core.takeProfit === null) return null;
+    const R = (m: number) => (buy ? -m : m);
+    const T = (i: number) => c[i].time;
+    const side: Side = buy ? 'BUY' : 'SELL';
+    const zoneName = buy ? 'DEMAND ZONE' : 'SUPPLY ZONE';
+    const liqName = buy ? 'BUY SIDE LIQUIDITY' : 'SELL SIDE LIQUIDITY';
+    const lifeEnd = Math.min(c.length - 1, core.bosIdx + SETUP_LIFETIME);
+    const endIdx = core.outcome ? core.outcome.idx : lifeEnd < c.length - 1 ? lifeEnd : null;
+    const endTime = endIdx === null ? null : T(endIdx);
+    const entryTime = T(core.triggerIdx);
+    const zoneStart = T(core.zoneStartIdx);
+    return {
+        key: `h|${side}|${zoneStart}|${entryTime}|${endTime}`,
+        side,
+        zone: {
+            top: Math.max(R(core.zoneTop), R(core.zoneBottom)),
+            bottom: Math.min(R(core.zoneTop), R(core.zoneBottom)),
+            startTime: zoneStart,
+            label: `${side} ENTRY AREA · ${zoneName} · MITIGATED`,
+            touched: true,
+        },
+        bos: { price: R(core.bosLevel), fromTime: T(core.bosFromIdx), toTime: T(core.bosIdx), label: 'BOS' },
+        target: { price: R(core.takeProfit), fromTime: T(core.targetIdx), toTime: null, label: `${liqName} 🎯` },
+        minor: core.minor ? { price: R(core.minor.price), fromTime: T(core.minor.idx), toTime: T(core.minor.sweepIdx), label: 'MINOR INDUCEMENT' } : null,
+        major: core.major
+            ? { price: R(core.major.price), fromTime: T(core.major.idx), toTime: T(core.major.sweepIdx), label: 'MAJOR INDUCEMENT ( TRAP )', sweepTime: T(core.major.sweepIdx) }
+            : null,
+        mss: core.mss ? { price: R(core.mss.price), fromTime: T(core.mss.idx), toTime: entryTime, label: 'MSS' } : null,
+        internals: core.ils.map((il, i) => ({
+            price: R(il.price),
+            fromTime: T(il.idx),
+            toTime: core.ilBroken[i] !== null ? T(core.ilBroken[i] as number) : null,
+            label: `IL-${i + 1}`,
+            broken: core.ilBroken[i] !== null,
+        })),
+        plan: { entry: R(core.entry), stopLoss: R(core.stopLoss), takeProfit: R(core.takeProfit), fromTime: entryTime, planned: false },
+        area: null,
+        entryTime,
+        exit: core.outcome ? { time: T(core.outcome.idx), kind: core.outcome.kind } : null,
+        endTime,
+        facts: [],
+    };
+}
+
+const historyCache = new Map<string, SmcOverlay[]>();
+/**
+ * Every earlier trade setup (entry taken) found in the candles, both directions, oldest first. Each one is fixed by its own candles:
+ * new candles never change or remove it. Pass the current setup so it is not drawn twice.
+ * @param candlesRaw closed candles, oldest first (the more are loaded, the further back the history goes)
+ */
+export function smcHistory(candlesRaw: Candle[], current?: SmcOverlay | null): SmcOverlay[] {
+    const c = candlesRaw.slice(-HISTORY_CANDLES);
+    if (c.length < MIN_CANDLES) return [];
+    const last = c[c.length - 1];
+    const ck = `${c.length}|${c[0].time}|${last.time}|${last.close}`;
+    let list = historyCache.get(ck);
+    if (!list) {
+        const seen = new Set<string>();
+        const out: SmcOverlay[] = [];
+        const add = (cores: Core[], buy: boolean) => {
+            for (const k of cores) {
+                const o = historyOverlay(k, buy, c);
+                if (!o) continue;
+                const id = `${o.side}|${o.zone.startTime}|${o.entryTime}`;
+                if (seen.has(id)) continue;
+                seen.add(id);
+                out.push(o);
+            }
+        };
+        add(scan(c, 1, null, true), false);
+        add(scan(c.map(mirror), 1, null, true), true);
+        out.sort((x, y) => x.zone.startTime - y.zone.startTime);
+        list = out;
+        historyCache.set(ck, list);
+        if (historyCache.size > 6) historyCache.delete(historyCache.keys().next().value as string);
+    }
+    return current ? list.filter(o => !(o.side === current.side && o.zone.startTime === current.zone.startTime)) : list;
 }
 
 /** Steps 2 to 8 for one break of structure. */
