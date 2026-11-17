@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts';
 import type { Candle } from './engine';
 import { estimateProfit } from '../forex-live/trade-engine';
@@ -253,9 +254,11 @@ interface Props {
     getLevels?: () => number[];
     /** More buttons for the top of the toolbar (the chart style and indicators menus). */
     extra?: ReactNode;
+    /** When given, the pencil button (open / close the tools) is shown in this element (the toolbar row) instead of on the chart. */
+    toggleHost?: HTMLElement | null;
 }
 
-export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey, extra, getLevels }: Props) {
+export default function ChartDrawings({ chart, series, getCandles, pipSize, resetKey, extra, getLevels, toggleHost }: Props) {
     const money = useMeasureContext();
     const svgRef = useRef<SVGSVGElement>(null);
     const [drawings, setDrawings] = useState<Drawing[]>([]);
@@ -919,6 +922,27 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const isText = TEXT_TOOLS.some(x => x.tool === tool);
     const isShape = SHAPE_TOOLS.some(x => x.tool === tool);
 
+    const toggleButton = (
+        <button
+            type='button'
+            className='fx-bar__toggle'
+            data-tip={barOpen ? 'Hide tools' : 'Chart tools'}
+            aria-label={barOpen ? 'Hide chart tools' : 'Open chart tools'}
+            aria-expanded={barOpen}
+            onClick={toggleBar}
+        >
+            {barOpen ? (
+                <Svg>
+                    <path d='M15 6l-6 6 6 6' />
+                </Svg>
+            ) : (
+                <Svg>
+                    <path d='M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3' />
+                </Svg>
+            )}
+        </button>
+    );
+
     return (
         <>
             <svg
@@ -1007,25 +1031,9 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 </div>
             )}
 
-            <div className={`fx-bar${barOpen ? ' is-open' : ' is-min'}`} onPointerDown={e => e.stopPropagation()}>
-                <button
-                    type='button'
-                    className='fx-bar__toggle'
-                    data-tip={barOpen ? 'Hide tools' : 'Chart tools'}
-                    aria-label={barOpen ? 'Hide chart tools' : 'Open chart tools'}
-                    aria-expanded={barOpen}
-                    onClick={toggleBar}
-                >
-                    {barOpen ? (
-                        <Svg>
-                            <path d='M15 6l-6 6 6 6' />
-                        </Svg>
-                    ) : (
-                        <Svg>
-                            <path d='M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3' />
-                        </Svg>
-                    )}
-                </button>
+            {toggleHost && createPortal(toggleButton, toggleHost)}
+            <div className={`fx-bar${barOpen ? ' is-open' : ' is-min'}${toggleHost ? ' fx-bar--hosted' : ''}`} onPointerDown={e => e.stopPropagation()}>
+                {!toggleHost && toggleButton}
                 {barOpen && (
                 <div className={`fx-bar__body${barLeaving ? ' is-leaving' : ''}`}>
                 {extra}

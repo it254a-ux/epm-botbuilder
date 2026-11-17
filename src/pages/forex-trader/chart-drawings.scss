@@ -622,3 +622,12 @@
         display: none;
     }
 }
+
+// the pencil lives in the toolbar row: the tools rail only shows while it is open, at the top left of the chart
+.fx-bar--hosted {
+    top: 8px;
+
+    &.is-min {
+        display: none;
+    }
+}

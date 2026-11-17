@@ -404,6 +404,7 @@ const ForexTrader = ({
     // the setup strip under the toolbar: one line always, the full details open on a tap
     const [stripOpen, setStripOpen] = useState(false);
     const [stripEl, setStripEl] = useState<HTMLElement | null>(null);
+    const [drawHost, setDrawHost] = useState<HTMLElement | null>(null);
     // the control beside the Trade setup button copies its exact top and height, so the two sit on one line
     const controlsRef = useRef<HTMLDivElement>(null);
     const [extraBox, setExtraBox] = useState<{ top: number; height: number } | null>(null);
@@ -1283,8 +1284,36 @@ const ForexTrader = ({
                     <span className='forex-trader__bar-sep' aria-hidden='true' />
                     <ChartStudies variant='bar' state={studies} onChange={setStudies} />
                     <span className='forex-trader__bar-sep' aria-hidden='true' />
+                    {headerMode && <span ref={setDrawHost} className='forex-trader__bar-draw' />}
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
-                    <span className='forex-trader__bar-grow' aria-hidden='true' />
+                    {headerMode && toolbarExtra && <div className='forex-trader__bar-extra'>{toolbarExtra}</div>}
+                    {headerMode ? (
+                        <div className={`forex-trader__bar-status${stripOpen ? ' is-open' : ''}`}>
+                            {outcome ? (
+                                <>
+                                    <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
+                                        {status && statusLabel(status, outcome.analysis)}
+                                    </span>
+                                    <span className='forex-trader__strip-text' title={outcome.analysis.statusText}>
+                                        {outcome.analysis.statusText}
+                                    </span>
+                                </>
+                            ) : (
+                                <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
+                            )}
+                            <button
+                                type='button'
+                                className='forex-trader__strip-btn'
+                                aria-expanded={stripOpen}
+                                onClick={() => setStripOpen(o => !o)}
+                            >
+                                Details {stripOpen ? '▴' : '▾'}
+                            </button>
+                            <div ref={setStripEl} className='forex-trader__strip-drawer' hidden={!stripOpen} />
+                        </div>
+                    ) : (
+                        <span className='forex-trader__bar-grow' aria-hidden='true' />
+                    )}
                     <div className='forex-trader__bar-view' role='group' aria-label='Chart source'>
                         <button
                             type='button'
@@ -1349,34 +1378,7 @@ const ForexTrader = ({
                     {liveButton}
                 </div>
             )}
-            {headerMode && (
-                <div className={`forex-trader__strip${stripOpen ? ' is-open' : ''}`}>
-                    <div className='forex-trader__strip-row'>
-                        {outcome ? (
-                            <>
-                                <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
-                                    {status && statusLabel(status, outcome.analysis)}
-                                </span>
-                                <span className='forex-trader__strip-text' title={outcome.analysis.statusText}>
-                                    {outcome.analysis.statusText}
-                                </span>
-                            </>
-                        ) : (
-                            <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
-                        )}
-                        <button
-                            type='button'
-                            className='forex-trader__strip-btn'
-                            aria-expanded={stripOpen}
-                            onClick={() => setStripOpen(o => !o)}
-                        >
-                            Details {stripOpen ? '▴' : '▾'}
-                        </button>
-                    </div>
-                    <div ref={setStripEl} className='forex-trader__strip-drawer' hidden={!stripOpen} />
-                </div>
-            )}
-            {toolbarExtra && (
+            {toolbarExtra && !headerMode && (
                 <div
                     className={`forex-trader__extra${inBar ? ' forex-trader__extra--below' : setupOpen ? ' is-setup-open' : ''}`}
                     style={!inBar && extraBox ? { top: extraBox.top, height: extraBox.height } : undefined}
@@ -1409,6 +1411,7 @@ const ForexTrader = ({
                     studies={!inBar}
                     studyState={studies}
                     onStudyState={setStudies}
+                    drawToggleHost={headerMode ? drawHost : null}
                 />
                 {view === 'all' && (
                     <iframe

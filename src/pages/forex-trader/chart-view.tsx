@@ -64,6 +64,8 @@ export interface ChartViewHandle {
 
 interface Props {
     pipSize: number;
+    /** The toolbar element that should hold the pencil button of the drawing tools (otherwise it sits on the chart). */
+    drawToggleHost?: HTMLElement | null;
     /** Show the chart style and indicators buttons (on by default; the small compare charts switch them off). */
     studies?: boolean;
     /** Asked for earlier candles when the chart is dragged back to its oldest one: gives the ones before `before` (epoch seconds), or none when there are no more. */
@@ -166,7 +168,7 @@ interface Derived {
 }
 
 const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
-    { pipSize, studies: showStudies = true, loadOlder, studyState, onStudyState },
+    { pipSize, studies: showStudies = true, loadOlder, studyState, onStudyState, drawToggleHost },
     ref
 ) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -1080,6 +1082,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                             .filter(n => Number.isFinite(n))
                     }
                     extra={showStudies ? <ChartStudies state={studies} onChange={setStudies} /> : undefined}
+                    toggleHost={drawToggleHost}
                 />
             )}
         </>

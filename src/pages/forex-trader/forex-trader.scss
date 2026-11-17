@@ -1797,27 +1797,49 @@
     }
 }
 
-// the floating Trade setup / bot controls sat just under the toolbar: they move down by the height of the strip
-@media (min-width: 1100px) {
-    .forex-trader--strip.forex-trader--result-out .forex-trader__controls {
-        top: 86px;
-    }
+// the toolbar row also holds the pencil (drawing tools), the Sniper and the setup status
+.forex-trader__bar-draw,
+.forex-trader__bar-extra {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+}
 
-    .forex-trader--strip.forex-trader--result-out .forex-trader__extra.forex-trader__extra--below {
-        top: 150px;
-    }
+.forex-trader__bar-draw .fx-bar__toggle {
+    width: 30px;
+    height: 28px;
+    border: 1px solid rgba(246, 211, 107, 0.3);
+    border-radius: 8px;
+}
 
-    // three rows now: toolbar, strip, chart (the chart row is the one that takes the rest of the height)
-    .forex-trader--strip.forex-trader--result-out:not(.forex-trader--panel) {
-        grid-template-rows: auto auto minmax(0, 1fr) !important;
-    }
+// the Sniper was placed over the chart by the page; in the row it simply sits in line
+.forex-trader__bar-extra > * {
+    position: static !important;
+    margin: 0 !important;
+    top: auto !important;
+    left: auto !important;
+}
 
-    .forex-trader--strip.forex-trader--result-out:not(.forex-trader--panel) .forex-trader__strip {
-        grid-column: 1 / -1;
-        grid-row: 2;
-    }
+.forex-trader__bar-status {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
 
-    .forex-trader--strip.forex-trader--result-out:not(.forex-trader--panel) .forex-trader__chart-wrap {
-        grid-row: 3 !important;
+    .forex-trader__pill {
+        flex: none;
+        max-width: 46%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
+}
+
+// a narrow toolbar keeps the status pill and the button, and drops the long sentence
+.forex-trader__bar--m .forex-trader__bar-status .forex-trader__strip-text,
+.forex-trader__bar--s .forex-trader__bar-status .forex-trader__strip-text {
+    display: none;
 }
