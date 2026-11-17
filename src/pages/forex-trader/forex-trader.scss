@@ -1807,6 +1807,11 @@
         top: 150px;
     }
 
+    // three rows now: toolbar, strip, chart (the chart row is the one that takes the rest of the height)
+    .forex-trader--strip.forex-trader--result-out:not(.forex-trader--panel) {
+        grid-template-rows: auto auto minmax(0, 1fr) !important;
+    }
+
     .forex-trader--strip.forex-trader--result-out:not(.forex-trader--panel) .forex-trader__strip {
         grid-column: 1 / -1;
         grid-row: 2;
