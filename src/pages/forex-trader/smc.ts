@@ -57,6 +57,8 @@ export interface SmcOverlay {
     target: SmcLine;
     minor: SmcLine | null;
     major: (SmcLine & { sweepTime: number }) | null;
+    /** Point of control of the drop that made the break: the price where price spent the most time (Deriv candles carry no volume). */
+    poc: (SmcLine & { nearZone: boolean }) | null;
     mss: SmcLine | null;
     internals: (SmcLine & { broken: boolean })[];
     plan: { entry: number; stopLoss: number; takeProfit: number; fromTime: number; planned: boolean } | null;
@@ -93,6 +95,8 @@ interface Core {
     missedIdx: number | null;
     targetPrice: number;
     targetIdx: number;
+    poc: number | null;
+    nearZone: boolean;
     major: Swept | null;
     minor: Swept | null;
     mss: Pivot | null;
@@ -226,6 +230,7 @@ function historyOverlay(core: Core, buy: boolean, c: Candle[]): SmcOverlay | nul
         major: core.major
             ? { price: R(core.major.price), fromTime: T(core.major.idx), toTime: T(core.major.sweepIdx), label: 'MAJOR INDUCEMENT ( TRAP )', sweepTime: T(core.major.sweepIdx) }
             : null,
+        poc: core.poc !== null ? { price: R(core.poc), fromTime: T(core.hIdx), toTime: null, label: core.nearZone ? 'POC + ZONE' : 'POC', nearZone: core.nearZone } : null,
         mss: core.mss ? { price: R(core.mss.price), fromTime: T(core.mss.idx), toTime: entryTime, label: 'MSS' } : null,
         internals: core.ils.map((il, i) => ({
             price: R(il.price),
@@ -323,6 +328,23 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
     const tEnd = touchIdx ?? end - 1;
     for (let k = hIdx; k <= tEnd; k++) if (c[k].low < c[targetIdx].low) targetIdx = k;
     const targetPrice = c[targetIdx].low;
+
+    // 4b. point of control of the leg (swing high down to the lowest low): the price level most candles traded through.
+    let poc: number | null = null;
+    if (targetIdx > hIdx && zoneTop > targetPrice) {
+        const BINS = 24;
+        const step = (zoneTop - targetPrice) / BINS;
+        const hits = new Array<number>(BINS).fill(0);
+        for (let k = hIdx; k <= targetIdx; k++) {
+            const b0 = Math.max(0, Math.floor((c[k].low - targetPrice) / step));
+            const b1 = Math.min(BINS - 1, Math.floor((c[k].high - targetPrice) / step));
+            for (let b = b0; b <= b1; b++) hits[b] += 1;
+        }
+        let best = 0;
+        for (let b = 1; b < BINS; b++) if (hits[b] >= hits[best]) best = b; // a tie goes to the higher level (nearer the zone)
+        poc = targetPrice + (best + 0.5) * step;
+    }
+    const nearZone = poc !== null && poc >= zoneBottom - 0.25 * a && poc <= zoneTop + 0.25 * a;
 
     // 5. sweeps: swing highs formed after the BOS, below the zone, that price later took out
     const swept: Swept[] = [];
@@ -422,7 +444,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
 
     return {
         bosIdx, bosLevel: best.level, bosFromIdx: best.from, hIdx, zoneTop, zoneBottom, zoneStartIdx, invalidIdx, touchIdx, missedIdx,
-        targetPrice, targetIdx, major, minor, mss, weakBreak, triggerIdx, ils, entry, stopLoss, takeProfit, outcome, ilBroken,
+        targetPrice, targetIdx, poc, nearZone, major, minor, mss, weakBreak, triggerIdx, ils, entry, stopLoss, takeProfit, outcome, ilBroken,
     };
 }
 
@@ -663,6 +685,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         major: core.major
             ? { price: R(core.major.price), fromTime: T(core.major.idx), toTime: T(core.major.sweepIdx), label: lineLabel.major, sweepTime: T(core.major.sweepIdx) }
             : null,
+        poc: core.poc !== null ? { price: R(core.poc), fromTime: T(core.hIdx), toTime: null, label: core.nearZone ? 'POC + ZONE' : 'POC', nearZone: core.nearZone } : null,
         mss: core.mss ? { price: R(core.mss.price), fromTime: T(core.mss.idx), toTime: core.triggerIdx !== null ? T(core.triggerIdx) : null, label: 'MSS' } : null,
         internals: core.ils.map((il, i) => ({
             price: R(il.price),
@@ -682,13 +705,14 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
             ...(core.major ? [{ label: 'Major inducement (trap)', value: `${px(R(core.major.price))}, swept` }] : []),
             ...(core.minor ? [{ label: 'Minor inducement', value: `${px(R(core.minor.price))}, swept` }] : []),
             ...(area ? [{ label: `${side} entry area`, value: `${zoneText}, stop ${px(area.stopLoss)}, target ${px(area.takeProfit)}` }] : []),
+            ...(core.poc !== null ? [{ label: 'POC (most-traded price of the drop)', value: `${px(R(core.poc))}${core.nearZone ? ', inside the zone: strongest setup' : ', outside the zone'}` }] : []),
             ...(core.mss ? [{ label: 'MSS level', value: px(R(core.mss.price)) }] : []),
             ...core.ils.map((il, i) => ({ label: `IL-${i + 1} (internal liquidity)`, value: `${px(R(il.price))}${core.ilBroken[i] !== null ? ', broken' : ''}` })),
         ],
     };
     overlay.key = [
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
-        overlay.minor?.price, overlay.major?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
+        overlay.minor?.price, overlay.major?.price, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
         overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,
     ].join('|');
 

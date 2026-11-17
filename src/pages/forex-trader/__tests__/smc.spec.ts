@@ -190,4 +190,15 @@ describe('Smart money strategy', () => {
         expect(h[0].side).toBe('BUY');
         expect(h[0].plan!.stopLoss).toBeLessThan(h[0].plan!.entry);
     });
+
+    it('POC: marks the most-traded price of the drop, mirrored for a BUY', () => {
+        const sell = analyseSmc(build(SELL), 'forex').smc!;
+        expect(sell.poc).not.toBeNull();
+        expect(sell.poc!.price).toBeLessThan(sell.zone.top);
+        expect(sell.poc!.price).toBeGreaterThan(sell.target.price);
+        expect(['POC', 'POC + ZONE'].includes(sell.poc!.label)).toBe(true);
+        const buy = analyseSmc(flip(build(SELL)), 'forex').smc!;
+        expect(buy.poc!.price).toBeCloseTo(8200 - sell.poc!.price, 6);
+        expect(buy.poc!.label).toBe(sell.poc!.label);
+    });
 });

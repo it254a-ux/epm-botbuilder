@@ -28,6 +28,7 @@ const C = {
     lineText: '#f1f5f9',
     bos: '#06b6d4',
     mss: '#f472b6',
+    poc: '#e879f9',
     minor: '#94a3b8',
     major: '#f59e0b',
     target: '#fbbf24',
@@ -149,6 +150,12 @@ export function drawSmc(
                 color: C.sweep,
                 text: 'LS',
             });
+        }
+
+        // ---- POC: the most-traded price of the drop (the volume-profile idea, measured in time at price). Bold when it sits in the zone.
+        if (o.poc) {
+            segment(o.poc.price, o.poc.fromTime, endT, C.poc, o.poc.label, C.poc, anchor - len * 6, { width: o.poc.nearZone ? 2 : 1, dashed: !o.poc.nearZone });
+            if (main) levels.push(o.poc.price);
         }
 
         // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
