@@ -1284,24 +1284,7 @@ const ForexTrader = ({
                     {headerMode && <span ref={setDrawHost} className='forex-trader__bar-draw' />}
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
                     {headerMode && toolbarExtra && <div className='forex-trader__bar-extra'>{toolbarExtra}</div>}
-                    {headerMode ? (
-                        <div className='forex-trader__bar-status'>
-                            {outcome ? (
-                                <>
-                                    <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
-                                        {status && statusLabel(status, outcome.analysis)}
-                                    </span>
-                                    <span className='forex-trader__strip-text' title={outcome.analysis.statusText}>
-                                        {outcome.analysis.statusText}
-                                    </span>
-                                </>
-                            ) : (
-                                <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className='forex-trader__bar-grow' aria-hidden='true' />
-                    )}
+                    <span className='forex-trader__bar-grow' aria-hidden='true' />
                     <div className='forex-trader__bar-view' role='group' aria-label='Chart source'>
                         <button
                             type='button'
