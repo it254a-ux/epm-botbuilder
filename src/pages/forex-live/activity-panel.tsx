@@ -15,6 +15,8 @@ const sign = (n: number | null) => (n === null || n === 0 ? '' : n > 0 ? ' is-up
  */
 const ActivityPanel = ({ positions, log, currency }: Props) => {
     const open = positions.filter(p => !p.closed);
+    // the "opened / closed / confirmed in ms" lines were only noise: just a refused or failed trade is still told
+    const errors = log.filter(l => l.kind === 'err').slice(0, 3);
 
     return (
         <section className='forex-live__card forex-live__log' aria-live='polite'>
@@ -32,10 +34,9 @@ const ActivityPanel = ({ positions, log, currency }: Props) => {
                     ))}
                 </ul>
             )}
-            {log.length === 0 && open.length === 0 && <p className='forex-live__hint'>Trades you open and close show up here as they happen.</p>}
-            {log.length > 0 && (
+            {errors.length > 0 && (
                 <ul className='forex-live__events'>
-                    {log.slice(0, 8).map(l => (
+                    {errors.map(l => (
                         <li key={l.id} className={`is-${l.kind}`}>
                             {l.text}
                         </li>
