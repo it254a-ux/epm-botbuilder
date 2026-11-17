@@ -472,6 +472,7 @@ const ForexLive = observer(() => {
                                 pickRef={pickRef}
                                 onMarkets={setNames}
                                 resultHost={resultHost}
+                                resultInHeader={!phone}
                                 onOpenCompare={openCompare}
                                 noAnalysis={phone}
                             />
@@ -543,10 +544,14 @@ const ForexLive = observer(() => {
                     </div>
 
                     {/* the Forex Trader analysis shows here, under the trades, and the whole column scrolls */}
-                    <div className='forex-live__pane' data-pane='analysis'>
-                        <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
-                    </div>
+                    {phone ? (
+                        <div className='forex-live__pane' data-pane='analysis'>
+                            <div className='forex-live__trader-host forex-trader forex-trader--panel' ref={setResultHost} />
+                        </div>
+                    ) : null}
                 </aside>
+                {/* computer: the setup shows in the chart header, so this is only a marker for the chart tool */}
+                {!phone && <div hidden ref={setResultHost} />}
             </div>
 
             {phone && (

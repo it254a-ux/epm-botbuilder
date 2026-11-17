@@ -209,6 +209,8 @@ interface ForexTraderProps {
     onMarkets?: (names: Record<string, string>) => void;
     /** When given, the analysis / results card is shown inside this element (a parent page's side column) instead of beside the chart. */
     resultHost?: HTMLElement | null;
+    /** Computer layout of Forex Live: the setup (status, details, stages, checklist) lives in a strip under the chart toolbar instead of the side column. */
+    resultInHeader?: boolean;
     /** When given, choosing "M15 analysis + M5 entry" opens this (a charts pop-up) instead of switching the tool into that mode. */
     onOpenCompare?: () => void;
     /** A plain price chart: no analysis lines, labels or signal badges, and only a small candle-size picker (phones). */
@@ -314,6 +316,7 @@ const ForexTrader = ({
     extraLines,
     onMarkets,
     resultHost,
+    resultInHeader,
     onOpenCompare,
     noAnalysis,
     pickRef,
@@ -398,6 +401,9 @@ const ForexTrader = ({
     const [fitHeight, setFitHeight] = useState<number | null>(null);
     // on Forex Live the trade setup floats over the chart; this opens and closes it
     const [setupOpen, setSetupOpen] = useState(!resultHost);
+    // the setup strip under the toolbar: one line always, the full details open on a tap
+    const [stripOpen, setStripOpen] = useState(false);
+    const [stripEl, setStripEl] = useState<HTMLElement | null>(null);
     // the control beside the Trade setup button copies its exact top and height, so the two sit on one line
     const controlsRef = useRef<HTMLDivElement>(null);
     const [extraBox, setExtraBox] = useState<{ top: number; height: number } | null>(null);
@@ -993,7 +999,9 @@ const ForexTrader = ({
         status === 'buy_ready' ? 'buy' : status === 'sell_ready' ? 'sell' : status === 'invalidated' ? 'bad' : 'wait';
 
     // the results card can live in a parent page's side column; it then has to carry the tool's own class so its styles still apply
-    const renderResult = (node: JSX.Element) => (resultHost ? createPortal(node, resultHost) : node);
+    const headerMode = !!resultInHeader && !!resultHost && !noAnalysis && variant !== 'panel';
+    const renderResult = (node: JSX.Element) =>
+        headerMode ? (stripEl ? createPortal(node, stripEl) : null) : resultHost ? createPortal(node, resultHost) : node;
 
     // the Trade setup button and its panel; on Forex Live it sits in the toolbar row above the chart
     const inBar = hostedHere && !noAnalysis && variant !== 'panel';
@@ -1209,7 +1217,7 @@ const ForexTrader = ({
     return (
         <div
             ref={rootRef}
-            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}${noAnalysis ? ' forex-trader--plain' : ''}`}
+            className={`forex-trader${resultHost ? ' forex-trader--result-out' : ''}${resultHost && !setupOpen ? ' forex-trader--setup-closed' : ''}${headerMode ? ' forex-trader--strip' : ''}${variant === 'panel' ? ' forex-trader--panel' : ''}${panelWidth && panelWidth >= 640 ? ' forex-trader--wide' : ''}${hideChart ? ' forex-trader--chart-hidden' : ''}${noAnalysis ? ' forex-trader--plain' : ''}`}
             style={fitHeight ? { height: `${fitHeight}px` } : undefined}
         >
             {noAnalysis && (
@@ -1339,6 +1347,42 @@ const ForexTrader = ({
                         )}
                     </button>
                     {liveButton}
+                </div>
+            )}
+            {headerMode && (
+                <div className={`forex-trader__strip${stripOpen ? ' is-open' : ''}`}>
+                    <div className='forex-trader__strip-row'>
+                        {outcome ? (
+                            <>
+                                <span className={`forex-trader__pill forex-trader__pill--${tone}`}>
+                                    {status && statusLabel(status, outcome.analysis)}
+                                </span>
+                                <span className='forex-trader__strip-text' title={outcome.analysis.statusText}>
+                                    {outcome.analysis.statusText}
+                                </span>
+                                {outcome.analysis.strategyId === (SMC_ID as unknown) && outcome.analysis.stages.length === 7 && (
+                                    <span className='forex-trader__strip-steps'>
+                                        {outcome.analysis.stages.map((s, i) => (
+                                            <i key={i} className={`is-${s.state}`} title={s.label}>
+                                                {['BOS', 'Zone', 'Target', 'Retrace', 'Sweep', 'MSS', 'Entry'][i]}
+                                            </i>
+                                        ))}
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <span className='forex-trader__strip-text'>Setup: waiting for the first analysis…</span>
+                        )}
+                        <button
+                            type='button'
+                            className='forex-trader__strip-btn'
+                            aria-expanded={stripOpen}
+                            onClick={() => setStripOpen(o => !o)}
+                        >
+                            Details {stripOpen ? '▴' : '▾'}
+                        </button>
+                    </div>
+                    <div ref={setStripEl} className='forex-trader__strip-drawer' hidden={!stripOpen} />
                 </div>
             )}
             {toolbarExtra && (
