@@ -1844,3 +1844,10 @@
 .forex-trader__bar--s .forex-trader__bar-status .forex-trader__strip-text {
     display: none;
 }
+
+// Forex Live: the market / candle size / price label sits at the bottom, right beside the TradingView logo
+.forex-trader--result-out .forex-trader__chart-info {
+    top: auto !important;
+    bottom: 36px !important;
+    left: 58px !important;
+}
