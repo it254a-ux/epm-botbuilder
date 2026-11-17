@@ -150,17 +150,19 @@ const MAX_SETUPS = 6;
 const SHOW_FINISHED_CANDLES = 12;
 
 /** The SELL rule on a series: one Core for each of the latest qualifying breaks of structure (newest first). */
-function scan(c: Candle[], a: number): Core[] {
+function scan(c: Candle[], a: number, liveIdx: number | null): Core[] {
     const n = c.length;
+    /** Candles that are really closed. The forming candle (the last one, while it is still open) only counts for touches and wicks. */
+    const nc = liveIdx ?? n;
     const S = SMC_PIVOT_SIDE;
-    const lows = pivotLows(c, S);
-    const highs = pivotHighs(c, S);
+    const lows = pivotLows(c.slice(0, nc), S);
+    const highs = pivotHighs(c.slice(0, nc), S);
 
     // 1. breaks of structure: a candle closes below a swing low that was still untouched, after a real push down
     const events: BosEvent[] = [];
     for (const L of lows) {
         let i = -1;
-        for (let k = L + S + 1; k < n; k++) {
+        for (let k = L + S + 1; k < nc; k++) {
             if (c[k].close < c[L].low) {
                 i = k;
                 break;
@@ -177,11 +179,11 @@ function scan(c: Candle[], a: number): Core[] {
     events.sort((x, y) => y.idx - x.idx || y.from - x.from);
     const unique: BosEvent[] = [];
     for (const e of events) if (!unique.some(u => u.idx === e.idx)) unique.push(e);
-    return unique.slice(0, MAX_SETUPS).map(e => scanOne(c, a, e, lows, highs));
+    return unique.slice(0, MAX_SETUPS).map(e => scanOne(c, a, e, lows, highs, nc));
 }
 
 /** Steps 2 to 8 for one break of structure. */
-function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: number[]): Core {
+function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: number[], nc: number): Core {
     const n = c.length;
     const S = SMC_PIVOT_SIDE;
     const bosIdx = best.idx;
@@ -203,7 +205,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
 
     // the idea is cancelled by a candle that CLOSES above the zone (a wick is fine)
     let invalidIdx: number | null = null;
-    for (let k = bosIdx + 1; k < n; k++) {
+    for (let k = bosIdx + 1; k < nc; k++) {
         if (c[k].close > zoneTop) {
             invalidIdx = k;
             break;
@@ -253,7 +255,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
         const start = Math.max(touchIdx, major.sweepIdx);
         const after = lows.filter(p => p > start);
         const consumed = new Set<number>();
-        for (let k = start + 1; k < end; k++) {
+        for (let k = start + 1; k < Math.min(end, nc); k++) {
             let cand: number | null = null;
             for (const p of after) if (p + S <= k && !consumed.has(p) && (cand === null || p > cand)) cand = p;
             if (cand === null) continue;
@@ -270,7 +272,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
         if (triggerIdx === null) {
             // no entry yet: show the swing low that still has to break (if any)
             let cand: number | null = null;
-            for (const p of after) if (p + S <= n - 1 && !consumed.has(p) && (cand === null || p > cand)) cand = p;
+            for (const p of after) if (p + S <= nc - 1 && !consumed.has(p) && (cand === null || p > cand)) cand = p;
             mss = cand === null ? null : { idx: cand, price: c[cand].low };
         }
     }
@@ -390,9 +392,14 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
 
     // Both directions are looked at. A pullback inside a bearish structure breaks small highs on the way up, so the "latest BOS wins"
     // is wrong: the setup to follow is a live trade first, then an idea still alive, and among those the zone price is closest to.
+    // The forming candle is used live only for what a wick can decide (price touched the zone, swept a high, stop or target hit).
+    // Everything decided by a CLOSE (break of structure, a candle closing beyond the zone, the MSS entry) waits for the candle to close.
+    const live = forming && forming.time > last.time ? forming : null;
+    const cs = live ? [...c, live] : c;
+    const liveIdx = live ? c.length : null;
     const priceNowReal = forming ? forming.close : last.close;
     const rank = (k: Core, isBuy: boolean): [number, number, number, number] => {
-        const finishedRecently = k.outcome !== null && c.length - 1 - k.outcome.idx <= SHOW_FINISHED_CANDLES;
+        const finishedRecently = k.outcome !== null && cs.length - 1 - k.outcome.idx <= SHOW_FINISHED_CANDLES;
         const live = k.triggerIdx !== null && k.outcome === null;
         const alive = k.invalidIdx === null && k.outcome === null && k.missedIdx === null;
         const tier = live || finishedRecently ? 0 : alive ? 1 : 2;
@@ -403,8 +410,8 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         return [tier, tier === 1 ? -progress : 0, tier === 0 ? 0 : dist, -k.bosIdx];
     };
     const all: { core: Core; isBuy: boolean; r: [number, number, number, number] }[] = [
-        ...scan(c, a).map(k => ({ core: k, isBuy: false, r: rank(k, false) })),
-        ...scan(c.map(mirror), a).map(k => ({ core: k, isBuy: true, r: rank(k, true) })),
+        ...scan(cs, a, liveIdx).map(k => ({ core: k, isBuy: false, r: rank(k, false) })),
+        ...scan(cs.map(mirror), a, liveIdx).map(k => ({ core: k, isBuy: true, r: rank(k, true) })),
     ];
     all.sort((x, y) => x.r[0] - y.r[0] || x.r[1] - y.r[1] || x.r[2] - y.r[2] || x.r[3] - y.r[3]);
     const pick = all.length ? all[0] : null;
@@ -416,7 +423,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
 
     const sgn = buy ? -1 : 1;
     const R = (m: number) => sgn * m;
-    const T = (i: number) => c[i].time;
+    const T = (i: number) => cs[i].time;
     const side: Side = buy ? 'BUY' : 'SELL';
     const zoneName = buy ? 'DEMAND ZONE' : 'SUPPLY ZONE';
     const liqName = buy ? 'BUY SIDE LIQUIDITY' : 'SELL SIDE LIQUIDITY';
@@ -538,7 +545,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     let area: SmcOverlay['area'] = null;
     if (!plan && core.triggerIdx === null && core.invalidIdx === null && core.missedIdx === null) {
         let hh = core.zoneTop;
-        if (core.touchIdx !== null) for (let k = core.touchIdx; k < n; k++) hh = Math.max(hh, c[k].high);
+        if (core.touchIdx !== null) for (let k = core.touchIdx; k < cs.length; k++) hh = Math.max(hh, cs[k].high);
         const sl = hh + SL_BUFFER_ATR * a;
         if (sl > core.zoneBottom && core.zoneBottom > core.targetPrice) {
             area = { entry: R(core.zoneBottom), stopLoss: R(sl), takeProfit: R(core.targetPrice), fromTime: last.time };

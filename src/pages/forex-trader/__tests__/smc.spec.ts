@@ -104,6 +104,26 @@ describe('Smart money strategy', () => {
         expect(buy.smc!.area!.takeProfit).toBeGreaterThan(buy.smc!.area!.entry);
     });
 
+    it('is live: the candle that is still forming already flips the zone to mitigated when its wick touches it', () => {
+        const closed = build(SELL.slice(0, 12)); // price is still well below the zone
+        const last = closed[closed.length - 1];
+        const forming: Candle = { time: last.time + 300, open: last.close, high: 4131.5, low: last.close - 0.5, close: 4130.2 };
+        const before = analyseSmc(closed, 'forex', null);
+        const during = analyseSmc(closed, 'forex', forming);
+        expect(before.smc!.zone.touched).toBe(false);
+        expect(during.smc!.zone.touched).toBe(true);
+        expect(during.smc!.zone.label).toBe('SELL ENTRY AREA · SUPPLY ZONE · MITIGATED');
+    });
+
+    it('is live but safe: a candle that is still forming never triggers the entry, only a closed one does', () => {
+        const closed = build(SELL);
+        const last = closed[closed.length - 1];
+        const strongRed: Candle = { time: last.time + 300, open: last.close, high: last.close + 0.4, low: 4107.6, close: 4108 };
+        expect(analyseSmc(closed, 'forex', strongRed).state).toBe('sweep_in_progress');
+        expect(analyseSmc(closed, 'forex', strongRed).entryTime).toBeNull();
+        expect(analyseSmc([...closed, strongRed], 'forex').state).toBe('ready');
+    });
+
     it('does not enter on a weak candle that merely pokes below the MSS low', () => {
         const base = build(SELL);
         const last = base[base.length - 1];
