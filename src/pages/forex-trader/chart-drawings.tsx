@@ -36,6 +36,8 @@ interface Drawing {
     /** Position marker only: the stake typed and the side (BUY or SELL) chosen when the tool was picked. */
     stake?: number;
     side?: PositionSide;
+    /** Position marker only: the last point is the stop loss (the ones before it are the entry and the exits). */
+    sl?: boolean;
 }
 
 /** How many clicks each tool needs. */
@@ -70,7 +72,7 @@ const HINTS: Record<DrawTool, string> = {
     rect: 'Click one corner, then the opposite corner',
     fib: 'Click the start of the move, then its end',
     measure: 'Click the start, then the end to measure price, percent and candles',
-    position: 'Click your entry, then each exit point · Enter or double-click to finish',
+    position: 'Click your entry, then each exit point. Press Stop loss, then click where the loss is cut · Enter or double-click to finish',
 };
 
 const LINE_TOOLS: Array<{ tool: DrawTool; label: string }> = [
@@ -301,6 +303,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
     const [posSide, setPosSide] = useState<PositionSide>('BUY');
     const [posPts, setPosPts] = useState<Pt[]>([]);
     const [posHover, setPosHover] = useState<Pt | null>(null);
+    const [posSl, setPosSl] = useState<Pt | null>(null);
+    const [slMode, setSlMode] = useState(false);
     const lastAdd = useRef<{ t: number; x: number; y: number } | null>(null);
 
     // ---- measuring -------------------------------------------------------------------------
@@ -496,9 +500,11 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
             return;
         }
         const id = nextId.current++;
-        setDrawings(d => [...d, { id, tool: 'position', pts: posPts, text: '', color, stake: posStake, side: posSide }]);
+        setDrawings(d => [...d, { id, tool: 'position', pts: posSl ? [...posPts, posSl] : posPts, text: '', color, stake: posStake, side: posSide, sl: posSl ? true : undefined }]);
         setSelected(id);
         setPosPts([]);
+        setPosSl(null);
+        setSlMode(false);
         setPosHover(null);
         setTool('cursor');
         lastAdd.current = null;
@@ -506,6 +512,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
 
     const cancelPosition = () => {
         setPosPts([]);
+        setPosSl(null);
+        setSlMode(false);
         setPosHover(null);
         setAsk(false);
         setTool('cursor');
@@ -537,6 +545,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
         setPosSide(askSide);
         closeAsk();
         setPosPts([]);
+        setPosSl(null);
+        setSlMode(false);
         setPosHover(null);
         lastAdd.current = null;
         setTool('position');
@@ -549,6 +559,13 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
             if (!p) return;
             e.preventDefault();
             setMenu(null);
+            // the stop loss: this click marks it (once), then the cursor goes back to placing exits
+            if (slMode) {
+                setPosSl(p);
+                setSlMode(false);
+                lastAdd.current = null;
+                return;
+            }
             const now = Date.now();
             const prev = lastAdd.current;
             // a double-click: the first click already placed the dot, so the second one just finishes
@@ -822,6 +839,8 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 const stake = d.stake ?? posStake;
                 const side: PositionSide = d.side ?? posSide;
                 const profits = positionProfits(d.pts.map(p => p.y), stake, mult, side);
+                const hasSl = !!d.sl && P.length >= 2;
+                const exitsEnd = hasSl ? P.length - 1 : P.length; // the stop loss is the last point
                 const entryCol = side === 'SELL' ? '#f97316' : '#3b82f6';
                 const pill = (cx: number, ty: number, text: string, fill: string, key: string) => {
                     const tw = text.length * 6.6 + 14;
@@ -835,7 +854,7 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                     );
                 };
                 const parts: ReactNode[] = [];
-                for (let i = 1; i < P.length; i++) {
+                for (let i = 1; i < exitsEnd; i++) {
                     const a = P[i - 1];
                     const b = P[i];
                     const profit = profits[i];
@@ -860,6 +879,20 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                     }
                 }
                 const entry = P[0];
+                if (hasSl) {
+                    const sp = P[P.length - 1];
+                    const loss = profits[P.length - 1];
+                    const red = '#ef4444';
+                    parts.push(
+                        <g key='sl' className='fx-pop'>
+                            <line x1={0} y1={sp.y} x2={plotW} y2={sp.y} stroke={red} strokeWidth={1} strokeDasharray='6 5' opacity={0.55} pointerEvents='none' />
+                            <line x1={entry.x} y1={entry.y} x2={sp.x} y2={sp.y} stroke={red} strokeWidth={sel ? 2.4 : 1.8} strokeDasharray='5 4' />
+                            <line x1={entry.x} y1={entry.y} x2={sp.x} y2={sp.y} stroke={HIDDEN} strokeWidth={14} />
+                            <rect x={sp.x - 5} y={sp.y - 5} width={10} height={10} rx={2} fill={red} stroke='#fff' strokeWidth={1.5} transform={`rotate(45 ${sp.x} ${sp.y})`} />
+                        </g>
+                    );
+                    if (loss !== null) parts.push(pill(sp.x, sp.y + (side === 'BUY' ? 26 : -12), `SL ${loss >= 0 ? '+' : ''}${loss.toFixed(2)} ${cur}`, red, 'sl-label'));
+                }
                 parts.push(
                     <circle key='entry' className='fx-pop' cx={entry.x} cy={entry.y} r={6.5} fill={entryCol} stroke='#fff' strokeWidth={2} />,
                     pill(entry.x, entry.y + (side === 'BUY' ? 28 : -12), `${side ?? 'ENTRY'} ${stake} ${cur}`, entryCol, 'entry-label')
@@ -962,7 +995,21 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                     {draft && renderShape({ id: -1, tool: draft.tool, pts: draft.pts, text: '', color }, true)}
                     {tool === 'position' &&
                         posPts.length > 0 &&
-                        renderShape({ id: -1, tool: 'position', pts: posHover ? [...posPts, posHover] : posPts, text: '', color, stake: posStake, side: posSide }, true)}
+                        renderShape(
+                            slMode
+                                ? { id: -1, tool: 'position', pts: posHover ? [...posPts, posHover] : posPts, text: '', color, stake: posStake, side: posSide, sl: !!posHover }
+                                : {
+                                      id: -1,
+                                      tool: 'position',
+                                      pts: [...posPts, ...(posHover ? [posHover] : []), ...(posSl ? [posSl] : [])],
+                                      text: '',
+                                      color,
+                                      stake: posStake,
+                                      side: posSide,
+                                      sl: !!posSl,
+                                  },
+                            true
+                        )}
                 </g>
                 {/* handles and price tags sit outside the clip so they stay visible at the edges */}
             </svg>
@@ -973,6 +1020,14 @@ export default function ChartDrawings({ chart, series, getCandles, pipSize, rese
                 <div className='fx-actions' onPointerDown={e => e.stopPropagation()}>
                     <button type='button' className='fx-actions__done' disabled={posPts.length === 0} onClick={finishPosition}>
                         Done
+                    </button>
+                    <button
+                        type='button'
+                        className={`fx-actions__sl${slMode ? ' is-on' : ''}`}
+                        disabled={posPts.length === 0}
+                        onClick={() => setSlMode(v => !v)}
+                    >
+                        {slMode ? 'Click the stop loss' : posSl ? 'Move stop loss' : 'Stop loss'}
                     </button>
                     <button type='button' className='fx-actions__cancel' onClick={cancelPosition}>
                         Cancel
