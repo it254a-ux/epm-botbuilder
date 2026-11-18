@@ -48,6 +48,14 @@ export interface SmcLine {
     pending?: boolean;
 }
 
+/** The market's own swings (HH / HL = rising, LH / LL = falling) and the sentiment they add up to. */
+export interface SmcTrend {
+    sentiment: 'BULLISH' | 'BEARISH' | 'RANGING';
+    /** True when the setup trades in the direction of the sentiment (SELL in a bearish market, BUY in a bullish one). */
+    withSetup: boolean;
+    swings: { time: number; price: number; high: boolean; tag: 'HH' | 'LH' | 'HL' | 'LL' }[];
+}
+
 /** Everything the chart needs to draw the markings (real prices, real times). */
 export interface SmcOverlay {
     /** Changes whenever something drawn changes. */
@@ -72,6 +80,10 @@ export interface SmcOverlay {
     endTime?: number | null;
     /** Lines of text for the result panel. */
     facts: { label: string; value: string }[];
+    /** Swing labels (HH / HL / LH / LL) and the sentiment, drawn on the chart. */
+    trend?: SmcTrend | null;
+    /** The POC when it lies between the entry and the target: the first (partial) take profit. */
+    partialTp?: number | null;
 }
 
 interface Pivot {
@@ -134,6 +146,33 @@ function pivotLows(c: Candle[], side: number): number[] {
         if (ok) out.push(i);
     }
     return out;
+}
+
+const TREND_SWINGS = 5;
+/** Labels the latest swings of each kind against the one before it, and reads the sentiment from the last two highs and lows. */
+function trendOf(c: Candle[], side: Side): SmcTrend {
+    const hi = pivotHighs(c, SMC_PIVOT_SIDE);
+    const lo = pivotLows(c, SMC_PIVOT_SIDE);
+    const swings: SmcTrend['swings'] = [];
+    const tagAll = (idx: number[], high: boolean) => {
+        const use = idx.slice(-(TREND_SWINGS + 1));
+        for (let k = 1; k < use.length; k++) {
+            const price = high ? c[use[k]].high : c[use[k]].low;
+            const prev = high ? c[use[k - 1]].high : c[use[k - 1]].low;
+            swings.push({ time: c[use[k]].time, price, high, tag: high ? (price > prev ? 'HH' : 'LH') : price > prev ? 'HL' : 'LL' });
+        }
+    };
+    tagAll(hi, true);
+    tagAll(lo, false);
+    swings.sort((x, y) => x.time - y.time);
+    const lastH = swings.filter(s => s.high).slice(-1)[0];
+    const lastL = swings.filter(s => !s.high).slice(-1)[0];
+    let sentiment: SmcTrend['sentiment'] = 'RANGING';
+    if (lastH && lastL) {
+        if (lastH.tag === 'HH' && lastL.tag === 'HL') sentiment = 'BULLISH';
+        else if (lastH.tag === 'LH' && lastL.tag === 'LL') sentiment = 'BEARISH';
+    }
+    return { sentiment, withSetup: (side === 'SELL' && sentiment === 'BEARISH') || (side === 'BUY' && sentiment === 'BULLISH'), swings: swings.slice(-8) };
 }
 
 /** Strong red candle: a real body (share of its range) that is at least as big as the recent average body. */
@@ -737,7 +776,21 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
             ...core.ils.map((il, i) => ({ label: `IL-${i + 1} (internal liquidity)`, value: `${px(R(il.price))}${core.ilBroken[i] !== null ? ', broken' : ''}` })),
         ],
     };
+    overlay.trend = trendOf(c, side);
+    {
+        const entryRef = overlay.plan?.entry ?? overlay.area?.entry ?? null;
+        const tpRef = overlay.plan?.takeProfit ?? overlay.area?.takeProfit ?? null;
+        const pocPx = core.poc !== null ? R(core.poc) : null;
+        overlay.partialTp =
+            pocPx !== null && entryRef !== null && tpRef !== null && (side === 'SELL' ? pocPx < entryRef && pocPx > tpRef : pocPx > entryRef && pocPx < tpRef) ? pocPx : null;
+        overlay.facts.push({
+            label: 'Market sentiment',
+            value: `${overlay.trend.sentiment}${overlay.trend.sentiment === 'RANGING' ? '' : overlay.trend.withSetup ? ': the setup goes with it' : ': the setup goes against it'}`,
+        });
+        if (overlay.partialTp !== null) overlay.facts.push({ label: 'First take profit (POC)', value: px(overlay.partialTp) });
+    }
     overlay.key = [
+        overlay.trend.sentiment, overlay.trend.swings.length, overlay.trend.swings[overlay.trend.swings.length - 1]?.time, overlay.partialTp,
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
         overlay.minor?.price, overlay.minor?.pending, overlay.major?.price, overlay.major?.pending, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
         overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,

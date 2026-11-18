@@ -215,4 +215,26 @@ describe('Smart money strategy', () => {
         expect(swept.major!.pending).toBeUndefined();
         expect(swept.major!.toTime).not.toBeNull();
     });
+
+    it('trend: labels the swings, reads the sentiment and says whether the setup goes with it', () => {
+        const a = analyseSmc(build(SELL), 'forex').smc!;
+        expect(a.trend!.swings.length).toBeGreaterThan(2);
+        expect(a.trend!.swings.every(s => ['HH', 'LH', 'HL', 'LL'].includes(s.tag))).toBe(true);
+        expect(['BULLISH', 'BEARISH', 'RANGING'].includes(a.trend!.sentiment)).toBe(true);
+        expect(a.trend!.withSetup).toBe(a.trend!.sentiment === 'BEARISH');
+        const b = analyseSmc(flip(build(SELL)), 'forex').smc!;
+        expect(b.trend!.swings.length).toBe(a.trend!.swings.length);
+        expect(b.trend!.withSetup).toBe(b.trend!.sentiment === 'BULLISH');
+    });
+
+    it('partial take profit: the POC is the first target when it lies between the entry and the target', () => {
+        const a = analyseSmc(build(SELL), 'forex').smc!;
+        const entry = a.plan?.entry ?? a.area!.entry;
+        if (a.partialTp !== null && a.partialTp !== undefined) {
+            expect(a.partialTp).toBeLessThan(entry);
+            expect(a.partialTp).toBeGreaterThan(a.target.price);
+        }
+        const b = analyseSmc(flip(build(SELL)), 'forex').smc!;
+        expect(b.partialTp == null).toBe(a.partialTp == null);
+    });
 });

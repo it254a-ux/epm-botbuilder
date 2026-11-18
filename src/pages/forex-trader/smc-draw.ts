@@ -199,6 +199,11 @@ export function drawSmc(
             axisLine(q.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp, true);
             levels.push(q.entry, q.stopLoss, q.takeProfit);
         }
+        // the POC between the entry and the target: the first (partial) take profit
+        if (main && o.partialTp != null) {
+            axisLine(o.partialTp, 'TP1 · POC', C.poc, true);
+            levels.push(o.partialTp);
+        }
         if (o.entryTime !== null) {
             markers.push({
                 time: nearest(o.entryTime) as UTCTimestamp,
@@ -227,6 +232,24 @@ export function drawSmc(
         .slice(-MAX_HISTORY_DRAWN)
         .forEach(h => one(h, false));
     if (o) one(o, true);
+    // the market's swings: HH / HL (rising) in green, LH / LL (falling) in red; the newest one also tells the sentiment
+    if (o?.trend) {
+        const tr = o.trend;
+        tr.swings.forEach((sw, i) => {
+            const rising = sw.tag === 'HH' || sw.tag === 'HL';
+            const last = i === tr.swings.length - 1;
+            const note =
+                last && tr.sentiment !== 'RANGING' ? ` · ${tr.sentiment}${tr.withSetup ? ' ✓ with the setup' : ' ✗ against the setup'}` : last ? ' · RANGING' : '';
+            markers.push({
+                time: nearest(sw.time) as UTCTimestamp,
+                position: sw.high ? 'aboveBar' : 'belowBar',
+                shape: 'circle',
+                size: 0,
+                color: rising ? '#4ade80' : '#f87171',
+                text: `${sw.tag}${note}`,
+            });
+        });
+    }
     markers.sort((a, b) => (a.time as number) - (b.time as number));
     return { markers, levels };
 }
