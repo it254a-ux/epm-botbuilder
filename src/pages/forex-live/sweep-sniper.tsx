@@ -15,7 +15,7 @@ import {
     type TargetMark,
 } from './price-guard';
 import type { GuardLevels } from './price-guard';
-import { loadSniper, saveSniper } from './sniper-storage';
+import { loadSniper, loadTargets, saveSniper, saveTargets } from './sniper-storage';
 import { watchTicks } from './tick-feed';
 import './sweep-sniper.scss';
 import { BUY_COLOR, SELL_COLOR, type Side } from './trade-engine';
@@ -103,13 +103,13 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
     const [targetDone, setTargetDone] = useState(false);
     const [picking, setPicking] = useState(false);
     // More targets: any number of extra marked prices, each with its own side, each fires once (read in the price feed through refs)
-    const [extras, setExtras] = useState<ExtraTarget[]>([]);
+    const [extras, setExtras] = useState<ExtraTarget[]>(() => loadTargets(symbol).map(t => ({ ...t, done: false })));
     const [pickingExtra, setPickingExtra] = useState<number | null>(null);
     const extrasRef = useRef<ExtraTarget[]>([]);
     extrasRef.current = extras;
     const extraMarks = useRef<Map<number, TargetMark>>(new Map());
     const extraDone = useRef<Set<number>>(new Set());
-    const nextExtraId = useRef(1);
+    const nextExtraId = useRef(extras.reduce((m, e) => Math.max(m, e.id), 0) + 1);
     const root = useRef<HTMLDivElement>(null);
     // the panel is never taller than the room under its button: it scrolls inside itself instead of running off the screen
     const [room, setRoom] = useState<number | null>(null);
@@ -288,6 +288,11 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                 }))
         );
     }, [extras]);
+
+    // remember the extra targets for a refresh (the Sniper itself still starts off)
+    useEffect(() => {
+        saveTargets(symbol, extras);
+    }, [symbol, extras]);
 
     // remember the settings for a refresh (never the armed state: the sniper stays off until you turn it on)
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { loadGroups, loadSniper, saveGroups, saveSniper } from '../sniper-storage';
+import { loadGroups, loadSniper, loadTargets, saveGroups, saveSniper, saveTargets } from '../sniper-storage';
 
 const memory = () => {
     const m: Record<string, string> = {};
@@ -33,5 +33,14 @@ describe('Sweep Sniper memory', () => {
         const back = loadGroups(now, st);
         expect(back).toHaveLength(1);
         expect(back[0]).toMatchObject({ uid: 1, ids: [11, 12], takeProfit: 20 });
+    });
+
+    it('remembers the extra targets of a market, and only for that market', () => {
+        const st = memory();
+        saveTargets('frxXAUUSD', [{ id: 1, text: '3892.5', side: 'SELL' }, { id: 2, text: '3899', side: 'SELL' }], st);
+        expect(loadTargets('frxXAUUSD', st)).toEqual([{ id: 1, text: '3892.5', side: 'SELL' }, { id: 2, text: '3899', side: 'SELL' }]);
+        expect(loadTargets('frxEURUSD', st)).toEqual([]);
+        expect(loadTargets('frxXAUUSD', { getItem: () => '{not json' })).toEqual([]);
+        expect(loadTargets('frxXAUUSD', { getItem: () => JSON.stringify({ symbol: 'frxXAUUSD', list: [{ id: 1, text: '5', side: 'HOLD' }] }) })).toEqual([]);
     });
 });

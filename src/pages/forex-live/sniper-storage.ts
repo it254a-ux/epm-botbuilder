@@ -71,3 +71,34 @@ export function saveGroups(groups: GuardGroup[], now = Date.now(), storage: Pick
         /* not critical */
     }
 }
+
+/** One extra Sniper target (a price and the side to trade there). */
+export interface SavedTarget {
+    id: number;
+    text: string;
+    side: Side;
+}
+
+const TARGETS_KEY = 'epm_sweep_sniper_targets_v1';
+
+/** The extra targets of this market from before a refresh (a price means nothing on another market). The Sniper itself stays off. */
+export function loadTargets(symbol: string, storage: Pick<Storage, 'getItem'> = localStorage): SavedTarget[] {
+    try {
+        const raw = storage.getItem(TARGETS_KEY);
+        const v = raw ? (JSON.parse(raw) as { symbol?: string; list?: SavedTarget[] }) : null;
+        if (!v || v.symbol !== symbol || !Array.isArray(v.list)) return [];
+        return v.list
+            .filter(t => t && Number.isFinite(t.id) && typeof t.text === 'string' && (t.side === 'BUY' || t.side === 'SELL'))
+            .map(t => ({ id: t.id, text: t.text, side: t.side }));
+    } catch {
+        return [];
+    }
+}
+
+export function saveTargets(symbol: string, list: SavedTarget[], storage: Pick<Storage, 'setItem'> = localStorage) {
+    try {
+        storage.setItem(TARGETS_KEY, JSON.stringify({ symbol, list: list.map(t => ({ id: t.id, text: t.text, side: t.side })) }));
+    } catch {
+        /* private mode or blocked storage: the targets simply are not remembered */
+    }
+}
