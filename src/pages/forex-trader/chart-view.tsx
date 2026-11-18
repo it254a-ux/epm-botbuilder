@@ -32,7 +32,7 @@ import {
     type StudyState,
 } from './indicators';
 import type { PdhResult } from './pdh';
-import { drawSmc } from './smc-draw';
+import { drawSmc, SMC_GUTTER_BARS } from './smc-draw';
 import { SMC_ID, smcHistory, type SmcOverlay } from './smc';
 
 /**
@@ -203,6 +203,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     const smcWindow = useRef<{ from: number; to: number } | null>(null);
     const smcTimer = useRef<number>(0);
     const paintSmcRef = useRef<() => void>(() => undefined);
+    // the Smart Money drawing runs further to the right (its names stand there): the opening view leaves that many fewer empty bars
+    const rightExtra = useRef(0);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -547,6 +549,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         const range = ts.getVisibleLogicalRange();
         clearDrawing();
         smcRef.current = st;
+        rightExtra.current = SMC_GUTTER_BARS - 1;
         // the newest candle may still be forming: history uses closed candles only
         const hist = smcHistory(cs.slice(0, -1), st.current);
         let view: { from: number; to: number } | undefined;
@@ -579,6 +582,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         // whatever draws next decides again whether it is Smart Money (paintSmc puts it back)
         smcRef.current = null;
         smcWindow.current = null;
+        rightExtra.current = 0;
     };
 
     // How a chart opens: each candle about 8 pixels wide, sitting at the latest price (zoom out or in from there).
@@ -589,7 +593,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         if (!ts) return;
         // about a third of the chart is left empty on the right, for the boxes and levels drawn after the last candle
         const w = hostRef.current?.clientWidth || window.innerWidth;
-        ts.applyOptions({ barSpacing: 8, rightOffset: Math.max(6, Math.round((w * 0.35) / 8)) });
+        ts.applyOptions({ barSpacing: 8, rightOffset: Math.max(6, Math.round((w * 0.35) / 8) - rightExtra.current) });
         ts.scrollToRealTime();
     };
 

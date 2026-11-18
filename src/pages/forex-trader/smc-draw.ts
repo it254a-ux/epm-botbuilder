@@ -43,6 +43,11 @@ const C = {
     rewardFaint: 'rgba(45,212,191,0.10)',
 };
 
+/** The drawing runs this many candle slots to the right of the last candle: the empty space where the names of the current setup are listed. */
+export const SMC_GUTTER_BARS = 40;
+/** Sharp red of the arrows that lead a name back to its line. */
+const ARROW_RED = '#ff1744';
+
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
 const MAX_HISTORY_DRAWN = 24;
 
@@ -61,9 +66,15 @@ export function drawSmc(
     const { chart, extra, lines } = t;
     const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
     const lastT = candles[candles.length - 1].time;
-    const defaultEndT = lastT + len * 8;
+    const defaultEndT = lastT + len * SMC_GUTTER_BARS;
     const markers: SeriesMarker<Time>[] = [];
     const levels: number[] = [];
+
+    // The chart gives a slot to every time that has data, not to every minute: empty slots to the right of the last candle are made
+    // here (invisible), so everything drawn there is spaced like real candles.
+    const spacer = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+    spacer.setData(Array.from({ length: SMC_GUTTER_BARS }, (_, k) => ({ time: (lastT + len * (k + 1)) as UTCTimestamp })));
+    extra.push(spacer);
 
     /** The candle time closest to `time`, so a label always sits on a real candle. */
     const nearest = (time: number) => {
@@ -73,9 +84,25 @@ export function drawSmc(
     };
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+    // The names of the current setup are not written on the candles (they hide behind them and cover each other): they are
+    // collected here and listed one under the other in the empty space to the right of the last candle (see layoutLabels).
+    interface LabelReq {
+        price: number;
+        text: string;
+        color: string;
+        /** The colour of the line the name belongs to. */
+        lineColor: string;
+        lineEnd: number;
+    }
+    let queue: LabelReq[] | null = null;
+
     /** A horizontal line from t0 to t1 with its name written on it. */
     const segment = (price: number, t0: number, t1: number, color: string, text: string | null, textColor: string, labelAt: number, opts: { width?: 1 | 2 | 3; dashed?: boolean; hidden?: boolean } = {}) => {
         const to = Math.max(t1, t0 + len);
+        if (queue && text) {
+            queue.push({ price, text, color: textColor, lineColor: opts.hidden ? textColor : color, lineEnd: to });
+            text = null;
+        }
         const labelT = text ? clamp(nearest(labelAt), t0, to) : t0;
         const times = Array.from(new Set([t0, labelT, to])).sort((a, b) => a - b);
         const s = chart.addLineSeries({
@@ -119,11 +146,56 @@ export function drawSmc(
         );
     };
 
+    /** Lists the collected names in the right-hand space, from the highest price down, never closer than `gap`. A name that had to move away
+     *  from its price gets a sharp red arrow that points back to the line. */
+    const layoutLabels = () => {
+        const items = queue;
+        queue = null;
+        if (!items || items.length === 0) return;
+        const recent = candles.slice(-150);
+        const span = Math.max(...recent.map(c => c.high)) - Math.min(...recent.map(c => c.low)) || 1;
+        const gap = span * 0.035;
+        const start = lastT + len * 6;
+        const sorted = [...items].sort((a, b) => b.price - a.price);
+        let prev = Infinity;
+        sorted.forEach(it => {
+            const y = Math.min(it.price, prev - gap);
+            prev = y;
+            const bars = Math.ceil(it.text.length * 0.7);
+            const centre = start + len * (bars / 2);
+            const end = start + len * (bars + 1);
+            // the line goes on (dotted) to where its name stands
+            if (it.lineEnd < end) {
+                const ext = chart.addLineSeries({ color: it.lineColor, lineWidth: 1, lineStyle: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+                ext.setData([it.lineEnd, end].map(time => ({ time: time as UTCTimestamp, value: it.price })));
+                extra.push(ext);
+            }
+            // the name itself, on an invisible line at its own height
+            const name = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+            name.setData([{ time: centre as UTCTimestamp, value: y }]);
+            name.setMarkers([{ time: centre as UTCTimestamp, position: 'inBar', shape: 'circle', size: 0, color: it.color, text: it.text }]);
+            extra.push(name);
+            if (Math.abs(y - it.price) > gap * 0.4) {
+                const from = start - len * 0.5;
+                const to = start - len * 4;
+                const arrow = chart.addLineSeries({ color: ARROW_RED, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+                arrow.setData([
+                    { time: to as UTCTimestamp, value: it.price },
+                    { time: from as UTCTimestamp, value: y },
+                ]);
+                const down = it.price < y; // the name stands above its line: the arrow points down at it
+                arrow.setMarkers([{ time: to as UTCTimestamp, position: down ? 'aboveBar' : 'belowBar', shape: down ? 'arrowDown' : 'arrowUp', color: ARROW_RED, size: 1 }]);
+                extra.push(arrow);
+            }
+        });
+    };
+
     /** Draws one setup. The current one runs on to the right edge; a past one stops where its own trade stopped. */
     const one = (o: SmcOverlay, main: boolean) => {
         const sell = o.side === 'SELL';
         const endT = o.endTime != null ? o.endTime : defaultEndT;
         const anchor = o.endTime != null ? o.endTime : lastT;
+        queue = main ? [] : null;
         // ---- the zone (SUPPLY ZONE for a SELL, DEMAND ZONE for a BUY), named UNMITIGATED until price touches it
         const zFill = sell ? C.supplyFill : C.demandFill;
         const zEdge = sell ? C.supplyEdge : C.demandEdge;
@@ -222,6 +294,18 @@ export function drawSmc(
                 text: o.exit.kind === 'target' ? 'TARGET ✓' : 'SL',
             });
         }
+        if (main && queue && o.trend && o.trend.sentiment !== 'RANGING') {
+            const good = o.trend.withSetup;
+            const col = good ? '#4ade80' : '#f87171';
+            queue.push({
+                price: candles[candles.length - 1].close,
+                text: `${o.trend.sentiment} SENTIMENT · ${good ? 'with the setup ✓' : 'against the setup ✗'}`,
+                color: col,
+                lineColor: col,
+                lineEnd: lastT,
+            });
+        }
+        if (main) layoutLabels();
     };
 
     // past setups first (older underneath), the current one on top
@@ -235,18 +319,15 @@ export function drawSmc(
     // the market's swings: HH / HL (rising) in green, LH / LL (falling) in red; the newest one also tells the sentiment
     if (o?.trend) {
         const tr = o.trend;
-        tr.swings.forEach((sw, i) => {
+        tr.swings.forEach(sw => {
             const rising = sw.tag === 'HH' || sw.tag === 'HL';
-            const last = i === tr.swings.length - 1;
-            const note =
-                last && tr.sentiment !== 'RANGING' ? ` · ${tr.sentiment}${tr.withSetup ? ' ✓ with the setup' : ' ✗ against the setup'}` : last ? ' · RANGING' : '';
             markers.push({
                 time: nearest(sw.time) as UTCTimestamp,
                 position: sw.high ? 'aboveBar' : 'belowBar',
                 shape: 'circle',
                 size: 0,
                 color: rising ? '#4ade80' : '#f87171',
-                text: `${sw.tag}${note}`,
+                text: sw.tag,
             });
         });
     }
