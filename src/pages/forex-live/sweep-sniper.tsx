@@ -28,6 +28,15 @@ export interface TargetLine {
     color: string;
 }
 
+/** One more hand-marked target (besides "My target"): its own price and side, fires once. */
+interface ExtraTarget {
+    id: number;
+    text: string;
+    side: Side;
+    done: boolean;
+}
+const MAX_EXTRA_TARGETS = 8;
+
 interface Props {
     symbol: string;
     currency: string;
@@ -42,6 +51,8 @@ interface Props {
     pickPrice?: PickPrice;
     /** Tells the page the line to draw on the chart for My target (null when there is none). */
     onTargetLine?: (line: TargetLine | null) => void;
+    /** Tells the page the lines to draw on the chart for the extra targets (an empty list when there are none). */
+    onExtraLines?: (lines: TargetLine[]) => void;
 }
 
 const CLOSE_MS = 200;
@@ -65,7 +76,7 @@ const Crosshair = () => (
  * My target: the person can also mark a price of their own (by clicking the chart or typing it) and choose BUY or SELL.
  * When the chart reaches that price, that trade opens, the same way and through the same Arm switch.
  */
-const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pickPrice, onTargetLine }: Props) => {
+const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -91,6 +102,14 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
     const [targetSide, setTargetSide] = useState<Side>('BUY');
     const [targetDone, setTargetDone] = useState(false);
     const [picking, setPicking] = useState(false);
+    // More targets: any number of extra marked prices, each with its own side, each fires once (read in the price feed through refs)
+    const [extras, setExtras] = useState<ExtraTarget[]>([]);
+    const [pickingExtra, setPickingExtra] = useState<number | null>(null);
+    const extrasRef = useRef<ExtraTarget[]>([]);
+    extrasRef.current = extras;
+    const extraMarks = useRef<Map<number, TargetMark>>(new Map());
+    const extraDone = useRef<Set<number>>(new Set());
+    const nextExtraId = useRef(1);
     const root = useRef<HTMLDivElement>(null);
     // the panel is never taller than the room under its button: it scrolls inside itself instead of running off the screen
     const [room, setRoom] = useState<number | null>(null);
@@ -117,6 +136,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
     triggerRef.current = onTrigger;
     const onTargetLineRef = useRef(onTargetLine);
     onTargetLineRef.current = onTargetLine;
+    const onExtraLinesRef = useRef(onExtraLines);
+    onExtraLinesRef.current = onExtraLines;
     const price = useRef<number | null>(null);
     // the check runs straight inside the price feed's callback (through these refs), not after a screen redraw,
     // so a touch is acted on the instant the tick arrives
@@ -175,6 +196,25 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                     setRinging(true);
                 }
             }
+            // More targets: each is armed from the side the price is on, then fires once when the price reaches it
+            if (onRef.current) {
+                for (const x of extrasRef.current) {
+                    if (extraDone.current.has(x.id)) continue;
+                    const m = extraMarks.current.get(x.id);
+                    if (!m) {
+                        const price = Number(x.text);
+                        const armedMark = armTarget(Number.isFinite(price) && price > 0 ? price : null, x.side, p);
+                        if (armedMark) extraMarks.current.set(x.id, armedMark);
+                    } else if (targetReached(m, p)) {
+                        extraDone.current.add(x.id);
+                        extraMarks.current.delete(x.id);
+                        setExtras(list => list.map(e => (e.id === x.id ? { ...e, done: true } : e)));
+                        triggerRef.current(m.side, settingsRef.current);
+                        bell.current!.start();
+                        setRinging(true);
+                    }
+                }
+            }
             setLast(p);
             if (before !== null && p !== before) setDir(p > before ? 'up' : 'down');
             if (typeof t?.pip_size === 'number') setDigits(t.pip_size);
@@ -209,6 +249,10 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         setPicking(false);
         setTargetText('');
         setTargetDone(false);
+        extraMarks.current = new Map();
+        extraDone.current = new Set();
+        setExtras([]);
+        setPickingExtra(null);
         setOn(false);
         applyArmed(null);
         setFired([]);
@@ -230,6 +274,20 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                 : null
         );
     }, [targetPrice, targetSide, targetDone]);
+
+    // the extra targets are drawn on the chart too, each as a line of its own (gone once it has fired)
+    useEffect(() => {
+        onExtraLinesRef.current?.(
+            extras
+                .filter(x => !x.done && Number(x.text) > 0)
+                .map((x, i) => ({
+                    key: `sniper-extra-${x.id}`,
+                    title: `TARGET ${x.side} #${i + 2}`,
+                    price: Number(x.text),
+                    color: x.side === 'BUY' ? BUY_COLOR : SELL_COLOR,
+                }))
+        );
+    }, [extras]);
 
     // remember the settings for a refresh (never the armed state: the sniper stays off until you turn it on)
     useEffect(() => {
@@ -253,6 +311,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
             cancelPick.current?.();
             window.clearTimeout(closeTimer.current);
             onTargetLineRef.current?.(null);
+            onExtraLinesRef.current?.([]);
         },
         []
     );
@@ -292,6 +351,14 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         targetDoneRef.current = false;
         setTargetDone(false);
         targetMarkRef.current = armTarget(targetRef.current.price, targetRef.current.side, price.current);
+        extraDone.current = new Set();
+        extraMarks.current = new Map();
+        setExtras(list => list.map(e => ({ ...e, done: false })));
+        for (const x of extrasRef.current) {
+            const n = Number(x.text);
+            const m = armTarget(Number.isFinite(n) && n > 0 ? n : null, x.side, price.current);
+            if (m) extraMarks.current.set(x.id, m);
+        }
         onRef.current = true;
         setOn(true);
         try {
@@ -303,6 +370,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
     const disarm = () => {
         onRef.current = false;
         targetMarkRef.current = null;
+        extraMarks.current = new Map();
         setOn(false);
         applyArmed(null);
         void wake.current?.release?.();
@@ -320,6 +388,24 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         cancelPick.current?.();
         cancelPick.current = null;
         setPicking(false);
+        setPickingExtra(null);
+    };
+    const startPickExtra = (id: number) => {
+        if (!pickPrice || on) return;
+        stopPick();
+        setPickingExtra(id);
+        cancelPick.current = pickPrice(p => {
+            cancelPick.current = null;
+            setPickingExtra(null);
+            if (p !== null && Number.isFinite(p) && p > 0) {
+                const text = digits !== null ? p.toFixed(digits) : String(Number(p.toPrecision(8)));
+                setExtras(list => list.map(e => (e.id === id ? { ...e, text, done: false } : e)));
+            }
+            window.clearTimeout(closeTimer.current);
+            setLeaving(false);
+            setOpen(true);
+        });
+        close();
     };
     const startPick = () => {
         if (!pickPrice || on) return;
@@ -337,7 +423,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         close();
     };
     const shown = armed ?? levels;
-    const have = levels.sell !== null || levels.buy !== null || targetPrice !== null;
+    const have = levels.sell !== null || levels.buy !== null || targetPrice !== null || extras.some(x => num(x.text) !== null);
 
     // one small box per line: what it will trade, the line's price, and how close price is
     const card = (line: Side, delay: number) => {
@@ -448,6 +534,91 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         );
     };
 
+    // one more target: its side, its price (typed or marked on the chart), how close price is, and a button to remove it
+    const extraCard = (x: ExtraTarget, i: number) => {
+        const price = num(x.text);
+        const tone = x.side === 'BUY' ? 'buy' : 'sell';
+        const away = price !== null && last !== null ? (Math.abs(price - last) / last) * 100 : null;
+        const meter = x.done ? 1 : away === null ? 0 : Math.max(0.04, 1 - away / METER_RANGE_PCT);
+        const near = !x.done && away !== null && away < METER_RANGE_PCT * 0.2;
+        const from = extraMarks.current.get(x.id)?.from;
+        const isPicking = pickingExtra === x.id;
+        const foot = x.done
+            ? `✓ ${x.side} opened`
+            : isPicking
+              ? 'Click the chart…'
+              : price === null
+                ? 'Mark it on the chart, or type a price'
+                : away !== null
+                  ? `${away.toFixed(2)}% away${on && from ? (from === 'above' ? ' ↓' : ' ↑') : ''}`
+                  : '…';
+        const patch = (change: Partial<ExtraTarget>) => setExtras(list => list.map(e => (e.id === x.id ? { ...e, ...change } : e)));
+        return (
+            <div
+                key={x.id}
+                className={`sn-target sn-target--${tone}${x.done ? ' is-fired' : ''}${near && on ? ' is-near' : ''}${on && price !== null && !x.done ? ' is-live' : ''}${isPicking ? ' is-picking' : ''}`}
+            >
+                <div className='sn-target__head'>
+                    <span>Target {i + 2}</span>
+                    <div className='sn-side' role='radiogroup' aria-label={`Trade to open at target ${i + 2}`}>
+                        <button type='button' role='radio' aria-checked={x.side === 'BUY'} className={x.side === 'BUY' ? 'is-on is-buy' : ''} disabled={on} onClick={() => patch({ side: 'BUY' })}>
+                            Buy
+                        </button>
+                        <button type='button' role='radio' aria-checked={x.side === 'SELL'} className={x.side === 'SELL' ? 'is-on is-sell' : ''} disabled={on} onClick={() => patch({ side: 'SELL' })}>
+                            Sell
+                        </button>
+                    </div>
+                </div>
+                <div className='sn-target__row'>
+                    <label className='sn-target__price'>
+                        <em>@</em>
+                        <input
+                            type='number'
+                            min='0'
+                            step='any'
+                            inputMode='decimal'
+                            aria-label={`Price of target ${i + 2}`}
+                            placeholder='Price to reach'
+                            value={x.text}
+                            disabled={on}
+                            onChange={e => patch({ text: e.target.value, done: false })}
+                        />
+                    </label>
+                    <button
+                        type='button'
+                        className={`sn-target__mark${isPicking ? ' is-on' : ''}`}
+                        disabled={(on && !isPicking) || !pickPrice}
+                        onClick={isPicking ? stopPick : () => startPickExtra(x.id)}
+                        title='Click the chart where you want the price to reach'
+                    >
+                        <Crosshair />
+                        <span>{isPicking ? 'Cancel' : 'Mark'}</span>
+                    </button>
+                    <button
+                        type='button'
+                        className='sn-target__mark'
+                        disabled={on}
+                        onClick={() => {
+                            if (isPicking) stopPick();
+                            setExtras(list => list.filter(e => e.id !== x.id));
+                        }}
+                        title='Remove this target'
+                        aria-label={`Remove target ${i + 2}`}
+                    >
+                        <span>×</span>
+                    </button>
+                </div>
+                <div className='sn-lvl__meter'>
+                    <i style={{ transform: `scaleX(${meter})` }} />
+                </div>
+                <div className='sn-lvl__foot'>
+                    <span>{price !== null ? `${x.side} at ${fmt(price)}` : 'No target yet'}</span>
+                    <span>{foot}</span>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div ref={root} className={`sniper${on ? ' is-armed' : ''}${ringing ? ' is-ringing' : ''}${open ? ' is-open' : ''}`}>
             <button
@@ -468,7 +639,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                 </svg>
             </button>
 
-            {picking && !open && (
+            {(picking || pickingExtra !== null) && !open && (
                 <div className='sniper__pick' role='status'>
                     <Crosshair />
                     <span>Click the chart where the price should reach</span>
@@ -526,6 +697,17 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                     </div>
 
                     {targetCard(0.15)}
+
+                    {extras.map((x, i) => extraCard(x, i))}
+                    <button
+                        type='button'
+                        className='sn-target__mark sn-add'
+                        disabled={on || extras.length >= MAX_EXTRA_TARGETS}
+                        onClick={() => setExtras(list => [...list, { id: nextExtraId.current++, text: '', side: 'BUY', done: false }])}
+                        title='Add another price for the Sniper to trade at'
+                    >
+                        + Add another target
+                    </button>
 
                     {status && (
                         <div className='sn-total' style={{ ['--d' as string]: '0.16s' }}>

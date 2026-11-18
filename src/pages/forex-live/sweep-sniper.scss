@@ -1334,3 +1334,10 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         transition: none !important;
     }
 }
+
+// the "+ Add another target" button under My target
+.sn-add {
+    width: 100%;
+    margin: 8px 0 2px;
+    justify-content: center;
+}

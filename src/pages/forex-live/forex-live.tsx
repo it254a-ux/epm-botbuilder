@@ -284,7 +284,11 @@ const ForexLive = observer(() => {
     const lines = useMemo(() => positionLines(positions, symbol), [positions, symbol]);
     // the Sniper's "My target" line goes on the main chart too (not on the Compare charts)
     const [targetLine, setTargetLine] = useState<TargetLine | null>(null);
-    const chartLines = useMemo(() => (targetLine ? [...lines, targetLine] : lines), [lines, targetLine]);
+    const [extraLines, setExtraLines] = useState<TargetLine[]>([]);
+    const chartLines = useMemo(
+        () => (targetLine || extraLines.length ? [...lines, ...(targetLine ? [targetLine] : []), ...extraLines] : lines),
+        [lines, targetLine, extraLines]
+    );
     // the chart hands over its "click to mark a price" function; the Sniper calls it through here
     const pickRef = useRef<PickPrice | null>(null);
     const pickPrice = useCallback<PickPrice>(onPick => {
@@ -463,6 +467,7 @@ const ForexLive = observer(() => {
                                         disabled={!isAuthorized}
                                         pickPrice={pickPrice}
                                         onTargetLine={setTargetLine}
+                                        onExtraLines={setExtraLines}
                                     />
                                 }
                                 extraLines={chartLines}
