@@ -8,6 +8,8 @@ export interface FireOptions {
     count?: number;
     /** A stake for these trades only (instead of the Stake box). */
     stake?: number;
+    /** A multiplier for these trades only (instead of the Multiplier box). */
+    multiplier?: number;
     onOpened?: (id: number) => void;
 }
 
@@ -103,9 +105,10 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
     const fire = (side: Side, opts?: FireOptions) => {
         if (disabled) return;
         const useStake = opts?.stake && opts.stake > 0 ? opts.stake : Number(prefs.stake);
+        const useMult = opts?.multiplier && multipliers.includes(opts.multiplier) ? opts.multiplier : prefs.multiplier;
         // Stop loss and take profit are both optional. What you type in the boxes is used as it is; the analysis
         // plan only fills a box you left empty, and only when you switched that option on (it is off by default).
-        const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, useStake, prefs.multiplier) : null;
+        const fromPlan = prefs.usePlan ? amountsFromPlan(plan, side, useStake, useMult) : null;
         const own = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
         const stake = useStake;
         let stopLoss = own(prefs.stopLoss) ?? (fromPlan && fromPlan.stopLoss > 0 ? fromPlan.stopLoss : null);
@@ -120,7 +123,7 @@ const TradePanel = ({ symbol, currency, multipliers, disabled, pending, onTrade,
             symbol,
             currency,
             stake,
-            multiplier: prefs.multiplier,
+            multiplier: useMult,
             stopLoss,
             takeProfit: own(prefs.takeProfit) ?? (fromPlan && fromPlan.takeProfit > 0 ? fromPlan.takeProfit : null),
         };

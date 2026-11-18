@@ -205,11 +205,12 @@ const ForexLive = observer(() => {
     const guardFire = useCallback(
         (
             side: Side,
-            s: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }
+            s: { count: number; stake: number | null; multiplier: number | null; takeProfit: number | null; stopLoss: number | null }
         ) => {
             fireRef.current?.(side, {
                 count: s.count,
                 stake: s.stake ?? undefined,
+                multiplier: s.multiplier ?? undefined,
                 onOpened: newGroup(side, s.takeProfit, s.stopLoss),
             });
         },
@@ -457,6 +458,7 @@ const ForexLive = observer(() => {
                                     <SweepSniper
                                         symbol={symbol}
                                         currency={currency}
+                                        multipliers={multipliers}
                                         levels={
                                             guardLevels.symbol === symbol
                                                 ? guardLevels.levels

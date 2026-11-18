@@ -9,6 +9,8 @@ export interface SavedSniper {
     symbol: string;
     count: number;
     stake: string;
+    /** The multiplier chosen in the Sniper ('' = the Trade panel's). */
+    mult: string;
     tp: string;
     sl: string;
     on: boolean;
@@ -31,6 +33,7 @@ export function loadSniper(storage: Pick<Storage, 'getItem'> = localStorage): Sa
             symbol: v.symbol,
             count: Number.isFinite(v.count) && (v.count as number) >= 1 ? (v.count as number) : 1,
             stake: typeof v.stake === 'string' ? v.stake : '',
+            mult: typeof v.mult === 'string' ? v.mult : '',
             tp: typeof v.tp === 'string' ? v.tp : '',
             sl: typeof v.sl === 'string' ? v.sl : '',
             on: v.on === true,

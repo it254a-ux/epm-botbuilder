@@ -40,10 +40,12 @@ const MAX_EXTRA_TARGETS = 8;
 interface Props {
     symbol: string;
     currency: string;
+    /** The multipliers Deriv allows for this market. */
+    multipliers: number[];
     /** The "Sell SL (if High swept)" and "Buy SL (if Low swept)" prices from the chart's analysis. */
     levels: GuardLevels;
     /** Opens the trades (the Trade panel's own stake, multiplier and options are used). */
-    onTrigger: (side: Side, settings: { count: number; stake: number | null; takeProfit: number | null; stopLoss: number | null }) => void;
+    onTrigger: (side: Side, settings: { count: number; stake: number | null; multiplier: number | null; takeProfit: number | null; stopLoss: number | null }) => void;
     /** Live line about the trades the sniper opened, e.g. "3 open · total +2.40 / target 5". */
     status?: string;
     disabled: boolean;
@@ -76,7 +78,7 @@ const Crosshair = () => (
  * My target: the person can also mark a price of their own (by clicking the chart or typing it) and choose BUY or SELL.
  * When the chart reaches that price, that trade opens, the same way and through the same Arm switch.
  */
-const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines }: Props) => {
+const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -94,6 +96,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
     modeRef.current = mode;
     const [count, setCount] = useState(saved.current?.count ?? 1);
     const [stake, setStake] = useState(saved.current?.stake ?? '');
+    const [mult, setMult] = useState(saved.current?.mult ?? '');
     const panel = useMeasureContext();
     const [tp, setTp] = useState(saved.current?.tp ?? '');
     const [sl, setSl] = useState(saved.current?.sl ?? '');
@@ -149,8 +152,8 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
         setArmed(a);
     };
     const num = (v: string) => (v.trim() && Number(v) > 0 ? Number(v) : null);
-    const settingsRef = useRef({ count: 1, stake: null as number | null, takeProfit: null as number | null, stopLoss: null as number | null });
-    settingsRef.current = { count, stake: num(stake), takeProfit: num(tp), stopLoss: num(sl) };
+    const settingsRef = useRef({ count: 1, stake: null as number | null, multiplier: null as number | null, takeProfit: null as number | null, stopLoss: null as number | null });
+    settingsRef.current = { count, stake: num(stake), multiplier: multipliers.includes(Number(mult)) ? Number(mult) : null, takeProfit: num(tp), stopLoss: num(sl) };
 
     // My target, read inside the price feed's callback through refs (same reason as above)
     const targetPrice = num(targetText);
@@ -300,6 +303,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
             symbol,
             count,
             stake,
+            mult,
             tp,
             sl,
             on: false,
@@ -307,7 +311,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
             fired: [...firedRef.current],
             savedAt: Date.now(),
         });
-    }, [symbol, count, stake, tp, sl, on, mode, fired]);
+    }, [symbol, count, stake, mult, tp, sl, on, mode, fired]);
 
     useEffect(
         () => () => {
@@ -752,6 +756,19 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                                 ) : null}
                             </div>
                         </label>
+                        <label className='sn-stake sn-mult' title='The multiplier of each trade. Leave it on the Trade panel to use the panel multiplier.'>
+                            <span>Multiplier</span>
+                            <div>
+                                <select value={multipliers.includes(Number(mult)) ? mult : ''} disabled={on} onChange={e => setMult(e.target.value)}>
+                                    <option value=''>Trade panel</option>
+                                    {multipliers.map(m => (
+                                        <option key={m} value={String(m)}>
+                                            x{m}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </label>
                         <div className='sn-set__pair'>
                             <label title='Optional: when all the trades together are at this profit, every one of them closes'>
                                 <span>Total take profit</span>
@@ -781,7 +798,7 @@ const SweepSniper = ({ symbol, currency, levels, onTrigger, status, disabled, pi
                         {disabled && !on ? 'Sign in to arm' : on ? 'Disarm Sniper' : have ? `Arm Sniper · ${count} trade${count === 1 ? '' : 's'}` : 'Waiting for analysis levels…'}
                     </button>
 
-                    <p className='sn-foot'>Uses the stake and multiplier set in the Trade panel. Works only while this page stays open.</p>
+                    <p className='sn-foot'>Uses the stake and multiplier set here, or in the Trade panel when left on it. Works only while this page stays open.</p>
                 </div>
             )}
         </div>

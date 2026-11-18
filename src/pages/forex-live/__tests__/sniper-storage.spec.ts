@@ -8,8 +8,8 @@ const memory = () => {
 describe('Sweep Sniper memory', () => {
     it('remembers the settings', () => {
         const st = memory();
-        saveSniper({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 }, st);
-        expect(loadSniper(st)).toEqual({ symbol: 'frxXAUUSD', count: 6, stake: '20', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 });
+        saveSniper({ symbol: 'frxXAUUSD', count: 6, stake: '20', mult: '200', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 }, st);
+        expect(loadSniper(st)).toEqual({ symbol: 'frxXAUUSD', count: 6, stake: '20', mult: '200', tp: '20', sl: '', on: true, mode: 'breakout', fired: ['SELL'], savedAt: 1000 });
     });
 
     it('survives broken or missing saved data', () => {
