@@ -15,6 +15,7 @@ import {
 import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
+import SmcLabels, { type SmcLabelSet } from './smc-labels';
 import ChartStudies from './chart-studies';
 import {
     atr,
@@ -205,6 +206,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     const paintSmcRef = useRef<() => void>(() => undefined);
     // the Smart Money drawing runs further to the right (its names stand there): the opening view leaves that many fewer empty bars
     const rightExtra = useRef(0);
+    const smcLabelsRef = useRef<SmcLabelSet | null>(null);
 
     useEffect(() => {
         const host = hostRef.current;
@@ -562,6 +564,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         }
         const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, st.current, cs, hist, view);
         series.setMarkers(out.markers);
+        smcLabelsRef.current = { anchor: out.anchor, items: out.labels };
         if (out.levels.length) {
             const span = Math.max(...out.levels) - Math.min(...out.levels);
             levelsRef.current = { min: Math.min(...out.levels) - span * 0.04, max: Math.max(...out.levels) + span * 0.04 };
@@ -583,6 +586,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         smcRef.current = null;
         smcWindow.current = null;
         rightExtra.current = 0;
+        smcLabelsRef.current = null;
     };
 
     // How a chart opens: each candle about 8 pixels wide, sitting at the latest price (zoom out or in from there).
@@ -1073,6 +1077,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
+            {apis && <SmcLabels chart={apis.chart} series={apis.series} getLabels={() => smcLabelsRef.current} />}
             {apis && (
                 <ChartDrawings
                     chart={apis.chart}

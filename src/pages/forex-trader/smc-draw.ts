@@ -45,8 +45,12 @@ const C = {
 
 /** The drawing runs this many candle slots to the right of the last candle: the empty space where the names of the current setup are listed. */
 export const SMC_GUTTER_BARS = 40;
-/** Sharp red of the arrows that lead a name back to its line. */
-const ARROW_RED = '#ff1744';
+/** One name for the chart's overlay: where its line is (price), what it says, and its colour. */
+export interface SmcLabel {
+    price: number;
+    text: string;
+    color: string;
+}
 
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
 const MAX_HISTORY_DRAWN = 24;
@@ -62,13 +66,14 @@ export function drawSmc(
     candles: Candle[],
     history: SmcOverlay[] = [],
     view?: { from: number; to: number }
-): { markers: SeriesMarker<Time>[]; levels: number[] } {
+): { markers: SeriesMarker<Time>[]; levels: number[]; labels: SmcLabel[]; anchor: number } {
     const { chart, extra, lines } = t;
     const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
     const lastT = candles[candles.length - 1].time;
     const defaultEndT = lastT + len * SMC_GUTTER_BARS;
     const markers: SeriesMarker<Time>[] = [];
     const levels: number[] = [];
+    const labelsOut: SmcLabel[] = [];
 
     // The chart gives a slot to every time that has data, not to every minute: empty slots to the right of the last candle are made
     // here (invisible), so everything drawn there is spaced like real candles.
@@ -146,46 +151,20 @@ export function drawSmc(
         );
     };
 
-    /** Lists the collected names in the right-hand space, from the highest price down, never closer than `gap`. A name that had to move away
-     *  from its price gets a sharp red arrow that points back to the line. */
+    /** The collected names go to the chart's overlay (smc-labels.tsx), which lists them to the right of the last candle and leads each
+     *  one back to its line with a red elbow arrow when it cannot stand on it. Here each line only gets a dotted extension, so the arrow
+     *  always lands on a line. */
     const layoutLabels = () => {
         const items = queue;
         queue = null;
-        if (!items || items.length === 0) return;
-        const recent = candles.slice(-150);
-        const span = Math.max(...recent.map(c => c.high)) - Math.min(...recent.map(c => c.low)) || 1;
-        const gap = span * 0.035;
-        const start = lastT + len * 6;
-        const sorted = [...items].sort((a, b) => b.price - a.price);
-        let prev = Infinity;
-        sorted.forEach(it => {
-            const y = Math.min(it.price, prev - gap);
-            prev = y;
-            const bars = Math.ceil(it.text.length * 0.7);
-            const centre = start + len * (bars / 2);
-            const end = start + len * (bars + 1);
-            // the line goes on (dotted) to where its name stands
-            if (it.lineEnd < end) {
+        if (!items) return;
+        const reach = lastT + len * 12;
+        items.forEach(it => {
+            labelsOut.push({ price: it.price, text: it.text, color: it.color });
+            if (it.lineEnd < reach) {
                 const ext = chart.addLineSeries({ color: it.lineColor, lineWidth: 1, lineStyle: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-                ext.setData([it.lineEnd, end].map(time => ({ time: time as UTCTimestamp, value: it.price })));
+                ext.setData([it.lineEnd, reach].map(time => ({ time: time as UTCTimestamp, value: it.price })));
                 extra.push(ext);
-            }
-            // the name itself, on an invisible line at its own height
-            const name = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-            name.setData([{ time: centre as UTCTimestamp, value: y }]);
-            name.setMarkers([{ time: centre as UTCTimestamp, position: 'inBar', shape: 'circle', size: 0, color: it.color, text: it.text }]);
-            extra.push(name);
-            if (Math.abs(y - it.price) > gap * 0.4) {
-                const from = start - len * 0.5;
-                const to = start - len * 4;
-                const arrow = chart.addLineSeries({ color: ARROW_RED, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-                arrow.setData([
-                    { time: to as UTCTimestamp, value: it.price },
-                    { time: from as UTCTimestamp, value: y },
-                ]);
-                const down = it.price < y; // the name stands above its line: the arrow points down at it
-                arrow.setMarkers([{ time: to as UTCTimestamp, position: down ? 'aboveBar' : 'belowBar', shape: down ? 'arrowDown' : 'arrowUp', color: ARROW_RED, size: 1 }]);
-                extra.push(arrow);
             }
         });
     };
@@ -332,5 +311,5 @@ export function drawSmc(
         });
     }
     markers.sort((a, b) => (a.time as number) - (b.time as number));
-    return { markers, levels };
+    return { markers, levels, labels: labelsOut, anchor: lastT };
 }

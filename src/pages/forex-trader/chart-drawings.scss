@@ -631,3 +631,13 @@
         display: none;
     }
 }
+
+// the names of the Smart Money setup, drawn over the chart
+.smc-names .smc-name {
+    font-size: 9px;
+    font-family: inherit;
+    paint-order: stroke;
+    stroke: #0b0f17;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
