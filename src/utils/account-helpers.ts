@@ -5,6 +5,34 @@ import { storeAuthInfo } from '@/external/deriv-core';
 
 export const MAX_MOBILE_WIDTH = 926;
 export const ACCOUNT_TYPE_KEY = 'account_type';
+export const LAST_SELECTED_LOGINID_KEY = 'last_selected_loginid';
+
+/** Remember the account the user picked, so a refresh or reconnect returns to it instead of the first (demo) account. */
+export const rememberSelectedLoginId = (loginid: string): void => {
+    try {
+        if (loginid) localStorage.setItem(LAST_SELECTED_LOGINID_KEY, loginid);
+    } catch {
+        /* storage unavailable */
+    }
+};
+
+/**
+ * Pick which account to connect as: the current one, else the one the user last selected,
+ * else the first in the list. Only ids that exist in the list are used.
+ */
+export const pickPreferredAccount = <T extends { account_id: string }>(accounts: T[]): T | undefined => {
+    if (!accounts || accounts.length === 0) return undefined;
+    try {
+        for (const key of ['active_loginid', LAST_SELECTED_LOGINID_KEY]) {
+            const id = localStorage.getItem(key);
+            const hit = id ? accounts.find(a => a.account_id === id) : undefined;
+            if (hit) return hit;
+        }
+    } catch {
+        /* storage unavailable */
+    }
+    return accounts[0];
+};
 
 /**
  * Check if a loginid represents a demo account

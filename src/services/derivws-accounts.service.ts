@@ -1,4 +1,5 @@
 import { isProduction } from '@/components/shared';
+import { pickPreferredAccount } from '@/utils/account-helpers';
 import brandConfig from '../../brand.config.json';
 
 /**
@@ -264,9 +265,7 @@ export class DerivWSAccountsService {
             // On an account switch the caller has already written the new loginid to
             // localStorage before triggering a WebSocket regeneration, so we honour
             // that selection here instead of always falling back to accounts[0].
-            const activeLoginId = localStorage.getItem('active_loginid');
-            const targetAccount =
-                (activeLoginId && accounts.find(a => a.account_id === activeLoginId)) || accounts[0];
+            const targetAccount = pickPreferredAccount(accounts) || accounts[0];
 
             // Step 4: Fetch OTP and WebSocket URL for the resolved account (always fresh OTP)
             const websocketURL = await this.fetchOTPWebSocketURL(accessToken, targetAccount.account_id);

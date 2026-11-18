@@ -8,6 +8,7 @@
 export const clearAuthData = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('active_loginid');
+    localStorage.removeItem('last_selected_loginid');
     localStorage.removeItem('client.country');
     localStorage.removeItem('account_type'); // Clear account type when clearing auth data
     localStorage.removeItem('accountsList');

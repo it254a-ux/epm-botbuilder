@@ -8,7 +8,7 @@ import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useLiveAccountBalances } from '@/hooks/useLiveAccountBalances';
 import { useStore } from '@/hooks/useStore';
-import { isDemoAccount } from '@/utils/account-helpers';
+import { isDemoAccount, rememberSelectedLoginId } from '@/utils/account-helpers';
 import { useForcedRealEnabled } from '@/utils/forced-real-flag';
 import { useLiveEquity } from '@/utils/live-equity';
 import { Localize } from '@deriv-com/translations';
@@ -84,6 +84,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
         (selected_loginid: string) => {
             if (selected_loginid === activeLoginid) return;
             localStorage.setItem('active_loginid', selected_loginid);
+            rememberSelectedLoginId(selected_loginid);
             client?.checkAndRegenerateWebSocket();
             setIsOpen(false);
         },

@@ -1,6 +1,6 @@
 // @ts-nocheck — vendored bot code with known upstream type gaps; see AGENTS.md
 /* [AI] - Analytics removed - utility functions moved to @/utils/account-helpers */
-import { getAccountId, getAccountType, isDemoAccount, removeUrlParameter } from '@/utils/account-helpers';
+import { getAccountId, getAccountType, isDemoAccount, pickPreferredAccount, removeUrlParameter } from '@/utils/account-helpers';
 /* [/AI] */
 import CommonStore from '@/stores/common-store';
 import { DerivWSAccountsService } from '@/services/derivws-accounts.service';
@@ -123,9 +123,10 @@ class APIBase {
                 const storedAccounts = sessionStorage.getItem('deriv_accounts');
                 if (storedAccounts) {
                     const accounts = JSON.parse(storedAccounts);
-                    if (accounts && accounts.length > 0 && accounts[0].account_id) {
-                        // Use the first account as default
-                        const accountId = accounts[0].account_id as string;
+                    const preferred = pickPreferredAccount(accounts || []);
+                    if (preferred && preferred.account_id) {
+                        // Use the account the user last selected, else the first one
+                        const accountId = preferred.account_id as string;
                         activeAccountId = accountId;
                         localStorage.setItem('active_loginid', accountId);
 

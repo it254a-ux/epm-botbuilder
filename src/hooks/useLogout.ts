@@ -27,6 +27,7 @@ export const useLogout = () => {
 
                 // Clear auth-related localStorage items
                 localStorage.removeItem('active_loginid');
+                localStorage.removeItem('last_selected_loginid');
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('accountsList');
                 localStorage.removeItem('clientAccounts');

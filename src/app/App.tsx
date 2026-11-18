@@ -115,7 +115,8 @@ function App() {
 
                 if (accounts && accounts.length > 0) {
                     DerivWSAccountsService.storeAccounts(accounts);
-                    const firstAccount = accounts[0];
+                    const { pickPreferredAccount } = await import('@/utils/account-helpers');
+                    const firstAccount = pickPreferredAccount(accounts) || accounts[0];
                     localStorage.setItem('active_loginid', firstAccount.account_id);
                     const isDemo =
                         firstAccount.account_id.startsWith('VRT') || firstAccount.account_id.startsWith('VRTC');
