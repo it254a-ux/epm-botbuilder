@@ -20,20 +20,20 @@ export interface SmcDrawTarget {
 const C = {
     supplyFill: 'rgba(248,152,136,0.26)',
     supplyEdge: '#f89888',
-    supplyText: '#ffd0c8',
+    supplyText: '#ff9a88',
     demandFill: 'rgba(112,216,184,0.24)',
     demandEdge: '#70d8b8',
-    demandText: '#c8f5e8',
+    demandText: '#6ee7c8',
     line: '#cbd5e1',
-    lineText: '#f1f5f9',
-    bos: '#06b6d4',
-    mss: '#f472b6',
-    poc: '#e879f9',
-    minor: '#94a3b8',
-    major: '#f59e0b',
-    target: '#fbbf24',
+    lineText: '#e2e8f0',
+    bos: '#22d3ee',
+    mss: '#f9a8d4',
+    poc: '#f0abfc',
+    minor: '#cbd5e1',
+    major: '#fbbf24',
+    target: '#fcd34d',
     sweep: '#a855f7',
-    broken: '#64748b',
+    broken: '#94a3b8',
     entry: '#3b82f6',
     sl: '#ef4444',
     tp: '#22c55e',
@@ -144,11 +144,11 @@ export function drawSmc(
             // ---- inducements (minor, then the major trap) and the sweep (LS)
             if (o.minor) {
                 const to = o.minor.toTime ?? (o.minor.pending ? endT : anchor);
-                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + to) / 2, { dashed: o.minor.pending });
+                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.minor, (o.minor.fromTime + to) / 2, { dashed: o.minor.pending });
             }
             if (o.major) {
                 const to = o.major.toTime ?? (o.major.pending ? endT : anchor);
-                segment(o.major.price, o.major.fromTime, to, C.major, o.major.label, C.lineText, (o.major.fromTime + to) / 2, { width: 2, dashed: o.major.pending });
+                segment(o.major.price, o.major.fromTime, to, C.major, o.major.label, C.major, (o.major.fromTime + to) / 2, { width: 2, dashed: o.major.pending });
                 if (!o.major.pending) markers.push({
                     time: nearest(o.major.sweepTime) as UTCTimestamp,
                     position: sell ? 'aboveBar' : 'belowBar',
