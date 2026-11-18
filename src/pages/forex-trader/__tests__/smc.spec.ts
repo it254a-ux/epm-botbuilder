@@ -201,4 +201,18 @@ describe('Smart money strategy', () => {
         expect(buy.poc!.price).toBeCloseTo(8200 - sell.poc!.price, 6);
         expect(buy.poc!.label).toBe(sell.poc!.label);
     });
+
+    it('shows the likely traps (minor and major inducement) before price has swept them, and keeps them when swept', () => {
+        const early = analyseSmc(build(SELL.slice(0, 8)), 'forex').smc!; // the swing high at ~4062 is untouched
+        expect(early.major).not.toBeNull();
+        expect(early.major!.pending).toBe(true);
+        expect(early.major!.label).toBe('MAJOR INDUCEMENT ( TRAP )');
+        expect(early.major!.toTime).toBeNull();
+        const buy = analyseSmc(flip(build(SELL.slice(0, 8))), 'forex').smc!;
+        expect(buy.major!.pending).toBe(true);
+        expect(buy.major!.price).toBeCloseTo(8200 - early.major!.price, 6);
+        const swept = analyseSmc(build(SELL), 'forex').smc!;
+        expect(swept.major!.pending).toBeUndefined();
+        expect(swept.major!.toTime).not.toBeNull();
+    });
 });

@@ -142,10 +142,14 @@ export function drawSmc(
             segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, { width: 1 });
 
             // ---- inducements (minor, then the major trap) and the sweep (LS)
-            if (o.minor) segment(o.minor.price, o.minor.fromTime, o.minor.toTime ?? anchor, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + (o.minor.toTime ?? anchor)) / 2);
+            if (o.minor) {
+                const to = o.minor.toTime ?? (o.minor.pending ? endT : anchor);
+                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.lineText, (o.minor.fromTime + to) / 2, { dashed: o.minor.pending });
+            }
             if (o.major) {
-                segment(o.major.price, o.major.fromTime, o.major.toTime ?? anchor, C.major, o.major.label, C.lineText, (o.major.fromTime + (o.major.toTime ?? anchor)) / 2, { width: 2 });
-                markers.push({
+                const to = o.major.toTime ?? (o.major.pending ? endT : anchor);
+                segment(o.major.price, o.major.fromTime, to, C.major, o.major.label, C.lineText, (o.major.fromTime + to) / 2, { width: 2, dashed: o.major.pending });
+                if (!o.major.pending) markers.push({
                     time: nearest(o.major.sweepTime) as UTCTimestamp,
                     position: sell ? 'aboveBar' : 'belowBar',
                     shape: sell ? 'arrowDown' : 'arrowUp',

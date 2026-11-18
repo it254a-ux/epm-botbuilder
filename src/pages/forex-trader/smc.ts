@@ -44,6 +44,8 @@ export interface SmcLine {
     /** null = the line runs on to the right edge. */
     toTime: number | null;
     label: string;
+    /** A level that price is expected to go for but has not taken yet (drawn dashed, runs on to the right). */
+    pending?: boolean;
 }
 
 /** Everything the chart needs to draw the markings (real prices, real times). */
@@ -99,6 +101,9 @@ interface Core {
     nearZone: boolean;
     major: Swept | null;
     minor: Swept | null;
+    /** The likely traps before any sweep: swing highs below the zone that are still untouched. */
+    watchMajor: Pivot | null;
+    watchMinor: Pivot | null;
     mss: Pivot | null;
     weakBreak: boolean;
     triggerIdx: number | null;
@@ -366,6 +371,19 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
         if (!minor || s.idx < minor.idx) minor = s;
     }
 
+    // 5b. before any sweep: the untouched swing highs below the zone are the likely traps (highest = major, an earlier lower one = minor)
+    const open: Pivot[] = [];
+    for (const p of highs) {
+        if (p <= bosIdx || p >= (touchIdx ?? end) || c[p].high >= zoneBottom) continue;
+        if (swept.some(s => s.idx === p)) continue;
+        open.push({ idx: p, price: c[p].high });
+    }
+    let watchMajor: Pivot | null = null;
+    if (!major) for (const o of open) if (!watchMajor || o.price > watchMajor.price || (o.price === watchMajor.price && o.idx > watchMajor.idx)) watchMajor = o;
+    let watchMinor: Pivot | null = null;
+    const trap = major ?? watchMajor;
+    if (!minor && trap) for (const o of open) if (o.price < trap.price && (!watchMinor || o.idx < watchMinor.idx)) watchMinor = o;
+
     // 6. MSS: after the sweep and the touch, price makes a swing low; a strong red candle closing below it is the entry
     let mss: Pivot | null = null;
     let weakBreak = false;
@@ -445,7 +463,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
 
     return {
         bosIdx, bosLevel: best.level, bosFromIdx: best.from, hIdx, zoneTop, zoneBottom, zoneStartIdx, invalidIdx, touchIdx, missedIdx,
-        targetPrice, targetIdx, poc, nearZone, major, minor, mss, weakBreak, triggerIdx, ils, entry, stopLoss, takeProfit, outcome, ilBroken,
+        targetPrice, targetIdx, poc, nearZone, major, minor, watchMajor, watchMinor, mss, weakBreak, triggerIdx, ils, entry, stopLoss, takeProfit, outcome, ilBroken,
     };
 }
 
@@ -684,10 +702,16 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         },
         bos: { price: R(core.bosLevel), fromTime: T(core.bosFromIdx), toTime: T(core.bosIdx), label: 'BOS' },
         target: { price: R(core.targetPrice), fromTime: T(core.targetIdx), toTime: null, label: `${liqName} 🎯` },
-        minor: core.minor ? { price: R(core.minor.price), fromTime: T(core.minor.idx), toTime: T(core.minor.sweepIdx), label: lineLabel.minor } : null,
+        minor: core.minor
+            ? { price: R(core.minor.price), fromTime: T(core.minor.idx), toTime: T(core.minor.sweepIdx), label: lineLabel.minor }
+            : core.watchMinor
+              ? { price: R(core.watchMinor.price), fromTime: T(core.watchMinor.idx), toTime: null, label: lineLabel.minor, pending: true }
+              : null,
         major: core.major
             ? { price: R(core.major.price), fromTime: T(core.major.idx), toTime: T(core.major.sweepIdx), label: lineLabel.major, sweepTime: T(core.major.sweepIdx) }
-            : null,
+            : core.watchMajor
+              ? { price: R(core.watchMajor.price), fromTime: T(core.watchMajor.idx), toTime: null, label: lineLabel.major, sweepTime: 0, pending: true }
+              : null,
         poc: core.poc !== null ? { price: R(core.poc), fromTime: T(core.hIdx), toTime: null, label: core.nearZone ? 'POC + ZONE' : 'POC', nearZone: core.nearZone } : null,
         mss: core.mss ? { price: R(core.mss.price), fromTime: T(core.mss.idx), toTime: core.triggerIdx !== null ? T(core.triggerIdx) : null, label: 'MSS' } : null,
         internals: core.ils.map((il, i) => ({
@@ -715,7 +739,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     };
     overlay.key = [
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
-        overlay.minor?.price, overlay.major?.price, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
+        overlay.minor?.price, overlay.minor?.pending, overlay.major?.price, overlay.major?.pending, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
         overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,
     ].join('|');
 
