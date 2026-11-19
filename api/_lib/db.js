@@ -11,8 +11,16 @@ let sql;
 let clientRef;
 let ready;
 
-/** The address of the database, or null when none is set. A leftover Postgres address (DATABASE_URL=postgres://...) is ignored. */
+/** A Postgres address (DATABASE_URL=postgres://...), or null. When set it takes priority over Turso. */
+function postgresUrl(env = process.env) {
+    const d = env.DATABASE_URL;
+    return d && /^postgres(ql)?:\/\//i.test(d) ? d : null;
+}
+
+/** The address of the database, or null when none is set. */
 function databaseUrl(env = process.env) {
+    const p = postgresUrl(env);
+    if (p) return p;
     const t = env.TURSO_DATABASE_URL;
     if (t) return t;
     const d = env.DATABASE_URL;
@@ -50,7 +58,32 @@ async function ensureSchema(client) {
     }
 }
 
+/** Postgres (Aiven, Neon, ...). Queries are already Postgres style, so they run as written. On Cloudflare the
+ *  'postgres' package resolves to its Workers build (workerd condition), which opens the connection over TCP. */
+function getPostgres(url) {
+    const postgres = require('postgres');
+    const pg = (postgres.default || postgres)(url, { ssl: 'require', max: 1, idle_timeout: 20, connect_timeout: 15 });
+    clientRef = { close: () => pg.end({ timeout: 1 }) };
+    const schemaReady = async () => {
+        const have = await pg`SELECT to_regclass('public.free_bots') AS t`;
+        if (have[0] && have[0].t) return;
+        await pg.unsafe(SCHEMA);
+    };
+    ready = schemaReady().catch(err => {
+        ready = null;
+        throw err;
+    });
+    return async (strings, ...values) => {
+        if (!ready) ready = schemaReady();
+        await ready;
+        return pg(strings, ...values);
+    };
+}
+
 function getDb() {
+    if (!sql && postgresUrl()) {
+        sql = getPostgres(postgresUrl());
+    }
     if (!sql) {
         const client = connect();
         clientRef = client;
