@@ -134,6 +134,15 @@ describe('Smart money strategy', () => {
         expect(a.entryTime).toBeNull();
     });
 
+    it('Direction: only the chosen side is looked at, the other side waits', () => {
+        const sellData = build(SELL, [[1, 4108], [8, 4060], [6, 4038]]);
+        expect(analyseSmc(sellData, 'forex').smc?.side).toBe('SELL');
+        expect(analyseSmc(sellData, 'forex', null, undefined, 'SELL').smc?.side).toBe('SELL');
+        // asking for BUY never shows a SELL: it is either a BUY setup or a wait for one
+        const buyOnly = analyseSmc(sellData, 'forex', null, undefined, 'BUY');
+        expect(buyOnly.smc ? buyOnly.smc.side === 'BUY' : buyOnly.state === 'waiting_bos').toBe(true);
+    });
+
     it('BUY is the exact mirror: demand zone, buy side liquidity, same states and the same risk to reward', () => {
         const sell = analyseSmc(build(SELL, [[1, 4108], [8, 4060], [6, 4038]]), 'forex');
         const buy = analyseSmc(flip(build(SELL, [[1, 4108], [8, 4060], [6, 4038]])), 'forex');

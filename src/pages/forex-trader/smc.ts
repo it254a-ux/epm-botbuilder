@@ -513,7 +513,7 @@ function scanOne(c: Candle[], a: number, best: BosEvent, lows: number[], highs: 
  * @param forming    the candle still forming (used only for the live price)
  * @param now        seconds since epoch (stale-data check); omit to skip it
  */
-export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Candle | null, now?: number): Analysis {
+export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Candle | null, now?: number, only?: Side | null): Analysis {
     void kind;
     const c = candlesRaw.slice(-MAX_CANDLES);
     const last = c.length ? c[c.length - 1] : null;
@@ -594,11 +594,18 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         ...scan(cs.map(mirror), a, liveIdx).map(k => ({ core: k, isBuy: true, r: rank(k, true) })),
     ];
     all.sort((x, y) => x.r[0] - y.r[0] || x.r[1] - y.r[1] || x.r[2] - y.r[2] || x.r[3] - y.r[3]);
-    const pick = all.length ? all[0] : null;
+    // the person may ask for one side only: the other side's setups are left out
+    const pool = only ? all.filter(x => x.isBuy === (only === 'BUY')) : all;
+    const pick = pool.length ? pool[0] : null;
     const buy = pick ? pick.isBuy : false;
     const core = pick ? pick.core : null;
     if (!core) {
-        return waiting('waiting_bos', 'Waiting for the direction: no recent break of structure (BOS) on this timeframe yet');
+        return waiting(
+            'waiting_bos',
+            only
+                ? `Waiting for a ${only} setup: no ${only} break of structure (BOS) on this timeframe yet`
+                : 'Waiting for the direction: no recent break of structure (BOS) on this timeframe yet'
+        );
     }
 
     const sgn = buy ? -1 : 1;

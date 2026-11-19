@@ -1851,3 +1851,71 @@
     bottom: 36px !important;
     left: 58px !important;
 }
+
+// Direction: Auto / Buy / Sell (Smart money strategy), a slim switch with a sliding thumb
+.forex-trader__dir {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+
+    &-seg {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        width: 168px;
+        padding: 2px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+
+        i {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            left: 2px;
+            width: calc((100% - 4px) / 3);
+            border-radius: 7px;
+            background: linear-gradient(180deg, #f8dc82, #e8b93f);
+            transition:
+                transform 0.32s cubic-bezier(0.34, 1.25, 0.5, 1),
+                background 0.3s ease;
+        }
+
+        &.is-buy i {
+            transform: translateX(100%);
+            background: linear-gradient(180deg, #34d399, #10b981);
+        }
+
+        &.is-sell i {
+            transform: translateX(200%);
+            background: linear-gradient(180deg, #fb7185, #ef4444);
+        }
+
+        button {
+            position: relative;
+            z-index: 1;
+            height: 22px;
+            border: 0;
+            background: transparent;
+            color: #8391a7;
+            font: inherit;
+            font-size: 10.5px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: color 0.25s ease;
+
+            &:hover {
+                color: #e2e8f0;
+            }
+
+            &.is-on {
+                color: #10141c;
+            }
+        }
+    }
+}

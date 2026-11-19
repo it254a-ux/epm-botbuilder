@@ -11,6 +11,8 @@ export type TPicks = {
     tf: number;
     category: string;
     strategyId: number;
+    /** Smart money strategy: which side to look for ('auto' = the best setup of either side). */
+    direction: 'auto' | 'BUY' | 'SELL';
 };
 
 const STORAGE_KEY = 'epm-forex-picks';

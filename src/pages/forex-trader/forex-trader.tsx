@@ -334,6 +334,7 @@ const ForexTrader = ({
     const [tf, setTf] = useSharedPick('tf', 3600, shared);
     const [category, setCategory] = useSharedPick('category', STRATEGY_CATEGORIES[0], shared);
     const [strategyId, setStrategyId] = useSharedPick('strategyId', 1, shared);
+    const [direction, setDirection] = useSharedPick('direction', 'auto', shared);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -768,8 +769,8 @@ const ForexTrader = ({
     // ---- live analysis -------------------------------------------------------
     // The latest values, readable from the candle stream callback below without
     // re-subscribing every time something changes.
-    const ctx = useRef({ strategy, tf, kind, info, symbol, live, closed, mode });
-    ctx.current = { strategy, tf, kind, info, symbol, live, closed, mode };
+    const ctx = useRef({ strategy, tf, kind, info, symbol, live, closed, mode, direction });
+    ctx.current = { strategy, tf, kind, info, symbol, live, closed, mode, direction };
     const outcomeRef = useRef<Outcome | null>(null);
     outcomeRef.current = outcome;
     const drawKey = useRef('');
@@ -789,13 +790,13 @@ const ForexTrader = ({
         const forming = all.find(x => x.time + c.tf > now) ?? null;
         const analysis =
             c.strategy.id === SMC_ID
-                ? analyseSmc(closedCandles, c.kind, forming, now)
+                ? analyseSmc(closedCandles, c.kind, forming, now, c.direction === 'auto' ? null : c.direction)
                 : c.strategy.id === VP_ID
                   ? analyseVolumeProfile(closedCandles, c.kind, forming, now)
                   : analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
         const lastClosed = closedCandles.length ? closedCandles[closedCandles.length - 1].time : 0;
         // changes when the situation really changes: new closed candle, new state, new sweep
-        const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;
+        const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${c.direction}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;
         return { analysis, closedCandles, key };
     };
 
@@ -983,7 +984,7 @@ const ForexTrader = ({
         drawKey.current = '';
         refresh(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading, loadError, closed, strategyId, kind, symbol, tf, mode]);
+    }, [loading, loadError, closed, strategyId, kind, symbol, tf, mode, direction]);
 
     // M15 + M5 mode: first calculation as soon as both timeframes are loaded
     useEffect(() => {
@@ -1077,6 +1078,20 @@ const ForexTrader = ({
                             </select>
                         </label>
                     </div>
+
+                    {mode === 'h1' && strategyId === SMC_ID && (
+                        <div className='forex-trader__dir' role='group' aria-label='Direction'>
+                            <span>Direction</span>
+                            <div className={`forex-trader__dir-seg is-${direction.toLowerCase()}`}>
+                                <i aria-hidden='true' />
+                                {(['auto', 'BUY', 'SELL'] as const).map(d => (
+                                    <button key={d} type='button' className={direction === d ? 'is-on' : ''} onClick={() => setDirection(d)}>
+                                        {d === 'auto' ? 'Auto' : d === 'BUY' ? 'Buy' : 'Sell'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className='forex-trader__cats' role='group' aria-label='Strategy categories'>
                         {STRATEGY_CATEGORIES.map(c => {
