@@ -23,6 +23,14 @@ interface Props {
 const RED = '#ff1a1a';
 const ROW = 17; // the least distance between two names, in pixels
 const CHAR_W = 5.4;
+/** The name with a thin dark outline under it (two texts, so every browser draws it the same), so it reads on any candle colour. */
+const halo = (x: number, y: number, text: string, color: string, centre: boolean) => {
+    const at = `x="${x}" y="${y}"${centre ? ' dominant-baseline="central"' : ''}`;
+    return (
+        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="3" stroke-linejoin="round">${esc(text)}</text>` +
+        `<text ${at} class="smc-name" fill="${color}" stroke="none">${esc(text)}</text>`
+    );
+};
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Pure layout, so it can be tested: the pixel position of each name and of its arrow. */
@@ -82,9 +90,9 @@ const SmcLabels = ({ chart, series, getLabels }: Props) => {
                                 const ex = p.arrow.elbowX;
                                 html += `<path d="M ${p.x - 5} ${p.y} H ${ex} V ${base}" fill="none" stroke="${RED}" stroke-width="2.4" stroke-linejoin="miter"/>`;
                                 html += `<polygon points="${ex},${tip} ${ex - 6},${base} ${ex + 6},${base}" fill="${RED}"/>`;
-                                html += `<text x="${p.x}" y="${p.y}" dominant-baseline="central" fill="${p.color}" class="smc-name">${esc(p.text)}</text>`;
+                                html += halo(p.x, p.y, p.text, p.color, true);
                             } else {
-                                html += `<text x="${p.x}" y="${p.y - 4}" fill="${p.color}" class="smc-name">${esc(p.text)}</text>`;
+                                html += halo(p.x, p.y - 4, p.text, p.color, false);
                             }
                         }
                     }
