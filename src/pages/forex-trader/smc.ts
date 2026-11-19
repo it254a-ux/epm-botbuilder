@@ -150,6 +150,19 @@ export function pivotLows(c: Candle[], side: number): number[] {
     return out;
 }
 
+/** Who is leading the market on this timeframe, from the swings: rising highs and lows = buyers, falling highs and lows = sellers. */
+export interface MarketControl {
+    who: 'BUYERS' | 'SELLERS' | 'MIXED';
+    detail: string;
+}
+export function marketControl(candles: Candle[]): MarketControl | null {
+    if (candles.length < 40) return null;
+    const t = trendOf(candles.slice(-300), 'BUY');
+    if (t.sentiment === 'BULLISH') return { who: 'BUYERS', detail: 'Higher highs and higher lows' };
+    if (t.sentiment === 'BEARISH') return { who: 'SELLERS', detail: 'Lower highs and lower lows' };
+    return { who: 'MIXED', detail: 'The swings point both ways: no side is clearly leading' };
+}
+
 const TREND_SWINGS = 5;
 /** Labels the latest swings of each kind against the one before it, and reads the sentiment from the last two highs and lows. */
 export function trendOf(c: Candle[], side: Side): SmcTrend {

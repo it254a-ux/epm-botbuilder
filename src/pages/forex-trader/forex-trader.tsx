@@ -8,7 +8,7 @@ import ChartStudies from './chart-studies';
 import { loadStudies, type StudyState } from './indicators';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
-import { analyseSmc, SMC_ID } from './smc';
+import { analyseSmc, marketControl, SMC_ID, type MarketControl } from './smc';
 import { analyseVolumeProfile, VP_ID } from './volume-profile';
 import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
 import MtfPanel from './mtf-panel';
@@ -335,6 +335,7 @@ const ForexTrader = ({
     const [category, setCategory] = useSharedPick('category', STRATEGY_CATEGORIES[0], shared);
     const [strategyId, setStrategyId] = useSharedPick('strategyId', 1, shared);
     const [direction, setDirection] = useSharedPick('direction', 'auto', shared);
+    const [control, setControl] = useState<MarketControl | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -896,6 +897,8 @@ const ForexTrader = ({
         if (!r) return;
         const { analysis, closedCandles, key } = r;
         drawIfChanged(analysis, closedCandles);
+        const mc = marketControl(closedCandles);
+        setControl(o => (o?.who === mc?.who && o?.detail === mc?.detail ? o : mc));
         setOutcome(o => ({
             analysis,
             ai: o?.ai ?? null,
@@ -1327,6 +1330,15 @@ const ForexTrader = ({
                     {headerMode && <span ref={setDrawHost} className='forex-trader__bar-draw' />}
                     <div className={`forex-trader__bar-setup${setupOpen ? ' is-open' : ''}`}>{controlsBlock}</div>
                     {headerMode && toolbarExtra && <div className='forex-trader__bar-extra'>{toolbarExtra}</div>}
+                    {mode === 'h1' && control && (
+                        <span
+                            className={`forex-trader__control is-${control.who.toLowerCase()}`}
+                            title={`${control.who === 'MIXED' ? 'Mixed market' : control.who === 'BUYERS' ? 'Buyers are leading' : 'Sellers are leading'} on this timeframe. ${control.detail}.`}
+                        >
+                            <i aria-hidden='true' />
+                            {control.who === 'BUYERS' ? 'Buyers lead' : control.who === 'SELLERS' ? 'Sellers lead' : 'Mixed'}
+                        </span>
+                    )}
                     <span className='forex-trader__bar-grow' aria-hidden='true' />
                     <div className='forex-trader__bar-view' role='group' aria-label='Chart source'>
                         <button

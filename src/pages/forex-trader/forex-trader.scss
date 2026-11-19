@@ -1919,3 +1919,58 @@
         }
     }
 }
+
+// who is leading the market (from the swings), in the toolbar
+.forex-trader__control {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(255, 255, 255, 0.04);
+    color: #cbd5e1;
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    cursor: default;
+    transition:
+        color 0.3s ease,
+        border-color 0.3s ease,
+        background 0.3s ease;
+
+    i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #94a3b8;
+        transition:
+            background 0.3s ease,
+            box-shadow 0.3s ease;
+    }
+
+    &.is-buyers {
+        color: #6ee7b7;
+        border-color: rgba(52, 211, 153, 0.4);
+        background: rgba(52, 211, 153, 0.08);
+
+        i {
+            background: #34d399;
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+        }
+    }
+
+    &.is-sellers {
+        color: #fda4af;
+        border-color: rgba(251, 113, 133, 0.4);
+        background: rgba(251, 113, 133, 0.08);
+
+        i {
+            background: #fb7185;
+            box-shadow: 0 0 8px rgba(251, 113, 133, 0.8);
+        }
+    }
+}
