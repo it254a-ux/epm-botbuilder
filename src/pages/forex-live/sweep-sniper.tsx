@@ -56,7 +56,7 @@ interface Props {
     /** Tells the page the lines to draw on the chart for the extra targets (an empty list when there are none). */
     onExtraLines?: (lines: TargetLine[]) => void;
     /** The entry price of the strategy being used on the chart (null when there is none): what the "Auto entry" switch follows. */
-    autoEntry?: { side: Side; price: number; confirmed: boolean } | null;
+    autoEntry?: { side: Side; price: number; confirmed: boolean; zone?: number } | null;
 }
 
 const CLOSE_MS = 200;
@@ -80,7 +80,7 @@ const Crosshair = () => (
  * My target: the person can also mark a price of their own (by clicking the chart or typing it) and choose BUY or SELL.
  * When the chart reaches that price, that trade opens, the same way and through the same Arm switch.
  */
-const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines, autoEntry }: Props) => {
+const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines, autoEntry: strategyEntry }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -116,6 +116,25 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
             return false;
         }
     });
+    // where Auto entry buys / sells: at the edge of the zone (early, like entering inside the marked zone) or at the strategy's own entry
+    const [autoAt, setAutoAt] = useState<'zone' | 'strategy'>(() => {
+        try {
+            return localStorage.getItem('epm_sniper_auto_at_v1') === 'strategy' ? 'strategy' : 'zone';
+        } catch {
+            return 'zone';
+        }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem('epm_sniper_auto_at_v1', autoAt);
+        } catch {
+            /* not critical */
+        }
+    }, [autoAt]);
+    const autoEntry: Props['autoEntry'] =
+        autoAt === 'zone' && strategyEntry && strategyEntry.zone !== undefined
+            ? { side: strategyEntry.side, price: strategyEntry.zone, confirmed: false, zone: strategyEntry.zone }
+            : strategyEntry;
     const autoRef = useRef(auto);
     autoRef.current = auto;
     const autoEntryRef = useRef<Props['autoEntry']>(null);
@@ -779,11 +798,21 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
                                 {autoFired
                                     ? 'done'
                                     : autoEntry
-                                      ? `${autoEntry.side} at ${autoEntry.price}${autoEntry.confirmed ? '' : ' (entry area)'}`
+                                      ? `${autoEntry.side} at ${autoEntry.price}${autoAt === 'zone' ? ' (zone edge)' : autoEntry.confirmed ? '' : ' (entry area)'}`
                                       : 'no strategy entry yet'}
                             </small>
                         </span>
                     </button>
+                    {auto && (
+                        <div className='sn-auto-at' role='group' aria-label='Where Auto entry trades'>
+                            <button type='button' disabled={on} className={autoAt === 'zone' ? 'is-on' : ''} onClick={() => setAutoAt('zone')} title='Trades as soon as price reaches the zone, before the confirmation (the early entry)'>
+                                Zone entry
+                            </button>
+                            <button type='button' disabled={on} className={autoAt === 'strategy' ? 'is-on' : ''} onClick={() => setAutoAt('strategy')} title="Trades at the strategy's own entry price (after the confirmation, once it forms)">
+                                Strategy entry
+                            </button>
+                        </div>
+                    )}
                     <button
                         type='button'
                         className='sn-target__mark sn-add'

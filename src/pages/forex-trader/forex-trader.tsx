@@ -201,7 +201,7 @@ interface ForexTraderProps {
     toolbarExtra?: ReactNode;
     onWatch?: (levels: { sell: number | null; buy: number | null }, symbol: string) => void;
     /** The entry price of the strategy being used (the entry area until the real entry forms), for a parent page's bot. Null when there is none. */
-    onEntry?: (entry: { side: 'BUY' | 'SELL'; price: number; confirmed: boolean } | null, symbol: string) => void;
+    onEntry?: (entry: { side: 'BUY' | 'SELL'; price: number; confirmed: boolean; zone?: number } | null, symbol: string) => void;
     /** Start in the M15 analysis + M5 entry mode instead of the H1 strategies. */
     initialMode?: 'h1' | 'mtf';
     /** Keep the tool's own chart out of sight (it still runs, so the analysis is identical). */
@@ -508,14 +508,16 @@ const ForexTrader = ({
         const sm = entryAnalysis?.smc;
         if (sm) {
             const p = sm.plan && !sm.plan.planned ? sm.plan : null;
-            if (p) return { side: sm.side, price: p.entry, confirmed: true };
+            // the edge of the zone price meets first (the top of a demand zone, the bottom of a supply zone): the early entry
+            const zone = sm.side === 'BUY' ? sm.zone.top : sm.zone.bottom;
+            if (p) return { side: sm.side, price: p.entry, confirmed: true, zone };
             const q = sm.area ?? (sm.plan ? sm.plan : null);
-            return q ? { side: sm.side, price: q.entry, confirmed: false } : null;
+            return q ? { side: sm.side, price: q.entry, confirmed: false, zone } : { side: sm.side, price: zone, confirmed: false, zone };
         }
         const pl = entryAnalysis?.plan;
         return pl ? { side: pl.side, price: pl.entry, confirmed: !pl.planned } : null;
     })();
-    const entryKey = entryPick ? `${entryPick.side}|${entryPick.price}|${entryPick.confirmed}` : '';
+    const entryKey = entryPick ? `${entryPick.side}|${entryPick.price}|${entryPick.confirmed}|${'zone' in entryPick ? entryPick.zone : ''}` : '';
     useEffect(() => {
         const ok = entryPick && Number.isFinite(entryPick.price) && entryPick.price > 0 ? entryPick : null;
         onEntryRef.current?.(ok, symbol);
@@ -898,7 +900,7 @@ const ForexTrader = ({
         const { analysis, closedCandles, key } = r;
         drawIfChanged(analysis, closedCandles);
         const mc = marketControl(closedCandles);
-        setControl(o => (o?.who === mc?.who && o?.detail === mc?.detail ? o : mc));
+        setControl(o => (o?.who === mc?.who && o?.detail === mc?.detail && o?.buyShare === mc?.buyShare ? o : mc));
         setOutcome(o => ({
             analysis,
             ai: o?.ai ?? null,
@@ -1333,7 +1335,7 @@ const ForexTrader = ({
                     {mode === 'h1' && control && (
                         <span
                             className={`forex-trader__control is-${control.who.toLowerCase()}`}
-                            title={`${control.who === 'MIXED' ? 'Mixed market' : control.who === 'BUYERS' ? 'Buyers are leading' : 'Sellers are leading'} on this timeframe. ${control.detail}.`}
+                            title={`${control.who === 'MIXED' ? 'Mixed market' : control.who === 'BUYERS' ? 'Buyers are leading' : 'Sellers are leading'} on this timeframe. ${control.detail}. Last 30 candles: buyers pushed ${control.buyShare}% of the movement, sellers ${100 - control.buyShare}%.`}
                         >
                             <i aria-hidden='true' />
                             {control.who === 'BUYERS' ? 'Buyers lead' : control.who === 'SELLERS' ? 'Sellers lead' : 'Mixed'}

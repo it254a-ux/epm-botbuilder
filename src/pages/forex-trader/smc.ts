@@ -154,13 +154,23 @@ export function pivotLows(c: Candle[], side: number): number[] {
 export interface MarketControl {
     who: 'BUYERS' | 'SELLERS' | 'MIXED';
     detail: string;
+    /** Share (0 to 100) of the last candles' movement made by rising candles: who is pushing harder. Deriv gives no volume, so movement is the closest measure. */
+    buyShare: number;
 }
 export function marketControl(candles: Candle[]): MarketControl | null {
     if (candles.length < 40) return null;
     const t = trendOf(candles.slice(-300), 'BUY');
-    if (t.sentiment === 'BULLISH') return { who: 'BUYERS', detail: 'Higher highs and higher lows' };
-    if (t.sentiment === 'BEARISH') return { who: 'SELLERS', detail: 'Lower highs and lower lows' };
-    return { who: 'MIXED', detail: 'The swings point both ways: no side is clearly leading' };
+    let up = 0;
+    let down = 0;
+    for (const k of candles.slice(-30)) {
+        const move = Math.abs(k.close - k.open) + 0.25 * (k.high - k.low);
+        if (k.close >= k.open) up += move;
+        else down += move;
+    }
+    const buyShare = up + down > 0 ? Math.round((up / (up + down)) * 100) : 50;
+    if (t.sentiment === 'BULLISH') return { who: 'BUYERS', detail: 'Higher highs and higher lows', buyShare };
+    if (t.sentiment === 'BEARISH') return { who: 'SELLERS', detail: 'Lower highs and lower lows', buyShare };
+    return { who: 'MIXED', detail: 'The swings point both ways: no side is clearly leading', buyShare };
 }
 
 const TREND_SWINGS = 5;
