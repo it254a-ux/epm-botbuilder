@@ -9,6 +9,7 @@ import { loadStudies, type StudyState } from './indicators';
 import { analyse, marketKind, MIN_RR, type Analysis, type Candle, type SweepStrategyId } from './engine';
 import { STRATEGIES, STRATEGY_CATEGORIES } from './strategies';
 import { analyseSmc, SMC_ID } from './smc';
+import { analyseVolumeProfile, VP_ID } from './volume-profile';
 import { analyseMtf, M15_SEC, M5_SEC, type MtfResult } from './mtf';
 import MtfPanel from './mtf-panel';
 import PdhPanel from './pdh-panel';
@@ -764,7 +765,9 @@ const ForexTrader = ({
         const analysis =
             c.strategy.id === SMC_ID
                 ? analyseSmc(closedCandles, c.kind, forming, now)
-                : analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
+                : c.strategy.id === VP_ID
+                  ? analyseVolumeProfile(closedCandles, c.kind, forming, now)
+                  : analyse(c.strategy.id as SweepStrategyId, closedCandles, c.kind, forming, now);
         const lastClosed = closedCandles.length ? closedCandles[closedCandles.length - 1].time : 0;
         // changes when the situation really changes: new closed candle, new state, new sweep
         const key = `${c.symbol}|${c.tf}|${c.strategy.id}|${analysis.state}|${analysis.sweep?.confirmTime ?? ''}|${lastClosed}`;

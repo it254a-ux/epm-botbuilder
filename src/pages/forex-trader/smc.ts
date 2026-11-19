@@ -84,6 +84,8 @@ export interface SmcOverlay {
     trend?: SmcTrend | null;
     /** The POC when it lies between the entry and the target: the first (partial) take profit. */
     partialTp?: number | null;
+    /** Earlier setups are not worked out for this strategy (the Volume profile one): the chart draws only the current one. */
+    noHistory?: boolean;
 }
 
 interface Pivot {
@@ -127,9 +129,9 @@ interface Core {
     ilBroken: (number | null)[];
 }
 
-const mirror = (c: Candle): Candle => ({ time: c.time, open: -c.open, high: -c.low, low: -c.high, close: -c.close });
+export const mirror = (c: Candle): Candle => ({ time: c.time, open: -c.open, high: -c.low, low: -c.high, close: -c.close });
 
-function pivotHighs(c: Candle[], side: number): number[] {
+export function pivotHighs(c: Candle[], side: number): number[] {
     const out: number[] = [];
     for (let i = side; i <= c.length - 1 - side; i++) {
         let ok = true;
@@ -138,7 +140,7 @@ function pivotHighs(c: Candle[], side: number): number[] {
     }
     return out;
 }
-function pivotLows(c: Candle[], side: number): number[] {
+export function pivotLows(c: Candle[], side: number): number[] {
     const out: number[] = [];
     for (let i = side; i <= c.length - 1 - side; i++) {
         let ok = true;
@@ -150,7 +152,7 @@ function pivotLows(c: Candle[], side: number): number[] {
 
 const TREND_SWINGS = 5;
 /** Labels the latest swings of each kind against the one before it, and reads the sentiment from the last two highs and lows. */
-function trendOf(c: Candle[], side: Side): SmcTrend {
+export function trendOf(c: Candle[], side: Side): SmcTrend {
     const hi = pivotHighs(c, SMC_PIVOT_SIDE);
     const lo = pivotLows(c, SMC_PIVOT_SIDE);
     const swings: SmcTrend['swings'] = [];

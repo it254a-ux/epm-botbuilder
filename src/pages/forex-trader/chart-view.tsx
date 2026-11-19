@@ -35,6 +35,7 @@ import {
 import type { PdhResult } from './pdh';
 import { drawSmc, SMC_GUTTER_BARS } from './smc-draw';
 import { SMC_ID, smcHistory, type SmcOverlay } from './smc';
+import { VP_ID } from './volume-profile';
 
 /**
  * Waits for the next click on the chart and gives the price at the spot that was clicked (null when Esc cancels it, or the
@@ -553,7 +554,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         smcRef.current = st;
         rightExtra.current = SMC_GUTTER_BARS - 1;
         // the newest candle may still be forming: history uses closed candles only
-        const hist = smcHistory(cs.slice(0, -1), st.current);
+        const hist = st.current?.noHistory ? [] : smcHistory(cs.slice(0, -1), st.current);
         let view: { from: number; to: number } | undefined;
         if (range) {
             const t0 = cs[Math.max(0, Math.floor(range.from))]?.time ?? cs[0].time;
@@ -765,7 +766,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 if (!series || !chart || !analysis || candles.length < 3) return;
 
                 // Smart Money strategy: its own markings (zone, BOS, sweep, MSS, liquidity, trade box) instead of the range picture
-                if (analysis.strategyId === (SMC_ID as unknown)) {
+                if (analysis.strategyId === (SMC_ID as unknown) || analysis.strategyId === (VP_ID as unknown)) {
                     smcRef.current = { current: analysis.smc ?? null };
                     paintSmcRef.current();
                     openView();
