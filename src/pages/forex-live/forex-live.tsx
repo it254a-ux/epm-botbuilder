@@ -83,6 +83,8 @@ const ForexLive = observer(() => {
         symbol: '',
     });
     const onWatch = useCallback((levels: GuardLevels, s: string) => setGuardLevels({ levels, symbol: s }), []);
+    const [stratEntry, setStratEntry] = useState<{ entry: { side: 'BUY' | 'SELL'; price: number; confirmed: boolean } | null; symbol: string }>({ entry: null, symbol: '' });
+    const onEntry = useCallback((entry: { side: 'BUY' | 'SELL'; price: number; confirmed: boolean } | null, s: string) => setStratEntry({ entry, symbol: s }), []);
     // the trades each touch of a Price Guard line opened, watched together
     const groups = useRef<GuardGroup[]>(loadGroups());
     const groupUid = useRef(groups.current.reduce((m, g) => Math.max(m, g.uid ?? 0), 0));
@@ -454,6 +456,7 @@ const ForexLive = observer(() => {
                                 onSymbolChange={setSymbol}
                                 onPlan={onPlan}
                                 onWatch={onWatch}
+                                onEntry={onEntry}
                                 toolbarExtra={
                                     <SweepSniper
                                         symbol={symbol}
@@ -465,6 +468,7 @@ const ForexLive = observer(() => {
                                                 : { sell: null, buy: null }
                                         }
                                         onTrigger={guardFire}
+                                        autoEntry={stratEntry.symbol === symbol ? stratEntry.entry : null}
                                         status={guardStatus}
                                         disabled={!isAuthorized}
                                         pickPrice={pickPrice}

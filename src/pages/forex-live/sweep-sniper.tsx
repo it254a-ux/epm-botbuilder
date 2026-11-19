@@ -55,6 +55,8 @@ interface Props {
     onTargetLine?: (line: TargetLine | null) => void;
     /** Tells the page the lines to draw on the chart for the extra targets (an empty list when there are none). */
     onExtraLines?: (lines: TargetLine[]) => void;
+    /** The entry price of the strategy being used on the chart (null when there is none): what the "Auto entry" switch follows. */
+    autoEntry?: { side: Side; price: number; confirmed: boolean } | null;
 }
 
 const CLOSE_MS = 200;
@@ -78,7 +80,7 @@ const Crosshair = () => (
  * My target: the person can also mark a price of their own (by clicking the chart or typing it) and choose BUY or SELL.
  * When the chart reaches that price, that trade opens, the same way and through the same Arm switch.
  */
-const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines }: Props) => {
+const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status, disabled, pickPrice, onTargetLine, onExtraLines, autoEntry }: Props) => {
     const { ws, isConnected } = useDerivWS();
     const [open, setOpen] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -106,7 +108,22 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
     const [targetDone, setTargetDone] = useState(false);
     const [picking, setPicking] = useState(false);
     // More targets: any number of extra marked prices, each with its own side, each fires once (read in the price feed through refs)
+    // "Auto entry": the Sniper picks the strategy's entry price by itself and follows it as the analysis updates
+    const [auto, setAuto] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('epm_sniper_auto_v1') === '1';
+        } catch {
+            return false;
+        }
+    });
+    const autoRef = useRef(auto);
+    autoRef.current = auto;
+    const autoEntryRef = useRef<Props['autoEntry']>(null);
+    autoEntryRef.current = autoEntry ?? null;
+    const autoMark = useRef<{ mark: TargetMark; price: number } | null>(null);
+    const autoDone = useRef(false);
     const [extras, setExtras] = useState<ExtraTarget[]>(() => loadTargets(symbol).map(t => ({ ...t, done: false })));
+    const [autoFired, setAutoFired] = useState(false);
     const [pickingExtra, setPickingExtra] = useState<number | null>(null);
     const extrasRef = useRef<ExtraTarget[]>([]);
     extrasRef.current = extras;
@@ -218,6 +235,24 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
                     }
                 }
             }
+            // Auto entry: follows the strategy's entry price (armed from the side the price is on), fires once
+            if (onRef.current && autoRef.current && !autoDone.current) {
+                const ae = autoEntryRef.current;
+                if (!ae) {
+                    autoMark.current = null;
+                } else if (!autoMark.current || autoMark.current.price !== ae.price || autoMark.current.mark.side !== ae.side) {
+                    const m = armTarget(ae.price, ae.side, p);
+                    autoMark.current = m ? { mark: m, price: ae.price } : null;
+                } else if (targetReached(autoMark.current.mark, p)) {
+                    const side = autoMark.current.mark.side;
+                    autoDone.current = true;
+                    autoMark.current = null;
+                    setAutoFired(true);
+                    triggerRef.current(side, settingsRef.current);
+                    bell.current!.start();
+                    setRinging(true);
+                }
+            }
             setLast(p);
             if (before !== null && p !== before) setDir(p > before ? 'up' : 'down');
             if (typeof t?.pip_size === 'number') setDigits(t.pip_size);
@@ -247,6 +282,9 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
         firedRef.current = new Set();
         targetMarkRef.current = null;
         targetDoneRef.current = false;
+        autoMark.current = null;
+        autoDone.current = false;
+        setAutoFired(false);
         cancelPick.current?.();
         cancelPick.current = null;
         setPicking(false);
@@ -281,16 +319,30 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
     // the extra targets are drawn on the chart too, each as a line of its own (gone once it has fired)
     useEffect(() => {
         onExtraLinesRef.current?.(
-            extras
-                .filter(x => !x.done && Number(x.text) > 0)
-                .map((x, i) => ({
-                    key: `sniper-extra-${x.id}`,
-                    title: `TARGET ${x.side} #${i + 2}`,
-                    price: Number(x.text),
-                    color: x.side === 'BUY' ? BUY_COLOR : SELL_COLOR,
-                }))
+            [
+                ...extras
+                    .filter(x => !x.done && Number(x.text) > 0)
+                    .map((x, i) => ({
+                        key: `sniper-extra-${x.id}`,
+                        title: `TARGET ${x.side} #${i + 2}`,
+                        price: Number(x.text),
+                        color: x.side === 'BUY' ? BUY_COLOR : SELL_COLOR,
+                    })),
+                ...(auto && autoEntry && !autoFired
+                    ? [{ key: 'sniper-auto', title: `AUTO ENTRY ${autoEntry.side}`, price: autoEntry.price, color: autoEntry.side === 'BUY' ? BUY_COLOR : SELL_COLOR }]
+                    : []),
+            ]
         );
-    }, [extras]);
+    }, [extras, auto, autoEntry?.price, autoEntry?.side, autoFired]);
+
+    // the strategy's entry is drawn on the chart while Auto entry is on (gone once it has fired)
+    useEffect(() => {
+        try {
+            localStorage.setItem('epm_sniper_auto_v1', auto ? '1' : '0');
+        } catch {
+            /* not critical */
+        }
+    }, [auto]);
 
     // remember the extra targets for a refresh (the Sniper itself still starts off)
     useEffect(() => {
@@ -362,6 +414,9 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
         targetMarkRef.current = armTarget(targetRef.current.price, targetRef.current.side, price.current);
         extraDone.current = new Set();
         extraMarks.current = new Map();
+        autoMark.current = null;
+        autoDone.current = false;
+        setAutoFired(false);
         setExtras(list => list.map(e => ({ ...e, done: false })));
         for (const x of extrasRef.current) {
             const n = Number(x.text);
@@ -380,6 +435,7 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
         onRef.current = false;
         targetMarkRef.current = null;
         extraMarks.current = new Map();
+        autoMark.current = null;
         setOn(false);
         applyArmed(null);
         void wake.current?.release?.();
@@ -432,7 +488,7 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
         close();
     };
     const shown = armed ?? levels;
-    const have = levels.sell !== null || levels.buy !== null || targetPrice !== null || extras.some(x => num(x.text) !== null);
+    const have = levels.sell !== null || levels.buy !== null || targetPrice !== null || extras.some(x => num(x.text) !== null) || auto;
 
     // one small box per line: what it will trade, the line's price, and how close price is
     const card = (line: Side, delay: number) => {
@@ -708,6 +764,26 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
                     {targetCard(0.15)}
 
                     {extras.map((x, i) => extraCard(x, i))}
+                    <button
+                        type='button'
+                        className={`sn-auto${auto ? ' is-on' : ''}`}
+                        disabled={on}
+                        aria-pressed={auto}
+                        onClick={() => setAuto(v => !v)}
+                        title="The Sniper picks the strategy's entry price by itself and follows it as the analysis updates. It fires once."
+                    >
+                        <span className='sn-auto__dot' />
+                        <span className='sn-auto__text'>
+                            Auto entry
+                            <small>
+                                {autoFired
+                                    ? 'done'
+                                    : autoEntry
+                                      ? `${autoEntry.side} at ${autoEntry.price}${autoEntry.confirmed ? '' : ' (entry area)'}`
+                                      : 'no strategy entry yet'}
+                            </small>
+                        </span>
+                    </button>
                     <button
                         type='button'
                         className='sn-target__mark sn-add'

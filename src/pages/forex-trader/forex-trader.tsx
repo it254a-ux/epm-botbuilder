@@ -200,6 +200,8 @@ interface ForexTraderProps {
     /** A control a parent page wants beside the Trade setup button (for example the Sweep Sniper). */
     toolbarExtra?: ReactNode;
     onWatch?: (levels: { sell: number | null; buy: number | null }, symbol: string) => void;
+    /** The entry price of the strategy being used (the entry area until the real entry forms), for a parent page's bot. Null when there is none. */
+    onEntry?: (entry: { side: 'BUY' | 'SELL'; price: number; confirmed: boolean } | null, symbol: string) => void;
     /** Start in the M15 analysis + M5 entry mode instead of the H1 strategies. */
     initialMode?: 'h1' | 'mtf';
     /** Keep the tool's own chart out of sight (it still runs, so the analysis is identical). */
@@ -311,6 +313,7 @@ const ForexTrader = ({
     onSymbolChange,
     onPlan,
     onWatch,
+    onEntry,
     toolbarExtra,
     initialMode,
     hideChart,
@@ -494,6 +497,28 @@ const ForexTrader = ({
         const ok = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
         onWatchRef.current?.({ sell: ok(watchSell), buy: ok(watchBuy) }, symbol);
     }, [watchSell, watchBuy, symbol]);
+
+    // ---- the strategy's entry (for the bot's "Auto entry"): the real entry once it formed, else the entry area
+    const onEntryRef = useRef(onEntry);
+    onEntryRef.current = onEntry;
+    const entryAnalysis = mode === 'mtf' ? null : (outcome?.analysis ?? null);
+    const entryPick = (() => {
+        const sm = entryAnalysis?.smc;
+        if (sm) {
+            const p = sm.plan && !sm.plan.planned ? sm.plan : null;
+            if (p) return { side: sm.side, price: p.entry, confirmed: true };
+            const q = sm.area ?? (sm.plan ? sm.plan : null);
+            return q ? { side: sm.side, price: q.entry, confirmed: false } : null;
+        }
+        const pl = entryAnalysis?.plan;
+        return pl ? { side: pl.side, price: pl.entry, confirmed: !pl.planned } : null;
+    })();
+    const entryKey = entryPick ? `${entryPick.side}|${entryPick.price}|${entryPick.confirmed}` : '';
+    useEffect(() => {
+        const ok = entryPick && Number.isFinite(entryPick.price) && entryPick.price > 0 ? entryPick : null;
+        onEntryRef.current?.(ok, symbol);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [entryKey, symbol]);
 
     // ---- lines from a parent page (open trades) go on this chart too
     const onMarketsRef = useRef(onMarkets);
