@@ -26,6 +26,44 @@ $spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     font-family: inherit;
     color: $ink;
+    display: flex;
+    align-items: stretch;
+    gap: 5px;
+
+    // ---- quick on/off switch beside the button ----
+    &__switch {
+        flex: none;
+        align-self: center;
+        position: relative;
+        width: 30px;
+        height: 16px;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.35);
+        cursor: pointer;
+        transition: background 0.2s ease;
+
+        i {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+            transition: transform 0.2s ease;
+        }
+
+        &.is-on {
+            background: #22c55e;
+
+            i {
+                transform: translateX(14px);
+            }
+        }
+    }
 
     // ---- the button next to "Trade setup" ----
     &__trigger {

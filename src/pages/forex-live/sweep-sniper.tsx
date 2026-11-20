@@ -723,6 +723,18 @@ const SweepSniper = ({ symbol, currency, multipliers, levels, onTrigger, status,
                 </svg>
             </button>
 
+            <button
+                type='button'
+                role='switch'
+                aria-checked={on}
+                className={`sniper__switch${on ? ' is-on' : ''}`}
+                onClick={() => (on ? disarm() : arm())}
+                title={on ? 'Sniper is ON: click to switch off' : 'Sniper is OFF: click to switch on'}
+                aria-label='Sniper on or off'
+            >
+                <i />
+            </button>
+
             {(picking || pickingExtra !== null) && !open && (
                 <div className='sniper__pick' role='status'>
                     <Crosshair />
