@@ -1,8 +1,11 @@
 
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { Card, CardContent } from '@/external/rise-fall-dtrader/components/ui/card';
 import { Skeleton } from '@/external/rise-fall-dtrader/components/ui/skeleton';
 import { TradeModeToggle } from '@/external/rise-fall-dtrader/components/custom/trade-mode-toggle';
+
+/** When true the chart column is left out (the bot panels are shown on their own, inside the site's DTrader tab). */
+export const NoChartContext = createContext(false);
 
 export interface TradeBodyProps {
   /**
@@ -73,15 +76,18 @@ export function TradeBody({
   cardContentClassName = DEFAULT_CARD_CONTENT,
   skeletonClassName = DEFAULT_SKELETON,
 }: TradeBodyProps) {
+  const noChart = useContext(NoChartContext);
   return (
     <div className={outerClassName}>
-      <div className={gridClassName}>
+      <div className={noChart ? 'mx-auto flex w-full max-w-[640px] flex-col flex-1 min-h-0' : gridClassName}>
         {/* Column 1: Chart */}
-        <div className={chartColClassName}>
-          <div className={chartWrapperClassName} style={{ touchAction: 'pan-y' }}>
-            {chart}
+        {!noChart && (
+          <div className={chartColClassName}>
+            <div className={chartWrapperClassName} style={{ touchAction: 'pan-y' }}>
+              {chart}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Column 2: Trade panel in a Card — the Automated-trading badge
             and Market-contracts icon render inline at the top via

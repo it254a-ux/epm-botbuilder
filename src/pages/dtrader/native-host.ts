@@ -131,6 +131,7 @@ export function loadDtrader(): Promise<void> {
     startAccountSync();
     startSelfRepair();
     startConnectionRepair();
+    void import('./auto-switch').then(m => m.startAutoSwitch());
     startUrlSync();
     startVideoSwap();
     startChartZoomOut();
