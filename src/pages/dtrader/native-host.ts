@@ -130,6 +130,7 @@ export function loadDtrader(): Promise<void> {
     shareSiteLogin();
     startAccountSync();
     startSelfRepair();
+    startConnectionRepair();
     startUrlSync();
     startVideoSwap();
     startChartZoomOut();
@@ -212,6 +213,77 @@ export function startSelfRepair(): void {
   };
   window.addEventListener('error', e => check(e.error ?? e.message));
   window.addEventListener('unhandledrejection', e => check(e.reason));
+}
+
+/**
+ * Connection repair: when DTrader loses its connection to Deriv for good (the internet dropped, the computer slept...) it shows its own
+ * "An unexpected error occurred - Connection failed. Please refresh this page" screen and stays stuck until someone presses Refresh.
+ * Nobody should ever see that screen: it is hidden, a short "Reconnecting" note is shown instead, and the page is reloaded by itself as
+ * soon as the internet is back. It only happens while DTrader is the page being looked at (never while the person is on another tab such
+ * as Forex Live, where a reload would stop an armed Sniper). If it keeps failing (3 times within 2 minutes) the original screen is left
+ * visible so it can never become an endless reload loop.
+ */
+let repairing = false;
+export function startConnectionRepair(): void {
+  if (repairing) return;
+  repairing = true;
+  let note: HTMLElement | null = null;
+  let reloadTimer = 0;
+  const tooMany = (): boolean => {
+    try {
+      const now = Date.now();
+      const times = (JSON.parse(sessionStorage.getItem('epm_dtrader_conn') || '[]') as number[]).filter(t => now - t < 120000);
+      return times.length >= 3;
+    } catch {
+      return false;
+    }
+  };
+  const remember = () => {
+    try {
+      const now = Date.now();
+      const times = (JSON.parse(sessionStorage.getItem('epm_dtrader_conn') || '[]') as number[]).filter(t => now - t < 120000);
+      times.push(now);
+      sessionStorage.setItem('epm_dtrader_conn', JSON.stringify(times));
+    } catch {
+      /* ignore */
+    }
+  };
+  const showNote = () => {
+    if (note) return;
+    note = document.createElement('div');
+    note.setAttribute('role', 'status');
+    note.style.cssText =
+      'position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:var(--general-main-1,#151a24);color:#cbd5e1;font:400 14px/1.4 inherit;';
+    note.innerHTML =
+      '<div style="text-align:center"><div style="width:26px;height:26px;margin:0 auto 12px;border:2px solid rgba(148,163,184,.3);border-top-color:#e8b93f;border-radius:50%;animation:epm-spin 0.9s linear infinite"></div>Reconnecting&hellip;</div>' +
+      '<style>@keyframes epm-spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(note);
+  };
+  const reloadWhenOnline = () => {
+    window.clearTimeout(reloadTimer);
+    if (!navigator.onLine) return; // the 'online' event tries again
+    reloadTimer = window.setTimeout(() => {
+      remember();
+      window.location.reload();
+    }, 1500);
+  };
+  const failed = (): boolean => {
+    const box = document.querySelector('.derivatives-trader .fullscreen-error, #derivatives_trader .fullscreen-error');
+    return !!box && /Connection failed|unexpected error/i.test(box.textContent || '');
+  };
+  window.setInterval(() => {
+    if (!document.body.classList.contains('epm-dtrader-active')) return;
+    if (!failed()) return;
+    if (tooMany()) return; // leave DTrader's own Refresh screen
+    showNote();
+    if (!reloadTimer) reloadWhenOnline();
+  }, 1000);
+  window.addEventListener('online', () => {
+    if (note) {
+      reloadTimer = 0;
+      reloadWhenOnline();
+    }
+  });
 }
 
 /**
