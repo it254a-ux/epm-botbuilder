@@ -814,7 +814,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         const tpRef = overlay.plan?.takeProfit ?? overlay.area?.takeProfit ?? null;
         const pocPx = core.poc !== null ? R(core.poc) : null;
         overlay.partialTp =
-            pocPx !== null && entryRef !== null && tpRef !== null && (side === 'SELL' ? pocPx < entryRef && pocPx > tpRef && pocPx < lastClose : pocPx > entryRef && pocPx < tpRef && pocPx > lastClose) ? pocPx : null; // and still ahead of the price now: a first target behind the price is of no use
+            pocPx !== null && entryRef !== null && tpRef !== null && (side === 'SELL' ? pocPx < entryRef && pocPx > tpRef && pocPx < last.close : pocPx > entryRef && pocPx < tpRef && pocPx > last.close) ? pocPx : null; // and still ahead of the last CLOSED candle (not the live price: that flipped back and forth around the POC and redrew the chart every second)
         overlay.facts.push({
             label: 'Market sentiment',
             value: `${overlay.trend.sentiment}${overlay.trend.sentiment === 'RANGING' ? '' : overlay.trend.withSetup ? ': the setup goes with it' : ': the setup goes against it'}`,
