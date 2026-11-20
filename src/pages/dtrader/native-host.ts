@@ -195,6 +195,7 @@ export function startAccountSync(): void {
 /**
  * Self-repair: after a site update, an old open tab can ask for a DTrader file that no longer exists
  * (a "Loading chunk failed" crash). Reload once to pick up the new version instead of staying broken.
+ * Only while DTrader itself is the tab being looked at.
  */
 let healing = false;
 export function startSelfRepair(): void {
@@ -203,6 +204,9 @@ export function startSelfRepair(): void {
   const check = (msg: unknown) => {
     const text = String((msg as { message?: string })?.message ?? msg ?? '');
     if (!/ChunkLoadError|Loading chunk|Loading CSS chunk|Unexpected token '<'/i.test(text)) return;
+    // DTrader is preloaded in the background, so this listener is always on. Never reload the page while the
+    // person is on another tab (Forex Live with an armed Sniper, Bot Builder...): that wipes what they set up.
+    if (!document.body.classList.contains('epm-dtrader-active')) return;
     try {
       const last = Number(sessionStorage.getItem('epm_dtrader_reload') || 0);
       if (Date.now() - last < 60000) return; // never loop
