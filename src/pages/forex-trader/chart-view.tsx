@@ -602,6 +602,32 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         ts.scrollToRealTime();
     };
 
+    // Safety net: if the candles are known but the chart shows none of them (the chart sometimes came up empty and needed a page refresh),
+    // put them back and open the view on the latest candle. Checked every 2 seconds; a chart that shows its candles is never touched.
+    const healRef = useRef<() => void>(() => undefined);
+    healRef.current = () => {
+        const series = seriesRef.current;
+        const chart = chartRef.current;
+        const have = candlesRef.current;
+        if (!series || !chart || have.length < 2 || !hostRef.current?.clientWidth) return;
+        let empty = false;
+        try {
+            const range = chart.timeScale().getVisibleLogicalRange();
+            empty = range === null || series.barsInLogicalRange(range) === null;
+        } catch {
+            return;
+        }
+        if (!empty) return;
+        if (studies.kind !== 'heikin') series.setData(have.map(toBar));
+        refreshDerived();
+        openView();
+        if (smcRef.current) paintSmcRef.current();
+    };
+    useEffect(() => {
+        const id = window.setInterval(() => healRef.current(), 2000);
+        return () => window.clearInterval(id);
+    }, []);
+
     const prepend = (candles: Candle[]) => {
         const have = candlesRef.current;
         const fresh = candles.filter(c => !have.length || c.time < have[0].time);
