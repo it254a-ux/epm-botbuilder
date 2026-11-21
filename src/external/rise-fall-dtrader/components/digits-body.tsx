@@ -3,7 +3,6 @@ import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/external/rise-fall-dtrader/hooks/use-is-mobile';
 import { Skeleton } from '@/external/rise-fall-dtrader/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/external/rise-fall-dtrader/components/ui/toggle-group';
 import { DigitAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-automated-panel';
 import { DigitEntryAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-entry-automated-panel';
 import { DigitMatchDiffEntryAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-match-diff-entry-automated-panel';
@@ -13,6 +12,7 @@ import { Digit3ConsecutiveAutomatedPanel } from '@/external/rise-fall-dtrader/co
 import { DigitTwinAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-twin-automated-panel';
 import { DigitTrickerAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-tricker-automated-panel';
 import { DigitStatsBar } from '@/external/rise-fall-dtrader/components/custom/digit-stats-bar';
+import { CompactSelect } from '@/external/rise-fall-dtrader/components/custom/compact-select';
 import { TradeBody } from '@/external/rise-fall-dtrader/components/trade-body';
 import { useMartingaleAutomation } from '@/external/rise-fall-dtrader/hooks/use-martingale-automation';
 import { useDigitsEntryAutomation } from '@/external/rise-fall-dtrader/hooks/use-digits-entry-automation';
@@ -478,24 +478,12 @@ export function DigitsBody({
   // Bot-type toggle — only shown for Matches/Differs, so Over/Under and
   // Even/Odd are unaffected.
   const matchDiffBotToggle = isMatchesDiffers && (
-    <ToggleGroup
-      type="single"
+    <CompactSelect
+      label="Bot"
       value={matchDiffBotType}
-      onValueChange={(value) => {
-        if (value) handleMatchDiffBotTypeChange(value as MatchDiffBotType);
-      }}
-      className="grid w-full grid-cols-3 gap-1.5 rounded-xl bg-muted p-1.5"
-    >
-      {MATCH_DIFF_BOT_OPTIONS.map((opt) => (
-        <ToggleGroupItem
-          key={opt.value}
-          value={opt.value}
-          className="h-8 min-w-0 justify-self-stretch whitespace-nowrap rounded-lg px-1 text-[11px] font-medium text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:font-bold data-[state=on]:shadow-sm hover:text-foreground"
-        >
-          {opt.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+      options={MATCH_DIFF_BOT_OPTIONS}
+      onChange={(value) => handleMatchDiffBotTypeChange(value as MatchDiffBotType)}
+    />
   );
 
   return (

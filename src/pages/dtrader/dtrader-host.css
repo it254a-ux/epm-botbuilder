@@ -366,20 +366,22 @@ iframe[src*='cloudflarestream.com'] {
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 9px;
     background: rgba(148, 163, 184, 0.08);
-    color: #b6c0cf;
+    color: inherit;
+    opacity: 0.8;
     font: 500 12px/1 inherit;
     letter-spacing: 0.01em;
     cursor: pointer;
     transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 .epm-mode__btn:hover {
-    background: rgba(148, 163, 184, 0.16);
-    color: #e6ebf3;
+    background: rgba(128, 128, 128, 0.2);
+    opacity: 1;
 }
 .epm-mode__btn.is-on {
     background: rgba(232, 185, 63, 0.14);
     border-color: rgba(232, 185, 63, 0.55);
-    color: #f0c75a;
+    color: #b8860b;
+    opacity: 1;
 }
 body.epm-dtrader-active .derivatives-trader .trade-params__option:not(.trade-params__option--minimized) {
     height: 46px !important;
@@ -412,14 +414,18 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     display: none;
     flex-direction: column;
     background: var(--general-main-1, #151a24);
+    border-radius: inherit;
+    overflow: hidden;
 }
 #epm-auto-pane .epm-mode--pane {
     flex: none;
-    width: min(100%, 320px);
-    margin: 8px auto 4px;
+    width: 100%;
+    margin: 0 0 6px;
+    padding: 0 2px;
 }
 .epm-auto-pane__body {
     flex: 1;
+    font-size: 13px;
     min-height: 0;
     overflow-y: auto;
 }

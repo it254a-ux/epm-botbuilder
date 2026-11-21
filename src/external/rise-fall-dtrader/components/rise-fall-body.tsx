@@ -2,12 +2,12 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/external/rise-fall-dtrader/components/ui/card';
 import { Skeleton } from '@/external/rise-fall-dtrader/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/external/rise-fall-dtrader/components/ui/toggle-group';
 import { useIsMobile } from '@/external/rise-fall-dtrader/hooks/use-is-mobile';
 import { useContractMarkers } from '@/external/rise-fall-dtrader/hooks/use-contract-markers';
 import { AutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/automated-panel';
 import { StreakReversalAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/streak-reversal-automated-panel';
 import { TradeBody } from './trade-body';
+import { CompactSelect } from '@/external/rise-fall-dtrader/components/custom/compact-select';
 import { useMartingaleAutomation } from '../hooks/use-martingale-automation';
 import { useStreakReversalAutomation } from '../hooks/use-streak-reversal-automation';
 import type { ActiveSymbol, ProposalInfo, BuyResult, DerivWS } from '@deriv/core';
@@ -223,36 +223,17 @@ export function RiseFallBody({
       activeTradeType={activeTradeType}
       onSelectTradeType={onSelectTradeType}
     >
-      <div className="space-y-1.5 mb-2">
-        <p className="text-[9px] text-muted-foreground">Entry mode</p>
-        <ToggleGroup
-          type="single"
+      <div className="mb-2">
+        <CompactSelect
+          label="Entry mode"
           value={entryMode}
           disabled={fixedAutomation.isRunning || streakAutomation.isRunning}
-          onValueChange={(value) => {
-            if (value) setEntryMode(value as EntryMode);
-          }}
-          className="w-full gap-0 rounded-full bg-muted p-0.5"
-        >
-          <ToggleGroupItem
-            value="fixed"
-            className="flex-1 h-6 rounded-full text-[10px] font-medium text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:font-bold data-[state=on]:shadow-sm hover:text-foreground"
-          >
-            Fixed direction
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="streak"
-            disabled={lastQuote === undefined}
-            className="flex-1 h-6 rounded-full text-[10px] font-medium text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:font-bold data-[state=on]:shadow-sm hover:text-foreground"
-          >
-            Streak reversal
-          </ToggleGroupItem>
-        </ToggleGroup>
-        {lastQuote === undefined && (
-          <p className="text-[9px] text-muted-foreground">
-            Streak reversal needs lastQuote/lastTickEpoch wired in from page.tsx (see RiseFallBodyProps).
-          </p>
-        )}
+          options={[
+            { value: 'fixed', label: 'Fixed direction' },
+            { value: 'streak', label: 'Streak reversal' },
+          ]}
+          onChange={(value) => setEntryMode(value as EntryMode)}
+        />
       </div>
 
       {entryMode === 'fixed' ? (

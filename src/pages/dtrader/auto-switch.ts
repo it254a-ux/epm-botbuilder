@@ -9,7 +9,7 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
-const ROOT_ID = 'derivatives_trader';
+const COLUMN = '.derivatives-trader .trade-params';
 const BAR_CLASS = 'epm-mode';
 const PANE_ID = 'epm-auto-pane';
 
@@ -43,10 +43,14 @@ function paint() {
 }
 
 function ensurePane(): HTMLElement | null {
-  if (pane && pane.isConnected) return pane;
-  const root = document.getElementById(ROOT_ID);
+  if (pane && pane.isConnected && pane.parentElement?.matches(COLUMN)) return pane;
+  const root = document.querySelector(COLUMN) as HTMLElement | null;
   if (!root) return null;
   if (getComputedStyle(root).position === 'static') root.style.position = 'relative';
+  if (pane) {
+    root.appendChild(pane); // Deriv rebuilt its column: move the bots view into the new one (the bots keep running)
+    return pane;
+  }
   pane = document.createElement('div');
   pane.id = PANE_ID;
   const head = makeBar();
@@ -55,7 +59,6 @@ function ensurePane(): HTMLElement | null {
   body.className = 'epm-auto-pane__body';
   pane.append(head, body);
   root.appendChild(pane);
-  mounted = false;
   return pane;
 }
 

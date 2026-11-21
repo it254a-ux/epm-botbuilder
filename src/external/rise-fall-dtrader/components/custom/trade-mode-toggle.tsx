@@ -1,3 +1,4 @@
+import { CompactSelect } from '@/external/rise-fall-dtrader/components/custom/compact-select';
 import { ModeRail } from '@/external/rise-fall-dtrader/components/custom/mode-rail';
 
 interface TradeModeToggleProps {
@@ -17,13 +18,27 @@ interface TradeModeToggleProps {
  * so this no longer toggles between modes — Automated trading is the
  * only mode, on every trade type.
  */
+const TYPES = [
+  { label: 'Rise/Fall', value: 'rise-fall' },
+  { label: 'Matches/Differs', value: 'matches-differs' },
+  { label: 'Over/Under', value: 'over-under' },
+  { label: 'Even/Odd', value: 'even-odd' },
+  { label: 'Accumulators', value: 'accumulators' },
+];
+
 export function TradeModeToggle({ label = 'Rise/Fall', activeTradeType, onSelectTradeType }: TradeModeToggleProps) {
   return (
     <div className="mb-2">
-      <ModeRail activeTradeType={activeTradeType} onSelectTradeType={onSelectTradeType} />
-      <div className="flex items-center gap-1 text-[13px] font-semibold text-foreground">
-        Automate {label}
-      </div>
+      {onSelectTradeType ? (
+        <CompactSelect
+          label="Contract type"
+          value={activeTradeType ?? 'rise-fall'}
+          options={TYPES}
+          onChange={onSelectTradeType}
+        />
+      ) : (
+        <ModeRail activeTradeType={activeTradeType} onSelectTradeType={onSelectTradeType} />
+      )}
     </div>
   );
 }
