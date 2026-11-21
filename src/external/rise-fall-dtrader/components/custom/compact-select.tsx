@@ -19,7 +19,7 @@ export function CompactSelect({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-full rounded-lg border border-border bg-background px-2 text-[13px] font-medium text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+        className="h-9 w-full rounded-lg border border-border px-2 text-[13px] font-medium text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

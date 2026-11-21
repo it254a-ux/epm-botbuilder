@@ -349,39 +349,35 @@ iframe[src*='cloudflarestream.com'] {
     overflow-y: auto !important;
 }
 
-/* ---- Manual / Auto switch row, and a more compact Duration / Stake / Buy so there is room for it ---- */
+/* ---- Manual / Auto switch row, and a more compact Duration / Stake / Buy so there is room for it ----
+   Every colour, border, radius and gap below comes from Dtrader's own design tokens, so it follows its theme by itself. */
 .epm-mode {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin: 0 0 6px;
+    gap: var(--core-spacing-400);
+    margin: 0 0 var(--core-spacing-400);
 }
 .epm-mode__btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 10px;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 9px;
-    background: rgba(148, 163, 184, 0.08);
-    color: inherit;
-    opacity: 0.8;
-    font: 500 12px/1 inherit;
-    letter-spacing: 0.01em;
+    gap: var(--core-spacing-400);
+    height: 32px;
+    padding: 0 var(--core-spacing-800);
+    border: 0;
+    border-radius: var(--core-borderRadius-400);
+    background: var(--semantic-color-slate-solid-surface-frame-low);
+    color: var(--component-textIcon-normal-subtle);
+    font: inherit;
+    font-size: 14px;
     cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 .epm-mode__btn:hover {
-    background: rgba(128, 128, 128, 0.2);
-    opacity: 1;
+    color: var(--component-textIcon-normal-prominent);
 }
 .epm-mode__btn.is-on {
-    background: rgba(232, 185, 63, 0.14);
-    border-color: rgba(232, 185, 63, 0.55);
-    color: #b8860b;
-    opacity: 1;
+    background: var(--component-chip-bg-selected);
+    color: var(--component-textIcon-normal-prominent);
 }
 body.epm-dtrader-active .derivatives-trader .trade-params__option:not(.trade-params__option--minimized) {
     height: 46px !important;
@@ -406,41 +402,32 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     font-size: 11px !important;
 }
 
-/* the bots screen, laid over the Dtrader screen */
+/* the bots screen, laid over the Dtrader trade column: no colours of its own, everything is taken from Dtrader */
 #epm-auto-pane {
     position: absolute;
     inset: 0;
     z-index: 60;
     display: none;
     flex-direction: column;
-    background: var(--general-main-1, #151a24);
-    border-radius: inherit;
-    overflow: hidden;
+    background: inherit;
+    color: var(--component-textIcon-normal-prominent);
+    font: inherit;
 }
 #epm-auto-pane .epm-mode--pane {
     flex: none;
     width: 100%;
-    margin: 0 0 6px;
-    padding: 0 2px;
 }
 .epm-auto-pane__body {
     flex: 1;
-    font-size: 13px;
     min-height: 0;
     overflow-y: auto;
+    font-size: 14px;
 }
 .epm-auto-pane__load {
     padding: 40px 16px;
     text-align: center;
-    color: #94a3b8;
-    font-size: 13px;
-}
-
-/* The bots view takes on Dtrader's own look: its font, text colour, background and sizes (and follows the light / dark theme) */
-#epm-auto-pane {
-    background: transparent;
-    color: inherit;
-    font-family: var(--brand-font-primary, inherit);
+    color: var(--component-textIcon-normal-subtle);
+    font-size: 14px;
 }
 #epm-auto-pane .dtrader-app,
 #epm-auto-pane .dtrader-app * {
@@ -455,23 +442,24 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 #epm-auto-pane main {
     background-color: transparent !important;
 }
+#epm-auto-pane .bg-muted {
+    background-color: var(--semantic-color-slate-solid-surface-frame-low) !important;
+}
 #epm-auto-pane .text-foreground,
 #epm-auto-pane .text-card-foreground {
-    color: inherit !important;
+    color: var(--component-textIcon-normal-prominent) !important;
 }
 #epm-auto-pane .text-muted-foreground {
-    color: inherit !important;
-    opacity: 0.65;
+    color: var(--component-textIcon-normal-subtle) !important;
 }
 #epm-auto-pane [class*='border-border'],
 #epm-auto-pane .border {
-    border-color: rgba(128, 128, 128, 0.28) !important;
+    border-color: var(--component-divider-default) !important;
 }
 #epm-auto-pane .rounded-xl,
 #epm-auto-pane .rounded-lg {
-    border-radius: 8px;
+    border-radius: var(--core-borderRadius-400);
 }
-/* the old panels used very small text; bring it to Dtrader's size */
 #epm-auto-pane [class*='text-[9px]'],
 #epm-auto-pane [class*='text-[10px]'],
 #epm-auto-pane [class*='text-[11px]'] {
@@ -487,23 +475,13 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 }
 #epm-auto-pane input,
 #epm-auto-pane select {
+    font: inherit;
     font-size: 14px;
-    color: inherit;
-    background: transparent;
-    border-color: rgba(128, 128, 128, 0.3);
+    color: var(--component-textIcon-normal-prominent);
+    background: var(--semantic-color-slate-solid-surface-frame-low);
+    border-color: var(--component-divider-default);
 }
 #epm-auto-pane select option {
-    color: #111;
-    background: #fff;
-}
-html.dark #epm-auto-pane select option {
-    color: #fff;
-    background: #1f2430;
-}
-html.dark #epm-auto-pane {
-    color-scheme: dark;
-}
-.epm-auto-pane__body {
-    font-size: 14px;
-    padding: 0 2px;
+    color: var(--component-textIcon-normal-prominent);
+    background: var(--semantic-color-slate-solid-surface-frame-mid);
 }
