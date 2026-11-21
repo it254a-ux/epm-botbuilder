@@ -435,3 +435,75 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     color: #94a3b8;
     font-size: 13px;
 }
+
+/* The bots view takes on Dtrader's own look: its font, text colour, background and sizes (and follows the light / dark theme) */
+#epm-auto-pane {
+    background: transparent;
+    color: inherit;
+    font-family: var(--brand-font-primary, inherit);
+}
+#epm-auto-pane .dtrader-app,
+#epm-auto-pane .dtrader-app * {
+    font-family: inherit;
+}
+#epm-auto-pane .dtrader-app {
+    background: transparent;
+    color: inherit;
+}
+#epm-auto-pane .bg-background,
+#epm-auto-pane .bg-card,
+#epm-auto-pane main {
+    background-color: transparent !important;
+}
+#epm-auto-pane .text-foreground,
+#epm-auto-pane .text-card-foreground {
+    color: inherit !important;
+}
+#epm-auto-pane .text-muted-foreground {
+    color: inherit !important;
+    opacity: 0.65;
+}
+#epm-auto-pane [class*='border-border'],
+#epm-auto-pane .border {
+    border-color: rgba(128, 128, 128, 0.28) !important;
+}
+#epm-auto-pane .rounded-xl,
+#epm-auto-pane .rounded-lg {
+    border-radius: 8px;
+}
+/* the old panels used very small text; bring it to Dtrader's size */
+#epm-auto-pane [class*='text-[9px]'],
+#epm-auto-pane [class*='text-[10px]'],
+#epm-auto-pane [class*='text-[11px]'] {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+}
+#epm-auto-pane [class*='text-[12px]'],
+#epm-auto-pane [class*='text-[13px]'],
+#epm-auto-pane .text-xs,
+#epm-auto-pane .text-sm {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+#epm-auto-pane input,
+#epm-auto-pane select {
+    font-size: 14px;
+    color: inherit;
+    background: transparent;
+    border-color: rgba(128, 128, 128, 0.3);
+}
+#epm-auto-pane select option {
+    color: #111;
+    background: #fff;
+}
+html.dark #epm-auto-pane select option {
+    color: #fff;
+    background: #1f2430;
+}
+html.dark #epm-auto-pane {
+    color-scheme: dark;
+}
+.epm-auto-pane__body {
+    font-size: 14px;
+    padding: 0 2px;
+}
