@@ -79,6 +79,23 @@ function ensurePane(): HTMLElement | null {
   head.classList.add('epm-mode--pane');
   const body = document.createElement('div');
   body.className = 'epm-auto-pane__body';
+  // Something on the page swallows the mouse wheel over this area, so scroll the bots view by hand
+  pane.addEventListener(
+    'wheel',
+    e => {
+      if (e.ctrlKey || e.deltaY === 0) return;
+      let t = e.target as HTMLElement | null;
+      while (t && t !== body) {
+        if (t.scrollHeight > t.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(t).overflowY)) return; // a list that scrolls itself
+        t = t.parentElement;
+      }
+      if (body.scrollHeight <= body.clientHeight) return;
+      body.scrollTop += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    { passive: false }
+  );
   pane.append(head, body);
   root.appendChild(pane);
   return pane;
