@@ -56,8 +56,10 @@ export function startDigitOverlay(): void {
       host.style.display = 'none';
       return;
     }
-    const chart = plus.closest('.sc-chart, .smartcharts, .ciq-chart-area, .chart-container') as HTMLElement | null;
-    const right = chart ? chart.getBoundingClientRect().right : window.innerWidth;
+    // the chart's right edge: the first wide container around the buttons (the price scale sits just inside it)
+    let box: HTMLElement | null = plus.parentElement;
+    while (box && box.getBoundingClientRect().width < 600) box = box.parentElement;
+    const right = box ? Math.min(box.getBoundingClientRect().right, window.innerWidth) : window.innerWidth;
     const left = r.right + 12;
     const width = Math.max(0, Math.min(400, right - left - 80));
     if (width < 220) {

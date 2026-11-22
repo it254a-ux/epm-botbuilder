@@ -1,7 +1,7 @@
 /* live digit circles beside the chart's zoom buttons: no background, small */
 .epm-digit-overlay {
     position: fixed;
-    z-index: 30;
+    z-index: 1000;
     pointer-events: none;
     background: transparent;
 }
