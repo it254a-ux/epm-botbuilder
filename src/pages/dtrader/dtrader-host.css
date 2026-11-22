@@ -697,3 +697,48 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
     max-width: none !important;
     margin-inline: 0 !important;
 }
+
+/* Auto = Manual: every size, weight, colour, corner and margin below is read from the live Manual fields (see auto-switch.ts) */
+#epm-auto-pane {
+    padding-left: var(--epm-pad-l, 0);
+    padding-right: var(--epm-pad-r, 0);
+    box-sizing: border-box;
+}
+#epm-auto-pane .epm-nf,
+#epm-auto-pane .epm-half {
+    background: var(--epm-box-bg, var(--component-field-bg-fill-default)) !important;
+    border-radius: var(--epm-box-radius, var(--core-borderRadius-400)) !important;
+    min-height: var(--epm-box-h, 46px) !important;
+    padding-inline: var(--epm-pad-x, 12px) !important;
+}
+#epm-auto-pane .epm-nf label,
+#epm-auto-pane .epm-nf [class*='text-muted'],
+#epm-auto-pane .epm-half > span {
+    font-size: var(--epm-fs-label, 14px) !important;
+    font-weight: var(--epm-fw-label, 400) !important;
+    color: var(--epm-col-label, inherit) !important;
+    line-height: var(--epm-lh-label, 1.3) !important;
+    opacity: 1 !important;
+}
+#epm-auto-pane .epm-nf input,
+#epm-auto-pane .epm-half select,
+#epm-auto-pane .epm-nf button,
+#epm-auto-pane .epm-nf button * {
+    font-size: var(--epm-fs-val, 14px) !important;
+    font-weight: var(--epm-fw-val, 400) !important;
+    color: var(--epm-col-val, inherit) !important;
+    line-height: var(--epm-lh-val, 1.3) !important;
+}
+#epm-auto-pane .font-semibold,
+#epm-auto-pane .font-bold,
+#epm-auto-pane .font-medium {
+    font-weight: var(--epm-fw-val, 400) !important;
+}
+#epm-auto-pane .text-muted-foreground,
+#epm-auto-pane .text-foreground {
+    font-size: var(--epm-fs-val, inherit);
+}
+#epm-auto-pane .bg-muted,
+#epm-auto-pane [data-state='on'] {
+    background-color: var(--epm-box-bg, var(--component-field-bg-fill-default)) !important;
+}

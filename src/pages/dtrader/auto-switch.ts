@@ -46,6 +46,7 @@ function fitPane() {
   if (!col || !document.body.classList.contains('epm-dtrader-active')) return;
   if (col.getBoundingClientRect().width === 0) return;
   holdPageStill();
+  if (pane && mode === 'manual') sampleManual(pane);
   const room = Math.max(240, Math.round(window.innerHeight - col.getBoundingClientRect().top - 8));
   col.style.maxHeight = `${room}px`;
   if (mode === 'auto') {
@@ -88,6 +89,7 @@ function setMode(next: 'manual' | 'auto') {
   if (next === 'auto') {
     const p = ensurePane();
     if (!p) return;
+    sampleManual(p);
     p.style.display = 'flex';
     if (!mounted) {
       mounted = true;
@@ -117,6 +119,63 @@ function ensureBar() {
   link.parentElement.insertBefore(makeBar(), link);
   paint();
   fitPane();
+}
+
+/**
+ * Copies the real Manual look onto the bots view: it reads the live Duration / Stake fields (text sizes, weights, colours, box
+ * colour, corners, height) and the column's side margins, and hands them to the bots view as CSS variables, so Auto is the same
+ * as Manual instead of an imitation of it.
+ */
+function leaf(root: Element, re: RegExp): HTMLElement | null {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    if (re.test((n.nodeValue || '').trim()) && n.parentElement && n.parentElement.getBoundingClientRect().width > 0) return n.parentElement;
+  }
+  return null;
+}
+function boxOf(el: HTMLElement, stop: Element): HTMLElement {
+  let best = el;
+  for (let n: HTMLElement | null = el; n && n !== stop; n = n.parentElement) {
+    const c = getComputedStyle(n);
+    if (c.backgroundColor && c.backgroundColor !== 'rgba(0, 0, 0, 0)' && c.backgroundColor !== 'transparent') return n;
+    best = n;
+  }
+  return best;
+}
+function sampleManual(pane: HTMLElement) {
+  const col = document.querySelector(COLUMN) as HTMLElement | null;
+  if (!col || col.getBoundingClientRect().width === 0) return;
+  const label = leaf(col, /^Duration$/) || leaf(col, /^Stake$/);
+  const value = leaf(col, /^\d+\s*(tick|ticks|seconds|minutes)$/i) || leaf(col, /^[\d.]+\s*USD$/);
+  const bar = col.querySelector('.epm-mode:not(.epm-mode--pane)') as HTMLElement | null;
+  const set = (k: string, v: string) => v && pane.style.setProperty(k, v);
+  if (label) {
+    const c = getComputedStyle(label);
+    set('--epm-fs-label', c.fontSize);
+    set('--epm-fw-label', c.fontWeight);
+    set('--epm-col-label', c.color);
+    set('--epm-lh-label', c.lineHeight);
+    const box = boxOf(label, col);
+    const b = getComputedStyle(box);
+    set('--epm-box-bg', b.backgroundColor);
+    set('--epm-box-radius', b.borderRadius);
+    set('--epm-box-h', `${Math.round(box.getBoundingClientRect().height)}px`);
+    set('--epm-pad-x', `${Math.round(label.getBoundingClientRect().left - box.getBoundingClientRect().left)}px`);
+  }
+  if (value) {
+    const c = getComputedStyle(value);
+    set('--epm-fs-val', c.fontSize);
+    set('--epm-fw-val', c.fontWeight);
+    set('--epm-col-val', c.color);
+    set('--epm-lh-val', c.lineHeight);
+  }
+  const ref = bar || (label ? boxOf(label, col) : null);
+  if (ref) {
+    const r = ref.getBoundingClientRect();
+    const cr = col.getBoundingClientRect();
+    set('--epm-pad-l', `${Math.max(0, Math.round(r.left - cr.left))}px`);
+    set('--epm-pad-r', `${Math.max(0, Math.round(cr.right - r.right))}px`);
+  }
 }
 
 /** On a computer the Dtrader tab never scrolls as a page: anything that got scrolled around the trading column is put back at the top. */
