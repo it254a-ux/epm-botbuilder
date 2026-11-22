@@ -3,7 +3,9 @@
  * of the "+", with no background so the chart shows through. It appears on the digit contract types only (Matches/Differs,
  * Over/Under, Even/Odd) and follows whichever market the chart is showing.
  */
+import './digit-overlay.css';
 import { createElement } from 'react';
+import { getChartsSymbol, getDtraderSymbol, setShownSymbol } from './dtrader-symbol';
 import { createRoot } from 'react-dom/client';
 
 const DIGIT_TYPES = /matches|differs|over|under|even|odd/i;
@@ -19,14 +21,29 @@ export function startDigitOverlay(): void {
   let mounted = false;
 
   const place = () => {
-    const plus = document.querySelector('.derivatives-trader .cq-zoom-in') as HTMLElement | null;
-    const chip = document.querySelector('.derivatives-trader .trade__trade-types button[data-state="selected"]');
-    const show =
-      document.body.classList.contains('epm-dtrader-active') && !!plus && !!chip && DIGIT_TYPES.test(chip.textContent || '');
-    if (!show || !plus) {
+    // find the zoom "+" of the chart that is actually on screen: the Dtrader chart (digit types only) or the Charts tab chart
+    let plus: HTMLElement | null = null;
+    let symbol = '';
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('.cq-zoom-in'))) {
+      if (el.getBoundingClientRect().width === 0) continue;
+      if (el.closest('.derivatives-trader')) {
+        const chip = document.querySelector('.derivatives-trader .trade__trade-types button[data-state="selected"]');
+        if (document.body.classList.contains('epm-dtrader-active') && chip && DIGIT_TYPES.test(chip.textContent || '')) {
+          plus = el;
+          symbol = getDtraderSymbol();
+          break;
+        }
+      } else if (getChartsSymbol()) {
+        plus = el;
+        symbol = getChartsSymbol();
+        break;
+      }
+    }
+    if (!plus || !symbol) {
       host.style.display = 'none';
       return;
     }
+    setShownSymbol(symbol);
     const r = plus.getBoundingClientRect();
     if (r.width === 0) {
       host.style.display = 'none';

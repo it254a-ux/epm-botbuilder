@@ -750,22 +750,3 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
     width: 100%;
 }
 
-/* live digit circles beside the chart's zoom buttons: no background, small */
-.epm-digit-overlay {
-    position: fixed;
-    z-index: 30;
-    pointer-events: none;
-    background: transparent;
-}
-.epm-digit-overlay .digit-stats {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    background: transparent;
-}
-.epm-digit-overlay .digit-stats__grid {
-    padding: 0 0 6px;
-}
-.epm-digit-overlay .digit-stats__pct {
-    font-size: 2.4cqw;
-}

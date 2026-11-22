@@ -20,3 +20,24 @@ export function onDtraderSymbol(l: (s: string) => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
 }
+
+/** Market of the Charts tab (set by the Charts page itself). */
+let charts = '';
+export const getChartsSymbol = () => charts;
+export const setChartsSymbol = (s: string) => {
+  charts = s;
+};
+
+/** The market the circles on screen should follow right now (picked by the overlay for whichever chart it sits on). */
+let shown = '';
+const shownListeners = new Set<(s: string) => void>();
+export const getShownSymbol = () => shown;
+export function setShownSymbol(s: string): void {
+  if (s === shown) return;
+  shown = s;
+  shownListeners.forEach(l => l(shown));
+}
+export function onShownSymbol(l: (s: string) => void): () => void {
+  shownListeners.add(l);
+  return () => shownListeners.delete(l);
+}
