@@ -547,3 +547,12 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 body.epm-dtrader-active .derivatives-trader .trade-params {
     scrollbar-width: thin;
 }
+/* fields that already share a row with another field (two or three per row) keep their label above the value, so nothing overlaps */
+#epm-auto-pane :is([class*='grid-cols-2'], [class*='grid-cols-3']) > .epm-nf,
+#epm-auto-pane .epm-nf :is([class*='grid-cols-2'], [class*='grid-cols-3']) {
+    display: block !important;
+}
+#epm-auto-pane .epm-nf > label,
+#epm-auto-pane .epm-nf > span {
+    overflow-wrap: anywhere;
+}
