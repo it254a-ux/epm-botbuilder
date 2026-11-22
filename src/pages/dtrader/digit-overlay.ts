@@ -7,6 +7,9 @@ import { createElement } from 'react';
 import { getChartsSymbol, getDtraderSymbol, setShownSymbol } from './dtrader-symbol';
 import { createRoot } from 'react-dom/client';
 
+// the chart's zoom buttons (Dtrader's chart and the Charts tab chart name them a little differently)
+const PLUS = ".cq-zoom-in, [class*='zoom-in' i], [aria-label*='zoom in' i], [title*='zoom in' i]";
+const MINUS = ".cq-zoom-out, [class*='zoom-out' i], [aria-label*='zoom out' i], [title*='zoom out' i]";
 let started = false;
 
 export function startDigitOverlay(): void {
@@ -22,7 +25,7 @@ export function startDigitOverlay(): void {
     // find the zoom "+" of the chart that is actually on screen: the Dtrader chart (digit types only) or the Charts tab chart
     let plus: HTMLElement | null = null;
     let symbol = '';
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>('.cq-zoom-in'))) {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(PLUS))) {
       if (el.getBoundingClientRect().width === 0) continue;
       if (el.closest('.derivatives-trader')) {
         if (document.body.classList.contains('epm-dtrader-active')) {
@@ -43,8 +46,8 @@ export function startDigitOverlay(): void {
     setShownSymbol(symbol);
     // move the zoom buttons (- o +) two button-widths to the left, to make room for the circles
     let group: HTMLElement | null = plus.parentElement;
-    for (let i = 0; i < 3 && group && !group.querySelector('.cq-zoom-out'); i++) group = group.parentElement;
-    if (group && group.querySelector('.cq-zoom-out')) {
+    for (let i = 0; i < 3 && group && !group.querySelector(MINUS); i++) group = group.parentElement;
+    if (group && group.querySelector(MINUS)) {
       const w = plus.getBoundingClientRect().width;
       group.style.transform = `translateX(${-Math.round(2 * (w + 10))}px)`;
     }
