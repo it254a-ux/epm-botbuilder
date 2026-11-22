@@ -41,6 +41,13 @@ export function startDigitOverlay(): void {
       return;
     }
     setShownSymbol(symbol);
+    // move the zoom buttons (- o +) two button-widths to the left, to make room for the circles
+    let group: HTMLElement | null = plus.parentElement;
+    for (let i = 0; i < 3 && group && !group.querySelector('.cq-zoom-out'); i++) group = group.parentElement;
+    if (group && group.querySelector('.cq-zoom-out')) {
+      const w = plus.getBoundingClientRect().width;
+      group.style.transform = `translateX(${-Math.round(2 * (w + 10))}px)`;
+    }
     const r = plus.getBoundingClientRect();
     if (r.width === 0) {
       host.style.display = 'none';
