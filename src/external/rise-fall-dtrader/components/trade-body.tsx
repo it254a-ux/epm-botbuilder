@@ -106,7 +106,7 @@ export function TradeBody({
             <Skeleton className={skeletonClassName} />
           ) : (
             <Card className={cardClassName}>
-              <CardContent className={cardContentClassName}>
+              <CardContent className={`epm-cc ${cardContentClassName}`}>
                 <TradeModeToggle
                   label={label}
                   activeTradeType={activeTradeType}

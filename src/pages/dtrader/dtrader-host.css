@@ -421,7 +421,7 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    font-size: 14px;
+    font-size: 13px;
 }
 .epm-auto-pane__load {
     padding: 40px 16px;
@@ -470,13 +470,13 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 #epm-auto-pane [class*='text-[13px]'],
 #epm-auto-pane .text-xs,
 #epm-auto-pane .text-sm {
-    font-size: 14px !important;
+    font-size: 13px !important;
     line-height: 1.4 !important;
 }
 #epm-auto-pane input,
 #epm-auto-pane select {
     font: inherit;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--component-textIcon-normal-prominent);
     background: var(--semantic-color-slate-solid-surface-frame-low);
     border-color: var(--component-divider-default);
@@ -497,4 +497,38 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
+}
+/* use the width: the two dropdowns at the top share one row, and spacing is tightened */
+#epm-auto-pane .epm-cc {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding-top: 4px !important;
+}
+#epm-auto-pane .epm-cc > * {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+#epm-auto-pane .epm-cc > .epm-half,
+#epm-auto-pane .epm-cc > :has(> .epm-half) {
+    flex: 1 1 calc(50% - 4px);
+    margin-bottom: 0 !important;
+}
+#epm-auto-pane .mb-2,
+#epm-auto-pane .mb-3 {
+    margin-bottom: 4px;
+}
+#epm-auto-pane [class*='space-y-'] > * + * {
+    margin-top: 4px !important;
+}
+#epm-auto-pane [class*='gap-3'],
+#epm-auto-pane [class*='gap-4'] {
+    gap: 6px !important;
+}
+#epm-auto-pane [class*='py-3'],
+#epm-auto-pane [class*='py-4'],
+#epm-auto-pane [class*='pt-4'],
+#epm-auto-pane [class*='pb-4'] {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
 }
