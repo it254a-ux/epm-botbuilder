@@ -36,6 +36,14 @@ function makeBar(): HTMLElement {
   return bar;
 }
 
+/** Keeps the bots view exactly as tall as the visible screen, so it scrolls inside itself instead of running off the bottom. */
+function fitPane() {
+  if (!pane || pane.style.display === 'none') return;
+  const top = pane.getBoundingClientRect().top;
+  pane.style.height = `${Math.max(240, Math.round(window.innerHeight - top - 8))}px`;
+  pane.style.bottom = 'auto';
+}
+
 function paint() {
   document.querySelectorAll(`.${BAR_CLASS} .epm-mode__btn`).forEach(el => {
     el.classList.toggle('is-on', (el as HTMLElement).dataset.mode === mode);
@@ -68,6 +76,8 @@ function setMode(next: 'manual' | 'auto') {
     const p = ensurePane();
     if (!p) return;
     p.style.display = 'flex';
+    fitPane();
+    window.setTimeout(fitPane, 300);
     if (!mounted) {
       mounted = true;
       const body = p.querySelector('.epm-auto-pane__body') as HTMLElement;
@@ -99,6 +109,8 @@ function ensureBar() {
 export function startAutoSwitch(): void {
   if (started) return;
   started = true;
+  window.addEventListener('resize', fitPane);
+  window.setInterval(fitPane, 1500);
   let queued = false;
   const run = () => {
     queued = false;

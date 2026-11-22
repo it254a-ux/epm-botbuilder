@@ -532,3 +532,13 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     padding-top: 4px !important;
     padding-bottom: 4px !important;
 }
+/* label on the left, value on the right of the same row (uses the empty width, saves height) */
+#epm-auto-pane .epm-nf {
+    display: grid !important;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+    column-gap: 8px;
+}
+#epm-auto-pane .epm-nf > * {
+    margin-top: 0 !important;
+}

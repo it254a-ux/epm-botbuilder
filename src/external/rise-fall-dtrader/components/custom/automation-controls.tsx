@@ -39,7 +39,7 @@ export function NumberField({
   step?: number;
 }) {
   return (
-    <div className="space-y-0.5">
+    <div className="epm-nf space-y-0.5">
       <Label className="text-[10px] text-muted-foreground">{label}</Label>
       <Input
         type="number"
@@ -82,7 +82,7 @@ function StrategySelect({
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative space-y-0.5">
+    <div ref={wrapRef} className="epm-nf relative space-y-0.5">
       <Label className="text-[10px] text-muted-foreground">Strategy</Label>
       <button
         type="button"
