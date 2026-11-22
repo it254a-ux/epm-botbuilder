@@ -742,3 +742,10 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
 #epm-auto-pane [data-state='on'] {
     background-color: var(--epm-box-bg, var(--component-field-bg-fill-default)) !important;
 }
+
+#epm-auto-pane .epm-half select {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: 100%;
+}

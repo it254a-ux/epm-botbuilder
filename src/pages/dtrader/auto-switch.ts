@@ -178,9 +178,36 @@ function sampleManual(pane: HTMLElement) {
   }
 }
 
+/**
+ * Everything around the trading column is made unscrollable ("clip" cannot be scrolled by anything, not even by a field being
+ * focused), so the page cannot shift when the bots view opens. It is undone again when Dtrader is not the page being looked at.
+ */
+const clipped = new Set<HTMLElement>();
+function lockAncestors(on: boolean) {
+  if (!on) {
+    clipped.forEach(el => el.style.removeProperty('overflow'));
+    clipped.clear();
+    return;
+  }
+  const col = document.querySelector(COLUMN) as HTMLElement | null;
+  if (!col) return;
+  for (let el: HTMLElement | null = col.parentElement; el; el = el.parentElement) {
+    if (clipped.has(el)) continue;
+    const o = getComputedStyle(el).overflow;
+    if (o.includes('auto') || o.includes('scroll') || o.includes('hidden') || el === document.body || el === document.documentElement) {
+      el.style.setProperty('overflow', 'clip', 'important');
+      clipped.add(el);
+    }
+  }
+}
+
 /** On a computer the Dtrader tab never scrolls as a page: anything that got scrolled around the trading column is put back at the top. */
 function holdPageStill(e?: Event) {
-  if (!document.body.classList.contains('epm-dtrader-active') || window.innerWidth < 1024) return;
+  if (!document.body.classList.contains('epm-dtrader-active') || window.innerWidth < 1024) {
+    lockAncestors(false);
+    return;
+  }
+  lockAncestors(true);
   const col = document.querySelector(COLUMN) as HTMLElement | null;
   if (!col || col.getBoundingClientRect().width === 0) return;
   const target = e?.target;
@@ -197,6 +224,8 @@ function holdPageStill(e?: Event) {
 export function startAutoSwitch(): void {
   if (started) return;
   started = true;
+  // load the bots screen in the background so the first press of Auto opens instantly
+  window.setTimeout(() => void import('./classic-bots').catch(() => undefined), 4000);
   document.addEventListener('scroll', e => (e.target === document ? holdPageStill() : holdPageStill(e)), true);
   window.addEventListener('resize', fitPane);
   window.setInterval(fitPane, 1500);
