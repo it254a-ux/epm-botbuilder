@@ -45,6 +45,7 @@ function fitPane() {
   const col = document.querySelector(COLUMN) as HTMLElement | null;
   if (!col || !document.body.classList.contains('epm-dtrader-active')) return;
   if (col.getBoundingClientRect().width === 0) return;
+  holdPageStill();
   const room = Math.max(240, Math.round(window.innerHeight - col.getBoundingClientRect().top - 8));
   col.style.maxHeight = `${room}px`;
   if (mode === 'auto') {
@@ -118,9 +119,26 @@ function ensureBar() {
   fitPane();
 }
 
+/** On a computer the Dtrader tab never scrolls as a page: anything that got scrolled around the trading column is put back at the top. */
+function holdPageStill(e?: Event) {
+  if (!document.body.classList.contains('epm-dtrader-active') || window.innerWidth < 1024) return;
+  const col = document.querySelector(COLUMN) as HTMLElement | null;
+  if (!col || col.getBoundingClientRect().width === 0) return;
+  const target = e?.target;
+  if (target instanceof Element) {
+    if (target.contains(col) && target.scrollTop > 0) target.scrollTop = 0;
+    return;
+  }
+  for (let el: HTMLElement | null = col.parentElement; el; el = el.parentElement) {
+    if (el.scrollTop > 0) el.scrollTop = 0;
+  }
+  if (window.scrollY > 0) window.scrollTo(0, 0);
+}
+
 export function startAutoSwitch(): void {
   if (started) return;
   started = true;
+  document.addEventListener('scroll', e => (e.target === document ? holdPageStill() : holdPageStill(e)), true);
   window.addEventListener('resize', fitPane);
   window.setInterval(fitPane, 1500);
   let queued = false;

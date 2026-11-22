@@ -641,3 +641,12 @@ body.epm-dtrader-active .derivatives-trader .trade-params .quill-input__containe
 #epm-auto-pane .epm-nf button[type='button'] {
     color: var(--component-field-label-color-default) !important;
 }
+
+/* make every layer of Deriv's field the same short height (the box itself is one of the layers) */
+body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper [class*='quill-input__']:not([class*='icon']):not([class*='rotate']),
+body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trade-params__option {
+    min-height: 0 !important;
+    height: 46px !important;
+    padding-block: 2px !important;
+    box-sizing: border-box;
+}
