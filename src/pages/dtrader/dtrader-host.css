@@ -376,7 +376,7 @@ iframe[src*='cloudflarestream.com'] {
     color: var(--component-textIcon-normal-prominent);
 }
 .epm-mode__btn.is-on {
-    background: var(--component-chip-bg-selected);
+    background: var(--semantic-color-slate-solid-surface-frame-mid);
     color: var(--component-textIcon-normal-prominent);
 }
 body.epm-dtrader-active .derivatives-trader .trade-params__option:not(.trade-params__option--minimized) {
@@ -484,4 +484,8 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 #epm-auto-pane select option {
     color: var(--component-textIcon-normal-prominent);
     background: var(--semantic-color-slate-solid-surface-frame-mid);
+}
+#epm-auto-pane [data-state='on'] {
+    background-color: var(--semantic-color-slate-solid-surface-frame-mid) !important;
+    color: var(--component-textIcon-normal-prominent) !important;
 }
