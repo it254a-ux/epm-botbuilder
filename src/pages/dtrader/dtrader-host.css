@@ -607,3 +607,37 @@ body.epm-dtrader-active .derivatives-trader .trade-params .quill-input__containe
         overflow: hidden !important;
     }
 }
+
+/* sizes, font and colours straight from the same tokens Dtrader's own fields use, so the bots view matches Manual exactly */
+#epm-auto-pane,
+#epm-auto-pane .dtrader-app,
+#epm-auto-pane .dtrader-app *,
+.epm-auto-pane__body {
+    font-family: var(--core-fontFamily-ibmPlex-sans, inherit);
+}
+.epm-auto-pane__body,
+#epm-auto-pane input,
+#epm-auto-pane select,
+#epm-auto-pane [class*='text-[12px]'],
+#epm-auto-pane [class*='text-[13px]'],
+#epm-auto-pane .text-xs,
+#epm-auto-pane .text-sm,
+#epm-auto-pane .epm-nf input,
+#epm-auto-pane .epm-half select,
+#epm-auto-pane .epm-nf button[type='button'] {
+    font-size: var(--core-fontSize-100) !important;
+}
+#epm-auto-pane [class*='text-[9px]'],
+#epm-auto-pane [class*='text-[10px]'],
+#epm-auto-pane [class*='text-[11px]'],
+#epm-auto-pane .epm-nf label,
+#epm-auto-pane .epm-nf [class*='text-muted'],
+#epm-auto-pane .epm-half > span {
+    font-size: var(--semantic-typography-caption-regular-default-fontSize) !important;
+    line-height: var(--semantic-typography-caption-regular-default-lineHeight) !important;
+}
+#epm-auto-pane .epm-nf input,
+#epm-auto-pane .epm-half select,
+#epm-auto-pane .epm-nf button[type='button'] {
+    color: var(--component-field-label-color-default) !important;
+}
