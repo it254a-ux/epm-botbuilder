@@ -406,6 +406,7 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 #epm-auto-pane {
     position: absolute;
     inset: 0;
+    height: auto;
     z-index: 60;
     display: none;
     flex-direction: column;
@@ -541,4 +542,8 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 }
 #epm-auto-pane .epm-nf > * {
     margin-top: 0 !important;
+}
+/* the trading column scrolls by itself, with a slim scrollbar */
+body.epm-dtrader-active .derivatives-trader .trade-params {
+    scrollbar-width: thin;
 }

@@ -36,12 +36,24 @@ function makeBar(): HTMLElement {
   return bar;
 }
 
-/** Keeps the bots view exactly as tall as the visible screen, so it scrolls inside itself instead of running off the bottom. */
+/**
+ * Keeps the trading column (Duration / Stake / Buy, or the bots view) exactly as tall as the visible screen, so only that
+ * column scrolls, not the whole page. In Auto the column is fixed to the screen height (the bots view fills it and scrolls
+ * inside itself); in Manual it grows with its content up to the screen height and then scrolls.
+ */
 function fitPane() {
-  if (!pane || pane.style.display === 'none') return;
-  const top = pane.getBoundingClientRect().top;
-  pane.style.height = `${Math.max(240, Math.round(window.innerHeight - top - 8))}px`;
-  pane.style.bottom = 'auto';
+  const col = document.querySelector(COLUMN) as HTMLElement | null;
+  if (!col || !document.body.classList.contains('epm-dtrader-active')) return;
+  if (col.getBoundingClientRect().width === 0) return;
+  const room = Math.max(240, Math.round(window.innerHeight - col.getBoundingClientRect().top - 8));
+  col.style.maxHeight = `${room}px`;
+  if (mode === 'auto') {
+    col.style.height = `${room}px`;
+    col.style.overflowY = 'hidden';
+  } else {
+    col.style.height = '';
+    col.style.overflowY = 'auto';
+  }
 }
 
 function paint() {
@@ -76,8 +88,6 @@ function setMode(next: 'manual' | 'auto') {
     const p = ensurePane();
     if (!p) return;
     p.style.display = 'flex';
-    fitPane();
-    window.setTimeout(fitPane, 300);
     if (!mounted) {
       mounted = true;
       const body = p.querySelector('.epm-auto-pane__body') as HTMLElement;
@@ -95,6 +105,7 @@ function setMode(next: 'manual' | 'auto') {
   } else if (pane) {
     pane.style.display = 'none';
   }
+  fitPane();
   paint();
 }
 
@@ -104,6 +115,7 @@ function ensureBar() {
   if (link.previousElementSibling?.classList.contains(BAR_CLASS)) return;
   link.parentElement.insertBefore(makeBar(), link);
   paint();
+  fitPane();
 }
 
 export function startAutoSwitch(): void {
