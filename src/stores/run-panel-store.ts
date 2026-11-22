@@ -768,6 +768,16 @@ export default class RunPanelStore {
 
         // Create a generic handler for ui.log.error that can extract error codes and use getLocalizedErrorMessage
         const handleUiLogError = (errorMessage: string) => {
+            // Stake limit warnings belong to the bot being edited or run. Switching between pages re-checks the Bot Builder
+            // workspace in the background, and that must not pop a red warning on pages the bot has nothing to do with.
+            if (
+                typeof errorMessage === 'string' &&
+                /stake amount that's at (least|most)|Please enter a stake/i.test(errorMessage) &&
+                !this.is_running &&
+                this.root_store.dashboard?.active_tab !== 1
+            ) {
+                return;
+            }
             // Check if this is a stake/payout error message first
             if (
                 typeof errorMessage === 'string' &&
