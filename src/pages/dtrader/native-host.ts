@@ -1,4 +1,5 @@
 import './dtrader-host.css';
+import { noteDtraderUrl } from './dtrader-symbol';
 /**
  * Runs Deriv's DTrader (built from dtrader-template, files in public/dtrader-app) inside the site's own page,
  * with no iframe. It signs in with the website's login, and stays loaded after the first visit so coming
@@ -132,6 +133,7 @@ export function loadDtrader(): Promise<void> {
     startSelfRepair();
     startConnectionRepair();
     void import('./auto-switch').then(m => m.startAutoSwitch());
+    void import('./digit-overlay').then(m => m.startDigitOverlay());
     startUrlSync();
     startVideoSwap();
     startChartZoomOut();
@@ -317,8 +319,15 @@ export function startUrlSync(): void {
   urlSyncing = true;
 
   // Hide DTrader's own long address while its page is on screen.
+  noteDtraderUrl(window.location.href);
+  const originalPush = history.pushState.bind(history);
+  history.pushState = (data: unknown, unused: string, url?: string | URL | null) => {
+    noteDtraderUrl(url);
+    originalPush(data, unused, url);
+  };
   const original = history.replaceState.bind(history);
   history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
+    noteDtraderUrl(url);
     if (url && /trade_type=/.test(String(url))) return; // never show DTrader's long address (also while it runs hidden in the background)
     original(data, unused, url);
   };

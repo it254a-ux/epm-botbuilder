@@ -8,6 +8,8 @@ interface DigitStatsWidgetProps {
     store: EpmTickStore;
     /** Digits to show with the filled blue "selected" circle (e.g. the barriers). */
     highlightDigits?: number[];
+    /** One row of ten instead of two rows of five. */
+    singleRow?: boolean;
 }
 
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -123,7 +125,7 @@ export function DigitStatsView({
  * the buffered ticks. Most frequent digit = teal arc, least frequent = red arc,
  * the latest tick's digit is enlarged with a red pointer.
  */
-function DigitStatsWidget({ store, highlightDigits = [] }: DigitStatsWidgetProps) {
+function DigitStatsWidget({ store, highlightDigits = [], singleRow = false }: DigitStatsWidgetProps) {
     const { ticks } = useEpmTickSnapshot(store);
 
     const { percentages, highest, lowest } = useMemo(() => {
@@ -150,6 +152,7 @@ function DigitStatsWidget({ store, highlightDigits = [] }: DigitStatsWidgetProps
             lowest={lowest}
             currentDigit={currentDigit}
             highlightDigits={highlightDigits}
+            singleRow={singleRow}
         />
     );
 }
