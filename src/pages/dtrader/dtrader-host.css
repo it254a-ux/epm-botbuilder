@@ -650,3 +650,20 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
     padding-block: 2px !important;
     box-sizing: border-box;
 }
+
+/* use the exact fill Deriv's own fields use, so the boxes show like on the Manual side */
+#epm-auto-pane .epm-nf,
+#epm-auto-pane .epm-cc > .epm-half,
+#epm-auto-pane .epm-cc > :has(> .epm-half) > .epm-half {
+    background: var(--component-field-bg-fill-default, var(--semantic-color-slate-solid-surface-frame-low)) !important;
+    border-radius: var(--core-borderRadius-400);
+    margin-inline: 0 !important;
+}
+#epm-auto-pane .bg-muted,
+#epm-auto-pane [data-state='on'] {
+    background-color: var(--component-field-bg-fill-default, var(--semantic-color-slate-solid-surface-frame-mid)) !important;
+}
+#epm-auto-pane .epm-nf button *,
+#epm-auto-pane .epm-nf button {
+    font-size: var(--core-fontSize-100) !important;
+}
