@@ -1,14 +1,12 @@
 /**
  * Live last-digit circles on the Dtrader chart: a small row sitting on the same level as the chart's zoom buttons, just to the right
- * of the "+", with no background so the chart shows through. It appears on the digit contract types only (Matches/Differs,
- * Over/Under, Even/Odd) and follows whichever market the chart is showing.
+ * of the "+", with no background so the chart shows through. It appears on every contract type, in Manual and in Auto, and follows whichever market the chart is showing.
  */
 import './digit-overlay.css';
 import { createElement } from 'react';
 import { getChartsSymbol, getDtraderSymbol, setShownSymbol } from './dtrader-symbol';
 import { createRoot } from 'react-dom/client';
 
-const DIGIT_TYPES = /matches|differs|over|under|even|odd/i;
 let started = false;
 
 export function startDigitOverlay(): void {
@@ -27,8 +25,7 @@ export function startDigitOverlay(): void {
     for (const el of Array.from(document.querySelectorAll<HTMLElement>('.cq-zoom-in'))) {
       if (el.getBoundingClientRect().width === 0) continue;
       if (el.closest('.derivatives-trader')) {
-        const chip = document.querySelector('.derivatives-trader .trade__trade-types button[data-state="selected"]');
-        if (document.body.classList.contains('epm-dtrader-active') && chip && DIGIT_TYPES.test(chip.textContent || '')) {
+        if (document.body.classList.contains('epm-dtrader-active')) {
           plus = el;
           symbol = getDtraderSymbol();
           break;
