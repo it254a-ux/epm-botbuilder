@@ -72,7 +72,14 @@ export function startDigitOverlay(): void {
     host.style.top = `${Math.round(r.top + r.height / 2 - host.offsetHeight / 2)}px`;
     if (!mounted) {
       mounted = true;
-      void import('./digit-overlay').then(m => createRoot(host).render(createElement(m.default)));
+      void import('./digit-overlay')
+        .then(m => createRoot(host).render(createElement(m.DigitOverlayGuarded)))
+        .catch(e => {
+          mounted = false;
+          host.textContent = `digits error: ${e instanceof Error ? e.message : String(e)}`;
+          host.style.color = '#ff6b6b';
+          host.style.fontSize = '11px';
+        });
     }
   };
   window.setInterval(place, 250);
