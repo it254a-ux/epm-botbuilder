@@ -667,3 +667,33 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
 #epm-auto-pane .epm-nf button {
     font-size: var(--core-fontSize-100) !important;
 }
+
+/* same width as the Manual fields: no extra side padding, border or card around the bots view */
+.epm-auto-pane__body {
+    padding: 0 !important;
+}
+#epm-auto-pane .dtrader-app,
+#epm-auto-pane .dtrader-app > *,
+#epm-auto-pane [class*='px-0'],
+#epm-auto-pane [class*='lg:px-3'],
+#epm-auto-pane [class*='sm:px-0'],
+#epm-auto-pane [class*='lg:px-'] {
+    padding-inline: 0 !important;
+}
+#epm-auto-pane :has(> .epm-cc) {
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+    border-radius: 0 !important;
+}
+#epm-auto-pane .epm-cc {
+    padding-inline: 0 !important;
+    padding-bottom: 8px !important;
+}
+#epm-auto-pane .epm-cc > *,
+#epm-auto-pane .epm-cc [class*='space-y-'] {
+    width: 100%;
+    max-width: none !important;
+    margin-inline: 0 !important;
+}
