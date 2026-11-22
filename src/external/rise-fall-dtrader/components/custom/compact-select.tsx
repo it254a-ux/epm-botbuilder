@@ -13,13 +13,13 @@ export function CompactSelect({
   disabled?: boolean;
 }) {
   return (
-    <label className="block w-full">
-      <span className="mb-1 block text-[11px] text-muted-foreground">{label}</span>
+    <label className="epm-half block w-full min-w-0">
+      <span className="mb-0.5 block text-[10px] text-muted-foreground">{label}</span>
       <select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-full rounded-lg border border-border px-2 text-[13px] font-medium text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+        className="h-7 w-full rounded-lg border border-border px-1.5 text-[12px] font-medium text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
