@@ -489,3 +489,12 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
     background-color: var(--semantic-color-slate-solid-surface-frame-mid) !important;
     color: var(--component-textIcon-normal-prominent) !important;
 }
+/* one scrollbar only: the bots view scrolls as a whole (the outer one), the old inner scroll areas just grow */
+#epm-auto-pane .dtrader-app,
+#epm-auto-pane .dtrader-app .overflow-hidden,
+#epm-auto-pane .dtrader-app .overflow-y-auto,
+#epm-auto-pane .dtrader-app .overflow-auto {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+}

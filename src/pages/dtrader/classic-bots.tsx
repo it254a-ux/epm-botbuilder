@@ -8,20 +8,24 @@ import { useDerivWSContext } from '@/external/rise-fall-dtrader/components/custo
 import { RiseFallBody } from '@/external/rise-fall-dtrader/components/rise-fall-body';
 import { DigitsBody } from '@/external/rise-fall-dtrader/components/digits-body';
 import { AccumulatorsBody } from '@/external/rise-fall-dtrader/components/accumulators-body';
-import { TemplateLayout } from '@/external/rise-fall-dtrader/components/custom/template-layout';
+import { DerivWSProvider } from '@/external/rise-fall-dtrader/components/custom/deriv-ws-provider';
+import { Toaster } from '@/external/rise-fall-dtrader/components/ui/sonner';
 import { NoChartContext } from '@/external/rise-fall-dtrader/components/trade-body';
 import '../../styles/dtrader-globals.css';
 
 /** The old DTrader's automated bots (Rise/Fall, Digits, Accumulators), shown without a chart inside the site's DTrader tab. */
 export default function ClassicBots() {
   return (
-    <TemplateLayout>
+    <>
+      <DerivWSProvider>
       <NoChartContext.Provider value={true}>
         <div className="dtrader-app h-full">
           <RiseFallPage />
         </div>
       </NoChartContext.Provider>
-    </TemplateLayout>
+      </DerivWSProvider>
+      <Toaster />
+    </>
   );
 }
 
