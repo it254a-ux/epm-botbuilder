@@ -590,3 +590,20 @@ body.epm-dtrader-active .derivatives-trader .purchase-button__information__wrapp
 #epm-auto-pane [class*='space-y-'] > * + * {
     margin-top: 6px !important;
 }
+
+/* Duration / Stake boxes: the height comes from Deriv's inner field element, so shrink that one */
+body.epm-dtrader-active .derivatives-trader .trade-params .quill-input__wrapper {
+    min-height: 0 !important;
+    height: 46px !important;
+    padding-block: 2px !important;
+}
+body.epm-dtrader-active .derivatives-trader .trade-params .quill-input__container {
+    gap: 0 !important;
+}
+/* on a computer the page itself never scrolls while Dtrader is showing: only the trading column does */
+@media (min-width: 1024px) {
+    html:has(body.epm-dtrader-active),
+    body.epm-dtrader-active {
+        overflow: hidden !important;
+    }
+}
