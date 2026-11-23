@@ -10,6 +10,8 @@ interface DigitStatsWidgetProps {
     highlightDigits?: number[];
     /** One row of ten instead of two rows of five. */
     singleRow?: boolean;
+    /** When set (0-9), this digit is shown as the current one instead of the last tick received here. */
+    currentDigitOverride?: number;
 }
 
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -125,7 +127,7 @@ export function DigitStatsView({
  * the buffered ticks. Most frequent digit = teal arc, least frequent = red arc,
  * the latest tick's digit is enlarged with a red pointer.
  */
-function DigitStatsWidget({ store, highlightDigits = [], singleRow = false }: DigitStatsWidgetProps) {
+function DigitStatsWidget({ store, highlightDigits = [], singleRow = false, currentDigitOverride }: DigitStatsWidgetProps) {
     const { ticks } = useEpmTickSnapshot(store);
 
     const { percentages, highest, lowest } = useMemo(() => {
@@ -143,7 +145,12 @@ function DigitStatsWidget({ store, highlightDigits = [], singleRow = false }: Di
         };
     }, [ticks]);
 
-    const currentDigit = ticks.length ? ticks[ticks.length - 1].digit : -1;
+    const currentDigit =
+        currentDigitOverride !== undefined && currentDigitOverride >= 0
+            ? currentDigitOverride
+            : ticks.length
+              ? ticks[ticks.length - 1].digit
+              : -1;
 
     return (
         <DigitStatsView
