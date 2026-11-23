@@ -17,3 +17,9 @@
 .epm-digit-overlay .digit-stats__pct {
     font-size: 2.4cqw;
 }
+.epm-digit-overlay .digit-stats--row .digit-stats__circle {
+    width: 9.2cqw;
+}
+.epm-digit-overlay .digit-stats--row .digit-stats__digit {
+    font-size: 4cqw;
+}
