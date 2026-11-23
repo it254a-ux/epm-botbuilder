@@ -11,10 +11,12 @@
         overflow-x: hidden;
 
         .quick-panel {
-            flex: 1 1 100%;
+            // sized from the screen width (not from its parent), so it can never run past the right edge
+            flex: 0 0 auto;
+            width: min(130rem, calc(100vw - 14rem));
             min-width: 0;
-            max-width: 130rem;
-            margin: 0 auto;
+            max-width: none;
+            margin: 0 auto 0 0;
         }
 
         .tab__dashboard__header .title {
