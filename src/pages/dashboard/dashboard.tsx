@@ -11,6 +11,7 @@ import Cards from './cards';
 import DashboardActions from './dashboard-actions';
 import DashboardTicker from './dashboard-ticker';
 import InfoPanel from './info-panel';
+import PageCards from './page-cards';
 import './dashboard-ticker.scss';
 
 type TMobileIconGuide = {
@@ -82,6 +83,7 @@ const DashboardComponent = observer(({ handleTabChange }: TMobileIconGuide) => {
                             </Text>
                         </div>
                         <Cards has_dashboard_strategies={has_dashboard_strategies} is_mobile={!isDesktop} />
+                        <PageCards handleTabChange={handleTabChange} />
                         <DashboardTicker
                             variant='markets'
                             label={localize('Free')}

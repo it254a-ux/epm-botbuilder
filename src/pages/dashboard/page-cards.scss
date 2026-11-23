@@ -1,0 +1,117 @@
+.page-cards {
+    width: 100%;
+    max-width: 84rem;
+    margin: 2.4rem auto 0;
+    padding: 0 1.6rem;
+    box-sizing: border-box;
+
+    &__title {
+        margin: 0 0 1.4rem;
+        text-align: center;
+        letter-spacing: 0.02em;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(25rem, 1fr));
+        gap: 1.2rem;
+    }
+}
+
+.page-card {
+    --card-accent: var(--brand-primary);
+
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    min-width: 0;
+    padding: 1.4rem 1.6rem;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-prominent);
+    border-radius: 1.6rem;
+    border: 1px solid color-mix(in srgb, var(--text-prominent) 12%, transparent);
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--card-accent) 14%, transparent), transparent 62%),
+        color-mix(in srgb, var(--general-main-1) 70%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+
+    &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 1.4rem;
+        bottom: 1.4rem;
+        width: 0.3rem;
+        border-radius: 0 0.3rem 0.3rem 0;
+        background: var(--card-accent);
+    }
+
+    &:hover,
+    &:focus-visible {
+        transform: translateY(-3px);
+        border-color: color-mix(in srgb, var(--card-accent) 60%, transparent);
+        box-shadow: 0 10px 26px color-mix(in srgb, var(--card-accent) 22%, transparent);
+        outline: none;
+
+        .page-card__arrow {
+            transform: translateX(4px);
+            opacity: 1;
+        }
+    }
+
+    &__icon {
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        width: 4.6rem;
+        height: 4.6rem;
+        font-size: 2.2rem;
+        border-radius: 1.3rem;
+        background: color-mix(in srgb, var(--card-accent) 20%, transparent);
+        border: 1px solid color-mix(in srgb, var(--card-accent) 38%, transparent);
+    }
+
+    &__body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        min-width: 0;
+        flex: 1;
+    }
+
+    &__name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    &__text {
+        font-size: 1.2rem;
+        line-height: 1.35;
+        color: var(--text-general);
+        opacity: 0.85;
+    }
+
+    &__arrow {
+        flex-shrink: 0;
+        font-size: 1.8rem;
+        color: var(--card-accent);
+        opacity: 0.6;
+        transition:
+            transform 0.2s ease,
+            opacity 0.2s ease;
+    }
+}
+
+@media (max-width: 1024px) {
+    .page-cards__grid {
+        grid-template-columns: 1fr;
+    }
+}
