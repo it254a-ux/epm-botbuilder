@@ -48,7 +48,7 @@ export function startDigitOverlay(): void {
     for (let i = 0; i < 3 && group && !group.querySelector(MINUS); i++) group = group.parentElement;
     if (group && group.querySelector(MINUS)) {
       const w = plus.getBoundingClientRect().width;
-      group.style.transform = `translateX(${-Math.round(4 * (w + 10))}px)`;
+      group.style.transform = `translateX(${-Math.round(5 * (w + 10))}px)`;
     }
     if (!symbol) {
       host.style.display = 'none';
