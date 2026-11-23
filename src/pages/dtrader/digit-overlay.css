@@ -18,8 +18,15 @@
     font-size: 2.4cqw;
 }
 .epm-digit-overlay .digit-stats--row .digit-stats__circle {
-    width: 9.2cqw;
+    width: 54px;
 }
 .epm-digit-overlay .digit-stats--row .digit-stats__digit {
-    font-size: 4cqw;
+    font-size: 20px;
+}
+.epm-digit-overlay .digit-stats--row .digit-stats__pct {
+    font-size: 9.5px;
+}
+.epm-digit-overlay .digit-stats--row .digit-stats__grid {
+    column-gap: 4px;
+    padding: 0 0 8px;
 }

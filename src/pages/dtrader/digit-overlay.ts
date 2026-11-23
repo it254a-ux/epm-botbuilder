@@ -65,7 +65,7 @@ export function startDigitOverlay(): void {
     while (box && box.getBoundingClientRect().width < 600) box = box.parentElement;
     const right = box ? Math.min(box.getBoundingClientRect().right, window.innerWidth) : window.innerWidth;
     const left = r.right + 12;
-    const width = Math.max(0, Math.min(460, right - left - 60));
+    const width = Math.max(0, Math.min(620, right - left - 30));
     if (width < 220) {
       host.style.display = 'none';
       return;
