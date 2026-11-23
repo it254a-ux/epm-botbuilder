@@ -47,8 +47,10 @@
                 left: 1.6rem;
             }
 
+            // measured from the screen's right edge (the page behind is wider than the screen, so its own right edge is off-screen)
             &--right {
-                right: 1.6rem;
+                position: fixed;
+                right: 5rem;
             }
         }
 
