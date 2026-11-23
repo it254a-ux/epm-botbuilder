@@ -750,3 +750,13 @@ body.epm-dtrader-active .derivatives-trader .trade-params__options-wrapper .trad
     width: 100%;
 }
 
+
+/* Bot "Status" bars (ten tiny columns, one per digit): keep their numbers tiny so they never pile up on each other */
+#epm-auto-pane [class*='grid-cols-10'] span {
+    font-size: 7px !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+}
+#epm-auto-pane [class*='grid-cols-10'] {
+    gap: 2px !important;
+}
