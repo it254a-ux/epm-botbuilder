@@ -190,8 +190,8 @@ function sampleManual(pane: HTMLElement) {
   if (ref) {
     const r = ref.getBoundingClientRect();
     const cr = col.getBoundingClientRect();
-    set('--epm-pad-l', `${Math.max(0, Math.round(r.left - cr.left))}px`);
-    set('--epm-pad-r', `${Math.max(0, Math.round(cr.right - r.right))}px`);
+    set('--epm-pad-l', `${Math.min(24, Math.max(0, Math.round(r.left - cr.left)))}px`);
+    set('--epm-pad-r', `${Math.min(24, Math.max(0, Math.round(cr.right - r.right)))}px`);
   }
 }
 
