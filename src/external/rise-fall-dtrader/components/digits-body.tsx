@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, useContext, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/external/rise-fall-dtrader/hooks/use-is-mobile';
 import { Skeleton } from '@/external/rise-fall-dtrader/components/ui/skeleton';
@@ -13,7 +13,7 @@ import { DigitTwinAutomatedPanel } from '@/external/rise-fall-dtrader/components
 import { DigitTrickerAutomatedPanel } from '@/external/rise-fall-dtrader/components/custom/digit-tricker-automated-panel';
 import { DigitStatsBar } from '@/external/rise-fall-dtrader/components/custom/digit-stats-bar';
 import { CompactSelect } from '@/external/rise-fall-dtrader/components/custom/compact-select';
-import { TradeBody } from '@/external/rise-fall-dtrader/components/trade-body';
+import { TradeBody, NoChartContext } from '@/external/rise-fall-dtrader/components/trade-body';
 import { useMartingaleAutomation } from '@/external/rise-fall-dtrader/hooks/use-martingale-automation';
 import { useDigitsEntryAutomation } from '@/external/rise-fall-dtrader/hooks/use-digits-entry-automation';
 import { useDigitsMatchDiffEntryAutomation } from '@/external/rise-fall-dtrader/hooks/use-digits-match-diff-entry-automation';
@@ -391,6 +391,7 @@ export function DigitsBody({
 
   // Switching bot type mid-run would leave the previous bot's automation
   // dangling in a running state with no visible controls, so stop it first.
+  const noChart = useContext(NoChartContext);
   const handleMatchDiffBotTypeChange = (next: MatchDiffBotType) => {
     if (next === matchDiffBotType) return;
     if (matchDiffAutomation.isRunning) matchDiffAutomation.stop('Switched bot');
@@ -471,7 +472,7 @@ export function DigitsBody({
   const chartWithOverlay = (
     <div className="relative h-full w-full max-lg:flex max-lg:flex-col">
       <div className="h-full w-full max-lg:h-auto max-lg:min-h-0 max-lg:flex-1">{chart}</div>
-      <DigitStatsBar selectedDigit={selectedDigit} onDigitSelect={setSelectedDigit} />
+      {!noChart && <DigitStatsBar selectedDigit={selectedDigit} onDigitSelect={setSelectedDigit} />}
     </div>
   );
 
