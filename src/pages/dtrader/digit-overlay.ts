@@ -76,7 +76,7 @@ export function startDigitOverlay(): void {
     host.style.top = `${Math.round(r.top + r.height / 2 - host.offsetHeight / 2)}px`;
     if (!mounted) {
       mounted = true;
-      void import('./digit-overlay')
+      void import('./digit-overlay-view')
         .then(m => createRoot(host).render(createElement(m.DigitOverlayGuarded)))
         .catch(e => {
           mounted = false;
