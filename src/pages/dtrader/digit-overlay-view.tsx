@@ -11,7 +11,34 @@ import { getShownSymbol, onShownSymbol } from './dtrader-symbol';
  */
 let tagEl: HTMLElement | null = null;
 const PRICE = /^\d[\d,]*\.(\d+)$/;
+// the chart header also shows the live price, e.g. "1620.18 - 0.12 (0.01%)"
+const HEADER = /^(\d[\d,]*\.\d+)\s*[-\u2212+]\s*\d/;
+let headerEl: HTMLElement | null = null;
+function headerDigit(): number {
+  const parse = (el: HTMLElement) => {
+    const m = (el.textContent || '').trim().match(HEADER);
+    return m ? Number(m[1].replace(/,/g, '').slice(-1)) : -1;
+  };
+  if (headerEl && headerEl.isConnected) {
+    const d = parse(headerEl);
+    if (d >= 0) return d;
+  }
+  headerEl = null;
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('div,span,p'))) {
+    if (el.children.length || el.closest('.epm-digit-overlay')) continue;
+    if (el.getBoundingClientRect().width === 0) continue;
+    const d = parse(el);
+    if (d >= 0) {
+      headerEl = el;
+      return d;
+    }
+  }
+  return -1;
+}
+
 function chartDigit(lastQuote: number): number {
+  const h = headerDigit();
+  if (h >= 0) return h;
   const read = (el: HTMLElement) => {
     const m = (el.textContent || '').trim().match(PRICE);
     return m ? { digit: Number(m[1].slice(-1)), value: Number((el.textContent || '').replace(/,/g, '')) } : null;
@@ -28,8 +55,6 @@ function chartDigit(lastQuote: number): number {
     if (t.length < 5 || t.length > 12) continue;
     const r = read(el);
     if (!r || el.getBoundingClientRect().width === 0) continue;
-    const bg = getComputedStyle(el).backgroundColor;
-    if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') continue;
     const diff = lastQuote ? Math.abs(r.value - lastQuote) : 0;
     if (!best || diff < best.diff) best = { el, digit: r.digit, diff };
   }
