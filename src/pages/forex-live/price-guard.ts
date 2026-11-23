@@ -132,7 +132,7 @@ export function createBell() {
 }
 
 /** How many trades one touch of a line can open. */
-export const GUARD_COUNTS = [1, 2, 3, 4, 5, 6, 10];
+export const GUARD_COUNTS = [1, 2, 3, 4, 5, 6, 7];
 
 /** The trades one touch of a line opened, watched together. */
 export interface GuardGroup {
