@@ -8,7 +8,7 @@
     --db-actions-size: 5.2rem;
     --db-rail-gap: 1rem;
 
-    // desktop: the six buttons are small and sit together in a tidy block of 2 columns x 3 rows at the top-left of the page
+    // desktop: six small buttons, three in a column on the left edge and three in a column on the right edge, level with each other
     @include desktop-screen {
         --db-actions-size: 3.8rem;
     }
@@ -38,7 +38,8 @@
 
         @include desktop-screen {
             position: absolute;
-            top: 12rem;
+            top: 50%;
+            transform: translateY(-50%);
             gap: var(--db-rail-gap);
             pointer-events: auto;
 
@@ -47,7 +48,7 @@
             }
 
             &--right {
-                left: calc(1.6rem + var(--db-actions-size) + var(--db-rail-gap));
+                right: 1.6rem;
             }
         }
 
