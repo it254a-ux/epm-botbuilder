@@ -39,11 +39,10 @@ export function startDigitOverlay(): void {
         break;
       }
     }
-    if (!plus || !symbol) {
+    if (!plus) {
       host.style.display = 'none';
       return;
     }
-    setShownSymbol(symbol);
     // move the zoom buttons (- o +) two button-widths to the left, to make room for the circles
     let group: HTMLElement | null = plus.parentElement;
     for (let i = 0; i < 3 && group && !group.querySelector(MINUS); i++) group = group.parentElement;
@@ -51,6 +50,11 @@ export function startDigitOverlay(): void {
       const w = plus.getBoundingClientRect().width;
       group.style.transform = `translateX(${-Math.round(2 * (w + 10))}px)`;
     }
+    if (!symbol) {
+      host.style.display = 'none';
+      return;
+    }
+    setShownSymbol(symbol);
     const r = plus.getBoundingClientRect();
     if (r.width === 0) {
       host.style.display = 'none';

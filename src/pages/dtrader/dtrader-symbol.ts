@@ -15,7 +15,16 @@ export function noteDtraderUrl(url?: string | URL | null): void {
     listeners.forEach(l => l(current));
   }
 }
-export const getDtraderSymbol = () => current;
+export function getDtraderSymbol(): string {
+  // Dtrader keeps its chosen market in its own saved state; read it live, fall back to the URL capture
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('trade_store') || '{}')?.symbol;
+    if (typeof saved === 'string' && saved) return saved;
+  } catch {
+    /* ignore */
+  }
+  return current;
+}
 export function onDtraderSymbol(l: (s: string) => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
