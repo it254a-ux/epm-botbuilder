@@ -43,7 +43,7 @@
             border-radius: 1.8rem;
 
             &--welcome {
-                margin: 0 0 1.4rem;
+                margin: 0 0 0.8rem;
             }
 
             &--markets {
@@ -53,17 +53,66 @@
 
         .page-cards {
             max-width: none;
-            margin: 1.8rem 0 0;
+            margin: 1rem 0 0;
             padding: 0;
 
             &__title {
-                margin-bottom: 1rem;
+                margin-bottom: 0.6rem;
             }
 
+            // five small cards per row, so all ten fit on the screen with the rest of the page
             &__grid {
-                grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
-                gap: 1rem;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 0.8rem;
             }
+        }
+
+        .page-card {
+            gap: 0.9rem;
+            padding: 0.8rem 1rem;
+            border-radius: 1.2rem;
+
+            &::before {
+                top: 0.9rem;
+                bottom: 0.9rem;
+            }
+
+            &__icon {
+                width: 3.4rem;
+                height: 3.4rem;
+                font-size: 1.7rem;
+                border-radius: 1rem;
+            }
+
+            &__name {
+                font-size: 1.3rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            &__text {
+                font-size: 1.05rem;
+                line-height: 1.25;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            &__arrow {
+                display: none;
+            }
+        }
+
+        // the four quick-start tiles: a little tighter
+        .tab__dashboard__table__images {
+            padding: 1rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .tab__dashboard__table__block {
+            padding-inline-end: 3rem;
         }
     }
 }
