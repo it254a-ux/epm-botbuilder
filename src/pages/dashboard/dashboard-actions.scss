@@ -6,8 +6,12 @@
 
 .db-actions {
     --db-actions-size: 5.2rem;
-    // distance of each group's middle from the edge: the Dashboard has 216px of empty padding on each side, so 108px is its middle
-    --db-side-x: 108px;
+    --db-rail-gap: 1rem;
+
+    // desktop: the six buttons are small and sit together in a tidy block of 2 columns x 3 rows at the top-left of the page
+    @include desktop-screen {
+        --db-actions-size: 3.8rem;
+    }
 
     // desktop: a full-size, click-through layer over the Dashboard content. Three buttons sit in the middle of the empty
     // space on the left and three in the middle of the empty space on the right.
@@ -34,17 +38,16 @@
 
         @include desktop-screen {
             position: absolute;
-            top: 50%;
+            top: 12rem;
+            gap: var(--db-rail-gap);
             pointer-events: auto;
 
             &--left {
-                left: var(--db-side-x);
-                transform: translate(-50%, -50%);
+                left: 1.6rem;
             }
 
             &--right {
-                right: var(--db-side-x);
-                transform: translate(50%, -50%);
+                left: calc(1.6rem + var(--db-actions-size) + var(--db-rail-gap));
             }
         }
 
@@ -124,11 +127,11 @@
 
 @keyframes db-actions-float {
     from {
-        transform: translateY(-0.5rem);
+        transform: translateY(-0.3rem);
     }
 
     to {
-        transform: translateY(0.5rem);
+        transform: translateY(0.3rem);
     }
 }
 

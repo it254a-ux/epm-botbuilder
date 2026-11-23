@@ -1,0 +1,66 @@
+// Desktop Dashboard layout: the page used to keep 216px of empty padding on both sides and big gaps between its rows.
+// Now the content uses the whole width (the small contact/social block sits in a narrow strip on the left), the rows
+// are close together, and the page scrolls when there is more than fits on one screen.
+
+@use 'components/shared/styles/mixins' as *;
+
+@include desktop-screen {
+    .tab__dashboard__content {
+        padding: 2rem 2.4rem 2.4rem 10rem;
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        .quick-panel {
+            flex: 1 1 100%;
+            min-width: 0;
+            max-width: 130rem;
+            margin: 0 auto;
+        }
+
+        .tab__dashboard__header .title {
+            height: auto;
+        }
+
+        .tab__dashboard__header .subtitle {
+            margin-top: 0.6rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .tab__dashboard__table__tiles {
+            padding: 1.2rem 0 0;
+            gap: 1rem;
+        }
+
+        .db-ticker {
+            --db-welcome-lift: 0rem;
+            --db-markets-lift: 0rem;
+
+            max-width: none;
+            height: 3.6rem;
+            border-radius: 1.8rem;
+
+            &--welcome {
+                margin: 0 0 1.4rem;
+            }
+
+            &--markets {
+                margin: 1.6rem 0 0;
+            }
+        }
+
+        .page-cards {
+            max-width: none;
+            margin: 1.8rem 0 0;
+            padding: 0;
+
+            &__title {
+                margin-bottom: 1rem;
+            }
+
+            &__grid {
+                grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+                gap: 1rem;
+            }
+        }
+    }
+}

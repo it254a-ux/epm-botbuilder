@@ -13,6 +13,7 @@ import DashboardTicker from './dashboard-ticker';
 import InfoPanel from './info-panel';
 import PageCards from './page-cards';
 import './dashboard-ticker.scss';
+import './dashboard-layout.scss';
 
 type TMobileIconGuide = {
     handleTabChange: (active_number: number) => void;
