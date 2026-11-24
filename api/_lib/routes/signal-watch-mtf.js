@@ -31,6 +31,7 @@ const ict = require('../ict');
 const pdhMod = require('../pdh');
 const grabMod = require('../grab');
 const grabTg = require('../grab-telegram');
+const smcTouch = require('../smc-touch');
 const approachMod = require('../approach');
 const core = require('../signals-core');
 const store = require('../signals-store');
@@ -103,12 +104,15 @@ module.exports = async function handler(req, res) {
     const pdhEnabled = String(process.env.MTF_PDH || 'on').toLowerCase() !== 'off';
     const grabEnabled = String(process.env.GRAB_ENABLED || 'on').toLowerCase() === 'on';
     const grabCfg = grabTg.readGrabConfig();
+    // Smart Money SELL alert: sent the moment price touches the entry of a sell setup (SMC_ALERT=off switches it off).
+    const smcCfg = smcTouch.readSmcConfig();
     // Heads-up when price nears the chart's Sell SL / Buy SL lines (APPROACH_ALERT=off switches it off). Never trades.
     const approachCfg = approachMod.readApproachConfig();
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
     if (ictEnabled) summary.ict = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0 };
     if (pdhEnabled) summary.pdh = { waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, alerts: 0 };
     if (grabEnabled) summary.grab = { waiting: 0, signals: 0, alerts: 0, newsHeld: 0 };
+    if (smcCfg.enabled) summary.smc = { waiting: 0, alerts: 0, newsHeld: 0 };
     if (approachCfg.enabled) summary.approach = { alerts: 0 };
     const report = { ok: true, dry, mode: 'M15 direction + M5 entry', summary, markets: [] };
 
@@ -171,6 +175,41 @@ module.exports = async function handler(req, res) {
                     entry.skipped = 'Market closed or suspended';
                     summary.closedOrSuspended++;
                     return;
+                }
+                // Smart Money sell: looked at on EVERY run (the cron job runs every minute), because the touch of the entry must be caught at once.
+                if (smcCfg.enabled) {
+                    entry.smc = {};
+                    try {
+                        const [s15, s1] = await Promise.all([deriv.getCandles(client, symbol, 900, 4), deriv.getCandles(client, symbol, 60, 0.25)]);
+                        const snow = Math.floor(Date.now() / 1000);
+                        const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg);
+                        entry.smc = { stage: r.stage, note: r.note };
+                        if (r.stage === 'waiting') summary.smc.waiting++;
+                        if (r.stage === 'touched') {
+                            const sc = news.currenciesFor(symbol, info.market);
+                            const sn = sc.length && newsData.events.length ? news.check(sc, newsData.events, snow, newsCfg) : {};
+                            const text = smcTouch.formatSmcSell(r, info.underlying_symbol_name, smcCfg, { siteUrl: core.signalsPageUrl(), newsNote: sn.upcoming ? news.newsNote(sn.upcoming, snow) : null });
+                            const alertKey = `${symbol}|smc-sell|${r.key}`;
+                            if (!write) {
+                                entry.smc.wouldSend = text;
+                            } else if (await store.claimAlert(sql, alertKey)) {
+                                try {
+                                    await send(() => sendTelegram(text));
+                                    entry.smc.sent = true;
+                                    summary.smc.alerts++;
+                                } catch (err) {
+                                    await store.releaseAlert(sql, alertKey); // let the next run try again
+                                    entry.smc.sent = `failed: ${err.message}`;
+                                    console.error('signal-watch-mtf: smc send failed:', err.message);
+                                }
+                            } else {
+                                entry.smc.skipped = 'Already sent for this setup';
+                            }
+                        }
+                    } catch (err) {
+                        entry.smc = { error: err.message };
+                        console.error(`signal-watch-mtf: smc ${symbol} failed:`, err.message);
+                    }
                 }
                 const seen = states.get(symbol);
                 if (!force && seen && seen.lastCandle >= expected) {
