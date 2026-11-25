@@ -3,6 +3,7 @@
 // Only the candles are different: the latest ones. buildSmcSvg() is pure (text in, text out);
 // renderSmcPng() turns it into a PNG with the shared renderer.
 const { px } = require('./engine');
+const { stakeTpPrice } = require('./smc-touch');
 const { svgToPng } = require('./signal-chart');
 
 const W = 862;
@@ -27,7 +28,10 @@ const hhmm = t => `${pad2(new Date(t * 1000).getUTCHours())}:${pad2(new Date(t *
  * @param {string} input.symbolName
  * @param {object} input.cfg     { multiplier }
  */
-function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
+function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
+    // take profit = stake x multiple (no stop loss): the picture shows that price, the entry zone and the structure
+    const r = { ...r0, takeProfit: stakeTpPrice(r0.entry, { multiplier: cfg.multiplier, tpMultiple: cfg.tpMultiple || 1.5 }) };
+    const tpMult = cfg.tpMultiple || 1.5;
     const TF = tf;
     const SLOT = SLOT_OF[tf] || 18.8;
     const BODY = SLOT < 12 ? 5 : 8;
@@ -40,7 +44,7 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
     const shown = candles.filter(c => xAt(c.time) >= PLOT.x0 - SLOT / 2);
     const N = shown.length;
 
-    const levels = [r.entry, r.stopLoss, r.takeProfit, r.zone.top, r.zone.bottom];
+    const levels = [r.entry, r.takeProfit, r.zone.top, r.zone.bottom];
     let lo = Math.min(...shown.map(c => c.low), ...levels);
     let hi = Math.max(...shown.map(c => c.high), ...levels);
     const span = hi - lo || 1;
@@ -49,7 +53,6 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
     const yOf = p => PLOT.y0 + ((hi - p) / (hi - lo)) * (PLOT.y1 - PLOT.y0);
     const dec = Math.min(6, Math.max(2, (px(r.entry).split('.')[1] || '').length));
     const pr = p => Number(p).toFixed(dec);
-    const rr = r.stopLoss > r.entry ? (r.entry - r.takeProfit) / (r.stopLoss - r.entry) : null;
 
     const out = [];
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="DejaVu Sans, sans-serif">`);
@@ -60,8 +63,8 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
     out.push(`<text x="64" y="52" font-size="19" font-weight="bold" fill="#0b0f14" text-anchor="middle">SELL</text>`);
     out.push(`<text x="126" y="44" font-size="22" font-weight="bold" fill="${C.text}">${esc(symbolName)} · ${tfLabel}</text>`);
     out.push(`<text x="126" y="66" font-size="13" fill="${C.dim}">Smart Money: BOS + zone + sweep · price reached the entry</text>`);
-    out.push(`<text x="${W - 18}" y="44" font-size="15" font-weight="bold" fill="${C.text}" text-anchor="end">Multiplier ×${cfg.multiplier}</text>`);
-    out.push(`<text x="${W - 18}" y="66" font-size="13" fill="${C.dim}" text-anchor="end">stake is the stop</text>`);
+    out.push(`<text x="${W - 18}" y="44" font-size="15" font-weight="bold" fill="${C.text}" text-anchor="end">Multiplier ×${cfg.multiplier} · TP ${tpMult}× stake</text>`);
+    out.push(`<text x="${W - 18}" y="66" font-size="13" fill="${C.dim}" text-anchor="end">No stop loss</text>`);
 
     // plot
     out.push(`<rect x="0" y="${PLOT.y0 - 2}" width="${W}" height="${PLOT.y1 - PLOT.y0 + 6}" fill="${C.panel}"/>`);
@@ -106,7 +109,6 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
     // lines across the chart
     const xLine = PLOT.x1;
     const hline = (p, col, w, dash, x0 = 0, x1 = xLine) => out.push(`<line x1="${n1(x0)}" y1="${n1(yOf(p))}" x2="${n1(x1)}" y2="${n1(yOf(p))}" stroke="${col}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`);
-    hline(r.stopLoss, C.sl, 1.6, '5 4');
     hline(r.entry, C.blue, 2);
     hline(r.entry, C.orange, 2, '6 6');
     hline(r.takeProfit, C.tp, 1.6, '5 4');
@@ -129,15 +131,12 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
     note(r.zone.top, '#f4a46a', 'SELL ENTRY AREA · SUPPLY ZONE · UNMITIGATED', 11);
     if (r.poc) note(r.poc, '#e9c9ff', 'POC + ZONE', -5);
     const yTp = yOf(r.takeProfit);
-    note(r.takeProfit, '#ffd54a', 'SELL SIDE LIQUIDITY', -6);
-    out.push(`<circle cx="${labelX + 152}" cy="${n1(yTp - 10)}" r="6" fill="none" stroke="#f6465d" stroke-width="1.6"/><circle cx="${labelX + 152}" cy="${n1(yTp - 10)}" r="2.5" fill="#f6465d"/>`);
 
     // price tags on the right axis: a name box and a price box, never on top of each other
     const tags = [
-        { p: r.stopLoss, col: C.sl, name: 'SL (idea fails)', tc: '#fff' },
         { p: r.entry, col: C.blue, name: 'SELL ENTRY AREA', tc: '#fff' },
         { p: r.entry, col: C.orange, name: 'AUTO ENTRY SELL', tc: '#0b0f14' },
-        { p: r.takeProfit, col: C.tp, name: `TP · RR 1:${rr ? rr.toFixed(1) : '-'}`, tc: '#0b0f14' },
+        { p: r.takeProfit, col: C.tp, name: `TP · ${tpMult}× stake`, tc: '#0b0f14' },
         { p: lastBar.close, col: C.now, name: '', tc: '#fff' },
     ];
     tags.forEach(t => { t.y = yOf(t.p); });

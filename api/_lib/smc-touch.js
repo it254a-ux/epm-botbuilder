@@ -18,6 +18,8 @@ function readSmcConfig(env = process.env) {
     return {
         enabled: String(env.SMC_ALERT || 'on').toLowerCase() !== 'off',
         multiplier: Math.max(1, num(env.SMC_MULTIPLIER, 100)),
+        // take profit = this many times the stake (no stop loss: the stake is the most that can be lost)
+        tpMultiple: Math.max(0.1, num(env.SMC_TP_STAKES, 1.5)),
         // a touch older than this many minutes is "too late": nothing is sent
         freshSeconds: Math.round(Math.max(1, num(env.SMC_FRESH_MINUTES, 5)) * 60),
         // closed M15 candles needed before the setup is trusted
@@ -69,6 +71,11 @@ function findSmcSell(c15, m1, kind, now, cfg, tf = TF) {
     return { stage: 'waiting', note: `Waiting for price to reach the entry ${engine.px(entry)}`, ...base };
 }
 
+/** The price a SELL multiplier trade opened at the entry has to reach to make `tpMultiple` times the stake. */
+function stakeTpPrice(entry, cfg) {
+    return entry * (1 - cfg.tpMultiple / cfg.multiplier);
+}
+
 /** The Telegram text. No stop-loss line: the trade is a Deriv multiplier whose stake is the stop. Uses Telegram HTML. */
 function formatSmcSell(r, symbolName, cfg, { siteUrl, newsNote } = {}) {
     const px = engine.px;
@@ -80,9 +87,8 @@ function formatSmcSell(r, symbolName, cfg, { siteUrl, newsNote } = {}) {
         `📊 Strategy: Smart Money (${tfName(r.tf || TF)})`,
         `🎯 Entry: <code>${px(r.entry)}</code>`,
         `🧱 Supply zone: <code>${px(r.zone.bottom)} – ${px(r.zone.top)}</code>`,
-        ...(r.poc ? [`✅ First take profit (POC): <code>${px(r.poc)}</code>`] : []),
-        `🏁 Target (sell side liquidity): <code>${px(r.takeProfit)}</code>`,
-        `⚙️ Trade it as a multiplier <b>×${cfg.multiplier}</b>; the stake is your stop.`,
+        `✅ Take profit: <b>${cfg.tpMultiple}× your stake</b> (${Math.round(cfg.tpMultiple * 100)}% profit), price about <code>${px(stakeTpPrice(r.entry, cfg))}</code>`,
+        `⚙️ Trade it as a multiplier <b>×${cfg.multiplier}</b>. No stop loss: the stake is the most you can lose.`,
         `🕒 Entry hit: ${gmtStamp(r.touchTime)}`,
         ...(newsNote ? ['', newsNote] : []),
         ...(siteUrl ? ['', `🔗 <a href="${escapeHtml(siteUrl)}">Open the signals page</a>`] : []),
@@ -91,4 +97,4 @@ function formatSmcSell(r, symbolName, cfg, { siteUrl, newsNote } = {}) {
     ].join('\n');
 }
 
-module.exports = { tfName, readSmcConfig, formingFromMinutes, findSmcSell, formatSmcSell };
+module.exports = { stakeTpPrice, tfName, readSmcConfig, formingFromMinutes, findSmcSell, formatSmcSell };
