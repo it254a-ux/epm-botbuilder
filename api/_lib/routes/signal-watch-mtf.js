@@ -106,6 +106,9 @@ module.exports = async function handler(req, res) {
     const grabCfg = grabTg.readGrabConfig();
     // Smart Money SELL alert: sent the moment price touches the entry of a sell setup (SMC_ALERT=off switches it off).
     const smcCfg = smcTouch.readSmcConfig();
+    // Smart Money only (the default): every other signal of this job (M15+M5 direction, ICT, Previous Day High/Low, Liquidity Grab,
+    // Sell/Buy SL heads-up) stays silent. Set SMC_ONLY=off to bring them back.
+    const smcOnly = smcCfg.enabled && String(process.env.SMC_ONLY || 'on').toLowerCase() !== 'off';
     // Heads-up when price nears the chart's Sell SL / Buy SL lines (APPROACH_ALERT=off switches it off). Never trades.
     const approachCfg = approachMod.readApproachConfig();
     const summary = { watching: 0, analysed: 0, closedOrSuspended: 0, noNewCandle: 0, waiting: 0, signalsSaved: 0, telegramSent: 0, newsHeld: 0, errors: 0, deferred: 0 };
@@ -211,6 +214,8 @@ module.exports = async function handler(req, res) {
                         console.error(`signal-watch-mtf: smc ${symbol} failed:`, err.message);
                     }
                 }
+                if (smcOnly) return; // Smart Money only: nothing else is analysed or sent
+
                 const seen = states.get(symbol);
                 if (!force && seen && seen.lastCandle >= expected) {
                     entry.skipped = 'No new closed M5 candle since the last check';
