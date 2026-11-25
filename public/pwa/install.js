@@ -1,4 +1,16 @@
 // Registers the app (service worker) and shows a small "Install app" button when the browser allows installing.
+// When the installed app is shown with its title bar merged into the page (window controls overlay), the site's own top bar
+// becomes the title bar: the website name written by the browser disappears, the bar can be dragged, and nothing hides under the window buttons.
+(function () {
+    var st = document.createElement('style');
+    st.textContent =
+        '@media (display-mode: window-controls-overlay){' +
+        '.app-header{-webkit-app-region:drag;app-region:drag;padding-left:env(titlebar-area-x,0);padding-right:calc(100vw - env(titlebar-area-x,0px) - env(titlebar-area-width,100vw));min-height:env(titlebar-area-height,40px)}' +
+        '.app-header a,.app-header button,.app-header input,.app-header select,.app-header [role=button],.app-header [role=tab],.app-header [tabindex]{-webkit-app-region:no-drag;app-region:no-drag}' +
+        '}';
+    document.head.appendChild(st);
+})();
+
 (function () {
     if (!('serviceWorker' in navigator) || !/^https:|^http:\/\/localhost/.test(location.href)) return;
     window.addEventListener('load', function () {
