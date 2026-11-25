@@ -48,14 +48,15 @@ const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
 const PDH_STRATEGY_ID = 8;
 const PDH_STRATEGY_NAME = 'Previous Day High/Low rejection';
 
-// The closed M15 candles only change every 15 minutes, so they are fetched once per 15 minutes per market (keeps Deriv's request limit free).
-const m15Cache = new Map();
-async function closedM15(client, symbol, now) {
-    const bucket = Math.floor(now / 900);
-    const hit = m15Cache.get(symbol);
+// Closed candles only change once per candle, so they are fetched once per candle per market (keeps Deriv's request limit free).
+const candleCache = new Map();
+async function closedCandles(client, symbol, tf, days, now) {
+    const bucket = Math.floor(now / tf);
+    const k = `${symbol}|${tf}`;
+    const hit = candleCache.get(k);
     if (hit && hit.bucket === bucket) return hit.candles;
-    const candles = await deriv.getCandles(client, symbol, 900, 4);
-    m15Cache.set(symbol, { bucket, candles });
+    const candles = await deriv.getCandles(client, symbol, tf, days);
+    candleCache.set(k, { bucket, candles });
     return candles;
 }
 
@@ -194,49 +195,58 @@ module.exports = async function handler(req, res) {
                 // Smart Money sell: looked at on EVERY run (the cron job runs every minute), because the touch of the entry must be caught at once.
                 if (smcCfg.enabled) {
                     entry.smc = {};
-                    try {
-                        const snow = Math.floor(Date.now() / 1000);
-                        const [s15, s1] = await Promise.all([closedM15(client, symbol, snow), deriv.getCandles(client, symbol, 60, 0.25)]);
-                        const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg);
-                        entry.smc = { stage: r.stage, note: r.note };
+                    const snow = Math.floor(Date.now() / 1000);
+                    let s1 = null;
+                    // the M15 chart and the M5 chart are both read; each setup is announced once
+                    for (const [tf, days] of [[900, 4], [300, 2]]) {
+                      const tn = smcTouch.tfName(tf);
+                      entry.smc[tn] = {};
+                      const out = entry.smc[tn];
+                      try {
+                        if (!s1) s1 = await deriv.getCandles(client, symbol, 60, 0.25);
+                        const s15 = await closedCandles(client, symbol, tf, days, snow);
+                        const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg, tf);
+                        out.stage = r.stage;
+                        out.note = r.note;
                         if (r.stage === 'waiting') summary.smc.waiting++;
                         if (r.stage === 'touched') {
                             const sc = news.currenciesFor(symbol, info.market);
                             const sn = sc.length && newsData.events.length ? news.check(sc, newsData.events, snow, newsCfg) : {};
                             const text = smcTouch.formatSmcSell(r, info.underlying_symbol_name, smcCfg, { siteUrl: core.signalsPageUrl(), newsNote: sn.upcoming ? news.newsNote(sn.upcoming, snow) : null });
-                            const alertKey = `${symbol}|smc-sell|${r.key}`;
+                            const alertKey = tf === 900 ? `${symbol}|smc-sell|${r.key}` : `${symbol}|smc-sell|${r.key}`;
                             if (!write) {
-                                entry.smc.wouldSend = text;
+                                out.wouldSend = text;
                             } else if (await store.claimAlert(sql, alertKey)) {
                                 try {
                                     await send(async () => {
                                         // the chart picture goes with the alert; if it cannot be drawn the text is sent alone
                                         try {
                                             try { const rs = require('@resvg/resvg-js'); if (typeof rs.ready === 'function') await rs.ready(); } catch (e) { /* real renderer needs no start-up */ }
-                                            const forming = smcTouch.formingFromMinutes(s1, snow);
-                                            const closedNow = s15.filter(c => c.time + 900 <= snow);
-                                            const png = smcChart.renderSmcPng({ candles: forming ? [...closedNow, forming] : closedNow, result: r, symbolName: info.underlying_symbol_name, cfg: smcCfg });
+                                            const forming = smcTouch.formingFromMinutes(s1, snow, tf);
+                                            const closedNow = s15.filter(c => c.time + tf <= snow);
+                                            const png = smcChart.renderSmcPng({ candles: forming ? [...closedNow, forming] : closedNow, result: r, symbolName: info.underlying_symbol_name, cfg: smcCfg, tf });
                                             return await sendTelegramPhoto(png, text);
                                         } catch (picErr) {
                                             console.error('signal-watch-mtf: smc chart picture failed, sending text only:', picErr.message);
-                                            entry.smc.picture = `failed: ${picErr.message}`;
+                                            out.picture = `failed: ${picErr.message}`;
                                         }
                                         return sendTelegram(text);
                                     });
-                                    entry.smc.sent = true;
+                                    out.sent = true;
                                     summary.smc.alerts++;
                                 } catch (err) {
                                     await store.releaseAlert(sql, alertKey); // let the next run try again
-                                    entry.smc.sent = `failed: ${err.message}`;
+                                    out.sent = `failed: ${err.message}`;
                                     console.error('signal-watch-mtf: smc send failed:', err.message);
                                 }
                             } else {
-                                entry.smc.skipped = 'Already sent for this setup';
+                                out.skipped = 'Already sent for this setup';
                             }
                         }
-                    } catch (err) {
-                        entry.smc = { error: err.message };
-                        console.error(`signal-watch-mtf: smc ${symbol} failed:`, err.message);
+                      } catch (err) {
+                        entry.smc[tn] = { error: err.message };
+                        console.error(`signal-watch-mtf: smc ${tn} ${symbol} failed:`, err.message);
+                      }
                     }
                 }
                 if (smcOnly) return; // Smart Money only: nothing else is analysed or sent

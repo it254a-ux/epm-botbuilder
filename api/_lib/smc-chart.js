@@ -8,10 +8,8 @@ const { svgToPng } = require('./signal-chart');
 const W = 862;
 const H = 1000;
 const PLOT = { x0: 0, x1: 765, y0: 127, y1: 945 };
-const SLOT = 18.8; // px per M15 candle (the website chart's zoom)
+const SLOT_OF = { 900: 18.8, 300: 9.75 }; // px per candle (the website chart's zoom: M15 and M5)
 const LAST_X = 330; // centre of the newest candle
-const BODY = 8;
-const TF = 900;
 const C = {
     bg: '#151a24', panel: '#161b27', grid: '#1f2634', text: '#d1d4dc', dim: '#8a8f9c', up: '#2ebd6b', down: '#ef5350',
     zone: '#f0883e', blue: '#3b82f6', orange: '#ff9800', poc: '#d9a7ff', bos: '#22d3ee', sl: '#ef4444', tp: '#22c55e',
@@ -29,7 +27,12 @@ const hhmm = t => `${pad2(new Date(t * 1000).getUTCHours())}:${pad2(new Date(t *
  * @param {string} input.symbolName
  * @param {object} input.cfg     { multiplier }
  */
-function buildSmcSvg({ candles, result: r, symbolName, cfg }) {
+function buildSmcSvg({ candles, result: r, symbolName, cfg, tf = 900 }) {
+    const TF = tf;
+    const SLOT = SLOT_OF[tf] || 18.8;
+    const BODY = SLOT < 12 ? 5 : 8;
+    const GRID = tf === 300 ? 3600 : 5400; // time labels: every hour on M5, every 90 minutes on M15
+    const tfLabel = tf === 300 ? '5m' : '15m';
     if (!candles.length) throw new Error('No candles to draw');
     const o = r.overlay || {};
     const lastT = candles[candles.length - 1].time;
@@ -55,7 +58,7 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg }) {
     // header
     out.push(`<rect x="18" y="26" width="92" height="38" rx="8" fill="#f6465d"/>`);
     out.push(`<text x="64" y="52" font-size="19" font-weight="bold" fill="#0b0f14" text-anchor="middle">SELL</text>`);
-    out.push(`<text x="126" y="44" font-size="22" font-weight="bold" fill="${C.text}">${esc(symbolName)} · 15m</text>`);
+    out.push(`<text x="126" y="44" font-size="22" font-weight="bold" fill="${C.text}">${esc(symbolName)} · ${tfLabel}</text>`);
     out.push(`<text x="126" y="66" font-size="13" fill="${C.dim}">Smart Money: BOS + zone + sweep · price reached the entry</text>`);
     out.push(`<text x="${W - 18}" y="44" font-size="15" font-weight="bold" fill="${C.text}" text-anchor="end">Multiplier ×${cfg.multiplier}</text>`);
     out.push(`<text x="${W - 18}" y="66" font-size="13" fill="${C.dim}" text-anchor="end">stake is the stop</text>`);
@@ -71,7 +74,7 @@ function buildSmcSvg({ candles, result: r, symbolName, cfg }) {
     }
     // time axis: a label every 90 minutes, also over the empty space on the right
     const tStart = lastT - Math.ceil(LAST_X / SLOT) * TF;
-    for (let t = Math.ceil(tStart / 5400) * 5400; xAt(t) < PLOT.x1; t += 5400) {
+    for (let t = Math.ceil(tStart / GRID) * GRID; xAt(t) < PLOT.x1; t += GRID) {
         const x = xAt(t);
         if (x < 20) continue;
         out.push(`<line x1="${n1(x)}" y1="${PLOT.y0}" x2="${n1(x)}" y2="${PLOT.y1}" stroke="${C.grid}"/>`);

@@ -10,7 +10,8 @@ const smc = require('./smc');
 const { escapeHtml, gmtStamp } = require('./signals-core');
 
 const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
-const TF = 900; // the Smart Money setup is read on the M15 chart
+const TF = 900; // default: the Smart Money setup is read on the M15 chart (the M5 chart is read too, see routes/signal-watch-mtf.js)
+const tfName = tf => (tf === 300 ? 'M5' : tf === 900 ? 'M15' : `${tf}s`);
 const LIVE_STATES = ['waiting_for_sweep', 'sweep_in_progress', 'ready'];
 
 function readSmcConfig(env = process.env) {
@@ -25,9 +26,9 @@ function readSmcConfig(env = process.env) {
 }
 
 /** The M15 candle that is still forming, built from the 1-minute candles (so a touch inside the candle is seen live). */
-function formingFromMinutes(m1, now) {
-    const open = Math.floor(now / TF) * TF;
-    const part = m1.filter(c => c.time >= open && c.time < open + TF);
+function formingFromMinutes(m1, now, tf = TF) {
+    const open = Math.floor(now / tf) * tf;
+    const part = m1.filter(c => c.time >= open && c.time < open + tf);
     if (!part.length) return null;
     return {
         time: open,
@@ -41,10 +42,10 @@ function formingFromMinutes(m1, now) {
 /**
  * @returns {{stage:'none', note:string} | {stage:'waiting', ...} | {stage:'touched', key, entry, stopLoss, takeProfit, zone, poc, touchTime, state, overlay}}
  */
-function findSmcSell(c15, m1, kind, now, cfg) {
-    const closed = c15.filter(c => c.time + TF <= now);
-    if (closed.length < cfg.minCandles) return { stage: 'none', note: 'Not enough M15 candles yet' };
-    const forming = formingFromMinutes(m1, now);
+function findSmcSell(c15, m1, kind, now, cfg, tf = TF) {
+    const closed = c15.filter(c => c.time + tf <= now);
+    if (closed.length < cfg.minCandles) return { stage: 'none', note: `Not enough ${tfName(tf)} candles yet` };
+    const forming = formingFromMinutes(m1, now, tf);
     const a = smc.analyseSmc(closed, kind, forming, now, 'SELL');
     const o = a.smc;
     if (!o || o.side !== 'SELL') return { stage: 'none', note: a.statusText };
@@ -54,8 +55,8 @@ function findSmcSell(c15, m1, kind, now, cfg) {
     const { entry, stopLoss, takeProfit } = ref;
     if (![entry, stopLoss, takeProfit].every(Number.isFinite) || !(takeProfit < entry && entry < stopLoss)) return { stage: 'none', note: 'Entry, stop and target are not in a valid sell order' };
 
-    const key = `${o.zone.startTime}`;
-    const base = { key, entry, stopLoss, takeProfit, zone: { top: o.zone.top, bottom: o.zone.bottom, label: o.zone.label }, poc: o.partialTp ?? (o.poc ? o.poc.price : null), state: a.state, overlay: o };
+    const key = tf === TF ? `${o.zone.startTime}` : `${tf}:${o.zone.startTime}`;
+    const base = { key, tf, entry, stopLoss, takeProfit, zone: { top: o.zone.top, bottom: o.zone.bottom, label: o.zone.label }, poc: o.partialTp ?? (o.poc ? o.poc.price : null), state: a.state, overlay: o };
     for (const c of m1) {
         if (c.time < ref.fromTime || !Number.isFinite(c.high)) continue;
         if (c.high >= stopLoss) return { stage: 'none', note: 'Price went past the idea\'s invalidation level', ...base };
@@ -76,7 +77,7 @@ function formatSmcSell(r, symbolName, cfg, { siteUrl, newsNote } = {}) {
         '',
         '⚡ <b>Price has just reached the entry. Enter SELL now.</b>',
         '',
-        `📊 Strategy: Smart Money (M15)`,
+        `📊 Strategy: Smart Money (${tfName(r.tf || TF)})`,
         `🎯 Entry: <code>${px(r.entry)}</code>`,
         `🧱 Supply zone: <code>${px(r.zone.bottom)} – ${px(r.zone.top)}</code>`,
         ...(r.poc ? [`✅ First take profit (POC): <code>${px(r.poc)}</code>`] : []),
@@ -90,4 +91,4 @@ function formatSmcSell(r, symbolName, cfg, { siteUrl, newsNote } = {}) {
     ].join('\n');
 }
 
-module.exports = { readSmcConfig, formingFromMinutes, findSmcSell, formatSmcSell };
+module.exports = { tfName, readSmcConfig, formingFromMinutes, findSmcSell, formatSmcSell };
