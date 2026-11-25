@@ -74,9 +74,20 @@ function connect(url = process.env.DERIV_WS_URL || DEFAULT_URL, timeoutMs = 1000
 }
 
 /** All markets Deriv currently offers, with open/suspended flags. */
+// The list of markets hardly ever changes, and Deriv limits how often it may be asked for ("RateLimit ... active_symbols"):
+// it is remembered for 6 hours, and if Deriv refuses while an older copy exists, the older copy is used.
+let activeCache = { at: 0, list: null };
 async function getActiveSymbols(client) {
-    const res = await client.send({ active_symbols: 'full' });
-    return (res.active_symbols || []).filter(s => s.underlying_symbol);
+    if (activeCache.list && Date.now() - activeCache.at < 6 * 3600 * 1000) return activeCache.list;
+    try {
+        const res = await client.send({ active_symbols: 'full' });
+        const list = (res.active_symbols || []).filter(s => s.underlying_symbol);
+        if (list.length) activeCache = { at: Date.now(), list };
+        return list;
+    } catch (err) {
+        if (activeCache.list) return activeCache.list;
+        throw err;
+    }
 }
 
 /** Candles for one symbol, oldest first. Same request the chart page uses. */

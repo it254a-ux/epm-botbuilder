@@ -47,6 +47,17 @@ const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
 const PDH_STRATEGY_ID = 8;
 const PDH_STRATEGY_NAME = 'Previous Day High/Low rejection';
 
+// The closed M15 candles only change every 15 minutes, so they are fetched once per 15 minutes per market (keeps Deriv's request limit free).
+const m15Cache = new Map();
+async function closedM15(client, symbol, now) {
+    const bucket = Math.floor(now / 900);
+    const hit = m15Cache.get(symbol);
+    if (hit && hit.bucket === bucket) return hit.candles;
+    const candles = await deriv.getCandles(client, symbol, 900, 4);
+    m15Cache.set(symbol, { bucket, candles });
+    return candles;
+}
+
 const numOr = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
 
 /** The Previous Day High/Low result in the shape the shared signal loop expects (it is only a trade when the Rejection Candle has formed). */
@@ -183,8 +194,8 @@ module.exports = async function handler(req, res) {
                 if (smcCfg.enabled) {
                     entry.smc = {};
                     try {
-                        const [s15, s1] = await Promise.all([deriv.getCandles(client, symbol, 900, 4), deriv.getCandles(client, symbol, 60, 0.25)]);
                         const snow = Math.floor(Date.now() / 1000);
+                        const [s15, s1] = await Promise.all([closedM15(client, symbol, snow), deriv.getCandles(client, symbol, 60, 0.25)]);
                         const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg);
                         entry.smc = { stage: r.stage, note: r.note };
                         if (r.stage === 'waiting') summary.smc.waiting++;
