@@ -48,14 +48,30 @@ const ICT_STRATEGY_NAME = 'ICT sweep + shift + gap';
 const PDH_STRATEGY_ID = 8;
 const PDH_STRATEGY_NAME = 'Previous Day High/Low rejection';
 
-// Closed candles only change once per candle, so they are fetched once per candle per market (keeps Deriv's request limit free).
+// Deriv answers "RateLimit" when asked too often: wait a moment and ask again (twice at most).
+async function withRetry(fn) {
+    for (let i = 0; ; i++) {
+        try { return await fn(); } catch (err) {
+            if (i >= 2 || !/RateLimit|rate limit/i.test(String(err && err.message))) throw err;
+            await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+        }
+    }
+}
+
+// Closed candles only change once per candle, so they are fetched once per candle per market, kept in memory and in the
+// database (every run may start on a fresh server), which keeps Deriv's request limit free for the 1-minute price checks.
 const candleCache = new Map();
-async function closedCandles(client, symbol, tf, days, now) {
+async function closedCandles(client, sql, symbol, tf, days, now) {
     const bucket = Math.floor(now / tf);
     const k = `${symbol}|${tf}`;
     const hit = candleCache.get(k);
     if (hit && hit.bucket === bucket) return hit.candles;
-    const candles = await deriv.getCandles(client, symbol, tf, days);
+    let candles = null;
+    if (sql) { try { candles = await store.getCandleCache(sql, k, bucket); } catch (e) { candles = null; } }
+    if (!candles) {
+        candles = await withRetry(() => deriv.getCandles(client, symbol, tf, days));
+        if (sql) { try { await store.setCandleCache(sql, k, bucket, candles); } catch (e) { /* the cache is a convenience */ } }
+    }
     candleCache.set(k, { bucket, candles });
     return candles;
 }
@@ -203,8 +219,8 @@ module.exports = async function handler(req, res) {
                       entry.smc[tn] = {};
                       const out = entry.smc[tn];
                       try {
-                        if (!s1) s1 = await deriv.getCandles(client, symbol, 60, 0.25);
-                        const s15 = await closedCandles(client, symbol, tf, days, snow);
+                        if (!s1) s1 = await withRetry(() => deriv.getCandles(client, symbol, 60, 0.25));
+                        const s15 = await closedCandles(client, sql, symbol, tf, days, snow);
                         const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg, tf);
                         out.stage = r.stage;
                         out.note = r.note;

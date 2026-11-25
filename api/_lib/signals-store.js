@@ -7,6 +7,7 @@ const prepared = new WeakSet();
 
 async function ensureTables(sql) {
     if (prepared.has(sql)) return;
+    await sql`CREATE TABLE IF NOT EXISTS smc_candles (key TEXT PRIMARY KEY, bucket BIGINT NOT NULL, data TEXT NOT NULL)`;
     await sql`
         CREATE TABLE IF NOT EXISTS signals (
             id                  SERIAL PRIMARY KEY,
@@ -345,6 +346,17 @@ async function getStates(sql, timeframe) {
     return new Map(rows.map(r => [r.symbol, { lastCandle: Number(r.last_candle), updatedAt: new Date(r.updated_at).getTime() }]));
 }
 
+/** Closed candles kept between runs (each run may start on a fresh server): returns the candles saved for this candle period, or null. */
+async function getCandleCache(sql, key, bucket) {
+    const rows = await sql`SELECT bucket, data FROM smc_candles WHERE key = ${key}`;
+    if (!rows.length || Number(rows[0].bucket) !== bucket) return null;
+    try { return JSON.parse(rows[0].data); } catch (e) { return null; }
+}
+
+async function setCandleCache(sql, key, bucket, candles) {
+    await sql`INSERT INTO smc_candles (key, bucket, data) VALUES (${key}, ${bucket}, ${JSON.stringify(candles)}) ON CONFLICT (key) DO UPDATE SET bucket = EXCLUDED.bucket, data = EXCLUDED.data`;
+}
+
 /** The cached economic calendar: { events, fetchedAt in ms } or null. */
 async function getNewsCache(sql) {
     const rows = await sql`SELECT events, fetched_at FROM signal_news_cache WHERE id = 1`;
@@ -386,4 +398,4 @@ async function listSignals(sql, limit) {
     }));
 }
 
-module.exports = { hasRecentAlert, claimAlert, releaseAlert, getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
+module.exports = { getCandleCache, setCandleCache, hasRecentAlert, claimAlert, releaseAlert, getUnsentMtf, hasRecentSignal, insertPending, getWaiting, resolvePending, getNewsCache, setNewsCache, getWatchlist, setWatchlist, getStates, ensureTables, insertSignal, markTelegramSent, getUnsent, getOpenSignals, closeSignal, markResultSent, getUnsentResults, getLastCandle, setLastCandle, listSignals };
