@@ -8,6 +8,8 @@
   // "TURSO_DATABASE_URL is not set".
   "keep_vars": true,
   "observability": { "enabled": true },
+  // Chart picture fonts are bundled into the worker as raw bytes
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

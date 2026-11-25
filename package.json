@@ -22,6 +22,7 @@
     "@deriv-com/ui": "^1.37.1",
     "@deriv-com/utils": "latest",
     "@resvg/resvg-js": "^2.6.2",
+    "@resvg/resvg-wasm": "2.6.2",
     "@deriv/deriv-api": "^1.0.15",
     "@deriv/js-interpreter": "^3.0.0",
     "@deriv/quill-icons": "2.4.16",

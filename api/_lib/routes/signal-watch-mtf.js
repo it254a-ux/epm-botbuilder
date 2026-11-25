@@ -23,7 +23,7 @@
 // Testing:  ?dry=1 shows what it would send (nothing is sent or saved)   ?force=1 re-analyses even without a new candle
 const { getDb } = require('../db');
 const deriv = require('../deriv');
-const { sendTelegram } = require('../telegram');
+const { sendTelegram, sendTelegramPhoto } = require('../telegram');
 const chart = require('../signal-chart');
 const { deliverSignal } = require('../signal-deliver');
 const mtf = require('../mtf');
@@ -32,6 +32,7 @@ const pdhMod = require('../pdh');
 const grabMod = require('../grab');
 const grabTg = require('../grab-telegram');
 const smcTouch = require('../smc-touch');
+const smcChart = require('../smc-chart');
 const approachMod = require('../approach');
 const core = require('../signals-core');
 const store = require('../signals-store');
@@ -208,7 +209,20 @@ module.exports = async function handler(req, res) {
                                 entry.smc.wouldSend = text;
                             } else if (await store.claimAlert(sql, alertKey)) {
                                 try {
-                                    await send(() => sendTelegram(text));
+                                    await send(async () => {
+                                        // the chart picture goes with the alert; if it cannot be drawn the text is sent alone
+                                        try {
+                                            try { const rs = require('@resvg/resvg-js'); if (typeof rs.ready === 'function') await rs.ready(); } catch (e) { /* real renderer needs no start-up */ }
+                                            const forming = smcTouch.formingFromMinutes(s1, snow);
+                                            const closedNow = s15.filter(c => c.time + 900 <= snow);
+                                            const png = smcChart.renderSmcPng({ candles: forming ? [...closedNow, forming] : closedNow, result: r, symbolName: info.underlying_symbol_name, cfg: smcCfg });
+                                            return await sendTelegramPhoto(png, text);
+                                        } catch (picErr) {
+                                            console.error('signal-watch-mtf: smc chart picture failed, sending text only:', picErr.message);
+                                            entry.smc.picture = `failed: ${picErr.message}`;
+                                        }
+                                        return sendTelegram(text);
+                                    });
                                     entry.smc.sent = true;
                                     summary.smc.alerts++;
                                 } catch (err) {

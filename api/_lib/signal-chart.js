@@ -214,7 +214,11 @@ let fontFiles = null;
 function loadFonts() {
     if (fontFiles) return fontFiles;
     const dir = path.join(__dirname, 'fonts');
-    fontFiles = ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf'].map(f => path.join(dir, f)).filter(f => fs.existsSync(f));
+    try {
+        fontFiles = ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf'].map(f => path.join(dir, f)).filter(f => fs.existsSync(f));
+    } catch (e) {
+        fontFiles = []; // on Cloudflare the fonts are bundled inside the renderer itself
+    }
     return fontFiles;
 }
 
@@ -223,7 +227,7 @@ function svgToPng(svg) {
     // eslint-disable-next-line global-require
     const { Resvg } = require('@resvg/resvg-js');
     const fonts = loadFonts();
-    if (!fonts.length) throw new Error('Chart fonts are missing');
+    if (!fonts.length && !Resvg.bundledFonts) throw new Error('Chart fonts are missing');
     const resvg = new Resvg(svg, {
         fitTo: { mode: 'width', value: W },
         font: { fontFiles: fonts, loadSystemFonts: false, defaultFontFamily: 'DejaVu Sans' },
