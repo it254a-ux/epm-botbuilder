@@ -213,8 +213,8 @@ function buildChartSvg({ candles, analysis, signal }) {
 let fontFiles = null;
 function loadFonts() {
     if (fontFiles) return fontFiles;
-    const dir = path.join(__dirname, 'fonts');
     try {
+        const dir = path.join(__dirname, 'fonts');
         fontFiles = ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf'].map(f => path.join(dir, f)).filter(f => fs.existsSync(f));
     } catch (e) {
         fontFiles = []; // on Cloudflare the fonts are bundled inside the renderer itself
