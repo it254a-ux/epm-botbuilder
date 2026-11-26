@@ -1,6 +1,6 @@
 jest.mock('../smc', () => ({ analyseSmc: jest.fn() }));
 const smc = require('../smc');
-const { findSmcSell, formatSmcSell, readSmcConfig } = require('../smc-touch');
+const { findSmcEntry: findSmcSell, formatSmcEntry: formatSmcSell, readSmcConfig } = require('../smc-touch');
 
 const cfg = readSmcConfig({});
 const now = 1_700_000_000;
@@ -15,7 +15,7 @@ const overlay = (extra = {}) => ({
 });
 const minute = (t, high) => ({ time: t, open: high - 1, high, low: high - 2, close: high - 1 });
 const run = (a, m1) => {
-    smc.analyseSmc.mockReturnValue(a);
+    smc.analyseSmc.mockReturnValue({ control: { who: 'SELLERS' }, ...a });
     return findSmcSell(c15, m1, 'forex', now, cfg);
 };
 
@@ -33,9 +33,21 @@ test('an old touch is too late', () => {
 test('price past the invalidation level cancels it', () => {
     expect(run({ state: 'waiting_for_sweep', smc: overlay() }, [minute(now - 60, 114)]).stage).toBe('none');
 });
-test('a buy setup or a finished setup is ignored', () => {
+test('a buy setup while sellers are in control, or a finished setup, is ignored', () => {
     expect(run({ state: 'waiting_for_sweep', smc: overlay({ side: 'BUY' }) }, [minute(now - 60, 109.5)]).stage).toBe('none');
     expect(run({ state: 'invalidated', smc: overlay() }, [minute(now - 60, 109.5)]).stage).toBe('none');
+});
+test('no side in control means no alert', () => {
+    expect(run({ control: { who: 'MIXED' }, state: 'waiting_for_sweep', smc: overlay() }, [minute(now - 60, 109.5)]).stage).toBe('none');
+});
+test('a buy setup is sent when buyers are in control (low reaches entry)', () => {
+    const buy = overlay({ side: 'BUY', zone: { top: 91, bottom: 89, startTime: 7, label: 'BUY ENTRY AREA' }, area: { entry: 91, stopLoss: 87, takeProfit: 105, fromTime: now - 3600 } });
+    const m = { time: now - 60, open: 93, high: 94, low: 90.5, close: 92 };
+    const r = run({ control: { who: 'BUYERS' }, state: 'waiting_for_sweep', smc: buy }, [m]);
+    expect(r.stage).toBe('touched');
+    const text = formatSmcSell(r, 'Gold/USD', cfg, {});
+    expect(text).toContain('BUY');
+    expect(text).toContain('Buyers are in control');
 });
 test('the confirmed plan entry is used when it exists', () => {
     const plan = { entry: 107, stopLoss: 113, takeProfit: 95, fromTime: now - 1200 };

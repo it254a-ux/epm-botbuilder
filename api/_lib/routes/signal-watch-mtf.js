@@ -38,6 +38,8 @@ const core = require('../signals-core');
 const store = require('../signals-store');
 const news = require('../news');
 const { authorised } = require('../signals-auth');
+const escapeHtmlSafe = core.escapeHtml;
+const gmtHm = t => new Date(t * 1000).toISOString().slice(11, 16);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MTF_TF = 300;
@@ -202,6 +204,42 @@ module.exports = async function handler(req, res) {
 
         const active = await deriv.getActiveSymbols(client);
         const bySymbol = new Map(active.map(s => [s.underlying_symbol, s]));
+        const bySymbolEarly = sym => bySymbol.get(sym);
+        // News on the Telegram channel: a heads-up shortly before each high-impact event, and a morning list (NEWS_POSTS=off stops both)
+        if (newsCfg.enabled && newsData.events.length && String(process.env.NEWS_POSTS || 'on').toLowerCase() !== 'off') {
+            report.newsPosts = [];
+            try {
+                const nnow = Math.floor(Date.now() / 1000);
+                const headMin = Math.max(5, Number(process.env.NEWS_POST_MINUTES) || 60);
+                const digestHour = Number.isFinite(Number(process.env.NEWS_DIGEST_HOUR_GMT)) && process.env.NEWS_DIGEST_HOUR_GMT !== '' ? Number(process.env.NEWS_DIGEST_HOUR_GMT) : 5;
+                const ccys = new Set(['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD']);
+                for (const sym of symbols) for (const c of news.currenciesFor(sym, (bySymbolEarly(sym) || {}).market)) ccys.add(c);
+                const wanted = newsData.events.filter(e => ccys.has(e.currency) && newsCfg.impacts.includes(e.impact)).sort((a, b) => a.time - b.time);
+                const posts = [];
+                for (const e of wanted.filter(e => e.time > nnow && e.time <= nnow + headMin * 60)) {
+                    posts.push({ key: `news|${e.time}|${e.currency}|${e.title}`, text: `📰 <b>High-impact news soon</b>\n${news.describe(e, nnow)}\n\n⏸ Smart Money alerts on ${escapeHtmlSafe(e.currency)} markets are on hold until it has passed.` });
+                }
+                const d = new Date(nnow * 1000);
+                if (d.getUTCHours() === digestHour && d.getUTCMinutes() < 10) {
+                    const dayStart = Math.floor(nnow / 86400) * 86400;
+                    const today = wanted.filter(e => e.time >= dayStart && e.time < dayStart + 86400);
+                    if (today.length) {
+                        const rowsTxt = today.map(e => `• ${gmtHm(e.time)} GMT · ${e.currency} · ${escapeHtmlSafe(e.title)}`).join('\n');
+                        posts.push({ key: `news-digest|${dayStart}`, text: `🗓 <b>High-impact news today</b>\n${rowsTxt}\n\nSmart Money alerts are held around these times.` });
+                    }
+                }
+                for (const post of posts) {
+                    if (!write) { report.newsPosts.push({ wouldSend: post.text }); continue; }
+                    if (await store.claimAlert(sql, post.key)) {
+                        try { await send(() => sendTelegram(post.text)); report.newsPosts.push({ sent: post.key }); } catch (err) {
+                            await store.releaseAlert(sql, post.key);
+                            console.error('signal-watch-mtf: news post failed:', err.message);
+                        }
+                    }
+                }
+            } catch (err) { console.error('signal-watch-mtf: news posts failed:', err.message); }
+        }
+
         const expected = core.expectedLastClosed(Math.floor(Date.now() / 1000), MTF_TF);
 
         const processSymbol = async symbol => {
@@ -228,15 +266,33 @@ module.exports = async function handler(req, res) {
                       try {
                         if (!s1) s1 = await withRetry(() => deriv.getCandles(client, symbol, 60, 0.25));
                         const s15 = await closedCandles(client, sql, symbol, tf, days, snow);
-                        const r = smcTouch.findSmcSell(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg, tf);
+                        const r = smcTouch.findSmcEntry(s15, s1, require('../engine').marketKind(info.market), snow, smcCfg, tf);
                         out.stage = r.stage;
                         out.note = r.note;
                         if (r.stage === 'waiting') summary.smc.waiting++;
                         if (r.stage === 'touched') {
                             const sc = news.currenciesFor(symbol, info.market);
                             const sn = sc.length && newsData.events.length ? news.check(sc, newsData.events, snow, newsCfg) : {};
-                            const text = smcTouch.formatSmcSell(r, info.underlying_symbol_name, smcCfg, { siteUrl: core.signalsPageUrl(), newsNote: sn.upcoming ? news.newsNote(sn.upcoming, snow) : null });
-                            const alertKey = tf === 900 ? `${symbol}|smc-sell|${r.key}` : `${symbol}|smc-sell|${r.key}`;
+                            if (sn.blackout) {
+                                // high-impact news around this market: hold the alert (nothing saved, so it can still go out if the setup is fresh after the news)
+                                out.skipped = `News blackout: ${news.describe(sn.blackout, snow)}`;
+                                summary.smc.newsHeld++;
+                                continue;
+                            }
+                            if (smcCfg.sessions.length && !smcCfg.sessions.includes(smcTouch.sessionKey(r.touchTime))) {
+                                out.skipped = `Outside the chosen trading hours (${smcCfg.sessions.join(', ')})`;
+                                continue;
+                            }
+                            // the 1h chart is read for information only
+                            let htf = null;
+                            try {
+                                const h1 = await closedCandles(client, sql, symbol, 3600, 10, snow);
+                                const eng = require('../engine');
+                                const ctl = require('../smc-control').readControl(h1, eng.atr(h1, 14));
+                                htf = smcTouch.htfNote(ctl, r.side);
+                            } catch (e) { out.htf = `unavailable: ${e.message}`; }
+                            const text = smcTouch.formatSmcEntry(r, info.underlying_symbol_name, smcCfg, { siteUrl: core.signalsPageUrl(), newsNote: sn.upcoming ? news.newsNote(sn.upcoming, snow) : null, htf });
+                            const alertKey = `${symbol}|smc-${r.side.toLowerCase()}|${r.key}`;
                             if (!write) {
                                 out.wouldSend = text;
                             } else if (await store.claimAlert(sql, alertKey)) {

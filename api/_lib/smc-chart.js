@@ -1,4 +1,4 @@
-// Chart picture for the Smart Money SELL alert. It copies the website chart (Forex Trader, Smart Money strategy) exactly:
+// Chart picture for the Smart Money alert (BUY or SELL). It copies the website chart (Forex Trader, Smart Money strategy) exactly:
 // same size (862 x 1000), same zoom (18.8 px per M15 candle, last candle at x=330), same markings and labels.
 // Only the candles are different: the latest ones. buildSmcSvg() is pure (text in, text out);
 // renderSmcPng() turns it into a PNG with the shared renderer.
@@ -30,7 +30,10 @@ const hhmm = t => `${pad2(new Date(t * 1000).getUTCHours())}:${pad2(new Date(t *
  */
 function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
     // take profit = stake x multiple (no stop loss): the picture shows that price, the entry zone and the structure
-    const r = { ...r0, takeProfit: stakeTpPrice(r0.entry, { multiplier: cfg.multiplier, tpMultiple: cfg.tpMultiple || 1.5 }) };
+    const r = { ...r0, takeProfit: stakeTpPrice(r0.entry, { multiplier: cfg.multiplier, tpMultiple: cfg.tpMultiple || 1.5 }, r0.side) };
+    const SIDE = r0.side === 'BUY' ? 'BUY' : 'SELL';
+    const isBuy = SIDE === 'BUY';
+    const who = r0.control ? (r0.control.who === 'BUYERS' ? 'Buyers' : r0.control.who === 'SELLERS' ? 'Sellers' : '') : '';
     const tpMult = cfg.tpMultiple || 1.5;
     const TF = tf;
     const SLOT = SLOT_OF[tf] || 18.8;
@@ -59,10 +62,10 @@ function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
     out.push(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
 
     // header
-    out.push(`<rect x="18" y="26" width="92" height="38" rx="8" fill="#f6465d"/>`);
-    out.push(`<text x="64" y="52" font-size="19" font-weight="bold" fill="#0b0f14" text-anchor="middle">SELL</text>`);
+    out.push(`<rect x="18" y="26" width="92" height="38" rx="8" fill="${isBuy ? '#0ecb81' : '#f6465d'}"/>`);
+    out.push(`<text x="64" y="52" font-size="19" font-weight="bold" fill="#0b0f14" text-anchor="middle">${SIDE}</text>`);
     out.push(`<text x="126" y="44" font-size="22" font-weight="bold" fill="${C.text}">${esc(symbolName)} · ${tfLabel}</text>`);
-    out.push(`<text x="126" y="66" font-size="13" fill="${C.dim}">Smart Money: BOS + zone + sweep · price reached the entry</text>`);
+    out.push(`<text x="126" y="66" font-size="13" fill="${C.dim}">Smart Money: BOS + zone + sweep · price reached the entry${who ? ` · ${who} in control` : ''}</text>`);
     out.push(`<text x="${W - 18}" y="44" font-size="15" font-weight="bold" fill="${C.text}" text-anchor="end">Multiplier ×${cfg.multiplier} · TP ${tpMult}× stake</text>`);
     out.push(`<text x="${W - 18}" y="66" font-size="13" fill="${C.dim}" text-anchor="end">No stop loss</text>`);
 
@@ -89,7 +92,7 @@ function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
     const xBoxEnd = LAST_X + 250;
     out.push(`<rect x="${n1(xz)}" y="${n1(yOf(r.zone.top))}" width="${n1(xBoxEnd - xz)}" height="${n1(Math.max(2, yOf(r.zone.bottom) - yOf(r.zone.top)))}" fill="${C.zone}" fill-opacity="0.22"/>`);
     const xt = Math.max(0, xAt(r.touchTime) - SLOT / 2);
-    out.push(`<rect x="${n1(xt)}" y="${n1(yOf(r.entry))}" width="${n1(xBoxEnd - xt)}" height="${n1(yOf(r.takeProfit) - yOf(r.entry))}" fill="#2a8c7a" fill-opacity="0.18"/>`);
+    out.push(`<rect x="${n1(xt)}" y="${n1(Math.min(yOf(r.entry), yOf(r.takeProfit)))}" width="${n1(xBoxEnd - xt)}" height="${n1(Math.abs(yOf(r.takeProfit) - yOf(r.entry)))}" fill="#2a8c7a" fill-opacity="0.18"/>`);
 
     // candles
     shown.forEach(c => {
@@ -128,14 +131,15 @@ function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
         out.push(`<text x="${labelX}" y="${n1(y + 4)}" font-size="12" font-weight="bold" fill="${C.bos}">BOS</text>`);
     }
     const note = (p, col, text, dy) => out.push(`<text x="${labelX}" y="${n1(yOf(p) + dy)}" font-size="12" font-weight="bold" fill="${col}" stroke="${C.panel}" stroke-width="3" paint-order="stroke">${esc(text)}</text>`);
-    note(r.zone.top, '#f4a46a', 'SELL ENTRY AREA · SUPPLY ZONE · UNMITIGATED', 11);
+    if (isBuy) note(r.zone.bottom, '#f4a46a', 'BUY ENTRY AREA · DEMAND ZONE · UNMITIGATED', -5);
+    else note(r.zone.top, '#f4a46a', 'SELL ENTRY AREA · SUPPLY ZONE · UNMITIGATED', 11);
     if (r.poc) note(r.poc, '#e9c9ff', 'POC + ZONE', -5);
     const yTp = yOf(r.takeProfit);
 
     // price tags on the right axis: a name box and a price box, never on top of each other
     const tags = [
-        { p: r.entry, col: C.blue, name: 'SELL ENTRY AREA', tc: '#fff' },
-        { p: r.entry, col: C.orange, name: 'AUTO ENTRY SELL', tc: '#0b0f14' },
+        { p: r.entry, col: C.blue, name: `${SIDE} ENTRY AREA`, tc: '#fff' },
+        { p: r.entry, col: C.orange, name: `AUTO ENTRY ${SIDE}`, tc: '#0b0f14' },
         { p: r.takeProfit, col: C.tp, name: `TP · ${tpMult}× stake`, tc: '#0b0f14' },
         { p: lastBar.close, col: C.now, name: '', tc: '#fff' },
     ];
