@@ -35,6 +35,8 @@ import {
 import type { PdhResult } from './pdh';
 import { drawSmc, SMC_GUTTER_BARS } from './smc-draw';
 import { SMC_ID, smcHistory, type SmcOverlay } from './smc';
+import { sameControl, type Control } from './smc-control';
+import SmcControlBadge from './smc-control-badge';
 import { VP_ID } from './volume-profile';
 
 /**
@@ -201,7 +203,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     const derivedRef = useRef<Derived[]>([]);
     const refreshTimer = useRef<number>(0);
     // Smart Money: the current setup plus every earlier one found in the loaded candles (more appear as the chart is dragged back)
-    const smcRef = useRef<{ current: SmcOverlay | null } | null>(null);
+    const smcRef = useRef<{ current: SmcOverlay | null; control?: Control | null } | null>(null);
+    const [control, setControl] = useState<Control | null>(null);
     const smcWindow = useRef<{ from: number; to: number } | null>(null);
     const smcTimer = useRef<number>(0);
     const paintSmcRef = useRef<() => void>(() => undefined);
@@ -563,7 +566,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
             view = { from: t0 - w, to: t1 + w };
             smcWindow.current = view;
         }
-        const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, st.current, cs, hist, view);
+        const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, st.current, cs, hist, view, st.control ?? null);
         series.setMarkers(out.markers);
         smcLabelsRef.current = { anchor: out.anchor, items: out.labels };
         if (out.levels.length) {
@@ -793,13 +796,15 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
 
                 // Smart Money strategy: its own markings (zone, BOS, sweep, MSS, liquidity, trade box) instead of the range picture
                 if (analysis.strategyId === (SMC_ID as unknown) || analysis.strategyId === (VP_ID as unknown)) {
-                    smcRef.current = { current: analysis.smc ?? null };
+                    smcRef.current = { current: analysis.smc ?? null, control: analysis.control ?? null };
+                    setControl(prev => (sameControl(prev, analysis.control ?? null) ? prev : analysis.control ?? null));
                     paintSmcRef.current();
                     openView();
                     return;
                 }
                 smcRef.current = null;
                 smcWindow.current = null;
+                setControl(prev => (prev ? null : prev));
 
                 const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
                 const lastT = candles[candles.length - 1].time;
@@ -1105,6 +1110,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
             {apis && <SmcLabels chart={apis.chart} series={apis.series} getLabels={() => smcLabelsRef.current} />}
+            {control && <SmcControlBadge control={control} />}
             {apis && (
                 <ChartDrawings
                     chart={apis.chart}

@@ -22,7 +22,7 @@ interface Props {
 
 const RED = '#ff1a1a';
 const ROW = 17; // the least distance between two names, in pixels
-const CHAR_W = 5.4;
+const CHAR_W = 7.2;
 /** The name with a thin dark outline under it (two texts, so every browser draws it the same), so it reads on any candle colour. */
 const halo = (x: number, y: number, text: string, color: string, centre: boolean) => {
     const at = `x="${x}" y="${y}"${centre ? ' dominant-baseline="central"' : ''}`;
@@ -40,7 +40,8 @@ export function layoutNames(
 ): { x: number; y: number; line: number; text: string; color: string; arrow: { elbowX: number } | null }[] {
     if (items.length === 0) return [];
     const widest = Math.max(...items.map(i => i.text.length)) * CHAR_W;
-    const x = Math.max(6, Math.min(box.anchorX + 96, box.plotW - 8 - widest));
+    // the names start right after the last candle, ON their own lines (which run on to the right), in bold
+    const x = Math.max(6, Math.min(box.anchorX + 12, box.plotW - 8 - widest));
     const sorted = [...items].sort((a, b) => a.y - b.y);
     const top = 10;
     const bottom = Math.max(top + ROW, box.plotH - 10);

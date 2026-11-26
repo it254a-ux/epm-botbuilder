@@ -9,6 +9,7 @@
  */
 
 import type { SmcOverlay } from './smc';
+import type { Control } from './smc-control';
 
 export interface Candle {
     /** Candle open time, seconds since epoch (UTC). */
@@ -144,6 +145,8 @@ export interface Analysis {
     stages: Stage[];
     /** Smart Money strategy only: the markings the chart draws (zone, BOS, sweep, MSS, liquidity...). */
     smc?: SmcOverlay | null;
+    /** Smart Money strategy only: who is in control of the market (buyers / sellers), read from the closed candles. */
+    control?: Control | null;
 }
 
 const DAY = 86400;

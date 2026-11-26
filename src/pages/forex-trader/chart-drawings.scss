@@ -732,6 +732,84 @@
 
 // the names of the Smart Money setup, drawn over the chart
 .smc-names .smc-name {
-    font-size: 9px;
+    font-size: 11px;
+    font-weight: 800;
     font-family: inherit;
+}
+
+// WHO IS IN CONTROL: a marker inside the chart (top centre), with a live blinking dot
+.smc-control {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    max-width: 78%;
+    padding: 6px 14px 7px;
+    border-radius: 10px;
+    background: rgba(13, 17, 26, 0.82);
+    border: 1px solid var(--smc-control-colour, #94a3b8);
+    pointer-events: none;
+    text-align: center;
+    backdrop-filter: blur(3px);
+
+    --smc-control-colour: #94a3b8;
+
+    &--buyers {
+        --smc-control-colour: #22c55e;
+    }
+
+    &--sellers {
+        --smc-control-colour: #ef4444;
+    }
+
+    &__title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--smc-control-colour);
+        font-size: 13px;
+        letter-spacing: 0.06em;
+    }
+
+    &__dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--smc-control-colour);
+        box-shadow: 0 0 0 0 var(--smc-control-colour);
+        animation: smc-control-blink 1.1s ease-in-out infinite;
+    }
+
+    &__note {
+        color: #cbd5e1;
+        font-size: 11px;
+    }
+
+    &__warn {
+        color: #fbbf24;
+        font-size: 11px;
+        font-weight: 700;
+    }
+}
+
+@keyframes smc-control-blink {
+    0% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+    }
+
+    50% {
+        opacity: 0.25;
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+    }
+
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    }
 }

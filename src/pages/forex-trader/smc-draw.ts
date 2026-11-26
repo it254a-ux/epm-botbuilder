@@ -7,6 +7,7 @@
 import type { IChartApi, IPriceLine, ISeriesApi, SeriesMarker, SeriesType, Time, UTCTimestamp } from 'lightweight-charts';
 import type { Candle } from './engine';
 import type { SmcOverlay } from './smc';
+import type { Control } from './smc-control';
 
 export interface SmcDrawTarget {
     chart: IChartApi;
@@ -29,7 +30,7 @@ const C = {
     bos: '#22d3ee',
     mss: '#f9a8d4',
     poc: '#f0abfc',
-    minor: '#cbd5e1',
+    minor: '#ffffff',
     major: '#fbbf24',
     target: '#fcd34d',
     sweep: '#a855f7',
@@ -65,7 +66,8 @@ export function drawSmc(
     o: SmcOverlay | null,
     candles: Candle[],
     history: SmcOverlay[] = [],
-    view?: { from: number; to: number }
+    view?: { from: number; to: number },
+    controlFallback?: Control | null
 ): { markers: SeriesMarker<Time>[]; levels: number[]; labels: SmcLabel[]; anchor: number } {
     const { chart, extra, lines } = t;
     const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
@@ -102,7 +104,7 @@ export function drawSmc(
     let queue: LabelReq[] | null = null;
 
     /** A horizontal line from t0 to t1 with its name written on it. */
-    const segment = (price: number, t0: number, t1: number, color: string, text: string | null, textColor: string, labelAt: number, opts: { width?: 1 | 2 | 3; dashed?: boolean; hidden?: boolean } = {}) => {
+    const segment = (price: number, t0: number, t1: number, color: string, text: string | null, textColor: string, labelAt: number, opts: { width?: 1 | 2 | 3 | 4; dashed?: boolean; hidden?: boolean } = {}) => {
         const to = Math.max(t1, t0 + len);
         if (queue && text) {
             queue.push({ price, text, color: textColor, lineColor: opts.hidden ? textColor : color, lineEnd: to });
@@ -195,7 +197,7 @@ export function drawSmc(
             // ---- inducements (minor, then the major trap) and the sweep (LS)
             if (o.minor) {
                 const to = o.minor.toTime ?? (o.minor.pending ? endT : anchor);
-                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.minor, (o.minor.fromTime + to) / 2, { dashed: o.minor.pending });
+                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.minor, (o.minor.fromTime + to) / 2, { width: 4, dashed: o.minor.pending });
             }
             if (o.major) {
                 const to = o.major.toTime ?? (o.major.pending ? endT : anchor);
@@ -222,6 +224,13 @@ export function drawSmc(
             o.internals.forEach(il => {
                 segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, anchor - len * 10, { dashed: il.broken });
             });
+        }
+
+        // ---- the line the OTHER side must close beyond to take control (named on the line)
+        if (main && o.control?.flip) {
+            const f = o.control.flip;
+            segment(f.price, f.time, endT, '#ffffff', f.label, '#ffffff', anchor - len * 4, { width: 2, dashed: true });
+            levels.push(f.price);
         }
 
         // ---- the trade box and its price tags
@@ -295,6 +304,23 @@ export function drawSmc(
         .slice(-MAX_HISTORY_DRAWN)
         .forEach(h => one(h, false));
     if (o) one(o, true);
+    // who is in control: the signs read from the candles (confirmed, sweep, reaction, strong move, retest), and, when no setup exists, its flip line
+    const ctl = o ? o.control ?? null : controlFallback ?? null;
+    if (ctl) {
+        if (!o && ctl.flip) {
+            segment(ctl.flip.price, ctl.flip.time, defaultEndT, '#ffffff', ctl.flip.label, '#ffffff', lastT - len * 4, { width: 2, dashed: true });
+            levels.push(ctl.flip.price);
+        }
+        ctl.events.forEach(ev => {
+            markers.push({
+                time: nearest(ev.time) as UTCTimestamp,
+                position: ev.position,
+                shape: ev.position === 'belowBar' ? 'arrowUp' : 'arrowDown',
+                color: ev.color,
+                text: ev.text,
+            });
+        });
+    }
     // the market's swings: HH / HL (rising) in green, LH / LL (falling) in red; the newest one also tells the sentiment
     if (o?.trend) {
         const tr = o.trend;

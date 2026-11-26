@@ -28,6 +28,7 @@ exports.analyseSmc = analyseSmc;
  *     A stop and the target in the same candle counts as a loss.
  * Closed candles only. Anything missing, old or unclear: no signal.
  */
+const smc_control_1 = require("./smc-control");
 const engine_1 = require("./engine");
 exports.SMC_ID = 34;
 exports.SMC_NAME = 'Smart money: BOS + zone + sweep + MSS';
@@ -525,6 +526,11 @@ function analyseSmc(candlesRaw, kind, forming, now, only) {
     const a = base.atr;
     if (!a || a <= 0)
         return waiting('no_data', 'Cannot measure the normal candle size yet');
+    // WHO IS IN CONTROL (closed candles only). In Auto mode the setup follows it: buyers in control = BUY setups, sellers = SELL setups.
+    // When no side has proven control, both are looked at as before and the chart says so.
+    const control = (0, smc_control_1.readControl)(c, a);
+    base.control = control;
+    const followed = only ? only : control && control.who === 'BUYERS' ? 'BUY' : control && control.who === 'SELLERS' ? 'SELL' : null;
     // Both directions are looked at. A pullback inside a bearish structure breaks small highs on the way up, so the "latest BOS wins"
     // is wrong: the setup to follow is a live trade first, then an idea still alive, and among those the zone price is closest to.
     // The forming candle is used live only for what a wick can decide (price touched the zone, swept a high, stop or target hit).
@@ -552,13 +558,15 @@ function analyseSmc(candlesRaw, kind, forming, now, only) {
     ];
     all.sort((x, y) => x.r[0] - y.r[0] || x.r[1] - y.r[1] || x.r[2] - y.r[2] || x.r[3] - y.r[3]);
     // the person may ask for one side only: the other side's setups are left out
-    const pool = only ? all.filter(x => x.isBuy === (only === 'BUY')) : all;
+    const pool = followed ? all.filter(x => x.isBuy === (followed === 'BUY')) : all;
     const pick = pool.length ? pool[0] : null;
     const buy = pick ? pick.isBuy : false;
     const core = pick ? pick.core : null;
     if (!core) {
-        return waiting('waiting_bos', only
-            ? `Waiting for a ${only} setup: no ${only} break of structure (BOS) on this timeframe yet`
+        return waiting('waiting_bos', followed
+            ? only
+                ? `Waiting for a ${followed} setup: no ${followed} break of structure (BOS) on this timeframe yet`
+                : `${control?.who === 'BUYERS' ? 'Buyers' : 'Sellers'} are in control: waiting for a ${followed} setup (no ${followed} break of structure yet). ${control?.flip?.note ?? ''}`
             : 'Waiting for the direction: no recent break of structure (BOS) on this timeframe yet');
     }
     const sgn = buy ? -1 : 1;
@@ -749,6 +757,7 @@ function analyseSmc(candlesRaw, kind, forming, now, only) {
         ],
     };
     overlay.trend = trendOf(c, side);
+    overlay.control = control;
     {
         const entryRef = overlay.plan?.entry ?? overlay.area?.entry ?? null;
         const tpRef = overlay.plan?.takeProfit ?? overlay.area?.takeProfit ?? null;
@@ -767,6 +776,7 @@ function analyseSmc(candlesRaw, kind, forming, now, only) {
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
         overlay.minor?.price, overlay.minor?.pending, overlay.major?.price, overlay.major?.pending, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
         overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,
+        control?.who, control?.since, control?.flip?.price, control?.weakening, control?.events.length,
     ].join('|');
     return {
         ...base,
@@ -779,5 +789,6 @@ function analyseSmc(candlesRaw, kind, forming, now, only) {
         entryTime,
         stages,
         smc: overlay,
+        control,
     };
 }

@@ -17,6 +17,7 @@
  *     A stop and the target in the same candle counts as a loss.
  * Closed candles only. Anything missing, old or unclear: no signal.
  */
+import { readControl, type Control } from './smc-control';
 import { atr, px, sessionAt, MIN_RR, type Analysis, type Candle, type MarketKind, type Side, type Stage, type SweepStrategyId, type TradePlan, type SetupState } from './engine';
 
 export const SMC_ID = 34;
@@ -84,6 +85,8 @@ export interface SmcOverlay {
     trend?: SmcTrend | null;
     /** The POC when it lies between the entry and the target: the first (partial) take profit. */
     partialTp?: number | null;
+    /** Who is in control of the market (the setup follows it) and the signs read around it. */
+    control?: Control | null;
     /** Earlier setups are not worked out for this strategy (the Volume profile one): the chart draws only the current one. */
     noHistory?: boolean;
 }
@@ -590,6 +593,11 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     }
     const a = base.atr;
     if (!a || a <= 0) return waiting('no_data', 'Cannot measure the normal candle size yet');
+    // WHO IS IN CONTROL (closed candles only). In Auto mode the setup follows it: buyers in control = BUY setups, sellers = SELL setups.
+    // When no side has proven control, both are looked at as before and the chart says so.
+    const control = readControl(c, a);
+    base.control = control;
+    const followed: Side | null = only ? only : control && control.who === 'BUYERS' ? 'BUY' : control && control.who === 'SELLERS' ? 'SELL' : null;
 
     // Both directions are looked at. A pullback inside a bearish structure breaks small highs on the way up, so the "latest BOS wins"
     // is wrong: the setup to follow is a live trade first, then an idea still alive, and among those the zone price is closest to.
@@ -618,15 +626,17 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
     ];
     all.sort((x, y) => x.r[0] - y.r[0] || x.r[1] - y.r[1] || x.r[2] - y.r[2] || x.r[3] - y.r[3]);
     // the person may ask for one side only: the other side's setups are left out
-    const pool = only ? all.filter(x => x.isBuy === (only === 'BUY')) : all;
+    const pool = followed ? all.filter(x => x.isBuy === (followed === 'BUY')) : all;
     const pick = pool.length ? pool[0] : null;
     const buy = pick ? pick.isBuy : false;
     const core = pick ? pick.core : null;
     if (!core) {
         return waiting(
             'waiting_bos',
-            only
-                ? `Waiting for a ${only} setup: no ${only} break of structure (BOS) on this timeframe yet`
+            followed
+                ? only
+                    ? `Waiting for a ${followed} setup: no ${followed} break of structure (BOS) on this timeframe yet`
+                    : `${control?.who === 'BUYERS' ? 'Buyers' : 'Sellers'} are in control: waiting for a ${followed} setup (no ${followed} break of structure yet). ${control?.flip?.note ?? ''}`
                 : 'Waiting for the direction: no recent break of structure (BOS) on this timeframe yet'
         );
     }
@@ -809,6 +819,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         ],
     };
     overlay.trend = trendOf(c, side);
+    overlay.control = control;
     {
         const entryRef = overlay.plan?.entry ?? overlay.area?.entry ?? null;
         const tpRef = overlay.plan?.takeProfit ?? overlay.area?.takeProfit ?? null;
@@ -826,6 +837,7 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         side, state, overlay.zone.top, overlay.zone.bottom, overlay.zone.touched, overlay.bos.price, overlay.target.price,
         overlay.minor?.price, overlay.minor?.pending, overlay.major?.price, overlay.major?.pending, overlay.poc?.price, overlay.mss?.price, overlay.internals.map(i => `${i.price}${i.broken}`).join(','),
         overlay.plan?.entry, overlay.plan?.stopLoss, overlay.area?.stopLoss, entryTime, overlay.exit?.time, n,
+        control?.who, control?.since, control?.flip?.price, control?.weakening, control?.events.length,
     ].join('|');
 
     return {
@@ -839,5 +851,6 @@ export function analyseSmc(candlesRaw: Candle[], kind: MarketKind, forming?: Can
         entryTime,
         stages,
         smc: overlay,
+        control,
     };
 }
