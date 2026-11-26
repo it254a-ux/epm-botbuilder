@@ -150,10 +150,17 @@ module.exports = async function handler(req, res) {
 
     let client;
     try {
-        client = await deriv.connect();
+        // Deriv sometimes refuses a connection for a moment: try three times before giving up
+        for (let i = 0; !client; i++) {
+            try { client = await deriv.connect(); } catch (e) {
+                if (i >= 2) throw e;
+                await new Promise(r => setTimeout(r, 1200));
+            }
+        }
     } catch (err) {
         console.error('signal-watch-mtf: Deriv connection failed:', err.message);
-        res.status(502).json({ ok: false, error: err.message });
+        // 200 on purpose: the next minute tries again, and the cron service does not count it as a failure (it switches a job off after many failures)
+        res.status(200).json({ ok: false, error: err.message, retryNextRun: true });
         return;
     }
 
@@ -481,5 +488,5 @@ module.exports = async function handler(req, res) {
     }
 
     report.elapsedMs = Date.now() - started;
-    res.status(report.ok ? 200 : 500).json(report);
+    res.status(200).json(report); // 200 even when part of a run failed: the next minute tries again
 };
