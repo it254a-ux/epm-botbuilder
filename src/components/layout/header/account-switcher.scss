@@ -984,3 +984,11 @@
         font-size: 9px;
     }
 }
+
+// Real account: the words "Real account" and the balance are green (demo keeps its own colours)
+.acc-info:not(.acc-info--is-virtual) {
+    .acc-info__account-type,
+    .acc-info__balance {
+        color: #22c55e !important;
+    }
+}
