@@ -1,8 +1,7 @@
 /**
  * The names of the current Smart Money setup, drawn over the chart (not on it) as plain thin names in the free space, like a professional chart, and only for the key things:
- *  - the names stand in one tidy column in the free space to the right of the last candle, in the order of their lines (so no two
- *    leader lines cross), spaced so that no pill touches another;
- *  - each name is plain thin writing with a short arrow pointing back to its line (the arrow has the colour of the line);
+ *  - each name stands directly on its own line, just above it, so it is clear which line it names;
+ *  - names that would meet are lifted one above the other;
  *  - the writing is thin: white on the dark theme, dark on the light theme.
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
@@ -32,57 +31,60 @@ const PILL_GAP = 4;
 const PAD = 0;
 
 export interface CalloutInput {
-    /** The y of the line the pill belongs to. */
+    /** The y of the line the name belongs to. */
     y: number;
-    /** The x where that line ends on screen (the leader line goes there). */
+    /** Where that line starts and ends on screen. */
+    x0: number;
     x1: number;
     text: string;
 }
 
 export interface CalloutPlaced {
     index: number;
+    /** Where the writing starts, and the y of its middle. */
     x: number;
     y: number;
     w: number;
     h: number;
-    /** Where the leader line touches the line, and where it leaves the pill. */
-    endX: number;
-    endY: number;
 }
 
-/** Pure layout, so it can be tested. The pills share one left edge, are listed in the order of their lines and never touch. */
-export function layoutCallouts(
-    items: CalloutInput[],
-    box: { plotW: number; plotH: number; anchorX: number }
-): CalloutPlaced[] {
+/**
+ * Pure layout, so it can be tested. Each name stands directly on its own line, just above it: a short line gets its name from the
+ * start of the line, a long line gets it at its right end. Names that would meet are lifted, one above the other.
+ */
+export function layoutCallouts(items: CalloutInput[], box: { plotW: number; plotH: number }): CalloutPlaced[] {
     const sized = items
-        .map((it, index) => ({ ...it, index, w: Math.ceil(it.text.length * CHAR_W + PAD * 2) }))
-        .sort((a, b) => a.y - b.y);
-    if (!sized.length) return [];
-    const widest = Math.max(...sized.map(s => s.w));
-    // to the right of the last candle when there is room, otherwise as far right as the pills fit
-    const x = Math.max(18, Math.min(box.anchorX + 26, box.plotW - widest - 4));
-    // top to bottom, each pill as near its own line as it can be without touching the one above
-    const ys: number[] = [];
-    sized.forEach((s, k) => {
-        const want = s.y - PILL_H / 2;
-        ys.push(k === 0 ? Math.max(2, want) : Math.max(want, ys[k - 1] + PILL_H + PILL_GAP));
-    });
-    // if the stack runs off the bottom, push it back up
-    const limit = box.plotH - PILL_H - 2;
-    for (let k = ys.length - 1; k >= 0; k--) {
-        const cap = k === ys.length - 1 ? limit : ys[k + 1] - PILL_H - PILL_GAP;
-        if (ys[k] > cap) ys[k] = cap;
+        .map((it, index) => {
+            const w = Math.ceil(it.text.length * CHAR_W);
+            const x0 = Math.max(0, it.x0);
+            const x1 = Math.min(box.plotW, it.x1);
+            const long = x1 - x0 >= w + 16;
+            const x = Math.max(4, Math.min(long ? x1 - w - 6 : x0 + 2, box.plotW - w - 4));
+            return { ...it, index, w, x };
+        })
+        .filter(it => it.x1 > 0 && it.x0 < box.plotW)
+        .sort((a, b) => b.y - a.y); // from the lowest line up: a lifted name goes up
+    const placed: CalloutPlaced[] = [];
+    for (const it of sized) {
+        let y = it.y - PILL_H / 2 - 4;
+        for (let again = true; again;) {
+            again = false;
+            for (const p of placed) {
+                if (it.x < p.x + p.w + 4 && p.x < it.x + it.w + 4 && Math.abs(p.y - y) < PILL_H + 1) {
+                    y = p.y - PILL_H - 1;
+                    again = true;
+                }
+            }
+        }
+        placed.push({
+            index: it.index,
+            x: it.x,
+            y: Math.max(PILL_H / 2, Math.min(y, box.plotH - PILL_H / 2)),
+            w: it.w,
+            h: PILL_H,
+        });
     }
-    return sized.map((s, k) => ({
-        index: s.index,
-        x,
-        y: ys[k],
-        w: s.w,
-        h: PILL_H,
-        endX: Math.max(2, Math.min(s.x1, x - 8)),
-        endY: s.y,
-    }));
+    return placed;
 }
 
 /** A line colour that is white would vanish on the light theme: use the writing colour then. */
@@ -140,11 +142,16 @@ class NamesPrimitive {
             const ts = chart.timeScale();
             const plotW = mediaSize.width;
             const pts = set.items
-                .map(i => ({ item: i, y: series.priceToCoordinate(i.price), x1: ts.timeToCoordinate(i.t1 as Time) }))
+                .map(i => ({
+                    item: i,
+                    y: series.priceToCoordinate(i.price),
+                    x0: ts.timeToCoordinate(i.t0 as Time),
+                    x1: ts.timeToCoordinate(i.t1 as Time),
+                }))
                 .filter((p): p is typeof p & { y: number } => p.y !== null && p.y > -10 && p.y < mediaSize.height);
             const placed = layoutCallouts(
-                pts.map(p => ({ y: p.y, x1: p.x1 ?? plotW, text: p.item.text })),
-                { plotW, plotH: mediaSize.height - 4, anchorX: ts.timeToCoordinate(set.anchor as Time) ?? plotW }
+                pts.map(p => ({ y: p.y, x0: p.x0 ?? 0, x1: p.x1 ?? plotW, text: p.item.text })),
+                { plotW, plotH: mediaSize.height - 4 }
             );
             ctx.save();
             ctx.font = "10px 'Jost', sans-serif";
@@ -153,17 +160,7 @@ class NamesPrimitive {
             ctx.lineJoin = 'round';
             for (const p of placed) {
                 const it = pts[p.index].item;
-                const midY = p.y + p.h / 2;
-                // a short arrow pointing back to the line, in the colour of that line
-                ctx.strokeStyle = colourOf(it.braceColor, ink.text);
-                ctx.lineWidth = 0.9;
-                ctx.beginPath();
-                ctx.moveTo(p.x - 4, midY);
-                ctx.lineTo(p.x - 16, midY);
-                ctx.moveTo(p.x - 11, midY - 3);
-                ctx.lineTo(p.x - 16, midY);
-                ctx.lineTo(p.x - 11, midY + 3);
-                ctx.stroke();
+                const midY = p.y;
                 // the name: a thin outline under it keeps it readable over lines and candles
                 ctx.strokeStyle = ink.bg;
                 ctx.lineWidth = 3;

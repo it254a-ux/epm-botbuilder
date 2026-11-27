@@ -1,24 +1,22 @@
 import { layoutCallouts } from '../smc-labels';
 
-const box = { plotW: 800, plotH: 500, anchorX: 400 };
+const box = { plotW: 800, plotH: 500 };
 
 describe('Smart money names', () => {
-    it('stand in one column, in the order of their lines, and never touch', () => {
-        const items = [200, 203, 206, 400].map((y, i) => ({ y, x1: 700, text: `Name number ${i}` }));
-        const out = layoutCallouts(items, box);
-        expect(out.length).toBe(4);
-        expect(new Set(out.map(o => o.x)).size).toBe(1);
-        for (let k = 1; k < out.length; k++) expect(out[k].y).toBeGreaterThanOrEqual(out[k - 1].y + out[k - 1].h);
-        expect(out.map(o => o.index)).toEqual([0, 1, 2, 3]);
+    it('a short line gets its name from its start, just above it', () => {
+        const [p] = layoutCallouts([{ y: 200, x0: 100, x1: 150, text: 'MAJOR INDUCEMENT ( TRAP )' }], box);
+        expect(p.x).toBe(102);
+        expect(p.y).toBeLessThan(200);
     });
-    it('keeps every pill inside the chart, even when the lines are at the bottom', () => {
-        const items = [470, 472, 474, 476].map((y, i) => ({ y, x1: 700, text: `N${i}` }));
-        const out = layoutCallouts(items, box);
-        expect(Math.max(...out.map(o => o.y + o.h))).toBeLessThanOrEqual(500);
-        for (let k = 1; k < out.length; k++) expect(out[k].y).toBeGreaterThanOrEqual(out[k - 1].y + out[k - 1].h);
+    it('a long line gets its name at its right end', () => {
+        const [p] = layoutCallouts([{ y: 200, x0: 0, x1: 700, text: 'BOS' }], box);
+        expect(p.x + p.w).toBeLessThanOrEqual(700);
+        expect(p.x).toBeGreaterThan(600);
     });
-    it('the column moves left when the long names do not fit to the right of the last candle', () => {
-        const out = layoutCallouts([{ y: 100, x1: 700, text: 'SELL ENTRY AREA · SUPPLY ZONE · MITIGATED' }], { ...box, anchorX: 700 });
-        expect(out[0].x + out[0].w).toBeLessThanOrEqual(800);
+    it('names that would meet are lifted apart, and stay inside the chart', () => {
+        const items = [200, 203, 206].map((y, i) => ({ y, x0: 0, x1: 700, text: `Name number ${i}` }));
+        const out = layoutCallouts(items, box).sort((a, b) => a.y - b.y);
+        for (let k = 1; k < out.length; k++) expect(out[k].y).toBeGreaterThanOrEqual(out[k - 1].y + out[k - 1].h);
+        expect(out.every(o => o.y >= 0 && o.x >= 0 && o.x + o.w <= 800)).toBe(true);
     });
 });
