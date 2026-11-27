@@ -520,12 +520,6 @@ const MarketForecast = () => {
                 </div>
             </div>
 
-            <p className='market-forecast__note'>
-                The faded candles show the middle of {PATHS} possible futures; the dashed lines mark the 10% to 90%
-                range of where the price could be. With only {PATHS} samples this is a rough guide, and the model cannot
-                know about news. It is not financial advice and no result is guaranteed, so try ideas on a demo account
-                first. Deriv synthetic indices are not offered because their prices come from a random number generator.
-            </p>
             {compare && (
                 <CompareCharts
                     symbol={symbol}
