@@ -17,6 +17,8 @@ interface Props {
     chart: IChartApi;
     series: ISeriesApi<SeriesType>;
     getLabels: () => SmcLabelSet | null;
+    /** The writing colour (white on the dark theme, dark on the light theme) and the chart background (for the thin outline). */
+    ink: { text: string; bg: string };
 }
 
 const GREEN = '#22c55e';
@@ -25,13 +27,13 @@ const ROW = 15; // the least distance between two names under each other
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** The name with a thin dark outline under it (two texts, so every browser draws it the same). Only the name is heavier; what comes after " · " is thinner. */
-const halo = (x: number, y: number, text: string, color: string) => {
+const halo = (x: number, y: number, text: string, color: string, bg: string) => {
     const cut = text.indexOf(' · ');
     const body =
         cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="200">${esc(text.slice(cut))}</tspan>`;
     const at = `x="${x}" y="${y}" text-anchor="middle" font-size="11"`;
     return (
-        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="2" stroke-linejoin="round" text-rendering="geometricPrecision">${body}</text>` +
+        `<text ${at} class="smc-name" fill="${bg}" stroke="${bg}" stroke-width="2" stroke-linejoin="round" text-rendering="geometricPrecision">${body}</text>` +
         `<text ${at} class="smc-name" fill="${color}" stroke="none" text-rendering="geometricPrecision">${body}</text>`
     );
 };
@@ -81,7 +83,7 @@ export function layoutBraces(
     return placed.map(({ w, ...rest }) => rest);
 }
 
-const SmcLabels = ({ chart, series, getLabels }: Props) => {
+const SmcLabels = ({ chart, series, getLabels, ink }: Props) => {
     const svg = useRef<SVGSVGElement>(null);
     useEffect(() => {
         let raf = 0;
@@ -115,7 +117,7 @@ const SmcLabels = ({ chart, series, getLabels }: Props) => {
                         for (const p of placed) {
                             const it = pts[p.index].item;
                             html += `<path d="${bracePath(p.x0, p.x1, p.line + 5)}" fill="none" stroke="${GREEN}" stroke-width="1.2"/>`;
-                            html += halo(p.nameX, p.nameY, it.text, it.color);
+                            html += halo(p.nameX, p.nameY, it.text, ink.text, ink.bg);
                         }
                     }
                 }
@@ -129,7 +131,7 @@ const SmcLabels = ({ chart, series, getLabels }: Props) => {
         };
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
-    }, [chart, series, getLabels]);
+    }, [chart, series, getLabels, ink]);
     return <svg ref={svg} className='fx-svg smc-names' aria-hidden />;
 };
 

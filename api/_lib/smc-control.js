@@ -79,7 +79,7 @@ function readControl(c, a) {
                 since = k;
                 sinceLevel = level;
                 pendingText = null;
-                events.push({ time: c[k].time, price: c[k].low, position: 'belowBar', color: GREEN, text: 'BUYERS CONFIRMED' });
+                events.push({ time: c[k].time, price: c[k].low, position: 'belowBar', color: GREEN, text: 'BC' });
             }
             else if (k === n - 1) {
                 pendingText = `A candle closed above ${fmt(level)}: waiting to see if buyers hold it`;
@@ -94,7 +94,7 @@ function readControl(c, a) {
                 since = k;
                 sinceLevel = level;
                 pendingText = null;
-                events.push({ time: c[k].time, price: c[k].high, position: 'aboveBar', color: RED, text: 'SELLERS CONFIRMED' });
+                events.push({ time: c[k].time, price: c[k].high, position: 'aboveBar', color: RED, text: 'SC' });
             }
             else if (k === n - 1) {
                 pendingText = `A candle closed below ${fmt(level)}: waiting to see if sellers hold it`;
@@ -180,13 +180,13 @@ function readControl(c, a) {
     }
     const lastLow = Array.from(new Set(sweepsLow)).slice(-2);
     const lastHigh = Array.from(new Set(sweepsHigh)).slice(-2);
-    lastLow.forEach(k => events.push({ time: c[k].time, price: c[k].low, position: 'belowBar', color: GREEN, text: 'SWEEP OF THE LOW' }));
-    lastHigh.forEach(k => events.push({ time: c[k].time, price: c[k].high, position: 'aboveBar', color: RED, text: 'SWEEP OF THE HIGH' }));
+    lastLow.forEach(k => events.push({ time: c[k].time, price: c[k].low, position: 'belowBar', color: GREEN, text: 'SWL' }));
+    lastHigh.forEach(k => events.push({ time: c[k].time, price: c[k].high, position: 'aboveBar', color: RED, text: 'SWH' }));
     // ---- reaction: the first strong candle the other way, right after a sweep
     lastLow.forEach(k => {
         for (let j = k; j <= Math.min(n - 1, k + 4); j++) {
             if (isStrong(c, j, true)) {
-                events.push({ time: c[j].time, price: c[j].low, position: 'belowBar', color: GREEN, text: 'BUYERS REACT' });
+                events.push({ time: c[j].time, price: c[j].low, position: 'belowBar', color: GREEN, text: 'BR' });
                 break;
             }
         }
@@ -194,7 +194,7 @@ function readControl(c, a) {
     lastHigh.forEach(k => {
         for (let j = k; j <= Math.min(n - 1, k + 4); j++) {
             if (isStrong(c, j, false)) {
-                events.push({ time: c[j].time, price: c[j].high, position: 'aboveBar', color: RED, text: 'SELLERS REACT' });
+                events.push({ time: c[j].time, price: c[j].high, position: 'aboveBar', color: RED, text: 'SR' });
                 break;
             }
         }
@@ -212,9 +212,9 @@ function readControl(c, a) {
             bestGreen = k;
     }
     if (bestRed >= 0)
-        events.push({ time: c[bestRed].time, price: c[bestRed].high, position: 'aboveBar', color: RED, text: 'STRONG SELL-OFF' });
+        events.push({ time: c[bestRed].time, price: c[bestRed].high, position: 'aboveBar', color: RED, text: 'SO' });
     if (bestGreen >= 0)
-        events.push({ time: c[bestGreen].time, price: c[bestGreen].low, position: 'belowBar', color: GREEN, text: 'STRONG RALLY' });
+        events.push({ time: c[bestGreen].time, price: c[bestGreen].low, position: 'belowBar', color: GREEN, text: 'RL' });
     // ---- retest: after control changed, did price come back to the broken line and hold (or fail)?
     if (who && since >= 0) {
         for (let j = since + 1; j < n; j++) {
@@ -225,7 +225,7 @@ function readControl(c, a) {
                 }
                 if (c[j].low <= sinceLevel + 0.25 * a && c[j].close > sinceLevel) {
                     if (j >= from)
-                        events.push({ time: c[j].time, price: c[j].low, position: 'belowBar', color: GREEN, text: 'RETEST HELD' });
+                        events.push({ time: c[j].time, price: c[j].low, position: 'belowBar', color: GREEN, text: 'RH' });
                     signs.push(`Retest held: price came back to ${fmt(sinceLevel)} and buyers defended it`);
                     break;
                 }
@@ -237,7 +237,7 @@ function readControl(c, a) {
                 }
                 if (c[j].high >= sinceLevel - 0.25 * a && c[j].close < sinceLevel) {
                     if (j >= from)
-                        events.push({ time: c[j].time, price: c[j].high, position: 'aboveBar', color: RED, text: 'RETEST HELD' });
+                        events.push({ time: c[j].time, price: c[j].high, position: 'aboveBar', color: RED, text: 'RH' });
                     signs.push(`Retest held: price came back to ${fmt(sinceLevel)} and sellers defended it`);
                     break;
                 }

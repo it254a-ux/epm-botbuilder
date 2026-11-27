@@ -37,6 +37,7 @@ import { drawSmc, SMC_GUTTER_BARS } from './smc-draw';
 import { SMC_ID, smcHistory, type SmcOverlay } from './smc';
 import { sameControl, type Control } from './smc-control';
 import SmcControlBadge from './smc-control-badge';
+import SmcAbbrButton from './smc-abbr';
 import { VP_ID } from './volume-profile';
 
 /**
@@ -205,6 +206,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     // Smart Money: the current setup plus every earlier one found in the loaded candles (more appear as the chart is dragged back)
     const smcRef = useRef<{ current: SmcOverlay | null; control?: Control | null } | null>(null);
     const [control, setControl] = useState<Control | null>(null);
+    // writing colour of the names on the chart: white on the dark theme, dark on the light theme
+    const [ink, setInk] = useState({ text: '#ffffff', bg: '#0e1116' });
     const smcWindow = useRef<{ from: number; to: number } | null>(null);
     const smcTimer = useRef<number>(0);
     const paintSmcRef = useRef<() => void>(() => undefined);
@@ -216,6 +219,8 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         const host = hostRef.current;
         if (!host) return;
         const th = readTheme(host);
+        const inkOf = (t: Theme) => ({ text: isDarkTheme(host) ? '#ffffff' : '#111827', bg: t.bg });
+        setInk(inkOf(th));
         const themeOptions = (t: Theme) => ({
             layout: { background: { color: t.bg }, textColor: t.text, fontSize: 10, fontFamily: `'Jost', ${t.font}` },
             grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
@@ -230,7 +235,14 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
             crosshair: { mode: 0 },
         });
         // Follow the website when its theme (dark / light) is switched.
-        const themeWatch = new MutationObserver(() => chart.applyOptions(themeOptions(readTheme(host))));
+        const themeWatch = new MutationObserver(() => {
+            const nt = readTheme(host);
+            chart.applyOptions(themeOptions(nt));
+            setInk(prev => {
+                const n = inkOf(nt);
+                return prev.text === n.text && prev.bg === n.bg ? prev : n;
+            });
+        });
         themeWatch.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ['class', 'data-theme', 'style'],
@@ -566,12 +578,22 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
             view = { from: t0 - w, to: t1 + w };
             smcWindow.current = view;
         }
-        const out = drawSmc({ chart, series, extra: extraRef.current, lines: linesRef.current }, st.current, cs, hist, view, st.control ?? null);
+        const out = drawSmc(
+            { chart, series, extra: extraRef.current, lines: linesRef.current },
+            st.current,
+            cs,
+            hist,
+            view,
+            st.control ?? null
+        );
         series.setMarkers(out.markers);
         smcLabelsRef.current = { anchor: out.anchor, items: out.labels };
         if (out.levels.length) {
             const span = Math.max(...out.levels) - Math.min(...out.levels);
-            levelsRef.current = { min: Math.min(...out.levels) - span * 0.04, max: Math.max(...out.levels) + span * 0.04 };
+            levelsRef.current = {
+                min: Math.min(...out.levels) - span * 0.04,
+                max: Math.max(...out.levels) + span * 0.04,
+            };
         }
         if (range) ts.setVisibleLogicalRange(range);
     };
@@ -797,7 +819,9 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
                 // Smart Money strategy: its own markings (zone, BOS, sweep, MSS, liquidity, trade box) instead of the range picture
                 if (analysis.strategyId === (SMC_ID as unknown) || analysis.strategyId === (VP_ID as unknown)) {
                     smcRef.current = { current: analysis.smc ?? null, control: analysis.control ?? null };
-                    setControl(prev => (sameControl(prev, analysis.control ?? null) ? prev : analysis.control ?? null));
+                    setControl(prev =>
+                        sameControl(prev, analysis.control ?? null) ? prev : (analysis.control ?? null)
+                    );
                     paintSmcRef.current();
                     openView();
                     return;
@@ -1109,7 +1133,10 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
-            {apis && <SmcLabels chart={apis.chart} series={apis.series} getLabels={() => smcLabelsRef.current} />}
+            {apis && (
+                <SmcLabels chart={apis.chart} series={apis.series} getLabels={() => smcLabelsRef.current} ink={ink} />
+            )}
+            <SmcAbbrButton />
             {control && <SmcControlBadge control={control} />}
             {apis && (
                 <ChartDrawings
