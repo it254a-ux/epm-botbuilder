@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createChart, LineStyle, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
-import { DerivWS } from '@deriv/core';
 import {
-    closedOnly,
-    decimalsOf,
-    leanOf,
-    medianBars,
-    readLevels,
-    type Bar,
-    type ForecastResult,
-} from './forecast-math';
+    createChart,
+    LineStyle,
+    type IChartApi,
+    type IPriceLine,
+    type ISeriesApi,
+    type UTCTimestamp,
+} from 'lightweight-charts';
+import { DerivWS } from '@deriv/core';
+import { closedOnly, decimalsOf, leanOf, medianBars, readLevels, type Bar, type ForecastResult } from './forecast-math';
 import CompareCharts from '../forex-trader/compare-charts';
 import './market-forecast.scss';
 
@@ -66,12 +65,28 @@ function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T>
  * The newest candles of a market. Each call opens its own short connection to Deriv's public data feed and
  * closes it again, so it never depends on a shared connection that might have dropped in between.
  */
-async function loadCandles(symbol: string, sec: number, end: number | 'latest' = 'latest', count = HISTORY): Promise<Bar[]> {
+async function loadCandles(
+    symbol: string,
+    sec: number,
+    end: number | 'latest' = 'latest',
+    count = HISTORY
+): Promise<Bar[]> {
     const socket = new DerivWS();
     try {
-        await within(socket.connect(), 12000, 'Could not reach the market data. Please check your internet and try again.');
+        await within(
+            socket.connect(),
+            12000,
+            'Could not reach the market data. Please check your internet and try again.'
+        );
         const d = await within(
-            socket.send<CandleMsg>({ ticks_history: symbol, style: 'candles', granularity: sec, end, count, adjust_start_time: 1 }),
+            socket.send<CandleMsg>({
+                ticks_history: symbol,
+                style: 'candles',
+                granularity: sec,
+                end,
+                count,
+                adjust_start_time: 1,
+            }),
             15000,
             'Loading candles took too long. Please try again.'
         );
@@ -79,7 +94,13 @@ async function loadCandles(symbol: string, sec: number, end: number | 'latest' =
             if (end !== 'latest') return [];
             throw new Error('No candles came back for this market.');
         }
-        return d.candles.map(c => ({ time: c.epoch, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }));
+        return d.candles.map(c => ({
+            time: c.epoch,
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close),
+        }));
     } finally {
         socket.disconnect();
     }
@@ -137,13 +158,35 @@ const MarketForecast = () => {
             timeScale: { borderColor: 'rgba(128,128,128,0.3)', timeVisible: true, secondsVisible: false },
         });
         realRef.current = chart.addCandlestickSeries({
-            upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a', borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderUpColor: '#26a69a',
+            borderDownColor: '#ef5350',
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350',
         });
         ghostRef.current = chart.addCandlestickSeries({
-            upColor: 'rgba(38,166,154,0.35)', downColor: 'rgba(239,83,80,0.35)', borderUpColor: 'rgba(38,166,154,0.8)', borderDownColor: 'rgba(239,83,80,0.8)', wickUpColor: 'rgba(38,166,154,0.8)', wickDownColor: 'rgba(239,83,80,0.8)',
+            upColor: 'rgba(38,166,154,0.35)',
+            downColor: 'rgba(239,83,80,0.35)',
+            borderUpColor: 'rgba(38,166,154,0.8)',
+            borderDownColor: 'rgba(239,83,80,0.8)',
+            wickUpColor: 'rgba(38,166,154,0.8)',
+            wickDownColor: 'rgba(239,83,80,0.8)',
         });
-        lowRef.current = chart.addLineSeries({ color: 'rgba(66,133,244,0.8)', lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
-        highRef.current = chart.addLineSeries({ color: 'rgba(66,133,244,0.8)', lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+        lowRef.current = chart.addLineSeries({
+            color: 'rgba(66,133,244,0.8)',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        highRef.current = chart.addLineSeries({
+            color: 'rgba(66,133,244,0.8)',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
         chartRef.current = chart;
         // dragging back near the oldest candle loads earlier ones, so the history never runs out
         const onRange = (range: { from: number; to: number } | null) => {
@@ -243,14 +286,17 @@ const MarketForecast = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    candles: closed.slice(-HISTORY).map(b => ({ t: b.time, o: b.open, h: b.high, l: b.low, c: b.close })),
+                    candles: closed
+                        .slice(-HISTORY)
+                        .map(b => ({ t: b.time, o: b.open, h: b.high, l: b.low, c: b.close })),
                     pred_len: horizon,
                     paths: PATHS,
                     levels: read.levels ?? undefined,
                 }),
             });
             const job = (await started.json().catch(() => null)) as { job?: string; error?: string } | null;
-            if (!started.ok || !job?.job) throw new Error(job?.error ?? 'The forecast service is offline right now. Please try again later.');
+            if (!started.ok || !job?.job)
+                throw new Error(job?.error ?? 'The forecast service is offline right now. Please try again later.');
 
             // a slow computer can need a few minutes, so check back every few seconds instead of waiting on one request
             const t0 = Date.now();
@@ -259,15 +305,25 @@ const MarketForecast = () => {
             while (!data) {
                 await sleep(3000);
                 if (!aliveRef.current) return;
-                if (Date.now() - t0 > MAX_WAIT_MS) throw new Error('The forecast is taking much longer than expected. Please try again later.');
-                setMessage(`Kronos is working… ${Math.round((Date.now() - t0) / 1000)} s (it can take a few minutes on a slow computer).`);
+                if (Date.now() - t0 > MAX_WAIT_MS)
+                    throw new Error('The forecast is taking much longer than expected. Please try again later.');
+                setMessage(
+                    `Kronos is working… ${Math.round((Date.now() - t0) / 1000)} s (it can take a few minutes on a slow computer).`
+                );
                 try {
                     const pr = await fetch(`/api/kronos-forecast?id=${job.job}`);
-                    const p = (await pr.json().catch(() => null)) as { status?: string; result?: ForecastResult; error?: string } | null;
+                    const p = (await pr.json().catch(() => null)) as {
+                        status?: string;
+                        result?: ForecastResult;
+                        error?: string;
+                    } | null;
                     if (!pr.ok || !p) {
                         const fatal = pr.status === 410 || pr.status === 429 || pr.status === 400;
                         failures += 1;
-                        if (fatal || failures >= 3) throw new Error(p?.error ?? 'The forecast service is offline right now. Please try again later.');
+                        if (fatal || failures >= 3)
+                            throw new Error(
+                                p?.error ?? 'The forecast service is offline right now. Please try again later.'
+                            );
                     } else if (p.status === 'error') {
                         throw new Error(p.error ?? 'The model hit a problem. Please try again.');
                     } else if (p.status === 'done' && p.result && Array.isArray(p.result.paths)) {
@@ -290,12 +346,23 @@ const MarketForecast = () => {
             highRef.current?.setData(times.map((time, i) => ({ time, value: forecast.p90_close[i] })));
             if (read.levels) {
                 const line = (price: number, title: string, color: string) =>
-                    realRef.current?.createPriceLine({ price, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title });
-                [line(read.levels.tp, 'TP', '#26a69a'), line(read.levels.sl, 'SL', '#ef5350')].forEach(l => l && linesRef.current.push(l));
+                    realRef.current?.createPriceLine({
+                        price,
+                        color,
+                        lineWidth: 1,
+                        lineStyle: LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title,
+                    });
+                [line(read.levels.tp, 'TP', '#26a69a'), line(read.levels.sl, 'SL', '#ef5350')].forEach(
+                    l => l && linesRef.current.push(l)
+                );
             }
             // frame the recent candles and the forecast, even when much older history has been loaded
             const last = barsRef.current.length - 1 + times.length;
-            chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, barsRef.current.length - 160), to: last + 3 });
+            chartRef.current
+                ?.timeScale()
+                .setVisibleLogicalRange({ from: Math.max(0, barsRef.current.length - 160), to: last + 3 });
             setResult(forecast);
             setMessage('');
         } catch (err) {
@@ -315,79 +382,132 @@ const MarketForecast = () => {
 
     return (
         <div className='market-forecast'>
-            <div className='market-forecast__head'>
-                <h2>Market Forecast</h2>
-                <span className='market-forecast__powered'>
-                    Powered by{' '}
-                    <a href='https://github.com/shiyu-coder/Kronos' target='_blank' rel='noreferrer'>
-                        Kronos
-                    </a>
-                </span>
-            </div>
+            <div className='market-forecast__top'>
+                <div className='market-forecast__panel'>
+                    <div className='market-forecast__head'>
+                        <h2>Market Forecast</h2>
+                        <span className='market-forecast__powered'>
+                            Powered by{' '}
+                            <a href='https://github.com/shiyu-coder/Kronos' target='_blank' rel='noreferrer'>
+                                Kronos
+                            </a>
+                        </span>
+                    </div>
 
-            <div className='market-forecast__controls'>
-                <label>
-                    Market
-                    <select value={symbol} onChange={e => setSymbol(e.target.value)} disabled={busy}>
-                        {MARKETS.map(m => (
-                            <option key={m.symbol} value={m.symbol}>
-                                {m.name}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <label>
-                    Candle size
-                    <select value={sec} onChange={e => setSec(Number(e.target.value))} disabled={busy}>
-                        {TIMEFRAMES.map(t => (
-                            <option key={t.sec} value={t.sec}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <label>
-                    Look ahead
-                    <select value={horizon} onChange={e => setHorizon(Number(e.target.value))} disabled={busy}>
-                        {HORIZONS.map(h => (
-                            <option key={h} value={h}>
-                                {h} candles (about {spanText(h * sec)})
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <button type='button' className='market-forecast__run' onClick={run} disabled={busy}>
-                    {busy ? 'Working…' : 'Run forecast'}
-                </button>
-            </div>
+                    <div className='market-forecast__controls'>
+                        <label>
+                            Market
+                            <select value={symbol} onChange={e => setSymbol(e.target.value)} disabled={busy}>
+                                {MARKETS.map(m => (
+                                    <option key={m.symbol} value={m.symbol}>
+                                        {m.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            Candle size
+                            <select value={sec} onChange={e => setSec(Number(e.target.value))} disabled={busy}>
+                                {TIMEFRAMES.map(t => (
+                                    <option key={t.sec} value={t.sec}>
+                                        {t.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            Look ahead
+                            <select value={horizon} onChange={e => setHorizon(Number(e.target.value))} disabled={busy}>
+                                {HORIZONS.map(h => (
+                                    <option key={h} value={h}>
+                                        {h} candles (about {spanText(h * sec)})
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <button type='button' className='market-forecast__run' onClick={run} disabled={busy}>
+                            {busy ? 'Working…' : 'Run forecast'}
+                        </button>
+                    </div>
 
-            <details className='market-forecast__levels'>
-                <summary>Check a trade idea (optional)</summary>
-                <div className='market-forecast__levels-row'>
-                    <label>
-                        Trade
-                        <select value={side} onChange={e => setSide(e.target.value as 'none' | 'buy' | 'sell')} disabled={busy}>
-                            <option value='none'>No trade</option>
-                            <option value='buy'>Buy</option>
-                            <option value='sell'>Sell</option>
-                        </select>
-                    </label>
-                    <label>
-                        Take profit price
-                        <input inputMode='decimal' value={tp} onChange={e => setTp(e.target.value)} disabled={busy || side === 'none'} />
-                    </label>
-                    <label>
-                        Stop loss price
-                        <input inputMode='decimal' value={sl} onChange={e => setSl(e.target.value)} disabled={busy || side === 'none'} />
-                    </label>
+                    <details className='market-forecast__levels'>
+                        <summary>Check a trade idea (optional)</summary>
+                        <div className='market-forecast__levels-row'>
+                            <label>
+                                Trade
+                                <select
+                                    value={side}
+                                    onChange={e => setSide(e.target.value as 'none' | 'buy' | 'sell')}
+                                    disabled={busy}
+                                >
+                                    <option value='none'>No trade</option>
+                                    <option value='buy'>Buy</option>
+                                    <option value='sell'>Sell</option>
+                                </select>
+                            </label>
+                            <label>
+                                Take profit price
+                                <input
+                                    inputMode='decimal'
+                                    value={tp}
+                                    onChange={e => setTp(e.target.value)}
+                                    disabled={busy || side === 'none'}
+                                />
+                            </label>
+                            <label>
+                                Stop loss price
+                                <input
+                                    inputMode='decimal'
+                                    value={sl}
+                                    onChange={e => setSl(e.target.value)}
+                                    disabled={busy || side === 'none'}
+                                />
+                            </label>
+                        </div>
+                    </details>
+
+                    {message && (
+                        <div
+                            className={`market-forecast__message${isError ? ' market-forecast__message--error' : ''}`}
+                            role='status'
+                        >
+                            {message}
+                        </div>
+                    )}
                 </div>
-            </details>
-
-            {message && (
-                <div className={`market-forecast__message${isError ? ' market-forecast__message--error' : ''}`} role='status'>
-                    {message}
+                <div className='market-forecast__panel market-forecast__panel--results'>
+                    {result && (
+                        <div className='market-forecast__cards'>
+                            <div className='market-forecast__card'>
+                                <strong>
+                                    {lean === 'up' ? 'Leaning up' : lean === 'down' ? 'Leaning down' : 'No clear lean'}
+                                </strong>
+                                <span>
+                                    {higher} of {result.paths.length} sample paths end higher after about{' '}
+                                    {spanText(horizon * sec)}.
+                                </span>
+                            </div>
+                            <div className='market-forecast__card'>
+                                <strong>Likely range at the end</strong>
+                                <span>
+                                    {endLow.toFixed(dec)} to {endHigh.toFixed(dec)} (last price{' '}
+                                    {result.last_close.toFixed(dec)}).
+                                </span>
+                            </div>
+                            {result.levels && (
+                                <div className='market-forecast__card'>
+                                    <strong>Your trade idea</strong>
+                                    <span>
+                                        {Math.round(result.levels.tp_first * 100)}% of the paths reached the take profit
+                                        first, {Math.round(result.levels.sl_first * 100)}% hit the stop loss first,{' '}
+                                        {Math.round(result.levels.neither * 100)}% reached neither.
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
 
             <div className='market-forecast__chart-wrap'>
                 <div className='market-forecast__chart' ref={holder} />
@@ -401,35 +521,11 @@ const MarketForecast = () => {
                 </button>
             </div>
 
-            {result && (
-                <div className='market-forecast__cards'>
-                    <div className='market-forecast__card'>
-                        <strong>
-                            {lean === 'up' ? 'Leaning up' : lean === 'down' ? 'Leaning down' : 'No clear lean'}
-                        </strong>
-                        <span>
-                            {higher} of {result.paths.length} sample paths end higher after about {spanText(horizon * sec)}.
-                        </span>
-                    </div>
-                    <div className='market-forecast__card'>
-                        <strong>Likely range at the end</strong>
-                        <span>
-                            {endLow.toFixed(dec)} to {endHigh.toFixed(dec)} (last price {result.last_close.toFixed(dec)}).
-                        </span>
-                    </div>
-                    {result.levels && (
-                        <div className='market-forecast__card'>
-                            <strong>Your trade idea</strong>
-                            <span>
-                                {Math.round(result.levels.tp_first * 100)}% of the paths reached the take profit first, {Math.round(result.levels.sl_first * 100)}% hit the stop loss first, {Math.round(result.levels.neither * 100)}% reached neither.
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
-
             <p className='market-forecast__note'>
-                The faded candles show the middle of {PATHS} possible futures; the dashed lines mark the 10% to 90% range of where the price could be. With only {PATHS} samples this is a rough guide, and the model cannot know about news. It is not financial advice and no result is guaranteed, so try ideas on a demo account first. Deriv synthetic indices are not offered because their prices come from a random number generator.
+                The faded candles show the middle of {PATHS} possible futures; the dashed lines mark the 10% to 90%
+                range of where the price could be. With only {PATHS} samples this is a rough guide, and the model cannot
+                know about news. It is not financial advice and no result is guaranteed, so try ideas on a demo account
+                first. Deriv synthetic indices are not offered because their prices come from a random number generator.
             </p>
             {compare && (
                 <CompareCharts

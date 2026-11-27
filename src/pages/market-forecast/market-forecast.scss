@@ -22,6 +22,31 @@
         -webkit-overflow-scrolling: touch;
     }
 
+    // two panels side by side, the same width and the same height: the header on the left, the results on the right
+    &__top {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        align-items: stretch;
+        margin-bottom: 8px;
+
+        @media (max-width: 900px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__panel {
+        min-width: 0;
+        padding: 10px 12px 2px;
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        border-radius: 8px;
+
+        &--results {
+            overflow-y: auto;
+            padding-bottom: 10px;
+        }
+    }
+
     &__head {
         display: flex;
         align-items: baseline;
