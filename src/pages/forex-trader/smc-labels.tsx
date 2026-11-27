@@ -42,14 +42,14 @@ const halo = (x: number, y: number, text: string, color: string, bg: string, anc
     );
 };
 
-/** A curly brace along a line: from x0 to x1, `dir` 1 = under the line (point down), -1 = over it (point up). */
-export function bracePath(x0: number, x1: number, y: number, dir: 1 | -1, depth = 6): string {
+/** A curly brace along a line: from x0 to x1, `dir` 1 = under the line (point down), -1 = over it (point up). Two smooth curves that
+ *  meet in a point in the middle, with no flat bar (a flat bar would look like a second line). */
+export function bracePath(x0: number, x1: number, y: number, dir: 1 | -1, depth = 9): string {
     const m = (x0 + x1) / 2;
-    const r = Math.min(depth, (x1 - x0) / 4);
-    const e = y + dir * 6; // the arms start a little off the line
-    const a = e + dir * 5; // the bar of the brace
-    const p = a + dir * depth; // the point
-    return `M ${x0} ${e} Q ${x0} ${a} ${x0 + r} ${a} L ${m - r} ${a} Q ${m} ${a} ${m} ${p} Q ${m} ${a} ${m + r} ${a} L ${x1 - r} ${a} Q ${x1} ${a} ${x1} ${e}`;
+    const e = y + dir * 5; // the ends start a little off the line
+    const a = e + dir * depth * 0.45;
+    const p = e + dir * depth;
+    return `M ${x0} ${e} C ${x0} ${a} ${m} ${e} ${m} ${p} C ${m} ${e} ${x1} ${a} ${x1} ${e}`;
 }
 
 export interface BraceInput {
@@ -88,7 +88,7 @@ export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: n
             ? Math.max(4 + w / 2, Math.min((it.x0 + it.x1) / 2, box.plotW - 4 - w / 2))
             : box.plotW - 8 - w / 2;
         const dir = it.brace ? it.dir : 1;
-        let nameY = it.brace ? it.y + dir * (BAND - (dir === 1 ? 0 : 6)) + (dir === 1 ? 0 : 0) : it.y + 12;
+        let nameY = it.brace ? it.y + dir * BAND + (dir === 1 ? 4 : 0) : it.y + 12;
         // keep clear of the names already placed that share some of the same width
         for (let again = true; again;) {
             again = false;
@@ -114,7 +114,7 @@ export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: n
     return placed.map(({ w, ...rest }) => rest);
 }
 
-/** Does a line run through candles, and on which side do the candles leave room? (pixel positions) */
+/** Does a line run through candles, and on which side do the candles leave room? (pixel positions; a tie goes above the line) */
 export function braceSide(
     y: number,
     candles: { x: number; top: number; bottom: number }[]
@@ -122,12 +122,14 @@ export function braceSide(
     let crosses = 0;
     let below = 0;
     let above = 0;
+    const overlap = (lo: number, hi: number, c: { top: number; bottom: number }) =>
+        Math.max(0, Math.min(hi, c.bottom) - Math.max(lo, c.top));
     for (const c of candles) {
         if (c.top <= y && c.bottom >= y) crosses++;
-        if (c.bottom > y && c.top < y + BAND) below++;
-        if (c.top < y && c.bottom > y - BAND) above++;
+        below += overlap(y, y + BAND, c);
+        above += overlap(y - BAND, y, c);
     }
-    return { brace: crosses > 0, dir: below <= above ? 1 : -1 };
+    return { brace: crosses > 0, dir: above <= below ? -1 : 1 };
 }
 
 const colourOf = (c: string, ink: string) =>

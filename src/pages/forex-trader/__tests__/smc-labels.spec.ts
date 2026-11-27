@@ -19,5 +19,6 @@ describe('Smart money names layout', () => {
         const through = braceSide(100, [{ x: 10, top: 80, bottom: 118 }, { x: 20, top: 110, bottom: 130 }]);
         expect(through.brace).toBe(true);
         expect(through.dir).toBe(-1); // the candles are below the line, so the room is above
+        expect(braceSide(100, [{ x: 10, top: 60, bottom: 125 }]).dir).toBe(1); // candles above: the room is below
     });
 });
