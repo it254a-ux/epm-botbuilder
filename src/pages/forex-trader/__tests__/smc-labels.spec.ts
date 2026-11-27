@@ -2,7 +2,7 @@ import { layoutCallouts } from '../smc-labels';
 
 const box = { plotW: 800, plotH: 500, anchorX: 400 };
 
-describe('Smart money callout pills', () => {
+describe('Smart money names', () => {
     it('stand in one column, in the order of their lines, and never touch', () => {
         const items = [200, 203, 206, 400].map((y, i) => ({ y, x1: 700, text: `Name number ${i}` }));
         const out = layoutCallouts(items, box);

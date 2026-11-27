@@ -139,6 +139,11 @@ export function drawSmc(
         opts: { width?: 1 | 2 | 3 | 4; dashed?: boolean; hidden?: boolean } = {}
     ) => {
         const to = Math.max(t1, t0 + len);
+        // only the key things are named and drawn: the entry area, BOS, MSS, the inducement traps and the target. Minor inducement, POC,
+        // the internal liquidity lines and the flip line stay out of the picture (less to read).
+        if (text && /^(MINOR|POC|IL-|LAST )/.test(text)) {
+            return;
+        }
         if (queue && text) {
             queue.push({
                 price,
@@ -399,19 +404,6 @@ export function drawSmc(
                 shape: 'circle',
                 color: o.exit.kind === 'target' ? C.tp : C.sl,
                 text: o.exit.kind === 'target' ? 'TARGET ✓' : 'SL',
-            });
-        }
-        if (main && queue && o.trend && o.trend.sentiment !== 'RANGING') {
-            const good = o.trend.withSetup;
-            const col = good ? '#4ade80' : '#f87171';
-            queue.push({
-                price: candles[candles.length - 1].close,
-                text: `${o.trend.sentiment} SENTIMENT · ${good ? 'with the setup ✓' : 'against the setup ✗'}`,
-                color: col,
-                lineColor: col,
-                t0: lastT - len * 10,
-                lineEnd: lastT,
-                thick: false,
             });
         }
         if (main) layoutLabels();

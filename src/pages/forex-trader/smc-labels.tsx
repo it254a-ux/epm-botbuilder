@@ -1,8 +1,8 @@
 /**
- * The names of the current Smart Money setup, drawn over the chart (not on it) as small callout pills, like a professional chart:
- *  - the pills stand in one tidy column in the free space to the right of the last candle, in the order of their lines (so no two
+ * The names of the current Smart Money setup, drawn over the chart (not on it) as plain thin names in the free space, like a professional chart, and only for the key things:
+ *  - the names stand in one tidy column in the free space to the right of the last candle, in the order of their lines (so no two
  *    leader lines cross), spaced so that no pill touches another;
- *  - each pill has a thin border in the colour of its own line and stands level with it (no leader lines: they only add clutter);
+ *  - each name is plain thin writing with a short arrow pointing back to its line (the arrow has the colour of the line);
  *  - the writing is thin: white on the dark theme, dark on the light theme.
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
@@ -27,9 +27,9 @@ interface Props {
 }
 
 const CHAR_W = 6.1; // thin 10px caps, a little generous
-const PILL_H = 16;
+const PILL_H = 14;
 const PILL_GAP = 4;
-const PAD = 7;
+const PAD = 0;
 
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -63,7 +63,7 @@ export function layoutCallouts(
     if (!sized.length) return [];
     const widest = Math.max(...sized.map(s => s.w));
     // to the right of the last candle when there is room, otherwise as far right as the pills fit
-    const x = Math.max(4, Math.min(box.anchorX + 22, box.plotW - widest - 4));
+    const x = Math.max(18, Math.min(box.anchorX + 26, box.plotW - widest - 4));
     // top to bottom, each pill as near its own line as it can be without touching the one above
     const ys: number[] = [];
     sized.forEach((s, k) => {
@@ -128,14 +128,14 @@ const SmcLabels = ({ chart, series, getLabels, ink }: Props) => {
                             const it = pts[p.index].item;
                             const col = colourOf(it.braceColor, ink.text);
                             const midY = p.y + p.h / 2;
-                            // the pill and its writing (only the name is a little heavier than what follows the " · ")
+                            // a short arrow pointing back to the line, then the name: plain thin writing, no box
+                            html += `<path d="M ${p.x - 4} ${midY} L ${p.x - 16} ${midY} M ${p.x - 11} ${midY - 3} L ${p.x - 16} ${midY} L ${p.x - 11} ${midY + 3}" fill="none" stroke="${col}" stroke-width="0.9"/>`;
                             const cut = it.text.indexOf(' · ');
                             const body =
                                 cut < 0
                                     ? esc(it.text)
                                     : `${esc(it.text.slice(0, cut))}<tspan font-weight="200">${esc(it.text.slice(cut))}</tspan>`;
-                            html += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.h / 2}" fill="${ink.bg}" fill-opacity="1" stroke="${col}" stroke-width="1"/>`;
-                            html += `<text x="${p.x + p.w / 2}" y="${midY}" dominant-baseline="central" text-anchor="middle" font-size="10" class="smc-name" fill="${ink.text}" text-rendering="geometricPrecision">${body}</text>`;
+                            html += `<text x="${p.x}" y="${midY}" dominant-baseline="central" font-size="10" class="smc-name" fill="${ink.text}" stroke="${ink.bg}" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-rendering="geometricPrecision">${body}</text>`;
                         }
                     }
                 }
