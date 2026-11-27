@@ -160,7 +160,8 @@ export function drawSmc(
         const items = queue;
         queue = null;
         if (!items) return;
-        const reach = lastT + len * 12;
+        // the dotted part runs on to the right, under the whole name
+        const reach = lastT + len * (SMC_GUTTER_BARS - 1);
         items.forEach(it => {
             labelsOut.push({ price: it.price, text: it.text, color: it.color });
             if (it.lineEnd < reach) {

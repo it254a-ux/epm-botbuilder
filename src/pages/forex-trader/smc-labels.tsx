@@ -22,7 +22,7 @@ interface Props {
 
 const RED = '#ff1a1a';
 const ROW = 17; // the least distance between two names, in pixels
-const CHAR_W = 6.2; // thin 10px, measured on the real chart
+const CHAR_W = 6.6; // thin 11px, measured on the real chart
 const MIN_FONT = 8;
 /** The name with a thin dark outline under it (two texts, so every browser draws it the same), so it reads on any candle colour. */
 const halo = (x: number, y: number, text: string, color: string, centre: boolean, size: number) => {
@@ -46,9 +46,9 @@ export function layoutNames(
     const widest = Math.max(...items.map(i => i.text.length)) * CHAR_W;
     // the names start right after the last candle, ON their own lines (which run on to the right), in bold.
     // When the longest name does not fit in the free space, the names get a smaller size (never moved back over the candles).
-    const x = Math.max(6, Math.min(box.anchorX + 12, box.plotW - 8 - (widest * MIN_FONT) / 10));
+    const x = Math.max(6, Math.min(box.anchorX + 12, box.plotW - 8 - (widest * MIN_FONT) / 11));
     const free = box.plotW - 8 - x;
-    const size = widest <= free ? 10 : Math.max(MIN_FONT, Math.floor((10 * free) / widest));
+    const size = widest <= free ? 11 : Math.max(MIN_FONT, Math.floor((11 * free) / widest));
     const sorted = [...items].sort((a, b) => a.y - b.y);
     const top = 10;
     const bottom = Math.max(top + ROW, box.plotH - 10);
@@ -100,7 +100,7 @@ const SmcLabels = ({ chart, series, getLabels }: Props) => {
                                 html += `<polygon points="${ex},${tip} ${ex - 6},${base} ${ex + 6},${base}" fill="${RED}"/>`;
                                 html += halo(p.x, p.y, p.text, p.color, true, p.size);
                             } else {
-                                html += halo(p.x, p.y - 4, p.text, p.color, false, p.size);
+                                html += halo(p.x, p.y + 11, p.text, p.color, false, p.size); // the name stands just below its line
                             }
                         }
                     }
