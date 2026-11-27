@@ -27,9 +27,12 @@ const MIN_FONT = 8;
 /** The name with a thin dark outline under it (two texts, so every browser draws it the same), so it reads on any candle colour. */
 const halo = (x: number, y: number, text: string, color: string, centre: boolean, size: number) => {
     const at = `x="${x}" y="${y}"${centre ? ' dominant-baseline="central"' : ''} font-size="${size}"`;
+    // only the name itself is bold; what comes after the first " · " (the explanation) is written in a normal weight
+    const cut = text.indexOf(' · ');
+    const body = cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="500">${esc(text.slice(cut))}</tspan>`;
     return (
-        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="3" stroke-linejoin="round">${esc(text)}</text>` +
-        `<text ${at} class="smc-name" fill="${color}" stroke="none">${esc(text)}</text>`
+        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="3" stroke-linejoin="round">${body}</text>` +
+        `<text ${at} class="smc-name" fill="${color}" stroke="none">${body}</text>`
     );
 };
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
