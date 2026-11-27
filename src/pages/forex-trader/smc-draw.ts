@@ -4,7 +4,15 @@
  * LS, MSS, IL-1, IL-2 and the trade box (risk above / reward below an entry, flipped for a BUY).
  * Pure drawing: it only reads the overlay that smc.ts calculated.
  */
-import type { IChartApi, IPriceLine, ISeriesApi, SeriesMarker, SeriesType, Time, UTCTimestamp } from 'lightweight-charts';
+import type {
+    IChartApi,
+    IPriceLine,
+    ISeriesApi,
+    SeriesMarker,
+    SeriesType,
+    Time,
+    UTCTimestamp,
+} from 'lightweight-charts';
 import type { Candle } from './engine';
 import type { SmcOverlay } from './smc';
 import type { Control } from './smc-control';
@@ -51,6 +59,11 @@ export interface SmcLabel {
     price: number;
     text: string;
     color: string;
+    /** The brace is drawn under the line from time t0 to time t1. */
+    t0: number;
+    t1: number;
+    /** The colour of the brace. */
+    braceColor: string;
 }
 
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
@@ -79,8 +92,15 @@ export function drawSmc(
 
     // The chart gives a slot to every time that has data, not to every minute: empty slots to the right of the last candle are made
     // here (invisible), so everything drawn there is spaced like real candles.
-    const spacer = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-    spacer.setData(Array.from({ length: SMC_GUTTER_BARS }, (_, k) => ({ time: (lastT + len * (k + 1)) as UTCTimestamp })));
+    const spacer = chart.addLineSeries({
+        color: 'rgba(0,0,0,0)',
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+    });
+    spacer.setData(
+        Array.from({ length: SMC_GUTTER_BARS }, (_, k) => ({ time: (lastT + len * (k + 1)) as UTCTimestamp }))
+    );
     extra.push(spacer);
 
     /** The candle time closest to `time`, so a label always sits on a real candle. */
@@ -99,15 +119,25 @@ export function drawSmc(
         color: string;
         /** The colour of the line the name belongs to. */
         lineColor: string;
+        t0: number;
         lineEnd: number;
     }
     let queue: LabelReq[] | null = null;
 
     /** A horizontal line from t0 to t1 with its name written on it. */
-    const segment = (price: number, t0: number, t1: number, color: string, text: string | null, textColor: string, labelAt: number, opts: { width?: 1 | 2 | 3 | 4; dashed?: boolean; hidden?: boolean } = {}) => {
+    const segment = (
+        price: number,
+        t0: number,
+        t1: number,
+        color: string,
+        text: string | null,
+        textColor: string,
+        labelAt: number,
+        opts: { width?: 1 | 2 | 3 | 4; dashed?: boolean; hidden?: boolean } = {}
+    ) => {
         const to = Math.max(t1, t0 + len);
         if (queue && text) {
-            queue.push({ price, text, color: textColor, lineColor: opts.hidden ? textColor : color, lineEnd: to });
+            queue.push({ price, text, color: textColor, lineColor: opts.hidden ? textColor : color, t0, lineEnd: to });
             text = null;
         }
         const labelT = text ? clamp(nearest(labelAt), t0, to) : t0;
@@ -122,7 +152,9 @@ export function drawSmc(
         });
         s.setData(times.map(time => ({ time: time as UTCTimestamp, value: price })));
         if (text) {
-            s.setMarkers([{ time: labelT as UTCTimestamp, position: 'inBar', shape: 'circle', size: 0, color: textColor, text }]);
+            s.setMarkers([
+                { time: labelT as UTCTimestamp, position: 'inBar', shape: 'circle', size: 0, color: textColor, text },
+            ]);
         }
         extra.push(s);
     };
@@ -149,26 +181,32 @@ export function drawSmc(
     };
     const axisLine = (price: number, title: string, color: string, dashed = false) => {
         lines.push(
-            t.series.createPriceLine({ price, color, lineWidth: 2, lineStyle: dashed ? 2 : 0, axisLabelVisible: true, title })
+            t.series.createPriceLine({
+                price,
+                color,
+                lineWidth: 2,
+                lineStyle: dashed ? 2 : 0,
+                axisLabelVisible: true,
+                title,
+            })
         );
     };
 
-    /** The collected names go to the chart's overlay (smc-labels.tsx), which lists them to the right of the last candle and leads each
-     *  one back to its line with a red elbow arrow when it cannot stand on it. Here each line only gets a dotted extension, so the arrow
-     *  always lands on a line. */
+    /** The collected names go to the chart's overlay (smc-labels.tsx): each one gets a curly brace under the part of its line that exists,
+     *  with the name under the brace point. There is no dotted extension to the right. */
     const layoutLabels = () => {
         const items = queue;
         queue = null;
         if (!items) return;
-        // the dotted part runs on to the right, under the whole name
-        const reach = lastT + len * (SMC_GUTTER_BARS - 1);
         items.forEach(it => {
-            labelsOut.push({ price: it.price, text: it.text, color: it.color });
-            if (it.lineEnd < reach) {
-                const ext = chart.addLineSeries({ color: it.lineColor, lineWidth: 1, lineStyle: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-                ext.setData([it.lineEnd, reach].map(time => ({ time: time as UTCTimestamp, value: it.price })));
-                extra.push(ext);
-            }
+            labelsOut.push({
+                price: it.price,
+                text: it.text,
+                color: it.color,
+                t0: it.t0,
+                t1: it.lineEnd,
+                braceColor: it.lineColor,
+            });
         });
     };
 
@@ -186,44 +224,106 @@ export function drawSmc(
         segment(o.zone.top, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
         segment(o.zone.bottom, o.zone.startTime, endT, zEdge, null, zEdge, anchor);
         // an earlier setup is drawn light: its zone, trade box and entry / exit marks only (no names), so old setups never cover the current one
-        if (main) segment((o.zone.top + o.zone.bottom) / 2, o.zone.startTime, endT, zEdge, o.zone.label, zText, anchor - len * 14, { hidden: true });
+        if (main)
+            segment(
+                (o.zone.top + o.zone.bottom) / 2,
+                o.zone.startTime,
+                endT,
+                zEdge,
+                o.zone.label,
+                zText,
+                anchor - len * 14,
+                { hidden: true }
+            );
 
         if (main) {
             // ---- BOS (the swing that was broken, up to the candle that closed through it)
-            segment(o.bos.price, o.bos.fromTime, o.bos.toTime ?? anchor, C.bos, o.bos.label, C.bos, ((o.bos.fromTime) + (o.bos.toTime ?? anchor)) / 2, { width: 2 });
+            segment(
+                o.bos.price,
+                o.bos.fromTime,
+                o.bos.toTime ?? anchor,
+                C.bos,
+                o.bos.label,
+                C.bos,
+                (o.bos.fromTime + (o.bos.toTime ?? anchor)) / 2,
+                { width: 2 }
+            );
 
             // ---- the target: SELL SIDE LIQUIDITY 🎯 (BUY: BUY SIDE LIQUIDITY 🎯)
-            segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, { width: 1 });
+            segment(o.target.price, o.target.fromTime, endT, C.target, o.target.label, C.target, anchor - len * 20, {
+                width: 1,
+            });
 
             // ---- inducements (minor, then the major trap) and the sweep (LS)
             if (o.minor) {
                 const to = o.minor.toTime ?? (o.minor.pending ? endT : anchor);
-                segment(o.minor.price, o.minor.fromTime, to, C.minor, o.minor.label, C.minor, (o.minor.fromTime + to) / 2, { width: 4, dashed: o.minor.pending });
+                segment(
+                    o.minor.price,
+                    o.minor.fromTime,
+                    to,
+                    C.minor,
+                    o.minor.label,
+                    C.minor,
+                    (o.minor.fromTime + to) / 2,
+                    { width: 4, dashed: o.minor.pending }
+                );
             }
             if (o.major) {
                 const to = o.major.toTime ?? (o.major.pending ? endT : anchor);
-                segment(o.major.price, o.major.fromTime, to, C.major, o.major.label, C.major, (o.major.fromTime + to) / 2, { width: 2, dashed: o.major.pending });
-                if (!o.major.pending) markers.push({
-                    time: nearest(o.major.sweepTime) as UTCTimestamp,
-                    position: sell ? 'aboveBar' : 'belowBar',
-                    shape: sell ? 'arrowDown' : 'arrowUp',
-                    color: C.sweep,
-                    text: 'LS',
-                });
+                segment(
+                    o.major.price,
+                    o.major.fromTime,
+                    to,
+                    C.major,
+                    o.major.label,
+                    C.major,
+                    (o.major.fromTime + to) / 2,
+                    { width: 2, dashed: o.major.pending }
+                );
+                if (!o.major.pending)
+                    markers.push({
+                        time: nearest(o.major.sweepTime) as UTCTimestamp,
+                        position: sell ? 'aboveBar' : 'belowBar',
+                        shape: sell ? 'arrowDown' : 'arrowUp',
+                        color: C.sweep,
+                        text: 'LS',
+                    });
             }
 
             // ---- POC: the most-traded price of the drop (the volume-profile idea, measured in time at price). Bold when it sits in the zone.
             if (o.poc) {
-                segment(o.poc.price, o.poc.fromTime, endT, C.poc, o.poc.label, C.poc, anchor - len * 6, { width: o.poc.nearZone ? 2 : 1, dashed: !o.poc.nearZone });
+                segment(o.poc.price, o.poc.fromTime, endT, C.poc, o.poc.label, C.poc, anchor - len * 6, {
+                    width: o.poc.nearZone ? 2 : 1,
+                    dashed: !o.poc.nearZone,
+                });
                 if (main) levels.push(o.poc.price);
             }
 
             // ---- MSS: the swing low (SELL) / high (BUY) whose break is the confirmation
-            if (o.mss) segment(o.mss.price, o.mss.fromTime, o.mss.toTime ?? endT, C.mss, o.mss.label, C.mss, (o.mss.fromTime + (o.mss.toTime ?? anchor)) / 2, { width: 2 });
+            if (o.mss)
+                segment(
+                    o.mss.price,
+                    o.mss.fromTime,
+                    o.mss.toTime ?? endT,
+                    C.mss,
+                    o.mss.label,
+                    C.mss,
+                    (o.mss.fromTime + (o.mss.toTime ?? anchor)) / 2,
+                    { width: 2 }
+                );
 
             // ---- internal liquidity: IL-1 is the nearest to the entry. Once broken the line stops there and turns grey.
             o.internals.forEach(il => {
-                segment(il.price, il.fromTime, il.toTime ?? endT, il.broken ? C.broken : C.line, il.broken ? `${il.label} broken` : il.label, il.broken ? C.broken : C.lineText, anchor - len * 10, { dashed: il.broken });
+                segment(
+                    il.price,
+                    il.fromTime,
+                    il.toTime ?? endT,
+                    il.broken ? C.broken : C.line,
+                    il.broken ? `${il.label} broken` : il.label,
+                    il.broken ? C.broken : C.lineText,
+                    anchor - len * 10,
+                    { dashed: il.broken }
+                );
             });
         }
 
@@ -244,7 +344,13 @@ export function drawSmc(
             zone(p.fromTime, endT, p.entry, p.takeProfit, faint ? C.rewardFaint : C.rewardFill);
             zone(p.fromTime, endT, p.entry, p.stopLoss, faint ? C.riskFaint : C.riskFill);
             const rr = Math.abs(p.takeProfit - p.entry) / (Math.abs(p.stopLoss - p.entry) || 1);
-            if (main) axisLine(p.entry, faint ? `Entry ${o.side} (planned, on MSS break)` : `ENTRY ${o.side}`, C.entry, faint);
+            if (main)
+                axisLine(
+                    p.entry,
+                    faint ? `Entry ${o.side} (planned, on MSS break)` : `ENTRY ${o.side}`,
+                    C.entry,
+                    faint
+                );
             if (main) axisLine(p.stopLoss, 'SL', C.sl);
             if (main) axisLine(p.takeProfit, `TP · RR 1:${rr.toFixed(1)}`, C.tp);
             if (main) levels.push(p.entry, p.stopLoss, p.takeProfit);
@@ -291,6 +397,7 @@ export function drawSmc(
                 text: `${o.trend.sentiment} SENTIMENT · ${good ? 'with the setup ✓' : 'against the setup ✗'}`,
                 color: col,
                 lineColor: col,
+                t0: lastT - len * 10,
                 lineEnd: lastT,
             });
         }
@@ -306,10 +413,13 @@ export function drawSmc(
         .forEach(h => one(h, false));
     if (o) one(o, true);
     // who is in control: the signs read from the candles (confirmed, sweep, reaction, strong move, retest), and, when no setup exists, its flip line
-    const ctl = o ? o.control ?? null : controlFallback ?? null;
+    const ctl = o ? (o.control ?? null) : (controlFallback ?? null);
     if (ctl) {
         if (!o && ctl.flip) {
-            segment(ctl.flip.price, ctl.flip.time, defaultEndT, '#ffffff', ctl.flip.label, '#ffffff', lastT - len * 4, { width: 2, dashed: true });
+            segment(ctl.flip.price, ctl.flip.time, defaultEndT, '#ffffff', ctl.flip.label, '#ffffff', lastT - len * 4, {
+                width: 2,
+                dashed: true,
+            });
             levels.push(ctl.flip.price);
         }
         ctl.events.forEach(ev => {

@@ -1,7 +1,6 @@
 /**
- * The names of the current Smart Money setup, drawn over the chart (not on it): listed one under the other to the right of the last
- * candle, so no candle can cover them and they never overlap. A name that cannot stand on its own line (another name is there) is
- * led back to its line by a sharp red elbow arrow, like the arrows of the videos.
+ * The names of the current Smart Money setup, drawn over the chart (not on it): each line has a thin green curly brace under the part
+ * of it that exists, and its name under the brace point (names that would meet are pushed down).
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
 import { useEffect, useRef } from 'react';
@@ -9,7 +8,7 @@ import type { IChartApi, ISeriesApi, SeriesType, Time } from 'lightweight-charts
 import type { SmcLabel } from './smc-draw';
 
 export interface SmcLabelSet {
-    /** The time of the last candle: the column of names starts to the right of it. */
+    /** The time of the last candle. */
     anchor: number;
     items: SmcLabel[];
 }
@@ -20,52 +19,66 @@ interface Props {
     getLabels: () => SmcLabelSet | null;
 }
 
-const RED = '#ff1a1a';
-const ROW = 17; // the least distance between two names, in pixels
+const GREEN = '#22c55e';
 const CHAR_W = 6.6; // thin 11px, measured on the real chart
-const MIN_FONT = 8;
-/** The name with a thin dark outline under it (two texts, so every browser draws it the same), so it reads on any candle colour. */
-const halo = (x: number, y: number, text: string, color: string, centre: boolean, size: number) => {
-    const at = `x="${x}" y="${y}"${centre ? ' dominant-baseline="central"' : ''} font-size="${size}"`;
-    // only the name itself is bold; what comes after the first " · " (the explanation) is written in a normal weight
+const ROW = 15; // the least distance between two names under each other
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** The name with a thin dark outline under it (two texts, so every browser draws it the same). Only the name is heavier; what comes after " · " is thinner. */
+const halo = (x: number, y: number, text: string, color: string) => {
     const cut = text.indexOf(' · ');
-    const body = cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="200">${esc(text.slice(cut))}</tspan>`;
+    const body =
+        cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="200">${esc(text.slice(cut))}</tspan>`;
+    const at = `x="${x}" y="${y}" text-anchor="middle" font-size="11"`;
     return (
         `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="2" stroke-linejoin="round" text-rendering="geometricPrecision">${body}</text>` +
         `<text ${at} class="smc-name" fill="${color}" stroke="none" text-rendering="geometricPrecision">${body}</text>`
     );
 };
-const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Pure layout, so it can be tested: the pixel position of each name and of its arrow. */
-export function layoutNames(
-    items: { y: number; text: string; color: string }[],
-    box: { anchorX: number; plotW: number; plotH: number }
-): { x: number; y: number; line: number; text: string; color: string; size: number; arrow: { elbowX: number } | null }[] {
-    if (items.length === 0) return [];
-    const widest = Math.max(...items.map(i => i.text.length)) * CHAR_W;
-    // the names start right after the last candle, ON their own lines (which run on to the right), in bold.
-    // When the longest name does not fit in the free space, the names get a smaller size (never moved back over the candles).
-    const x = Math.max(6, Math.min(box.anchorX + 12, box.plotW - 8 - (widest * MIN_FONT) / 11));
-    const free = box.plotW - 8 - x;
-    const size = widest <= free ? 11 : Math.max(MIN_FONT, Math.floor((11 * free) / widest));
-    const sorted = [...items].sort((a, b) => a.y - b.y);
-    const top = 10;
-    const bottom = Math.max(top + ROW, box.plotH - 10);
-    const ys: number[] = [];
-    sorted.forEach((it, k) => ys.push(Math.max(it.y, k === 0 ? top : ys[k - 1] + ROW)));
-    // when the column ran off the bottom, push it back up from the end
-    for (let k = sorted.length - 1; k >= 0; k--) {
-        const limit = k === sorted.length - 1 ? bottom : ys[k + 1] - ROW;
-        if (ys[k] > limit) ys[k] = limit;
+/** A curly brace under a line: from x0 to x1, at height y, bulging down, with its point at the middle. */
+export function bracePath(x0: number, x1: number, y: number, depth = 6): string {
+    const m = (x0 + x1) / 2;
+    const r = Math.min(depth, (x1 - x0) / 4);
+    return `M ${x0} ${y - 3} Q ${x0} ${y + 2} ${x0 + r} ${y + 2} L ${m - r} ${y + 2} Q ${m} ${y + 2} ${m} ${y + depth + 1} Q ${m} ${y + 2} ${m + r} ${y + 2} L ${x1 - r} ${y + 2} Q ${x1} ${y + 2} ${x1} ${y - 3}`;
+}
+
+/** Pure layout, so it can be tested: where each brace goes and where its name stands (names that would meet are pushed down). */
+export function layoutBraces(
+    items: { y: number; x0: number; x1: number; text: string }[],
+    box: { plotW: number; plotH: number }
+): { index: number; x0: number; x1: number; line: number; nameX: number; nameY: number }[] {
+    const sorted = items
+        .map((it, index) => ({ ...it, index, x0: Math.max(4, it.x0), x1: Math.min(box.plotW - 4, it.x1) }))
+        .filter(it => it.x1 - it.x0 >= 12)
+        .sort((a, b) => a.y - b.y);
+    const placed: { index: number; x0: number; x1: number; line: number; nameX: number; nameY: number; w: number }[] =
+        [];
+    for (const it of sorted) {
+        const w = it.text.length * CHAR_W;
+        const nameX = Math.max(4 + w / 2, Math.min((it.x0 + it.x1) / 2, box.plotW - 4 - w / 2));
+        let nameY = it.y + 20;
+        // keep clear of the names already placed that share some of the same width
+        for (let again = true; again;) {
+            again = false;
+            for (const p of placed) {
+                if (Math.abs(p.nameX - nameX) < (w + p.w) / 2 && Math.abs(p.nameY - nameY) < ROW) {
+                    nameY = p.nameY + ROW;
+                    again = true;
+                }
+            }
+        }
+        placed.push({
+            index: it.index,
+            x0: it.x0,
+            x1: it.x1,
+            line: it.y,
+            nameX,
+            nameY: Math.min(nameY, box.plotH - 4),
+            w,
+        });
     }
-    let n = 0;
-    return sorted.map((it, k) => {
-        const moved = Math.abs(ys[k] - it.y) > 7;
-        const elbowX = Math.min(box.anchorX + 20 + n * 9, x - 14);
-        if (moved) n++;
-        return { x, y: ys[k], line: it.y, text: it.text, color: it.color, size, arrow: moved ? { elbowX } : null };
-    });
+    return placed.map(({ w, ...rest }) => rest);
 }
 
 const SmcLabels = ({ chart, series, getLabels }: Props) => {
@@ -82,26 +95,27 @@ const SmcLabels = ({ chart, series, getLabels }: Props) => {
                 const set = getLabels();
                 if (set && set.items.length) {
                     const ts = chart.timeScale();
-                    const ax = ts.timeToCoordinate(set.anchor as Time);
                     const rect = el.getBoundingClientRect();
                     const plotW = ts.width();
-                    if (ax !== null && rect.height > 60) {
+                    if (rect.height > 60) {
                         const pts = set.items
-                            .map(i => ({ y: series.priceToCoordinate(i.price), text: i.text, color: i.color }))
-                            .filter((p): p is { y: number; text: string; color: string } => p.y !== null && p.y > -10 && p.y < rect.height);
-                        const placed = layoutNames(pts, { anchorX: ax, plotW, plotH: rect.height - 30 });
+                            .map(i => ({
+                                item: i,
+                                y: series.priceToCoordinate(i.price),
+                                x0: ts.timeToCoordinate(i.t0 as Time),
+                                x1: ts.timeToCoordinate(i.t1 as Time),
+                            }))
+                            .filter(
+                                (p): p is typeof p & { y: number } => p.y !== null && p.y > -10 && p.y < rect.height
+                            );
+                        const placed = layoutBraces(
+                            pts.map(p => ({ y: p.y, x0: p.x0 ?? 0, x1: p.x1 ?? plotW, text: p.item.text })),
+                            { plotW, plotH: rect.height - 30 }
+                        );
                         for (const p of placed) {
-                            if (p.arrow) {
-                                const up = p.line < p.y;
-                                const tip = p.line;
-                                const base = up ? tip + 9 : tip - 9;
-                                const ex = p.arrow.elbowX;
-                                html += `<path d="M ${p.x - 5} ${p.y} H ${ex} V ${base}" fill="none" stroke="${RED}" stroke-width="2.4" stroke-linejoin="miter"/>`;
-                                html += `<polygon points="${ex},${tip} ${ex - 6},${base} ${ex + 6},${base}" fill="${RED}"/>`;
-                                html += halo(p.x, p.y, p.text, p.color, true, p.size);
-                            } else {
-                                html += halo(p.x, p.y + 11, p.text, p.color, false, p.size); // the name stands just below its line
-                            }
+                            const it = pts[p.index].item;
+                            html += `<path d="${bracePath(p.x0, p.x1, p.line + 5)}" fill="none" stroke="${GREEN}" stroke-width="1.2"/>`;
+                            html += halo(p.nameX, p.nameY, it.text, it.color);
                         }
                     }
                 }
