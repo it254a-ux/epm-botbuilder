@@ -130,12 +130,10 @@ const SmcLabels = ({ chart, series, getLabels, ink }: Props) => {
                             const midY = p.y + p.h / 2;
                             // a short arrow pointing back to the line, then the name: plain thin writing, no box
                             html += `<path d="M ${p.x - 4} ${midY} L ${p.x - 16} ${midY} M ${p.x - 11} ${midY - 3} L ${p.x - 16} ${midY} L ${p.x - 11} ${midY + 3}" fill="none" stroke="${col}" stroke-width="0.9"/>`;
-                            const cut = it.text.indexOf(' · ');
-                            const body =
-                                cut < 0
-                                    ? esc(it.text)
-                                    : `${esc(it.text.slice(0, cut))}<tspan font-weight="200">${esc(it.text.slice(cut))}</tspan>`;
-                            html += `<text x="${p.x}" y="${midY}" dominant-baseline="central" font-size="10" class="smc-name" fill="${ink.text}" stroke="${ink.bg}" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-rendering="geometricPrecision">${body}</text>`;
+                            // one piece of writing (an outline copy under it keeps it readable over lines and candles)
+                            const at = `x="${p.x}" y="${midY}" dominant-baseline="central" font-size="10" class="smc-name"`;
+                            html += `<text ${at} fill="${ink.bg}" stroke="${ink.bg}" stroke-width="3" stroke-linejoin="round">${esc(it.text)}</text>`;
+                            html += `<text ${at} fill="${ink.text}">${esc(it.text)}</text>`;
                         }
                     }
                 }
