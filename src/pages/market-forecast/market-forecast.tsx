@@ -383,7 +383,20 @@ const MarketForecast = () => {
     return (
         <div className='market-forecast'>
             <div className='market-forecast__top'>
-                <div className='market-forecast__panel'>
+                <div className='market-forecast__left'>
+                    <div className='market-forecast__chart-wrap'>
+                        <div className='market-forecast__chart' ref={holder} />
+                        <button
+                            type='button'
+                            className='market-forecast__compare-btn'
+                            onClick={() => setCompare(true)}
+                            title='Open 2 or 4 charts of this market, each with its own candle size'
+                        >
+                            Compare charts
+                        </button>
+                    </div>
+                </div>
+                <div className='market-forecast__panel market-forecast__panel--right'>
                     <div className='market-forecast__head'>
                         <h2>Market Forecast</h2>
                         <span className='market-forecast__powered'>
@@ -474,8 +487,6 @@ const MarketForecast = () => {
                             {message}
                         </div>
                     )}
-                </div>
-                <div className='market-forecast__panel market-forecast__panel--results'>
                     {result && (
                         <div className='market-forecast__cards'>
                             <div className='market-forecast__card'>
@@ -507,18 +518,6 @@ const MarketForecast = () => {
                         </div>
                     )}
                 </div>
-            </div>
-
-            <div className='market-forecast__chart-wrap'>
-                <div className='market-forecast__chart' ref={holder} />
-                <button
-                    type='button'
-                    className='market-forecast__compare-btn'
-                    onClick={() => setCompare(true)}
-                    title='Open 2 or 4 charts of this market, each with its own candle size'
-                >
-                    Compare charts
-                </button>
             </div>
 
             <p className='market-forecast__note'>
