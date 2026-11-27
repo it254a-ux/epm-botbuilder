@@ -35,7 +35,7 @@ const halo = (x: number, y: number, text: string, color: string, bg: string, anc
     const cut = text.indexOf(' · ');
     const body =
         cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="200">${esc(text.slice(cut))}</tspan>`;
-    const at = `x="${x}" y="${y}" text-anchor="${anchor}" font-size="11"`;
+    const at = `x="${x}" y="${y}" text-anchor="${anchor}" font-size="10"`;
     return (
         `<text ${at} class="smc-name" fill="${bg}" stroke="${bg}" stroke-width="2" stroke-linejoin="round" text-rendering="geometricPrecision">${body}</text>` +
         `<text ${at} class="smc-name" fill="${color}" stroke="none" text-rendering="geometricPrecision">${body}</text>`
@@ -114,7 +114,7 @@ export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: n
     return placed.map(({ w, ...rest }) => rest);
 }
 
-/** Does a line run through candles, and on which side do the candles leave room? (pixel positions; a tie goes above the line) */
+/** Does a line run through candles, and on which side do the candles leave room? (pixel positions; above wins unless the candles clearly leave more room below) */
 export function braceSide(
     y: number,
     candles: { x: number; top: number; bottom: number }[]
@@ -129,7 +129,7 @@ export function braceSide(
         below += overlap(y, y + BAND, c);
         above += overlap(y - BAND, y, c);
     }
-    return { brace: crosses > 0, dir: above <= below ? -1 : 1 };
+    return { brace: crosses > 0, dir: above <= below + 30 ? -1 : 1 };
 }
 
 const colourOf = (c: string, ink: string) =>
@@ -183,7 +183,7 @@ const SmcLabels = ({ chart, series, getLabels, getCandles, ink }: Props) => {
                         for (const p of placed) {
                             const it = pts[p.index].item;
                             if (p.brace) {
-                                html += `<path d="${bracePath(p.x0, p.x1, p.line, p.dir)}" fill="none" stroke="${colourOf(it.braceColor, ink.text)}" stroke-width="1.1"/>`;
+                                html += `<path d="${bracePath(p.x0, p.x1, p.line, p.dir)}" fill="none" stroke="${colourOf(it.braceColor, ink.text)}" stroke-width="${it.thick ? 2.2 : 1.1}"/>`;
                             }
                             html += halo(p.nameX, p.nameY, it.text, ink.text, ink.bg, p.brace ? 'middle' : 'end');
                         }

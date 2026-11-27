@@ -64,6 +64,8 @@ export interface SmcLabel {
     t1: number;
     /** The colour of the brace. */
     braceColor: string;
+    /** The brace is drawn thicker for the lines that used to be drawn thick. */
+    thick: boolean;
 }
 
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
@@ -121,6 +123,7 @@ export function drawSmc(
         lineColor: string;
         t0: number;
         lineEnd: number;
+        thick: boolean;
     }
     let queue: LabelReq[] | null = null;
 
@@ -137,7 +140,15 @@ export function drawSmc(
     ) => {
         const to = Math.max(t1, t0 + len);
         if (queue && text) {
-            queue.push({ price, text, color: textColor, lineColor: opts.hidden ? textColor : color, t0, lineEnd: to });
+            queue.push({
+                price,
+                text,
+                color: textColor,
+                lineColor: opts.hidden ? textColor : color,
+                t0,
+                lineEnd: to,
+                thick: (opts.width ?? 1) >= 4,
+            });
             text = null;
         }
         const labelT = text ? clamp(nearest(labelAt), t0, to) : t0;
@@ -206,6 +217,7 @@ export function drawSmc(
                 t0: it.t0,
                 t1: it.lineEnd,
                 braceColor: it.lineColor,
+                thick: it.thick,
             });
         });
     };
@@ -265,7 +277,7 @@ export function drawSmc(
                     o.minor.label,
                     C.minor,
                     (o.minor.fromTime + to) / 2,
-                    { width: 4, dashed: o.minor.pending }
+                    { width: 4, dashed: o.minor.pending, hidden: true }
                 );
             }
             if (o.major) {
@@ -399,6 +411,7 @@ export function drawSmc(
                 lineColor: col,
                 t0: lastT - len * 10,
                 lineEnd: lastT,
+                thick: false,
             });
         }
         if (main) layoutLabels();

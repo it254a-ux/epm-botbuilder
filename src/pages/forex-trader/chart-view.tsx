@@ -222,7 +222,7 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         const inkOf = (t: Theme) => ({ text: isDarkTheme(host) ? '#ffffff' : '#111827', bg: t.bg });
         setInk(inkOf(th));
         const themeOptions = (t: Theme) => ({
-            layout: { background: { color: t.bg }, textColor: t.text, fontSize: 10, fontFamily: `'Jost', ${t.font}` },
+            layout: { background: { color: t.bg }, textColor: t.text, fontSize: 9, fontFamily: `'Jost', ${t.font}` },
             grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
             rightPriceScale: { borderColor: t.border },
             timeScale: { borderColor: t.border },
