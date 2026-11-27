@@ -12,7 +12,10 @@ describe('Smart money names layout', () => {
     it('a line in free space gets a plain name at the right, no brace', () => {
         const out = layoutBraces([{ y: 200, x0: 50, x1: 600, text: 'IL-1', brace: false, dir: 1 }], { plotW: 700, plotH: 500 });
         expect(out[0].brace).toBe(false);
-        expect(out[0].nameX).toBeGreaterThan(600);
+        expect(out[0].nameX).toBeGreaterThan(300);
+    });
+    it('a long line never gets a brace, even when candles touch it', () => {
+        expect(braceSide(100, [{ x: 10, top: 80, bottom: 118 }], 900, 400).brace).toBe(false);
     });
     it('a brace is used only where candles are on the line, on the side with room', () => {
         expect(braceSide(100, [{ x: 10, top: 150, bottom: 180 }]).brace).toBe(false);

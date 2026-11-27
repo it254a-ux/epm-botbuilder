@@ -31,7 +31,7 @@ const BAND = 26; // how far from the line the brace and its name reach, in pixel
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** The name with a thin outline under it (two texts, so every browser draws it the same). Only the name is heavier; what comes after " · " is thinner. */
-const halo = (x: number, y: number, text: string, color: string, bg: string, anchor: 'middle' | 'end') => {
+const halo = (x: number, y: number, text: string, color: string, bg: string, anchor: 'middle' | 'start') => {
     const cut = text.indexOf(' · ');
     const body =
         cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="200">${esc(text.slice(cut))}</tspan>`;
@@ -75,7 +75,10 @@ export interface BracePlaced {
 }
 
 /** Pure layout, so it can be tested: where each brace goes and where its name stands (names that would meet are pushed away from their line). */
-export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: number }): BracePlaced[] {
+export function layoutBraces(
+    items: BraceInput[],
+    box: { plotW: number; plotH: number; anchorX?: number }
+): BracePlaced[] {
     const sorted = items
         .map((it, index) => ({ ...it, index, x0: Math.max(4, it.x0), x1: Math.min(box.plotW - 4, it.x1) }))
         .filter(it => it.x1 - it.x0 >= 12)
@@ -86,7 +89,7 @@ export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: n
         // a line in free space: the name is written at the right end, just under the line
         const nameX = it.brace
             ? Math.max(4 + w / 2, Math.min((it.x0 + it.x1) / 2, box.plotW - 4 - w / 2))
-            : box.plotW - 8 - w / 2;
+            : Math.max(4 + w / 2, Math.min((box.anchorX ?? box.plotW) + 10 + w / 2, box.plotW - 8 - w / 2));
         const dir = it.brace ? it.dir : 1;
         let nameY = it.brace ? it.y + dir * BAND + (dir === 1 ? 4 : 0) : it.y + 12;
         // keep clear of the names already placed that share some of the same width
@@ -117,7 +120,9 @@ export function layoutBraces(items: BraceInput[], box: { plotW: number; plotH: n
 /** Does a line run through candles, and on which side do the candles leave room? (pixel positions; above wins unless the candles clearly leave more room below) */
 export function braceSide(
     y: number,
-    candles: { x: number; top: number; bottom: number }[]
+    candles: { x: number; top: number; bottom: number }[],
+    span = 0,
+    maxSpan = Infinity
 ): { brace: boolean; dir: 1 | -1 } {
     let crosses = 0;
     let below = 0;
@@ -129,7 +134,7 @@ export function braceSide(
         below += overlap(y, y + BAND, c);
         above += overlap(y - BAND, y, c);
     }
-    return { brace: crosses > 0, dir: above <= below + 30 ? -1 : 1 };
+    return { brace: crosses > 0 && span < maxSpan, dir: above <= below + 30 ? -1 : 1 };
 }
 
 const colourOf = (c: string, ink: string) =>
@@ -176,16 +181,27 @@ const SmcLabels = ({ chart, series, getLabels, getCandles, ink }: Props) => {
                                 if (x !== null && top !== null && bottom !== null && x >= x0 - 2 && x <= x1 + 2)
                                     under.push({ x, top, bottom });
                             }
-                            const side = braceSide(p.y, under);
+                            const side = braceSide(p.y, under, Math.min(x1, plotW) - Math.max(x0, 0), plotW * 0.4);
                             return { y: p.y, x0, x1, text: p.item.text, brace: side.brace, dir: side.dir };
                         });
-                        const placed = layoutBraces(inputs, { plotW, plotH: rect.height - 30 });
+                        const placed = layoutBraces(inputs, {
+                            plotW,
+                            plotH: rect.height - 30,
+                            anchorX: ts.timeToCoordinate(set.anchor as Time) ?? plotW,
+                        });
                         for (const p of placed) {
                             const it = pts[p.index].item;
                             if (p.brace) {
                                 html += `<path d="${bracePath(p.x0, p.x1, p.line, p.dir)}" fill="none" stroke="${colourOf(it.braceColor, ink.text)}" stroke-width="${it.thick ? 2.2 : 1.1}"/>`;
                             }
-                            html += halo(p.nameX, p.nameY, it.text, ink.text, ink.bg, p.brace ? 'middle' : 'end');
+                            html += halo(
+                                p.brace ? p.nameX : p.nameX - (it.text.length * CHAR_W) / 2,
+                                p.nameY,
+                                it.text,
+                                ink.text,
+                                ink.bg,
+                                p.brace ? 'middle' : 'start'
+                            );
                         }
                     }
                 }
