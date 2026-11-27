@@ -732,8 +732,10 @@
 
 // the names of the Smart Money setup, drawn over the chart
 .smc-names .smc-name {
-    font-weight: 800;
-    font-family: inherit;
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    text-rendering: geometricPrecision;
 }
 
 // WHO IS IN CONTROL: plain words inside the chart (bottom right, next to the price scale), with a live blinking dot
