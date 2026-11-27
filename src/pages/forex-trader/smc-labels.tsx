@@ -7,7 +7,7 @@
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
 import { useEffect, useRef } from 'react';
-import type { IChartApi, ISeriesApi, SeriesType, Time } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, ISeriesPrimitive, SeriesType, Time } from 'lightweight-charts';
 import type { SmcLabel } from './smc-draw';
 
 export interface SmcLabelSet {
@@ -30,8 +30,6 @@ const CHAR_W = 6.1; // thin 10px caps, a little generous
 const PILL_H = 14;
 const PILL_GAP = 4;
 const PAD = 0;
-
-const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export interface CalloutInput {
     /** The y of the line the pill belongs to. */
@@ -90,65 +88,125 @@ export function layoutCallouts(
 /** A line colour that is white would vanish on the light theme: use the writing colour then. */
 const colourOf = (c: string, ink: string) => (/^#?(f{3}|f{6})$/i.test(c.replace('#', '')) ? ink : c);
 
+interface Deps {
+    chart: IChartApi;
+    series: ISeriesApi<SeriesType>;
+    getLabels: () => SmcLabelSet | null;
+    ink: () => { text: string; bg: string };
+}
+
+/**
+ * The names are drawn by the chart itself (a series primitive), in the same paint as the candles. That is what keeps them fixed:
+ * they move, zoom and squeeze with the chart on the very same frame, with no lag and no shaking. Each name is placed from its own
+ * line's price and from the last candle's time, so it follows them exactly.
+ */
+class NamesPrimitive {
+    private deps: Deps;
+    private requestUpdate: (() => void) | null = null;
+    private view: { renderer: () => { draw: (target: CanvasTarget) => void } };
+
+    constructor(deps: Deps) {
+        this.deps = deps;
+        const renderer = { draw: (target: CanvasTarget) => this.draw(target) };
+        this.view = { renderer: () => renderer };
+    }
+
+    attached(param: { requestUpdate: () => void }) {
+        this.requestUpdate = param.requestUpdate;
+    }
+
+    detached() {
+        this.requestUpdate = null;
+    }
+
+    refresh() {
+        this.requestUpdate?.();
+    }
+
+    updateAllViews() {
+        /* everything is worked out while drawing */
+    }
+
+    paneViews() {
+        return [this.view];
+    }
+
+    private draw(target: CanvasTarget) {
+        const { chart, series, getLabels } = this.deps;
+        const set = getLabels();
+        if (!set || !set.items.length) return;
+        const ink = this.deps.ink();
+        target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+            const ts = chart.timeScale();
+            const plotW = mediaSize.width;
+            const pts = set.items
+                .map(i => ({ item: i, y: series.priceToCoordinate(i.price), x1: ts.timeToCoordinate(i.t1 as Time) }))
+                .filter((p): p is typeof p & { y: number } => p.y !== null && p.y > -10 && p.y < mediaSize.height);
+            const placed = layoutCallouts(
+                pts.map(p => ({ y: p.y, x1: p.x1 ?? plotW, text: p.item.text })),
+                { plotW, plotH: mediaSize.height - 4, anchorX: ts.timeToCoordinate(set.anchor as Time) ?? plotW }
+            );
+            ctx.save();
+            ctx.font = "10px 'Jost', sans-serif";
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.lineJoin = 'round';
+            for (const p of placed) {
+                const it = pts[p.index].item;
+                const midY = p.y + p.h / 2;
+                // a short arrow pointing back to the line, in the colour of that line
+                ctx.strokeStyle = colourOf(it.braceColor, ink.text);
+                ctx.lineWidth = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(p.x - 4, midY);
+                ctx.lineTo(p.x - 16, midY);
+                ctx.moveTo(p.x - 11, midY - 3);
+                ctx.lineTo(p.x - 16, midY);
+                ctx.lineTo(p.x - 11, midY + 3);
+                ctx.stroke();
+                // the name: a thin outline under it keeps it readable over lines and candles
+                ctx.strokeStyle = ink.bg;
+                ctx.lineWidth = 3;
+                ctx.strokeText(it.text, p.x, midY);
+                ctx.fillStyle = ink.text;
+                ctx.fillText(it.text, p.x, midY);
+            }
+            ctx.restore();
+        });
+    }
+}
+
+/** The part of the chart's drawing target that is used here. */
+interface CanvasTarget {
+    useMediaCoordinateSpace: <T>(
+        f: (scope: { context: CanvasRenderingContext2D; mediaSize: { width: number; height: number } }) => T
+    ) => T;
+}
+
 const SmcLabels = ({ chart, series, getLabels, ink }: Props) => {
-    const svg = useRef<SVGSVGElement>(null);
+    const inkRef = useRef(ink);
+    const prim = useRef<NamesPrimitive | null>(null);
+    inkRef.current = ink;
     useEffect(() => {
-        let raf = 0;
-        let last = '';
-        const loop = () => {
-            raf = requestAnimationFrame(loop);
-            const el = svg.current;
-            if (!el) return;
-            let html = '';
+        const primitive = new NamesPrimitive({ chart, series, getLabels, ink: () => inkRef.current });
+        prim.current = primitive;
+        series.attachPrimitive(primitive as unknown as ISeriesPrimitive<Time>);
+        // the analysis changes now and then (new candle, new setup): ask for a fresh paint
+        const timer = window.setInterval(() => primitive.refresh(), 700);
+        return () => {
+            window.clearInterval(timer);
             try {
-                const set = getLabels();
-                if (set && set.items.length) {
-                    const ts = chart.timeScale();
-                    const rect = el.getBoundingClientRect();
-                    const plotW = ts.width();
-                    if (rect.height > 60) {
-                        const pts = set.items
-                            .map(i => ({
-                                item: i,
-                                y: series.priceToCoordinate(i.price),
-                                x1: ts.timeToCoordinate(i.t1 as Time),
-                            }))
-                            .filter(
-                                (p): p is typeof p & { y: number } => p.y !== null && p.y > -10 && p.y < rect.height
-                            );
-                        const placed = layoutCallouts(
-                            pts.map(p => ({ y: p.y, x1: p.x1 ?? plotW, text: p.item.text })),
-                            {
-                                plotW,
-                                plotH: rect.height - 30,
-                                anchorX: ts.timeToCoordinate(set.anchor as Time) ?? plotW,
-                            }
-                        );
-                        for (const p of placed) {
-                            const it = pts[p.index].item;
-                            const col = colourOf(it.braceColor, ink.text);
-                            const midY = p.y + p.h / 2;
-                            // a short arrow pointing back to the line, then the name: plain thin writing, no box
-                            html += `<path d="M ${p.x - 4} ${midY} L ${p.x - 16} ${midY} M ${p.x - 11} ${midY - 3} L ${p.x - 16} ${midY} L ${p.x - 11} ${midY + 3}" fill="none" stroke="${col}" stroke-width="0.9"/>`;
-                            // one piece of writing (an outline copy under it keeps it readable over lines and candles)
-                            const at = `x="${p.x}" y="${midY}" dominant-baseline="central" font-size="10" class="smc-name"`;
-                            html += `<text ${at} fill="${ink.bg}" stroke="${ink.bg}" stroke-width="3" stroke-linejoin="round">${esc(it.text)}</text>`;
-                            html += `<text ${at} fill="${ink.text}">${esc(it.text)}</text>`;
-                        }
-                    }
-                }
+                series.detachPrimitive(primitive as unknown as ISeriesPrimitive<Time>);
             } catch {
                 /* the chart is being removed */
             }
-            if (html !== last) {
-                last = html;
-                el.innerHTML = html;
-            }
+            prim.current = null;
         };
-        raf = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(raf);
-    }, [chart, series, getLabels, ink]);
-    return <svg ref={svg} className='fx-svg smc-names' aria-hidden />;
+    }, [chart, series, getLabels]);
+    useEffect(() => {
+        prim.current?.refresh();
+    }, [ink]);
+    return null;
 };
 
 export default SmcLabels;
