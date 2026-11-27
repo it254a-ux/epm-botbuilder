@@ -29,10 +29,10 @@ const halo = (x: number, y: number, text: string, color: string, centre: boolean
     const at = `x="${x}" y="${y}"${centre ? ' dominant-baseline="central"' : ''} font-size="${size}"`;
     // only the name itself is bold; what comes after the first " · " (the explanation) is written in a normal weight
     const cut = text.indexOf(' · ');
-    const body = cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="500">${esc(text.slice(cut))}</tspan>`;
+    const body = cut < 0 ? esc(text) : `${esc(text.slice(0, cut))}<tspan font-weight="400">${esc(text.slice(cut))}</tspan>`;
     return (
-        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="3" stroke-linejoin="round">${body}</text>` +
-        `<text ${at} class="smc-name" fill="${color}" stroke="none">${body}</text>`
+        `<text ${at} class="smc-name" fill="#0b0f17" stroke="#0b0f17" stroke-width="2.4" stroke-linejoin="round" text-rendering="geometricPrecision">${body}</text>` +
+        `<text ${at} class="smc-name" fill="${color}" stroke="none" text-rendering="geometricPrecision">${body}</text>`
     );
 };
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
