@@ -484,16 +484,6 @@ const ForexLive = observer(() => {
                                 onOpenCompare={openCompare}
                                 noAnalysis={phone}
                             />
-                            {!phone && (
-                                <button
-                                    type='button'
-                                    className='forex-live__compare-btn'
-                                    onClick={openCompare}
-                                    title='Open 2 or 4 charts of this market, each with its own candle size'
-                                >
-                                    Compare charts
-                                </button>
-                            )}
                         </div>
                     );
                     // on a computer the chart box sits in a slot that keeps its place in the page while the box is lifted to full height

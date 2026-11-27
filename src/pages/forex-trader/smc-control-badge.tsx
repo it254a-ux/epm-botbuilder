@@ -1,6 +1,6 @@
 /**
  * "Who is in control" marker, drawn INSIDE the chart (not in the top bar): BUYERS / SELLERS IN CONTROL with a live blinking dot,
- * the line the other side must close beyond to take control, and a warning when the side in control is being rejected.
+ * small and thin, no caption under it.
  */
 import type { Control } from './smc-control';
 
@@ -16,8 +16,6 @@ const SmcControlBadge = ({ control }: { control: Control }) => (
             <span className='smc-control__dot' aria-hidden />
             <b>{TITLE[control.who]}</b>
         </div>
-        {control.flip && <div className='smc-control__note'>{control.flip.note}</div>}
-        {control.weakening && <div className='smc-control__warn'>{control.weakening}</div>}
     </div>
 );
 
