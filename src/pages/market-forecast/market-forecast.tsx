@@ -10,6 +10,7 @@ import {
     type Bar,
     type ForecastResult,
 } from './forecast-math';
+import CompareCharts from '../forex-trader/compare-charts';
 import './market-forecast.scss';
 
 /**
@@ -92,6 +93,7 @@ const toPoint = (b: Bar) => ({ time: b.time as UTCTimestamp, open: b.open, high:
 const MarketForecast = () => {
     const [symbol, setSymbol] = useState('frxXAUUSD');
     const [sec, setSec] = useState(300);
+    const [compare, setCompare] = useState(false);
     const [horizon, setHorizon] = useState(48);
     const [side, setSide] = useState<'none' | 'buy' | 'sell'>('none');
     const [tp, setTp] = useState('');
@@ -387,7 +389,17 @@ const MarketForecast = () => {
                 </div>
             )}
 
-            <div className='market-forecast__chart' ref={holder} />
+            <div className='market-forecast__chart-wrap'>
+                <div className='market-forecast__chart' ref={holder} />
+                <button
+                    type='button'
+                    className='market-forecast__compare-btn'
+                    onClick={() => setCompare(true)}
+                    title='Open 2 or 4 charts of this market, each with its own candle size'
+                >
+                    Compare charts
+                </button>
+            </div>
 
             {result && (
                 <div className='market-forecast__cards'>
@@ -419,6 +431,15 @@ const MarketForecast = () => {
             <p className='market-forecast__note'>
                 The faded candles show the middle of {PATHS} possible futures; the dashed lines mark the 10% to 90% range of where the price could be. With only {PATHS} samples this is a rough guide, and the model cannot know about news. It is not financial advice and no result is guaranteed, so try ideas on a demo account first. Deriv synthetic indices are not offered because their prices come from a random number generator.
             </p>
+            {compare && (
+                <CompareCharts
+                    symbol={symbol}
+                    marketName={MARKETS.find(m => m.symbol === symbol)?.name ?? symbol}
+                    kind={symbol.startsWith('frx') ? 'forex' : 'other'}
+                    lines={[]}
+                    onClose={() => setCompare(false)}
+                />
+            )}
         </div>
     );
 };
