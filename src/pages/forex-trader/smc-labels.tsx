@@ -1,7 +1,8 @@
 /**
  * The names of the current Smart Money setup, drawn over the chart (not on it) as plain thin names in the free space, like a professional chart, and only for the key things:
- *  - each name stands directly on its own line, just above it, so it is clear which line it names;
- *  - names that would meet are lifted one above the other;
+ *  - a key line or level is highlighted by a thin box along it with its name inside, like the Smart Money teaching charts; the zone's
+ *    name is written inside the zone's own shading;
+ *  - boxes that would meet are moved apart;
  *  - the writing is thin: white on the dark theme, dark on the light theme.
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
@@ -31,56 +32,75 @@ const PILL_GAP = 4;
 const PAD = 0;
 
 export interface CalloutInput {
-    /** The y of the line the name belongs to. */
+    /** The y of the line (or of the middle of the zone) the name belongs to. */
     y: number;
-    /** Where that line starts and ends on screen. */
+    /** Where that line or zone starts and ends on screen. */
     x0: number;
     x1: number;
     text: string;
+    /** true = a thin highlight box on the line with the name inside; false = only the name, inside the zone's own shading. */
+    box: boolean;
 }
 
 export interface CalloutPlaced {
     index: number;
-    /** Where the writing starts, and the y of its middle. */
+    box: boolean;
+    /** The highlight box (for a name without a box: the space the writing takes). */
     x: number;
-    y: number;
     w: number;
+    /** The y of the middle of the box. */
+    y: number;
     h: number;
 }
 
 /**
- * Pure layout, so it can be tested. Each name stands directly on its own line, just above it: a short line gets its name from the
- * start of the line, a long line gets it at its right end. Names that would meet are lifted, one above the other.
+ * Pure layout, so it can be tested. Like the Smart Money teaching charts: a key level is highlighted by a thin box along it, and the
+ * name is written inside the box. The box is as long as the line (or just long enough for the name, from the start of a short line).
+ * The zone has its own shading, so its name is simply written inside it. Boxes that would meet are moved apart, downwards.
  */
 export function layoutCallouts(items: CalloutInput[], box: { plotW: number; plotH: number }): CalloutPlaced[] {
     const sized = items
         .map((it, index) => {
-            const w = Math.ceil(it.text.length * CHAR_W);
+            const tw = Math.ceil(it.text.length * CHAR_W);
             const x0 = Math.max(0, it.x0);
             const x1 = Math.min(box.plotW, it.x1);
-            const long = x1 - x0 >= w + 16;
-            const x = Math.max(4, Math.min(long ? x1 - w - 6 : x0 + 2, box.plotW - w - 4));
-            return { ...it, index, w, x };
+            const need = tw + 14;
+            let x: number;
+            let w: number;
+            if (!it.box) {
+                // the zone: the name in the middle of the part of the zone that can be seen
+                w = tw;
+                x = Math.max(4, Math.min((x0 + x1) / 2 - tw / 2, box.plotW - tw - 4));
+            } else if (x1 - x0 >= need) {
+                x = x0;
+                w = x1 - x0;
+            } else {
+                // a short line: the box starts with the line and is long enough for the name
+                w = need;
+                x = Math.max(2, Math.min(x0, box.plotW - need - 2));
+            }
+            return { ...it, index, x, w };
         })
         .filter(it => it.x1 > 0 && it.x0 < box.plotW)
-        .sort((a, b) => b.y - a.y); // from the lowest line up: a lifted name goes up
+        .sort((a, b) => a.y - b.y);
     const placed: CalloutPlaced[] = [];
     for (const it of sized) {
-        let y = it.y - PILL_H / 2 - 4;
+        let y = it.y;
         for (let again = true; again;) {
             again = false;
             for (const p of placed) {
-                if (it.x < p.x + p.w + 4 && p.x < it.x + it.w + 4 && Math.abs(p.y - y) < PILL_H + 1) {
-                    y = p.y - PILL_H - 1;
+                if (it.x < p.x + p.w + 2 && p.x < it.x + it.w + 2 && Math.abs(p.y - y) < PILL_H + 2) {
+                    y = p.y + PILL_H + 2;
                     again = true;
                 }
             }
         }
         placed.push({
             index: it.index,
+            box: it.box,
             x: it.x,
-            y: Math.max(PILL_H / 2, Math.min(y, box.plotH - PILL_H / 2)),
             w: it.w,
+            y: Math.max(PILL_H / 2, Math.min(y, box.plotH - PILL_H / 2)),
             h: PILL_H,
         });
     }
@@ -150,7 +170,7 @@ class NamesPrimitive {
                 }))
                 .filter((p): p is typeof p & { y: number } => p.y !== null && p.y > -10 && p.y < mediaSize.height);
             const placed = layoutCallouts(
-                pts.map(p => ({ y: p.y, x0: p.x0 ?? 0, x1: p.x1 ?? plotW, text: p.item.text })),
+                pts.map(p => ({ y: p.y, x0: p.x0 ?? 0, x1: p.x1 ?? plotW, text: p.item.text, box: p.item.box })),
                 { plotW, plotH: mediaSize.height - 4 }
             );
             ctx.save();
@@ -161,12 +181,28 @@ class NamesPrimitive {
             for (const p of placed) {
                 const it = pts[p.index].item;
                 const midY = p.y;
-                // the name: a thin outline under it keeps it readable over lines and candles
-                ctx.strokeStyle = ink.bg;
-                ctx.lineWidth = 3;
-                ctx.strokeText(it.text, p.x, midY);
-                ctx.fillStyle = ink.text;
-                ctx.fillText(it.text, p.x, midY);
+                const col = colourOf(it.braceColor, ink.text);
+                if (p.box) {
+                    // the highlight box on the line, with the name inside it
+                    ctx.fillStyle = ink.bg;
+                    ctx.globalAlpha = 0.88;
+                    ctx.fillRect(p.x, midY - p.h / 2, p.w, p.h);
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(p.x + 0.5, midY - p.h / 2 + 0.5, p.w - 1, p.h - 1);
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = ink.text;
+                    ctx.fillText(it.text, p.x + p.w / 2, midY + 0.5);
+                } else {
+                    // the zone's name inside its own shading (a thin outline keeps it readable)
+                    ctx.textAlign = 'left';
+                    ctx.strokeStyle = ink.bg;
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(it.text, p.x, midY);
+                    ctx.fillStyle = ink.text;
+                    ctx.fillText(it.text, p.x, midY);
+                }
             }
             ctx.restore();
         });

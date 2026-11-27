@@ -66,6 +66,8 @@ export interface SmcLabel {
     braceColor: string;
     /** The brace is drawn thicker for the lines that used to be drawn thick. */
     thick: boolean;
+    /** true = a line or level: it gets a thin highlight box with its name inside. false = the zone: the name goes inside the zone's own shading. */
+    box: boolean;
 }
 
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
@@ -124,6 +126,7 @@ export function drawSmc(
         t0: number;
         lineEnd: number;
         thick: boolean;
+        box: boolean;
     }
     let queue: LabelReq[] | null = null;
 
@@ -153,6 +156,7 @@ export function drawSmc(
                 t0,
                 lineEnd: to,
                 thick: (opts.width ?? 1) >= 4,
+                box: !opts.hidden,
             });
             text = null;
         }
@@ -223,6 +227,7 @@ export function drawSmc(
                 t1: it.lineEnd,
                 braceColor: it.lineColor,
                 thick: it.thick,
+                box: it.box,
             });
         });
     };
