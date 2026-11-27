@@ -1,27 +1,24 @@
-import { braceSide, layoutBraces } from '../smc-labels';
+import { layoutCallouts } from '../smc-labels';
 
-describe('Smart money names layout', () => {
-    it('keeps names that would meet apart, inside the chart', () => {
-        const items = [100, 104, 300].map((y, i) => ({ y, x0: 50, x1: 400, text: `Name ${i}`, brace: true, dir: 1 as const }));
-        const out = layoutBraces(items, { plotW: 700, plotH: 500 });
-        expect(out.length).toBe(3);
-        expect(out[0].nameY).toBeGreaterThan(out[0].line);
-        expect(out[1].nameY - out[0].nameY >= 14).toBe(true);
-        expect(out.every(o => o.nameX >= 4 && o.nameX < 700)).toBe(true);
+const box = { plotW: 800, plotH: 500, anchorX: 400 };
+
+describe('Smart money callout pills', () => {
+    it('stand in one column, in the order of their lines, and never touch', () => {
+        const items = [200, 203, 206, 400].map((y, i) => ({ y, x1: 700, text: `Name number ${i}` }));
+        const out = layoutCallouts(items, box);
+        expect(out.length).toBe(4);
+        expect(new Set(out.map(o => o.x)).size).toBe(1);
+        for (let k = 1; k < out.length; k++) expect(out[k].y).toBeGreaterThanOrEqual(out[k - 1].y + out[k - 1].h);
+        expect(out.map(o => o.index)).toEqual([0, 1, 2, 3]);
     });
-    it('a line in free space gets a plain name at the right, no brace', () => {
-        const out = layoutBraces([{ y: 200, x0: 50, x1: 600, text: 'IL-1', brace: false, dir: 1 }], { plotW: 700, plotH: 500 });
-        expect(out[0].brace).toBe(false);
-        expect(out[0].nameX).toBeGreaterThan(300);
+    it('keeps every pill inside the chart, even when the lines are at the bottom', () => {
+        const items = [470, 472, 474, 476].map((y, i) => ({ y, x1: 700, text: `N${i}` }));
+        const out = layoutCallouts(items, box);
+        expect(Math.max(...out.map(o => o.y + o.h))).toBeLessThanOrEqual(500);
+        for (let k = 1; k < out.length; k++) expect(out[k].y).toBeGreaterThanOrEqual(out[k - 1].y + out[k - 1].h);
     });
-    it('a long line never gets a brace, even when candles touch it', () => {
-        expect(braceSide(100, [{ x: 10, top: 80, bottom: 118 }], 900, 400).brace).toBe(false);
-    });
-    it('a brace is used only where candles are on the line, on the side with room', () => {
-        expect(braceSide(100, [{ x: 10, top: 150, bottom: 180 }]).brace).toBe(false);
-        const through = braceSide(100, [{ x: 10, top: 80, bottom: 118 }, { x: 20, top: 110, bottom: 130 }]);
-        expect(through.brace).toBe(true);
-        expect(through.dir).toBe(-1); // the candles are below the line, so the room is above
-        expect(braceSide(100, [{ x: 10, top: 60, bottom: 125 }]).dir).toBe(1); // candles above: the room is below
+    it('the column moves left when the long names do not fit to the right of the last candle', () => {
+        const out = layoutCallouts([{ y: 100, x1: 700, text: 'SELL ENTRY AREA · SUPPLY ZONE · MITIGATED' }], { ...box, anchorX: 700 });
+        expect(out[0].x + out[0].w).toBeLessThanOrEqual(800);
     });
 });
