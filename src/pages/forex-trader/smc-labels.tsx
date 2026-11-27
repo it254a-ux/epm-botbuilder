@@ -2,7 +2,7 @@
  * The names of the current Smart Money setup, drawn over the chart (not on it) as small callout pills, like a professional chart:
  *  - the pills stand in one tidy column in the free space to the right of the last candle, in the order of their lines (so no two
  *    leader lines cross), spaced so that no pill touches another;
- *  - each pill has a thin border in the colour of its own line, and a thin leader line to the end of that line;
+ *  - each pill has a thin border in the colour of its own line and stands level with it (no leader lines: they only add clutter);
  *  - the writing is thin: white on the dark theme, dark on the light theme.
  * It follows the chart every frame (scroll, zoom, price scale), changing the picture only when something moved.
  */
@@ -128,16 +128,13 @@ const SmcLabels = ({ chart, series, getLabels, ink }: Props) => {
                             const it = pts[p.index].item;
                             const col = colourOf(it.braceColor, ink.text);
                             const midY = p.y + p.h / 2;
-                            // the leader line, with a small dot where it meets the line
-                            html += `<path d="M ${p.endX} ${p.endY} L ${p.x} ${midY}" fill="none" stroke="${col}" stroke-width="0.8" stroke-opacity="0.8"/>`;
-                            html += `<circle cx="${p.endX}" cy="${p.endY}" r="1.8" fill="${col}"/>`;
                             // the pill and its writing (only the name is a little heavier than what follows the " · ")
                             const cut = it.text.indexOf(' · ');
                             const body =
                                 cut < 0
                                     ? esc(it.text)
                                     : `${esc(it.text.slice(0, cut))}<tspan font-weight="200">${esc(it.text.slice(cut))}</tspan>`;
-                            html += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.h / 2}" fill="${ink.bg}" fill-opacity="0.92" stroke="${col}" stroke-width="1"/>`;
+                            html += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.h / 2}" fill="${ink.bg}" fill-opacity="1" stroke="${col}" stroke-width="1"/>`;
                             html += `<text x="${p.x + p.w / 2}" y="${midY}" dominant-baseline="central" text-anchor="middle" font-size="10" class="smc-name" fill="${ink.text}" text-rendering="geometricPrecision">${body}</text>`;
                         }
                     }
