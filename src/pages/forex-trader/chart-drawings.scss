@@ -736,18 +736,17 @@
     font-family: inherit;
 }
 
-// WHO IS IN CONTROL: a small marker inside the chart (bottom right, where the Compare charts button was), with a live blinking dot
+// WHO IS IN CONTROL: plain words inside the chart (bottom right, next to the price scale), with a live blinking dot
 .smc-control {
     position: absolute;
-    bottom: 42px;
-    right: 96px;
+    bottom: 34px;
+    right: 70px;
     z-index: 7;
     display: flex;
     align-items: center;
-    padding: 1px 9px 2px;
-    border-radius: 999px;
-    background: rgba(13, 17, 26, 0.7);
-    border: 1px solid var(--smc-control-colour, #94a3b8);
+    padding: 0;
+    border: 0;
+    background: none;
     pointer-events: none;
     white-space: nowrap;
 
@@ -767,7 +766,7 @@
         gap: 5px;
         color: var(--smc-control-colour);
         font-family: 'Gaegu', 'Segoe Print', cursive;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 300;
         line-height: 1.2;
         letter-spacing: 0.05em;
@@ -779,8 +778,8 @@
     }
 
     &__dot {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
         border-radius: 50%;
         background: var(--smc-control-colour);
         box-shadow: 0 0 0 0 var(--smc-control-colour);
