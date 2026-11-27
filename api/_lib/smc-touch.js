@@ -20,7 +20,7 @@ function readSmcConfig(env = process.env) {
         enabled: String(env.SMC_ALERT || 'on').toLowerCase() !== 'off',
         multiplier: Math.max(1, num(env.SMC_MULTIPLIER, 100)),
         // take profit = this many times the stake (no stop loss: the stake is the most that can be lost)
-        tpMultiple: Math.max(0.1, num(env.SMC_TP_STAKES, 1.5)),
+        tpMultiple: Math.max(0.05, num(env.SMC_TP_STAKES, 0.2)),
         // a touch older than this many minutes is "too late": nothing is sent
         freshSeconds: Math.round(Math.max(1, num(env.SMC_FRESH_MINUTES, 5)) * 60),
         // closed M15 candles needed before the setup is trusted

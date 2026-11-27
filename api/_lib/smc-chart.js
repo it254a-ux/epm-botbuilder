@@ -30,11 +30,11 @@ const hhmm = t => `${pad2(new Date(t * 1000).getUTCHours())}:${pad2(new Date(t *
  */
 function buildSmcSvg({ candles, result: r0, symbolName, cfg, tf = 900 }) {
     // take profit = stake x multiple (no stop loss): the picture shows that price, the entry zone and the structure
-    const r = { ...r0, takeProfit: stakeTpPrice(r0.entry, { multiplier: cfg.multiplier, tpMultiple: cfg.tpMultiple || 1.5 }, r0.side) };
+    const r = { ...r0, takeProfit: stakeTpPrice(r0.entry, { multiplier: cfg.multiplier, tpMultiple: cfg.tpMultiple || 0.2 }, r0.side) };
     const SIDE = r0.side === 'BUY' ? 'BUY' : 'SELL';
     const isBuy = SIDE === 'BUY';
     const who = r0.control ? (r0.control.who === 'BUYERS' ? 'Buyers' : r0.control.who === 'SELLERS' ? 'Sellers' : '') : '';
-    const tpMult = cfg.tpMultiple || 1.5;
+    const tpMult = cfg.tpMultiple || 0.2;
     const TF = tf;
     const SLOT = SLOT_OF[tf] || 18.8;
     const BODY = SLOT < 12 ? 5 : 8;
