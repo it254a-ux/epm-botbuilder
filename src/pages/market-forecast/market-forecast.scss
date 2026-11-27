@@ -25,7 +25,7 @@
     // two panels side by side, the same width and the same height: the header on the left, the results on the right
     &__top {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) 190px; // the right column is as wide as the header used to be tall
         gap: 12px;
         align-items: stretch;
         margin-bottom: 8px;
@@ -52,6 +52,29 @@
             overflow-y: auto;
             padding-bottom: 10px;
             max-height: 420px; // the same height as the chart
+
+            // the slim column: everything stacks, one under another
+            .market-forecast__controls,
+            .market-forecast__levels-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+
+            .market-forecast__controls select,
+            .market-forecast__levels-row input,
+            .market-forecast__levels-row select {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .market-forecast__run {
+                width: 100%;
+            }
+
+            .market-forecast__cards {
+                grid-template-columns: minmax(0, 1fr);
+            }
 
             @media (max-width: 900px) {
                 max-height: none;
