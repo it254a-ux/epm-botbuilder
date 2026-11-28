@@ -10,8 +10,10 @@
   ! Cache-Control
   Cache-Control: public, max-age=604800
 /splash/*
+  ! Cache-Control
   Cache-Control: public, max-age=604800
 /static/*
+  ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 /owner/*
   X-Frame-Options: DENY
