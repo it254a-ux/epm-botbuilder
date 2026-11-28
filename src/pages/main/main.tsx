@@ -827,34 +827,8 @@ const AppWrapper = observer(() => {
                                 </Suspense>
                             </div>
                         )}
-                        {/* Same hidden-preload approach as Charts above, for the
-                            same reason — TradingView's own remote page (an
-                            iframe) takes real time to load, so starting that
-                            early means it's already loaded by the time someone
-                            actually opens the tab. Safe to preload
-                            unconditionally like this: unlike Dtrader's OTP-based
-                            auth (see the commit history for why that one was
-                            reverted), this iframe's URL is static with nothing
-                            session- or token-specific in it, so there's no
-                            staleness risk from loading it ahead of time. */}
-                        {active_tab !== DBOT_TABS.TRADING_VIEW && (
-                            <div
-                                style={{
-                                    position: 'fixed',
-                                    top: '-9999px',
-                                    left: '-9999px',
-                                    width: '1px',
-                                    height: '1px',
-                                    overflow: 'hidden',
-                                    pointerEvents: 'none',
-                                }}
-                                aria-hidden='true'
-                            >
-                                <Suspense fallback={null}>
-                                    <TradingViewPage />
-                                </Suspense>
-                            </div>
-                        )}
+                        {/* TradingView is no longer preloaded hidden at page open (its ~400 files slowed the first load);
+                            it loads when its tab is opened. */}
                     </div>
                 </div>
             </div>
