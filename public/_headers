@@ -1,5 +1,14 @@
 /*
   Cache-Control: no-cache, no-store, must-revalidate
+/dtrader-app/js/*
+  ! Cache-Control
+  Cache-Control: public, max-age=604800
+/dtrader-app/css/*
+  ! Cache-Control
+  Cache-Control: public, max-age=604800
+/js/smartcharts/*
+  ! Cache-Control
+  Cache-Control: public, max-age=604800
 /splash/*
   Cache-Control: public, max-age=604800
 /static/*
