@@ -33,6 +33,7 @@ const grabMod = require('../grab');
 const grabTg = require('../grab-telegram');
 const smcTouch = require('../smc-touch');
 const smcChart = require('../smc-chart');
+const smcResult = require('../smc-result');
 const approachMod = require('../approach');
 const core = require('../signals-core');
 const store = require('../signals-store');
@@ -190,6 +191,23 @@ module.exports = async function handler(req, res) {
             }
         }
 
+        if (write && smcCfg.enabled) {
+            // Smart Money results: one message for each trade that has reached its take profit (nothing to do when none is open)
+            try {
+                const rc = smcResult.readResultConfig();
+                summary.smcResults = await smcResult.checkTrades(sql, {
+                    getM1: (symbol, since) => deriv.getCandles(client, symbol, 60, Math.min(2, Math.max(0.1, (Math.floor(Date.now() / 1000) - since) / 86400 + 0.02))),
+                    send: text => send(() => sendTelegram(text)),
+                    now: Math.floor(Date.now() / 1000),
+                    stakes: rc.stakes,
+                    expirySeconds: rc.expirySeconds,
+                    siteUrl: core.signalsPageUrl(),
+                });
+            } catch (err) {
+                console.error('signal-watch-mtf: smc results failed:', err.message);
+            }
+        }
+
         const rows = sql ? await store.getWatchlist(sql) : [];
         report.watchlistSource = rows.length ? 'database' : 'environment (WATCH_SYMBOLS)';
         const states = sql ? await store.getStates(sql, MTF_TF) : new Map();
@@ -313,6 +331,12 @@ module.exports = async function handler(req, res) {
                                     });
                                     out.sent = true;
                                     summary.smc.alerts++;
+                                    // remember the trade, so a message goes out when its take profit is reached
+                                    try {
+                                        await smcResult.recordTrade(sql, { key: alertKey, symbol, symbolName: info.underlying_symbol_name, side: r.side === 'BUY' ? 'BUY' : 'SELL', tf, entry: r.entry, takeProfit: smcTouch.stakeTpPrice(r.entry, smcCfg, r.side === 'BUY' ? 'BUY' : 'SELL'), multiplier: smcCfg.multiplier, tpMultiple: smcCfg.tpMultiple, entryTime: r.touchTime });
+                                    } catch (recErr) {
+                                        console.error('signal-watch-mtf: could not remember the smc trade:', recErr.message);
+                                    }
                                 } catch (err) {
                                     await store.releaseAlert(sql, alertKey); // let the next run try again
                                     out.sent = `failed: ${err.message}`;
