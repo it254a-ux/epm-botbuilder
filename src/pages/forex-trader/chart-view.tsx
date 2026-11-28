@@ -1121,8 +1121,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     return (
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
-            {apis && (
-            )}
             <SmcAbbrButton />
             {control && <SmcControlBadge control={control} />}
             {apis && (
