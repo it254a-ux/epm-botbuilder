@@ -15,7 +15,6 @@ import {
 import type { Analysis, Candle } from './engine';
 import { strategyLabel } from './engine';
 import ChartDrawings from './chart-drawings';
-import SmcLabels, { type SmcLabelSet } from './smc-labels';
 import ChartStudies from './chart-studies';
 import {
     atr,
@@ -206,21 +205,16 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
     // Smart Money: the current setup plus every earlier one found in the loaded candles (more appear as the chart is dragged back)
     const smcRef = useRef<{ current: SmcOverlay | null; control?: Control | null } | null>(null);
     const [control, setControl] = useState<Control | null>(null);
-    // writing colour of the names on the chart: white on the dark theme, dark on the light theme
-    const [ink, setInk] = useState({ text: '#ffffff', bg: '#0e1116' });
     const smcWindow = useRef<{ from: number; to: number } | null>(null);
     const smcTimer = useRef<number>(0);
     const paintSmcRef = useRef<() => void>(() => undefined);
     // the Smart Money drawing runs further to the right (its names stand there): the opening view leaves that many fewer empty bars
     const rightExtra = useRef(0);
-    const smcLabelsRef = useRef<SmcLabelSet | null>(null);
 
     useEffect(() => {
         const host = hostRef.current;
         if (!host) return;
         const th = readTheme(host);
-        const inkOf = (t: Theme) => ({ text: isDarkTheme(host) ? '#ffffff' : '#111827', bg: t.bg });
-        setInk(inkOf(th));
         const themeOptions = (t: Theme) => ({
             layout: { background: { color: t.bg }, textColor: t.text, fontSize: 9, fontFamily: `'Jost', ${t.font}` },
             grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
@@ -238,10 +232,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         const themeWatch = new MutationObserver(() => {
             const nt = readTheme(host);
             chart.applyOptions(themeOptions(nt));
-            setInk(prev => {
-                const n = inkOf(nt);
-                return prev.text === n.text && prev.bg === n.bg ? prev : n;
-            });
         });
         themeWatch.observe(document.documentElement, {
             attributes: true,
@@ -587,7 +577,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
             st.control ?? null
         );
         series.setMarkers(out.markers);
-        smcLabelsRef.current = { anchor: out.anchor, items: out.labels };
         if (out.levels.length) {
             const span = Math.max(...out.levels) - Math.min(...out.levels);
             levelsRef.current = {
@@ -612,7 +601,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         smcRef.current = null;
         smcWindow.current = null;
         rightExtra.current = 0;
-        smcLabelsRef.current = null;
     };
 
     // How a chart opens: each candle about 8 pixels wide, sitting at the latest price (zoom out or in from there).
@@ -1134,13 +1122,6 @@ const ChartView = forwardRef<ChartViewHandle, Props>(function ChartView(
         <>
             <div ref={hostRef} className='forex-trader__chart-host' />
             {apis && (
-                <SmcLabels
-                    chart={apis.chart}
-                    series={apis.series}
-                    getLabels={() => smcLabelsRef.current}
-                    getCandles={() => candlesRef.current}
-                    ink={ink}
-                />
             )}
             <SmcAbbrButton />
             {control && <SmcControlBadge control={control} />}

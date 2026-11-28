@@ -22,6 +22,23 @@ export const ABBREVIATIONS: [string, string][] = [
     ['BOS', 'Break of structure'],
     ['POC', 'Point of control'],
     ['IL', 'Internal liquidity'],
+    ['MIT', 'Major inducement (trap)'],
+    ['MI', 'Minor inducement'],
+    ['SEA', 'Sell entry area'],
+    ['BEA', 'Buy entry area'],
+    ['SZ', 'Supply zone'],
+    ['DZ', 'Demand zone'],
+    ['MTG', 'Mitigated'],
+    ['UMT', 'Unmitigated'],
+    ['SSL', 'Sell side liquidity'],
+    ['BSL', 'Buy side liquidity'],
+    ['EB', 'Entry buy'],
+    ['ES', 'Entry sell'],
+    ['LSL', 'Last low'],
+    ['LSH', 'Last high'],
+    ['LHL', 'Last higher low'],
+    ['LLH', 'Last lower high'],
+    ['IL-1 ✗', 'Internal liquidity broken'],
 ];
 
 const SmcAbbrButton = () => {

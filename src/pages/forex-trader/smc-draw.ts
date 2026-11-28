@@ -54,21 +54,6 @@ const C = {
 
 /** The drawing runs this many candle slots to the right of the last candle: the empty space where the names of the current setup are listed. */
 export const SMC_GUTTER_BARS = 40;
-/** One name for the chart's overlay: where its line is (price), what it says, and its colour. */
-export interface SmcLabel {
-    price: number;
-    text: string;
-    color: string;
-    /** The brace is drawn under the line from time t0 to time t1. */
-    t0: number;
-    t1: number;
-    /** The colour of the brace. */
-    braceColor: string;
-    /** The brace is drawn thicker for the lines that used to be drawn thick. */
-    thick: boolean;
-    /** true = a line or level: it gets a thin highlight box with its name inside. false = the zone: the name goes inside the zone's own shading. */
-    box: boolean;
-}
 
 /** Past setups drawn at most this many at once (each one is about a dozen small series). */
 const MAX_HISTORY_DRAWN = 24;
@@ -85,14 +70,13 @@ export function drawSmc(
     history: SmcOverlay[] = [],
     view?: { from: number; to: number },
     controlFallback?: Control | null
-): { markers: SeriesMarker<Time>[]; levels: number[]; labels: SmcLabel[]; anchor: number } {
+): { markers: SeriesMarker<Time>[]; levels: number[] } {
     const { chart, extra, lines } = t;
     const len = candles[candles.length - 1].time - candles[candles.length - 2].time || 900;
     const lastT = candles[candles.length - 1].time;
     const defaultEndT = lastT + len * SMC_GUTTER_BARS;
     const markers: SeriesMarker<Time>[] = [];
     const levels: number[] = [];
-    const labelsOut: SmcLabel[] = [];
 
     // The chart gives a slot to every time that has data, not to every minute: empty slots to the right of the last candle are made
     // here (invisible), so everything drawn there is spaced like real candles.
@@ -115,20 +99,28 @@ export function drawSmc(
     };
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-    // The names of the current setup are not written on the candles (they hide behind them and cover each other): they are
-    // collected here and listed one under the other in the empty space to the right of the last candle (see layoutLabels).
-    interface LabelReq {
-        price: number;
-        text: string;
-        color: string;
-        /** The colour of the line the name belongs to. */
-        lineColor: string;
-        t0: number;
-        lineEnd: number;
-        thick: boolean;
-        box: boolean;
-    }
-    let queue: LabelReq[] | null = null;
+    // ---- the names: written on their lines by the chart itself (so they stay fixed when the chart is dragged or zoomed).
+    // Names of two or more words are shortened (the ABR button lists them) and no name is written twice for the same level.
+    const SHORT: [RegExp, (m: RegExpMatchArray) => string][] = [
+        [/^(SELL|BUY) ENTRY AREA · (SUPPLY|DEMAND) ZONE · (MITIGATED|UNMITIGATED)$/, m => `${m[1] === 'SELL' ? 'SEA' : 'BEA'} · ${m[2] === 'SUPPLY' ? 'SZ' : 'DZ'} · ${m[3] === 'MITIGATED' ? 'MTG' : 'UMT'}`],
+        [/^MAJOR INDUCEMENT/, () => 'MIT'],
+        [/^MINOR INDUCEMENT/, () => 'MI'],
+        [/^(SELL|BUY) SIDE LIQUIDITY/, m => `${m[1] === 'SELL' ? 'SSL' : 'BSL'} 🎯`],
+        [/^POC \+ ZONE$/, () => 'POC+Z'],
+        [/^(IL-\d) broken$/, m => `${m[1]} ✗`],
+        [/^LAST HIGHER LOW/, () => 'LHL'],
+        [/^LAST LOWER HIGH/, () => 'LLH'],
+        [/^LAST LOW/, () => 'LSL'],
+        [/^LAST HIGH/, () => 'LSH'],
+    ];
+    const short = (text: string) => {
+        for (const [re, f] of SHORT) {
+            const m = text.match(re);
+            if (m) return f(m);
+        }
+        return text;
+    };
+    const named = new Set<string>();
 
     /** A horizontal line from t0 to t1 with its name written on it. */
     const segment = (
@@ -142,23 +134,10 @@ export function drawSmc(
         opts: { width?: 1 | 2 | 3 | 4; dashed?: boolean; hidden?: boolean } = {}
     ) => {
         const to = Math.max(t1, t0 + len);
-        // only the key things are named and drawn: the entry area, BOS, MSS, the inducement traps and the target. Minor inducement, POC,
-        // the internal liquidity lines and the flip line stay out of the picture (less to read).
-        if (text && /^(MINOR|POC|IL-|LAST )/.test(text)) {
-            return;
-        }
-        if (queue && text) {
-            queue.push({
-                price,
-                text,
-                color: textColor,
-                lineColor: opts.hidden ? textColor : color,
-                t0,
-                lineEnd: to,
-                thick: (opts.width ?? 1) >= 4,
-                box: !opts.hidden,
-            });
-            text = null;
+        if (text) {
+            const key = `${short(text)}|${price.toFixed(2)}`;
+            text = named.has(key) ? null : short(text);
+            if (text) named.add(key);
         }
         const labelT = text ? clamp(nearest(labelAt), t0, to) : t0;
         const times = Array.from(new Set([t0, labelT, to])).sort((a, b) => a - b);
@@ -212,32 +191,11 @@ export function drawSmc(
         );
     };
 
-    /** The collected names go to the chart's overlay (smc-labels.tsx): each one gets a curly brace under the part of its line that exists,
-     *  with the name under the brace point. There is no dotted extension to the right. */
-    const layoutLabels = () => {
-        const items = queue;
-        queue = null;
-        if (!items) return;
-        items.forEach(it => {
-            labelsOut.push({
-                price: it.price,
-                text: it.text,
-                color: it.color,
-                t0: it.t0,
-                t1: it.lineEnd,
-                braceColor: it.lineColor,
-                thick: it.thick,
-                box: it.box,
-            });
-        });
-    };
-
     /** Draws one setup. The current one runs on to the right edge; a past one stops where its own trade stopped. */
     const one = (o: SmcOverlay, main: boolean) => {
         const sell = o.side === 'SELL';
         const endT = o.endTime != null ? o.endTime : defaultEndT;
         const anchor = o.endTime != null ? o.endTime : lastT;
-        queue = main ? [] : null;
         // ---- the zone (SUPPLY ZONE for a SELL, DEMAND ZONE for a BUY), named UNMITIGATED until price touches it
         const zFill = sell ? C.supplyFill : C.demandFill;
         const zEdge = sell ? C.supplyEdge : C.demandEdge;
@@ -287,7 +245,7 @@ export function drawSmc(
                     o.minor.label,
                     C.minor,
                     (o.minor.fromTime + to) / 2,
-                    { width: 4, dashed: o.minor.pending, hidden: true }
+                    { dashed: o.minor.pending }
                 );
             }
             if (o.major) {
@@ -399,7 +357,7 @@ export function drawSmc(
                 position: sell ? 'aboveBar' : 'belowBar',
                 shape: sell ? 'arrowDown' : 'arrowUp',
                 color: C.entry,
-                text: `ENTRY ${o.side}`,
+                text: sell ? 'ES' : 'EB',
             });
         }
         if (o.exit) {
@@ -411,7 +369,6 @@ export function drawSmc(
                 text: o.exit.kind === 'target' ? 'TARGET ✓' : 'SL',
             });
         }
-        if (main) layoutLabels();
     };
 
     // past setups first (older underneath), the current one on top
@@ -457,6 +414,19 @@ export function drawSmc(
             });
         });
     }
+    // the same mark twice in a row (two candles close together) is shown once
+    const seen = new Map<string, number>();
+    const single = markers
+        .slice()
+        .sort((a, b) => (a.time as number) - (b.time as number))
+        .filter(m => {
+            if (!m.text || !/^(ES|EB|TARGET ✓|SL)$/.test(m.text)) return true;
+            const last = seen.get(m.text);
+            seen.set(m.text, m.time as number);
+            return last === undefined || (m.time as number) - last > len * 3;
+        });
+    markers.length = 0;
+    markers.push(...single);
     markers.sort((a, b) => (a.time as number) - (b.time as number));
-    return { markers, levels, labels: labelsOut, anchor: lastT };
+    return { markers, levels };
 }
