@@ -52,7 +52,7 @@ const LiveBalance = observer(() => {
                     className='toolbar__balance-badge__type'
                     style={{ fontSize: '9px', letterSpacing: 'normal', textTransform: 'none' }}
                 >
-                    {displayAsVirtual ? 'Demo account' : 'Real account'}
+                    {displayAsVirtual ? 'Demo account' : 'Real Account'}
                 </span>
                 <span className='toolbar__balance-badge__amount' style={{ fontSize: '12px' }}>
                     {formatBalance(balance)} {currency}

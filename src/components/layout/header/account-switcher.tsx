@@ -164,7 +164,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                 {displayAsVirtual ? (
                                     <Localize i18n_default_text='Demo account' />
                                 ) : (
-                                    <Localize i18n_default_text='Real account' />
+                                    <Localize i18n_default_text='Real Account' />
                                 )}
                             </Text>
                             {showChevron && (
@@ -288,7 +288,7 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
                                                 {accountDisplayAsVirtual ? (
                                                     <Localize i18n_default_text='Demo account' />
                                                 ) : (
-                                                    <Localize i18n_default_text='Real account' />
+                                                    <Localize i18n_default_text='Real Account' />
                                                 )}
                                             </Text>
                                             <div className='acc-dropdown__account-id'>{account.loginid}</div>
