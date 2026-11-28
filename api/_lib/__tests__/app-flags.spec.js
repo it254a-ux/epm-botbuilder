@@ -33,3 +33,34 @@ describe('forced_real switch', () => {
         expect(await getFlag(fakeSql(), 'something_else')).toBeNull();
     });
 });
+
+describe('forced Real Account list', () => {
+    const { getAccounts, setAccounts, cleanAccounts } = require('../app-flags');
+    const sqlWith = value => {
+        let stored = value;
+        const sql = (strings, ...vals) => {
+            const q = strings.join('?');
+            if (/^\s*CREATE TABLE/i.test(q)) return Promise.resolve([]);
+            if (/^\s*SELECT/i.test(q)) return Promise.resolve(stored === undefined ? [] : [{ value: stored }]);
+            if (/^\s*INSERT/i.test(q)) {
+                stored = vals[0];
+                return Promise.resolve([]);
+            }
+            return Promise.resolve([]);
+        };
+        return sql;
+    };
+    test('starts with the one account used so far', async () => {
+        expect(await getAccounts(sqlWith(undefined))).toEqual(['DOT94283012']);
+    });
+    test('can add, change and remove accounts', async () => {
+        const sql = sqlWith(undefined);
+        await setAccounts(sql, ['dot94283012', 'CR1234567']);
+        expect(await getAccounts(sql)).toEqual(['DOT94283012', 'CR1234567']);
+        await setAccounts(sql, []);
+        expect(await getAccounts(sql)).toEqual([]);
+    });
+    test('drops wrong-looking IDs and duplicates', () => {
+        expect(cleanAccounts(['CR1', 'bad id', 'CR1234567', 'cr1234567', ''])).toEqual(['CR1234567']);
+    });
+});

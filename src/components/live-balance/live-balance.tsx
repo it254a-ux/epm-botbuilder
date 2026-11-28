@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite';
 import { useStore } from '@/hooks/useStore';
 import { CurrencyIcon } from '@/components/currency/currency-icon';
-import { useForcedRealEnabled } from '@/utils/forced-real-flag';
+import { useForcedRealAccounts, useForcedRealEnabled } from '@/utils/forced-real-flag';
 import './live-balance.scss';
 /**
  * Login IDs that should always display as "Real account" regardless of the
@@ -9,7 +9,6 @@ import './live-balance.scss';
  * DTrader app header and account-switcher.tsx. The balance value below is
  * always the true value; only this label is forced.
  */
-const FORCED_REAL_LABEL_LOGIN_IDS = ['DOT94283012'];
 const formatBalance = (balance: string) => {
     const amount = Number(balance ?? 0);
     return amount.toLocaleString(undefined, {
@@ -20,9 +19,10 @@ const formatBalance = (balance: string) => {
 const LiveBalance = observer(() => {
     const { client } = useStore();
     const forcedRealOn = useForcedRealEnabled();
+    const forcedRealIds = useForcedRealAccounts();
     const { balance, currency, is_logged_in, is_virtual, loginid } = client;
     if (!is_logged_in) return null;
-    const forceRealLabel = forcedRealOn && !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
+    const forceRealLabel = forcedRealOn && !!loginid && forcedRealIds.includes(loginid);
     const displayAsVirtual = is_virtual && !forceRealLabel;
     return (
         <div

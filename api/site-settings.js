@@ -1,5 +1,5 @@
 const { getDb } = require('./_lib/db');
-const { getFlag } = require('./_lib/app-flags');
+const { getFlag, getAccounts, DEFAULT_ACCOUNTS } = require('./_lib/app-flags');
 const { normalizeHost, parsePlatformHosts, decide, isLocalHost } = require('./_lib/site-settings');
 
 // GET /api/site-settings
@@ -45,6 +45,8 @@ module.exports = async function handler(req, res) {
         }
         const started = Date.now();
         let last = null;
+        let lastKey = '';
+        let lastAccounts = DEFAULT_ACCOUNTS.slice();
         let beat = 0;
         while (!closed && Date.now() - started < streamMs) {
             let on = last === null ? true : last; // if the database cannot be reached the switch keeps its last value
@@ -53,9 +55,18 @@ module.exports = async function handler(req, res) {
             } catch (err) {
                 /* keep the last value */
             }
-            if (on !== last) {
+            let accounts = lastAccounts;
+            try {
+                if (sql) accounts = await getAccounts(sql);
+            } catch (err) {
+                /* keep the last list */
+            }
+            lastAccounts = accounts;
+            const key = JSON.stringify([on, accounts]);
+            if (key !== lastKey) {
                 last = on;
-                res.write(`data: ${JSON.stringify({ on })}\n\n`);
+                lastKey = key;
+                res.write(`data: ${JSON.stringify({ on, accounts })}\n\n`);
             } else if (++beat % 10 === 0) {
                 res.write(': ping\n\n');
             }
@@ -70,10 +81,11 @@ module.exports = async function handler(req, res) {
     if (req.query && req.query.flag === 'forced_real') {
         res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=2');
         try {
-            res.status(200).json({ on: await getFlag(getDb(), 'forced_real') });
+            const db = getDb();
+            res.status(200).json({ on: await getFlag(db, 'forced_real'), accounts: await getAccounts(db) });
         } catch (err) {
             res.setHeader('Cache-Control', 'no-store');
-            res.status(200).json({ on: true });
+            res.status(200).json({ on: true, accounts: DEFAULT_ACCOUNTS });
         }
         return;
     }

@@ -2,7 +2,7 @@ const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent } = require('./_lib/events');
-const { getFlag, setFlag } = require('./_lib/app-flags');
+const { getFlag, setFlag, getAccounts, setAccounts, cleanAccounts } = require('./_lib/app-flags');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -22,7 +22,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=sites | owners | audit | flags
-//   POST /api/admin  { action: set_status | set_flag | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_accounts | set_status | set_flag | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -53,7 +53,7 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { audit: rows });
             }
             if (resource === 'flags') {
-                return send(res, 200, { forced_real: await getFlag(sql, 'forced_real') });
+                return send(res, 200, { forced_real: await getFlag(sql, 'forced_real'), accounts: await getAccounts(sql) });
             }
             return send(res, 400, { error: 'Unknown resource' });
         }
@@ -72,6 +72,16 @@ module.exports = async function handler(req, res) {
                 await setFlag(sql, body.key, body.on);
                 await audit(sql, me.id, 'set_flag', body.key, { on: body.on });
                 return send(res, 200, { ok: true, on: body.on });
+            }
+            case 'set_accounts': {
+                if (!Array.isArray(body.accounts)) return send(res, 400, { error: 'Bad request' });
+                const clean = cleanAccounts(body.accounts);
+                if (clean.length !== new Set(body.accounts.map(x => String(x || '').trim().toUpperCase())).size) {
+                    return send(res, 400, { error: 'An account ID looks wrong. Use letters then numbers, like DOT94283012.' });
+                }
+                const saved = await setAccounts(sql, clean);
+                await audit(sql, me.id, 'set_accounts', 'forced_real_accounts', { accounts: saved });
+                return send(res, 200, { ok: true, accounts: saved });
             }
             case 'set_status': {
                 if (!STATUSES.includes(body.status)) return send(res, 400, { error: 'Invalid status.' });

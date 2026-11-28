@@ -50,11 +50,35 @@
             stat(count('pending'), 'Waiting for approval', '#ffb020'), stat(owners.length, 'Accounts', '#8b7bff')]));
 
         var on = !flags || flags.forced_real !== false;
+        var accts = (flags && flags.accounts) || ['DOT94283012'];
         var sw = el('button', { class: 'adm-switch', role: 'switch', 'aria-checked': on ? 'true' : 'false', 'aria-label': 'Account label switch', onclick: function () { act({ action: 'set_flag', key: 'forced_real', on: !on }); } });
         app.appendChild(el('div', { class: 'card adm-switch-card' }, [
             el('div', { class: 'adm-switch-text' }, [el('h2', { text: 'Account label' }),
-                el('p', { class: 'sub', text: 'Account DOT94283012 is shown as "Real account" while this switch is ON. Switch it OFF and it shows as Demo like the others. The balance is always the true balance.' })]),
+                el('p', { class: 'sub', text: 'The accounts listed below are shown as "Real Account" while this switch is ON. Switch it OFF and they show as Demo like the others. The balance is always the true balance.' })]),
             el('span', { class: 'adm-state ' + (on ? 'on' : 'off'), text: on ? 'ON' : 'OFF' }), sw]));
+
+        var idInput = el('input', { type: 'text', placeholder: 'Account ID, e.g. DOT94283012', autocomplete: 'off', autocapitalize: 'characters' });
+        var addAcct = function () {
+            var v = (idInput.value || '').trim().toUpperCase();
+            if (!v) return;
+            if (accts.indexOf(v) !== -1) { alert(v + ' is already in the list.'); return; }
+            act({ action: 'set_accounts', accounts: accts.concat([v]) });
+        };
+        idInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') addAcct(); });
+        var acctRows = accts.map(function (id) {
+            return el('div', { class: 'adm-item' }, [el('div', { class: 'adm-main' }, [el('div', { class: 'adm-name' }, [el('span', { text: id })])]),
+                el('div', { class: 'adm-actions' }, [
+                    btn('Change', 'b-info', function () {
+                        var v = prompt('Change ' + id + ' to which account ID?', id);
+                        if (v === null) return; v = v.trim().toUpperCase(); if (!v || v === id) return;
+                        act({ action: 'set_accounts', accounts: accts.map(function (x) { return x === id ? v : x; }) }); }),
+                    btn('Remove', 'b-bad', function () {
+                        if (confirm('Stop showing ' + id + ' as "Real Account"?')) act({ action: 'set_accounts', accounts: accts.filter(function (x) { return x !== id; }) }); })])]);
+        });
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Accounts shown as Real Account' }),
+            el('p', { class: 'sub', text: 'Add an account, change one to a different account, or remove it. It takes effect on the site within a few seconds.' }),
+            acctRows.length ? el('div', { class: 'adm-list' }, acctRows) : el('p', { class: 'muted', text: 'No accounts. Every account shows its true type.' }),
+            el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-top:14px' }, [idInput, btn('Add account', 'b-ok', addAcct)])]));
 
         var siteItems = sites.map(function (s, i) {
             var acts = el('div', { class: 'adm-actions' });

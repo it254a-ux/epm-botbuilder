@@ -9,7 +9,7 @@ import { useApiBase } from '@/hooks/useApiBase';
 import { useLiveAccountBalances } from '@/hooks/useLiveAccountBalances';
 import { useStore } from '@/hooks/useStore';
 import { isDemoAccount, rememberSelectedLoginId } from '@/utils/account-helpers';
-import { useForcedRealEnabled } from '@/utils/forced-real-flag';
+import { useForcedRealAccounts, useForcedRealEnabled } from '@/utils/forced-real-flag';
 import { useLiveEquity } from '@/utils/live-equity';
 import { Localize } from '@deriv-com/translations';
 import { TAccountSwitcher } from './common/types';
@@ -27,16 +27,14 @@ import './account-switcher.scss';
  * dropdown list too, not just the active one, so a forced-real account
  * sorts into the Real tab and shows the Real label wherever it appears.
  */
-const FORCED_REAL_LABEL_LOGIN_IDS = ['DOT94283012'];
-
-const isForcedRealId = (loginid: string | undefined) => !!loginid && FORCED_REAL_LABEL_LOGIN_IDS.includes(loginid);
 
 const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
     // the Admin page can switch the forced "Real account" label off
     const forcedRealOn = useForcedRealEnabled();
+    const forcedRealIds = useForcedRealAccounts();
     const liveBalances = useLiveAccountBalances();
     const liveEquity = useLiveEquity();
-    const isForcedReal = (loginid: string | undefined) => forcedRealOn && isForcedRealId(loginid);
+    const isForcedReal = (loginid: string | undefined) => forcedRealOn && !!loginid && forcedRealIds.includes(loginid);
     const [isOpen, setIsOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<'real' | 'demo'>('real');
     const [isResetting, setIsResetting] = useState(false);
